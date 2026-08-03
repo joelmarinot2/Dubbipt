@@ -5,14 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#140F30">
 <title>Desglose Digital de Libreto</title>
-
-<!-- Librerías -->
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.2/mammoth.browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<!-- Configuración + módulos propios -->
-
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -30,14 +27,20 @@ body{font-family:var(--body);color:var(--ink);min-height:100dvh;
   background:radial-gradient(1100px 560px at 80% -10%,rgba(167,139,250,.13),transparent 60%),
              radial-gradient(900px 520px at -5% 105%,rgba(63,208,238,.08),transparent 55%),var(--bg);}
 .wrap{max-width:1100px;margin:0 auto;padding:22px 18px 70px}
-header{display:flex;align-items:center;gap:13px;margin-bottom:20px}
+header{display:flex;align-items:center;gap:13px;margin-bottom:20px;flex-wrap:wrap}
 .mk{width:42px;height:42px;border-radius:12px;flex:none;display:grid;place-items:center;
   background:linear-gradient(135deg,var(--violet),#7C5CE0);color:#160f33;
   font-family:var(--disp);font-weight:700;font-size:15px;box-shadow:0 4px 18px var(--glow)}
 header h1{font-family:var(--disp);font-weight:700;font-size:20px}
 header p{font-size:12.5px;color:var(--ink-dim);margin-top:1px}
-.who{margin-left:auto;text-align:right;font-size:12px;color:var(--ink-faint)}
+.htools{margin-left:auto;display:flex;align-items:center;gap:10px}
+.who{text-align:right;font-size:12px;color:var(--ink-faint)}
 .who b{color:var(--ink-dim);display:block;font-size:12.5px}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink-dim);border-radius:10px;
+  padding:7px 11px;font-size:12px;cursor:pointer;font-family:var(--disp)}
+.chip:hover{color:var(--ink);border-color:var(--violet)}
+.chip.on{color:var(--ok);border-color:rgba(74,222,128,.4)}
+.chip.hide{display:none}
 
 .crumb{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;font-size:14px}
 .crumb a{color:var(--violet-2);cursor:pointer;font-family:var(--disp);font-weight:600}
@@ -50,7 +53,7 @@ header p{font-size:12.5px;color:var(--ink-dim);margin-top:1px}
 .btnv:hover{border-color:var(--violet)}
 .btnv.pri{background:linear-gradient(135deg,var(--violet),#7C5CE0);color:#160f33;border:0}
 .bar-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
-.bar-actions input.search{flex:1;min-width:200px;background:var(--inset);border:1px solid var(--line-soft);
+.bar-actions input.search{flex:1;min-width:180px;background:var(--inset);border:1px solid var(--line-soft);
   border-radius:10px;padding:10px 14px;color:var(--ink);font-size:14px;outline:none}
 .bar-actions input.search:focus{border-color:var(--violet)}
 
@@ -61,8 +64,6 @@ header p{font-size:12.5px;color:var(--ink-dim);margin-top:1px}
 .tile::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cc,#A78BFA)}
 .tile h3{font-family:var(--disp);font-size:15.5px;color:var(--cc,#A78BFA);margin-bottom:4px}
 .tile small{color:var(--ink-dim);font-size:12.5px}
-.tile.add{display:grid;place-items:center;border-style:dashed;color:var(--ink-dim);min-height:92px;cursor:pointer}
-.tile.add:hover{color:var(--violet-2)}
 .tile .del{position:absolute;top:8px;right:10px;color:var(--ink-faint);font-size:14px;opacity:0;transition:.15s}
 .tile:hover .del{opacity:1}
 .tile .del:hover{color:#F472B6}
@@ -81,21 +82,29 @@ header p{font-size:12.5px;color:var(--ink-dim);margin-top:1px}
   border-radius:50%;animation:sp .8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 
-.stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
 .stat{background:var(--inset);border:1px solid var(--line-soft);border-radius:10px;padding:8px 14px;font-size:12.5px;color:var(--ink-dim)}
 .stat b{color:var(--ink);font-family:var(--disp);font-size:15px;margin-right:5px}
 
-.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.banner{background:linear-gradient(135deg,rgba(167,139,250,.16),rgba(124,92,224,.10));
+  border:1px solid var(--violet);border-radius:12px;padding:10px 14px;margin-bottom:14px;
+  display:flex;align-items:center;gap:10px;font-size:13.5px}
+.banner .x{margin-left:auto;cursor:pointer;color:var(--ink-dim)}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
 .ccard{background:var(--panel);border:1px solid var(--line-soft);border-radius:var(--r);
-  padding:14px 15px;cursor:pointer;position:relative;overflow:hidden;transition:transform .12s,border-color .12s}
+  padding:14px 15px;position:relative;overflow:hidden;transition:transform .12s,border-color .12s}
 .ccard:hover{transform:translateY(-2px);border-color:var(--violet)}
+.ccard.pick{border-color:var(--violet);box-shadow:0 0 0 2px var(--glow)}
 .ccard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cc,#A78BFA)}
 .ccard.done{opacity:.72}
-.ccard .top{display:flex;align-items:baseline;gap:8px}
+.ccard .top{display:flex;align-items:center;gap:8px;cursor:pointer}
 .ccard h3{font-family:var(--disp);font-weight:600;font-size:15px;color:var(--cc,#A78BFA)}
 .ccard .n{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
-.ccard .tal{font-size:12.5px;color:var(--ink-dim);margin:4px 0 8px}
-.ccard .tal.ng{color:var(--ink-faint);font-style:italic}
+.ccard .talrow{display:flex;align-items:center;gap:6px;margin:6px 0 8px}
+.ccard .talrow input{flex:1;background:var(--inset);border:1px solid var(--line-soft);border-radius:8px;
+  padding:6px 9px;color:var(--ink);font-size:12.5px;outline:none}
+.ccard .talrow input:focus{border-color:var(--violet)}
 .bar{height:5px;border-radius:3px;background:var(--inset);margin-bottom:8px;overflow:hidden}
 .bar i{display:block;height:100%;background:var(--cc,#A78BFA);border-radius:3px;transition:width .25s}
 .ccard.done .bar i{background:var(--ok)}
@@ -103,16 +112,24 @@ header p{font-size:12.5px;color:var(--ink-dim);margin-top:1px}
 .pg{font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:7px;cursor:pointer;
   background:var(--inset);border:1px solid var(--line-soft);color:var(--ink-dim)}
 .pg.rec{color:var(--ok);border-color:rgba(74,222,128,.4);text-decoration:line-through}
+.ccard .acts{display:flex;gap:8px;margin-top:10px}
+.ccard .mini{font-size:11.5px;color:var(--ink-faint);cursor:pointer;font-family:var(--disp)}
+.ccard .mini:hover{color:var(--violet-2)}
 
 .empty{text-align:center;padding:50px 20px;color:var(--ink-faint)}
 .empty .ic{font-size:40px;margin-bottom:10px}
 
 .panel{background:var(--panel);border:1px solid var(--line-soft);border-radius:var(--r);padding:16px;margin-top:16px}
 .panel h2{font-family:var(--disp);font-size:16px;margin-bottom:10px}
-.blk{border-bottom:1px solid var(--line-soft);padding:10px 0;display:flex;gap:12px}
-.blk .meta{flex:none;width:74px;font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
+.blk{border-bottom:1px solid var(--line-soft);padding:10px 0;display:flex;gap:12px;cursor:pointer}
+.blk:hover{background:rgba(167,139,250,.05)}
+.blk.focus{background:rgba(167,139,250,.12);border-radius:8px}
+.blk .meta{flex:none;width:78px;font-family:var(--mono);font-size:11px;color:var(--ink-faint)}
 .blk .tx{flex:1;font-size:14px;line-height:1.5}
 .blk .nm{font-family:var(--disp);font-weight:600;color:var(--cc,#A78BFA);margin-right:6px}
+.blk .rec{display:inline-block;margin-top:5px;font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:6px;
+  background:var(--inset);border:1px solid var(--line-soft);color:var(--ink-dim)}
+.blk.on .rec{color:var(--ok);border-color:rgba(74,222,128,.4)}
 .msg{font-size:12.5px;color:var(--ink-dim)}
 .err{color:#F472B6}
 </style>
@@ -125,12 +142,13 @@ header p{font-size:12.5px;color:var(--ink-dim);margin-top:1px}
       <h1>Desglose Digital de Libreto</h1>
       <p>Desglose automático de personajes desde el guion · en la nube</p>
     </div>
-    <div class="who" id="who"></div>
+    <div class="htools">
+      <button class="chip hide" id="installBtn">⬇️ Instalar</button>
+      <div class="who" id="who"></div>
+    </div>
   </header>
-
   <div id="view"></div>
 </div>
-
 <script>
 window.SUPA = {
   url: "https://rdveoxcnrtirhxpmtmck.supabase.co",
@@ -138,7 +156,6 @@ window.SUPA = {
 };
 </script>
 <script>
-/* ===== auth.js (en línea) ===== */
 /* ============================================================
  *  auth.js · Módulo de Autenticación (Login + Registro + guarda de ruta)
  *  Reemplaza el ingreso por estudio/anónimo por cuentas reales.
@@ -369,7 +386,6 @@ window.SUPA = {
 
 </script>
 <script>
-/* ===== desglose-auto.js (en línea) ===== */
 /* ============================================================
  *  desglose-auto.js · Motor de DESGLOSE AUTOMÁTICO de personajes
  *  Entrada:  un guion .pdf (pdf.js) o .docx (mammoth.js)
@@ -740,256 +756,348 @@ window.SUPA = {
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-/* ================= estado ================= */
 const $ = (id) => document.getElementById(id);
 const view = () => $('view');
-let ME = null, PROFILE = null;
-let SHOW = null;      // {id,name}
-let EP = null;        // {id,name,progress,...}
-let BD = null;        // breakdown data {chars, scenes, script}
-let PROGRESS = {};    // {charKey:[páginas grabadas]}
+let ME=null, PROFILE=null, SHOW=null, EP=null;
+let BD=null;                 // {chars, scenes, script}
+let CHARIDS={};              // key -> [ids en BD.script]
+let PROGRESS=new Set();      // ids de intervenciones grabadas
+let CH=null;                 // canal realtime
+let LIB=null;                // ventana del libreto
+let FOCUS=-1;                // intervención activa
+let MERGE=null;              // key origen cuando se está fusionando
+let saveT=null;
 
-function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
-function toast(t, err){ const m=$('vmsg'); if(m){ m.textContent=t||''; m.className='msg'+(err?' err':''); } }
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+function toast(t,e){const m=$('vmsg'); if(m){m.textContent=t||''; m.className='msg'+(e?' err':'');}}
+function color(name){return DDLDesglose.charColor(DDLDesglose.norm(name));}
 
-/* ================= diagnóstico: nunca dejar la pantalla en blanco ========= */
-function fatal(msg){
-  view().innerHTML = '<div style="background:#2a1030;border:1px solid #6b2f4f;border-radius:12px;'
-    + 'padding:18px;color:#F472B6;font-size:14px;line-height:1.6">⚠️ '+esc(msg)
-    + '<br><br><span style="color:#B4ADD9">Abre la consola (F12) para ver el detalle. '
-    + 'Si acabas de subir cambios, prueba Ctrl+Shift+R.</span></div>';
-}
-window.addEventListener('error', ev => { if(!view().innerHTML.trim()) fatal('Error: '+ev.message); });
+/* ---- diagnóstico: nunca pantalla en blanco ---- */
+function fatal(msg){view().innerHTML='<div style="background:#2a1030;border:1px solid #6b2f4f;border-radius:12px;padding:18px;color:#F472B6;font-size:14px;line-height:1.6">⚠️ '+esc(msg)+'<br><br><span style="color:#B4ADD9">Abre la consola (F12). Si subiste cambios, prueba Ctrl+Shift+R.</span></div>';}
+window.addEventListener('error',ev=>{if(!view().innerHTML.trim())fatal('Error: '+ev.message);});
 
-/* ================= arranque (ya autenticado) ================= */
 (function boot(){
-  if(!window.SUPA)            return fatal('No cargó config.js (window.SUPA). Verifica que el archivo esté en la raíz.');
-  if(!window.supabase)       return fatal('No cargó el SDK de Supabase (¿bloqueó el CDN o no hay internet?).');
-  if(!window.DDLAuth)        return fatal('No cargó auth.js. Verifica que el archivo esté junto a index.html.');
-  if(!window.DDLDesglose)    return fatal('No cargó desglose-auto.js. Verifica que el archivo esté en la raíz.');
-  DDLAuth.onReady((user, profile) => {
-    ME = user; PROFILE = profile;
-    $('who').innerHTML = '<b>'+esc(profile && profile.full_name || user.email)+'</b>'
-      + esc((profile && profile.role) || 'member');
+  if(!window.SUPA) return fatal('No cargó la configuración (window.SUPA).');
+  if(!window.supabase) return fatal('No cargó el SDK de Supabase.');
+  if(!window.DDLAuth) return fatal('No cargó el módulo de login.');
+  if(!window.DDLDesglose) return fatal('No cargó el motor de desglose.');
+  DDLAuth.onReady((user,profile)=>{
+    ME=user; PROFILE=profile;
+    $('who').innerHTML='<b>'+esc(profile&&profile.full_name||user.email)+'</b>'+esc((profile&&profile.role)||'member');
     renderShows();
   });
 })();
 
-/* ================= 1) PROGRAMAS ================= */
+/* ================= PROGRAMAS ================= */
 async function renderShows(){
-  SHOW = null; EP = null; BD = null;
-  view().innerHTML = `
+  leaveEp(); SHOW=null; EP=null; BD=null;
+  view().innerHTML=`
     <div class="crumb"><span class="now">📚 Programas</span></div>
-    <div class="bar-actions">
-      <input class="search" id="q" placeholder="Buscar programa…">
-      <button class="btnv pri" onclick="newShow()">＋ Nuevo programa</button>
-    </div>
+    <div class="bar-actions"><input class="search" id="q" placeholder="Buscar programa…">
+      <button class="btnv pri" onclick="newShow()">＋ Nuevo programa</button></div>
     <span class="msg" id="vmsg"></span>
     <div class="grid" id="grid"><div class="loading show"><div class="spin"></div>Cargando…</div></div>`;
-  let shows = [];
-  try{ const { data } = await sb.from('shows').select('*').order('created_at',{ascending:false}); shows = data||[]; }
-  catch(e){ toast('No se pudieron cargar los programas: '+e.message, true); }
-  const paint = (list) => {
-    $('grid').innerHTML = list.map(s =>
-      `<div class="tile" style="--cc:${color(s.name)}" onclick="openShow('${s.id}','${esc(s.name)}')">
-         <span class="del" onclick="event.stopPropagation();delShow('${s.id}')">✕</span>
-         <h3>${esc(s.name)}</h3><small>Abrir capítulos →</small></div>`
-    ).join('') || `<div class="empty"><div class="ic">🎬</div>Crea tu primer programa.</div>`;
-  };
+  let shows=[];
+  try{const {data}=await sb.from('shows').select('*').order('created_at',{ascending:false});shows=data||[];}
+  catch(e){toast('No se pudieron cargar los programas: '+e.message,true);}
+  const paint=(list)=>{$('grid').innerHTML=list.map(s=>
+    `<div class="tile" style="--cc:${color(s.name)}" onclick="openShow('${s.id}','${esc(s.name)}')">
+       <span class="del" onclick="event.stopPropagation();delShow('${s.id}')">✕</span>
+       <h3>${esc(s.name)}</h3><small>Abrir capítulos →</small></div>`).join('')
+    ||`<div class="empty"><div class="ic">🎬</div>Crea tu primer programa.</div>`;};
   paint(shows);
-  $('q').oninput = () => { const q=$('q').value.toLowerCase(); paint(shows.filter(s=>s.name.toLowerCase().includes(q))); };
+  $('q').oninput=()=>{const q=$('q').value.toLowerCase();paint(shows.filter(s=>s.name.toLowerCase().includes(q)));};
 }
-async function newShow(){
-  const name = prompt('Nombre del programa (ej. Cien Años de Soledad):'); if(!name||!name.trim()) return;
-  const { error } = await sb.from('shows').insert({ name:name.trim(), studio:(PROFILE&&PROFILE.studio)||null });
-  if(error) return toast('Error: '+error.message, true);
-  renderShows();
-}
-async function delShow(id){
-  if(!confirm('¿Borrar el programa y todos sus capítulos?')) return;
-  const { error } = await sb.from('shows').delete().eq('id', id);
-  if(error) return toast('Error: '+error.message, true);
-  renderShows();
-}
-function openShow(id, name){ SHOW={id,name}; renderEpisodes(); }
+async function newShow(){const name=prompt('Nombre del programa:');if(!name||!name.trim())return;
+  const {error}=await sb.from('shows').insert({name:name.trim(),studio:(PROFILE&&PROFILE.studio)||null});
+  if(error)return toast('Error: '+error.message,true);renderShows();}
+async function delShow(id){if(!confirm('¿Borrar el programa y todos sus capítulos?'))return;
+  const {error}=await sb.from('shows').delete().eq('id',id);if(error)return toast('Error: '+error.message,true);renderShows();}
+function openShow(id,name){SHOW={id,name};renderEpisodes();}
 
-/* ================= 2) CAPÍTULOS ================= */
+/* ================= CAPÍTULOS ================= */
 async function renderEpisodes(){
-  EP = null; BD = null;
-  view().innerHTML = `
-    <div class="crumb"><a onclick="renderShows()">📚 Programas</a><span class="sep">›</span>
-      <span class="now">${esc(SHOW.name)}</span></div>
-    <div class="bar-actions">
-      <input class="search" id="q" placeholder="Buscar capítulo…">
-      <button class="btnv pri" onclick="newEp()">＋ Nuevo capítulo</button>
-    </div>
+  leaveEp(); EP=null; BD=null;
+  view().innerHTML=`
+    <div class="crumb"><a onclick="renderShows()">📚 Programas</a><span class="sep">›</span><span class="now">${esc(SHOW.name)}</span></div>
+    <div class="bar-actions"><input class="search" id="q" placeholder="Buscar capítulo…">
+      <button class="btnv pri" onclick="newEp()">＋ Nuevo capítulo</button></div>
     <span class="msg" id="vmsg"></span>
     <div class="grid" id="grid"><div class="loading show"><div class="spin"></div>Cargando…</div></div>`;
-  let eps = [];
-  try{ const { data } = await sb.from('episodes').select('*').eq('show_id',SHOW.id).order('created_at'); eps=data||[]; }
-  catch(e){ toast('No se pudieron cargar los capítulos: '+e.message, true); }
-  const paint = (list) => {
-    $('grid').innerHTML = list.map(e =>
-      `<div class="tile" style="--cc:${color(e.name)}" onclick="openEp('${e.id}')">
-         <span class="del" onclick="event.stopPropagation();delEp('${e.id}')">✕</span>
-         <h3>${esc(e.name)}</h3><small>${e.pdf_name?'✓ '+esc(e.pdf_name):'Sin guion aún'}</small></div>`
-    ).join('') || `<div class="empty"><div class="ic">🎞️</div>Crea el primer capítulo.</div>`;
-  };
+  let eps=[];
+  try{const {data}=await sb.from('episodes').select('*').eq('show_id',SHOW.id).order('created_at');eps=data||[];}
+  catch(e){toast('No se pudieron cargar los capítulos: '+e.message,true);}
+  const paint=(list)=>{$('grid').innerHTML=list.map(e=>
+    `<div class="tile" style="--cc:${color(e.name)}" onclick="openEp('${e.id}')">
+       <span class="del" onclick="event.stopPropagation();delEp('${e.id}')">✕</span>
+       <h3>${esc(e.name)}</h3><small>${e.pdf_name?'✓ '+esc(e.pdf_name):'Sin guion aún'}</small></div>`).join('')
+    ||`<div class="empty"><div class="ic">🎞️</div>Crea el primer capítulo.</div>`;};
   paint(eps);
-  $('q').oninput = () => { const q=$('q').value.toLowerCase(); paint(eps.filter(e=>e.name.toLowerCase().includes(q))); };
+  $('q').oninput=()=>{const q=$('q').value.toLowerCase();paint(eps.filter(e=>e.name.toLowerCase().includes(q)));};
 }
-async function newEp(){
-  const name = prompt('Nombre del capítulo (ej. Capítulo 1):'); if(!name||!name.trim()) return;
-  const { data, error } = await sb.from('episodes').insert({ show_id:SHOW.id, name:name.trim() }).select().single();
-  if(error) return toast('Error: '+error.message, true);
-  openEpObj(data);
-}
-async function delEp(id){
-  if(!confirm('¿Borrar este capítulo?')) return;
-  const { error } = await sb.from('episodes').delete().eq('id', id);
-  if(error) return toast('Error: '+error.message, true);
-  renderEpisodes();
-}
-async function openEp(id){
-  const { data } = await sb.from('episodes').select('*').eq('id',id).single();
-  openEpObj(data);
-}
-function openEpObj(ep){ EP = ep; PROGRESS = ep.progress || {}; renderEpisode(); }
+async function newEp(){const name=prompt('Nombre del capítulo:');if(!name||!name.trim())return;
+  const {data,error}=await sb.from('episodes').insert({show_id:SHOW.id,name:name.trim()}).select().single();
+  if(error)return toast('Error: '+error.message,true);openEpObj(data);}
+async function delEp(id){if(!confirm('¿Borrar este capítulo?'))return;
+  const {error}=await sb.from('episodes').delete().eq('id',id);if(error)return toast('Error: '+error.message,true);renderEpisodes();}
+async function openEp(id){const {data}=await sb.from('episodes').select('*').eq('id',id).single();openEpObj(data);}
+function openEpObj(ep){EP=ep;PROGRESS=new Set((ep.progress&&ep.progress.done)||[]);renderEpisode();}
 
-/* ================= 3) CAPÍTULO: cargar guion / ver desglose ================= */
+/* ================= CAPÍTULO ================= */
 async function renderEpisode(){
-  view().innerHTML = `
+  view().innerHTML=`
     <div class="crumb"><a onclick="renderShows()">📚 Programas</a><span class="sep">›</span>
-      <a onclick="renderEpisodes()">${esc(SHOW.name)}</a><span class="sep">›</span>
-      <span class="now">${esc(EP.name)}</span></div>
+      <a onclick="renderEpisodes()">${esc(SHOW.name)}</a><span class="sep">›</span><span class="now">${esc(EP.name)}</span></div>
     <span class="msg" id="vmsg"></span>
     <div id="epbody"><div class="loading show"><div class="spin"></div>Buscando desglose…</div></div>`;
-  BD = await DDLDesglose.load(EP.id);
-  if(BD && BD.chars && BD.chars.length){ renderBreakdown(); }
-  else { renderUpload(); }
+  BD=await DDLDesglose.load(EP.id);
+  if(BD&&BD.chars&&BD.chars.length){buildIndex();subscribeEp();renderBreakdown();}
+  else renderUpload();
 }
-
 function renderUpload(){
-  $('epbody').innerHTML = `
-    <label class="drop" id="drop">
-      <div class="ic">📄</div>
+  $('epbody').innerHTML=`
+    <label class="drop" id="drop"><div class="ic">📄</div>
       <b>Cargar guion (PDF o Word)</b>
-      <small>El desglose de personajes se genera automáticamente · el .xlsm ya no se usa</small>
-      <input type="file" id="inFile" accept="application/pdf,.pdf,.docx">
-    </label>
+      <small>El desglose de personajes se genera automáticamente</small>
+      <input type="file" id="inFile" accept="application/pdf,.pdf,.docx"></label>
     <div class="loading" id="load"><div class="spin"></div><span id="loadmsg">Procesando…</span></div>
     <div id="review"></div>`;
-  const drop = $('drop'), input = $('inFile');
-  input.onchange = () => { if(input.files[0]) onGuion(input.files[0]); };
+  const drop=$('drop'),input=$('inFile');
+  input.onchange=()=>{if(input.files[0])onGuion(input.files[0]);};
   ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
   ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
-  drop.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) onGuion(f); });
+  drop.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f)onGuion(f);});
 }
-
 async function onGuion(file){
-  $('load').classList.add('show'); $('loadmsg').textContent='Leyendo y desglosando «'+file.name+'»…';
-  let r;
-  try{ r = await DDLDesglose.fromFile(file); }
-  catch(e){ $('load').classList.remove('show'); return toast('No se pudo leer el guion: '+e.message, true); }
+  $('load').classList.add('show');$('loadmsg').textContent='Leyendo y desglosando «'+file.name+'»…';
+  let r;try{r=await DDLDesglose.fromFile(file);}catch(e){$('load').classList.remove('show');return toast('No se pudo leer: '+e.message,true);}
   $('load').classList.remove('show');
-  if(!r.chars.length){ toast('No se detectaron personajes. ¿El guion trae los nombres en MAYÚSCULAS?', true); }
-
-  DDLDesglose.renderReview(r, {
-    mount: $('review'),
-    onSave: async (res) => {
-      // subir el guion original al bucket "guiones" (opcional, no bloquea)
-      try{
-        const path = SHOW.id+'/'+EP.id+'/'+file.name;
-        await sb.storage.from('guiones').upload(path, file, { upsert:true });
-        await sb.from('episodes').update({ pdf_name:file.name, pdf_path:path }).eq('id', EP.id);
-        EP.pdf_name = file.name;
-      }catch(e){ console.warn('storage', e); }
-      await DDLDesglose.save(EP.id, res, { edited:true });
-      BD = { chars:res.chars, scenes:res.scenes,
-             script:(res.script||[]).map(b=>({k:b.key,p:b.page,s:b.scene,t:(b.lines||[]).join(' ')})) };
-      renderBreakdown();
-    }
-  });
+  if(!r.chars.length)toast('No se detectaron personajes. ¿Los nombres están en MAYÚSCULAS?',true);
+  DDLDesglose.renderReview(r,{mount:$('review'),onSave:async(res)=>{
+    try{const path=SHOW.id+'/'+EP.id+'/'+file.name;
+      await sb.storage.from('guiones').upload(path,file,{upsert:true});
+      await sb.from('episodes').update({pdf_name:file.name,pdf_path:path}).eq('id',EP.id);EP.pdf_name=file.name;
+    }catch(e){console.warn('storage',e);}
+    BD={chars:res.chars,scenes:res.scenes,
+        script:(res.script||[]).map(b=>({k:b.key,p:b.page,s:b.scene,t:(b.lines||[]).join(' ')}))};
+    await saveBreakdown();buildIndex();subscribeEp();renderBreakdown();
+  }});
+}
+async function saveBreakdown(){
+  const data={chars:BD.chars.map(c=>({key:c.key,display:c.display,talent:c.talent||'',pages:c.pages,scenes:c.scenes||[],totalInts:c.totalInts,noRec:c.noRec,color:c.color})),
+    scenes:BD.scenes,script:BD.script,meta:{version:'v11'}};
+  const {error}=await sb.from('breakdowns').upsert({episode_id:EP.id,data,edited:true},{onConflict:'episode_id'});
+  if(error)toast('No se pudo guardar: '+error.message,true);
 }
 
-/* ================= 4) VISTA DE DESGLOSE + AVANCE ================= */
-function recSet(k){ return new Set(PROGRESS[k]||[]); }
-function isDone(c){ const r=recSet(c.key); return c.pages.length>0 && c.pages.every(p=>r.has(p.p)); }
+/* ================= índice de intervenciones ================= */
+function buildIndex(){
+  CHARIDS={};
+  (BD.script||[]).forEach((b,i)=>{(CHARIDS[b.k]=CHARIDS[b.k]||[]).push(i);});
+  // asegura que cada char tenga entrada aunque no tenga diálogos
+  BD.chars.forEach(c=>{CHARIDS[c.key]=CHARIDS[c.key]||[];});
+}
+function charRecCount(key){return (CHARIDS[key]||[]).filter(i=>PROGRESS.has(i)).length;}
+function pageIds(key,page){return (CHARIDS[key]||[]).filter(i=>BD.script[i].p===page);}
+function pageDone(key,page){const ids=pageIds(key,page);return ids.length>0&&ids.every(i=>PROGRESS.has(i));}
+function isDone(c){const ids=CHARIDS[c.key]||[];return ids.length>0?ids.every(i=>PROGRESS.has(i)):c.pages.every(p=>false);}
 
+/* ================= VISTA DESGLOSE ================= */
 function renderBreakdown(){
-  const chars = BD.chars.slice().sort((a,b)=> b.totalInts-a.totalInts || a.display.localeCompare(b.display,'es'));
-  const totInts = chars.reduce((s,c)=>s+c.totalInts,0);
-  const doneN = chars.filter(isDone).length;
-  $('epbody').innerHTML = `
+  const chars=BD.chars.slice().sort((a,b)=>b.totalInts-a.totalInts||a.display.localeCompare(b.display,'es'));
+  const totInts=chars.reduce((s,c)=>s+c.totalInts,0);
+  $('epbody').innerHTML=`
+    ${MERGE?`<div class="banner">🔗 Fusionando <b style="margin:0 4px">${esc(dispOf(MERGE))}</b> → elige el personaje <b>destino</b> (se conservan sus datos).
+       <span class="x" onclick="cancelMerge()">Cancelar ✕</span></div>`:''}
     <div class="stats">
       <div class="stat"><b>${chars.length}</b>personajes</div>
       <div class="stat"><b>${totInts}</b>intervenciones</div>
       <div class="stat"><b>${(BD.scenes||[]).length}</b>escenas</div>
-      <div class="stat"><b>${doneN}</b>✓ terminados</div>
+      <div class="stat"><b>${chars.filter(isDone).length}</b>✓ terminados</div>
     </div>
     <div class="bar-actions">
       <input class="search" id="q" placeholder="Buscar personaje o talento…">
-      <button class="btnv" onclick="reDesglose()">🔄 Rehacer desglose</button>
+      <button class="btnv" onclick="openLibreto()">📖 Abrir libreto en ventana</button>
+      <button class="btnv" onclick="renderUpload()">🔄 Rehacer</button>
     </div>
     <div class="cards" id="cards"></div>
     <div id="detail"></div>`;
-  const paint = (q) => {
-    q = (q||'').toLowerCase();
-    const list = chars.filter(c=> !q || c.display.toLowerCase().includes(q) || (c.talent||'').toLowerCase().includes(q));
-    $('cards').innerHTML = list.map(c=>{
-      const rec = recSet(c.key);
-      const recN = c.pages.filter(p=>rec.has(p.p)).length;
-      const pct = c.pages.length ? Math.round(100*recN/c.pages.length) : 0;
-      const done = isDone(c);
-      const pgs = c.pages.slice(0,14).map(p=>`<span class="pg ${rec.has(p.p)?'rec':''}" onclick="event.stopPropagation();togglePage('${c.key}',${p.p})">${p.p}</span>`).join('');
-      return `<div class="ccard ${done?'done':''}" style="--cc:${c.color}" onclick="openChar('${c.key}')">
-        <div class="top"><h3>${esc(c.display)}</h3><span class="n">${c.totalInts} int · ${c.pages.length} pág</span></div>
-        <div class="tal ${c.talent?'':'ng'}">${c.talent?esc(c.talent):'Sin talento asignado'}</div>
+  const paint=(q)=>{q=(q||'').toLowerCase();
+    const list=chars.filter(c=>!q||c.display.toLowerCase().includes(q)||(c.talent||'').toLowerCase().includes(q));
+    $('cards').innerHTML=list.map(c=>{
+      const ids=CHARIDS[c.key]||[];const rec=charRecCount(c.key);const tot=ids.length||c.totalInts||0;
+      const pct=tot?Math.round(100*rec/tot):0;const done=isDone(c);
+      const pgs=c.pages.slice(0,14).map(p=>`<span class="pg ${pageDone(c.key,p.p)?'rec':''}" onclick="togglePage('${c.key}',${p.p})">${p.p}</span>`).join('');
+      return `<div class="ccard ${done?'done':''} ${MERGE&&MERGE!==c.key?'pick':''}" style="--cc:${c.color}" ${MERGE?`onclick="doMerge('${c.key}')"`:''}>
+        <div class="top" ${MERGE?'':`onclick="openChar('${c.key}')"`}>
+          <h3>${esc(c.display)}</h3><span class="n">${rec}/${tot} int · ${c.pages.length} pág</span></div>
+        <div class="talrow"><span style="color:var(--ink-faint);font-size:12px">🎙️</span>
+          <input value="${esc(c.talent||'')}" placeholder="asignar talento…" onchange="setTalent('${c.key}',this.value)" onclick="event.stopPropagation()"></div>
         <div class="bar"><i style="width:${pct}%"></i></div>
         <div class="pgs">${pgs}${c.pages.length>14?'<span class="pg">+'+(c.pages.length-14)+'</span>':''}</div>
-      </div>`;
-    }).join('') || `<div class="empty">Sin coincidencias.</div>`;
-  };
+        ${MERGE?'':`<div class="acts"><span class="mini" onclick="openChar('${c.key}')">Ver diálogos ›</span>
+          <span class="mini" onclick="startMerge('${c.key}')">🔗 Fusionar</span></div>`}
+      </div>`;}).join('')||`<div class="empty">Sin coincidencias.</div>`;};
   paint('');
-  $('q').oninput = () => paint($('q').value);
+  $('q').oninput=()=>paint($('q').value);
+}
+function dispOf(key){const c=BD.chars.find(x=>x.key===key);return c?c.display:key;}
+
+/* ---- talento ---- */
+async function setTalent(key,val){const c=BD.chars.find(x=>x.key===key);if(!c)return;c.talent=val.trim();
+  await saveBreakdown();broadcast('chars',{});}
+
+/* ---- fusionar ---- */
+function startMerge(key){MERGE=key;renderBreakdown();}
+function cancelMerge(){MERGE=null;renderBreakdown();}
+async function doMerge(targetKey){
+  if(!MERGE||MERGE===targetKey){MERGE=null;return renderBreakdown();}
+  const src=BD.chars.find(c=>c.key===MERGE),dst=BD.chars.find(c=>c.key===targetKey);
+  if(!src||!dst){MERGE=null;return renderBreakdown();}
+  if(!confirm('Fusionar «'+src.display+'» dentro de «'+dst.display+'»?')){MERGE=null;return renderBreakdown();}
+  // reasignar diálogos del origen al destino
+  (BD.script||[]).forEach(b=>{if(b.k===src.key)b.k=dst.key;});
+  // combinar páginas
+  const pm=new Map(dst.pages.map(p=>[p.p,p.ints]));
+  src.pages.forEach(p=>pm.set(p.p,(pm.get(p.p)||0)+p.ints));
+  dst.pages=[...pm.entries()].sort((a,b)=>a[0]-b[0]).map(([p,ints])=>({p,ints}));
+  dst.scenes=[...new Set([...(dst.scenes||[]),...(src.scenes||[])])].sort((a,b)=>a-b);
+  dst.totalInts=(dst.totalInts||0)+(src.totalInts||0);
+  if(!dst.talent&&src.talent)dst.talent=src.talent;
+  BD.chars=BD.chars.filter(c=>c.key!==src.key);
+  MERGE=null;buildIndex();await saveBreakdown();broadcast('chars',{});renderBreakdown();
 }
 
-async function togglePage(key, p){
-  const arr = new Set(PROGRESS[key]||[]);
-  arr.has(p) ? arr.delete(p) : arr.add(p);
-  PROGRESS[key] = [...arr].sort((a,b)=>a-b);
-  renderBreakdown();
-  try{ await sb.from('episodes').update({ progress:PROGRESS }).eq('id', EP.id); }
-  catch(e){ toast('No se pudo guardar el avance: '+e.message, true); }
+/* ---- avance ---- */
+function persistProgress(){clearTimeout(saveT);saveT=setTimeout(()=>{
+  sb.from('episodes').update({progress:{done:[...PROGRESS]}}).eq('id',EP.id).then(()=>{},()=>{});},400);}
+function afterProgress(){persistProgress();broadcast('progress',{done:[...PROGRESS]});refreshProgressUI();}
+function toggleBlock(id,noBroadcast){id=+id;PROGRESS.has(id)?PROGRESS.delete(id):PROGRESS.add(id);
+  if(!noBroadcast)afterProgress();else refreshProgressUI();}
+function togglePage(key,page){const ids=pageIds(key,page);const all=ids.every(i=>PROGRESS.has(i));
+  ids.forEach(i=>all?PROGRESS.delete(i):PROGRESS.add(i));afterProgress();}
+function refreshProgressUI(){ // repinta tarjetas y detalle sin perder scroll
+  if($('cards')){const q=$('q')?$('q').value:'';const ev=new Event('input');
+    // re-render tarjetas
+    renderCardsOnly(q);}
+  if(FOCUS>=0&&$('detail')&&$('detail').innerHTML)refreshDetail();
+  if(LIB&&!LIB.closed)LIB.postMessage({t:'progress',done:[...PROGRESS]},'*');
+}
+function renderCardsOnly(q){const chars=BD.chars.slice().sort((a,b)=>b.totalInts-a.totalInts||a.display.localeCompare(b.display,'es'));
+  q=(q||'').toLowerCase();const list=chars.filter(c=>!q||c.display.toLowerCase().includes(q)||(c.talent||'').toLowerCase().includes(q));
+  const box=$('cards');if(!box)return;
+  box.innerHTML=list.map(c=>{const ids=CHARIDS[c.key]||[];const rec=charRecCount(c.key);const tot=ids.length||c.totalInts||0;
+    const pct=tot?Math.round(100*rec/tot):0;const done=isDone(c);
+    const pgs=c.pages.slice(0,14).map(p=>`<span class="pg ${pageDone(c.key,p.p)?'rec':''}" onclick="togglePage('${c.key}',${p.p})">${p.p}</span>`).join('');
+    return `<div class="ccard ${done?'done':''}" style="--cc:${c.color}">
+      <div class="top" onclick="openChar('${c.key}')"><h3>${esc(c.display)}</h3><span class="n">${rec}/${tot} int · ${c.pages.length} pág</span></div>
+      <div class="talrow"><span style="color:var(--ink-faint);font-size:12px">🎙️</span>
+        <input value="${esc(c.talent||'')}" placeholder="asignar talento…" onchange="setTalent('${c.key}',this.value)" onclick="event.stopPropagation()"></div>
+      <div class="bar"><i style="width:${pct}%"></i></div>
+      <div class="pgs">${pgs}${c.pages.length>14?'<span class="pg">+'+(c.pages.length-14)+'</span>':''}</div>
+      <div class="acts"><span class="mini" onclick="openChar('${c.key}')">Ver diálogos ›</span>
+        <span class="mini" onclick="startMerge('${c.key}')">🔗 Fusionar</span></div></div>`;}).join('');
 }
 
-function openChar(key){
-  const c = BD.chars.find(x=>x.key===key); if(!c) return;
-  const blocks = (BD.script||[]).filter(b=>b.k===key);
-  const rec = recSet(key);
-  $('detail').innerHTML = `
-    <div class="panel">
-      <h2 style="color:${c.color}">${esc(c.display)} <span style="font-size:12px;color:var(--ink-faint)">· ${c.totalInts} intervenciones</span></h2>
-      ${blocks.map(b=>`
-        <div class="blk" style="--cc:${c.color}">
-          <div class="meta">pág ${b.p}<br>
-            <span class="pg ${rec.has(b.p)?'rec':''}" onclick="togglePage('${key}',${b.p})" style="margin-top:4px;display:inline-block">${rec.has(b.p)?'✓ grabada':'grabar'}</span>
-          </div>
-          <div class="tx"><span class="nm">${esc(c.display)}:</span>${esc(b.t||'—')}</div>
-        </div>`).join('') || '<div class="msg">Este personaje no tiene diálogos guardados en el libreto.</div>'}
-      <div style="margin-top:12px"><button class="btnv" onclick="document.getElementById('detail').innerHTML=''">Cerrar</button></div>
-    </div>`;
-  $('detail').scrollIntoView({behavior:'smooth', block:'start'});
+/* ---- detalle por personaje (marcación por intervención) ---- */
+let CURKEY=null;
+function openChar(key){CURKEY=key;const c=BD.chars.find(x=>x.key===key);if(!c)return;refreshDetail();
+  $('detail').scrollIntoView({behavior:'smooth',block:'start'});}
+function refreshDetail(){const c=BD.chars.find(x=>x.key===CURKEY);if(!c){$('detail').innerHTML='';return;}
+  const ids=CHARIDS[c.key]||[];
+  $('detail').innerHTML=`<div class="panel"><h2 style="color:${c.color}">${esc(c.display)}
+    <span style="font-size:12px;color:var(--ink-faint)">· ${charRecCount(c.key)}/${ids.length} grabadas</span></h2>
+    ${ids.map(i=>{const b=BD.script[i];const on=PROGRESS.has(i);
+      return `<div class="blk ${on?'on':''} ${i===FOCUS?'focus':''}" style="--cc:${c.color}" onclick="setFocus(${i})">
+        <div class="meta">pág ${b.p}<br><span class="rec" onclick="event.stopPropagation();toggleBlock(${i})">${on?'✓ grabada':'grabar'}</span></div>
+        <div class="tx"><span class="nm">${esc(c.display)}:</span>${esc(b.t||'—')}</div></div>`;}).join('')
+      ||'<div class="msg">Sin diálogos guardados para este personaje.</div>'}
+    <div style="margin-top:12px"><button class="btnv" onclick="CURKEY=null;document.getElementById('detail').innerHTML=''">Cerrar</button></div></div>`;
 }
 
-async function reDesglose(){
-  if(!confirm('Esto reemplaza el desglose actual (se conserva el avance por página). ¿Continuar?')) return;
-  renderUpload();
+/* ================= LIBRETO EN OTRA VENTANA ================= */
+function openLibreto(){
+  LIB=window.open('','libretoDDL','width=560,height=840');
+  if(!LIB){toast('El navegador bloqueó la ventana. Permite ventanas emergentes para este sitio.',true);return;}
+  const doc=libretoHTML();
+  LIB.document.open();LIB.document.write(doc);LIB.document.close();
+  // enviar datos cuando cargue
+  setTimeout(()=>{sendLibretoData();LIB.postMessage({t:'progress',done:[...PROGRESS]},'*');if(FOCUS>=0)LIB.postMessage({t:'focus',id:FOCUS},'*');},300);
+}
+function sendLibretoData(){if(!LIB||LIB.closed)return;
+  const colors={};BD.chars.forEach(c=>colors[c.key]=c.color);
+  const disp={};BD.chars.forEach(c=>disp[c.key]=c.display);
+  LIB.postMessage({t:'data',script:BD.script,colors,disp},'*');}
+window.addEventListener('message',ev=>{const d=ev.data||{};
+  if(d.t==='focus')setFocus(d.id,true);
+  if(d.t==='toggle')toggleBlock(d.id);
+});
+function libretoHTML(){
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Libreto</title><style>
+  body{margin:0;background:#150F30;color:#EFECFB;font-family:'Inter',system-ui,sans-serif}
+  .hd{position:sticky;top:0;background:#1E1740;border-bottom:1px solid #3a2f6b;padding:10px 14px;font-weight:600}
+  .b{border-bottom:1px solid #241C4E;padding:9px 14px;display:flex;gap:10px;cursor:pointer}
+  .b:hover{background:rgba(167,139,250,.06)}
+  .b.focus{background:rgba(167,139,250,.16)}
+  .m{flex:none;width:74px;font-family:ui-monospace,monospace;font-size:11px;color:#7d76a8}
+  .m .r{display:inline-block;margin-top:4px;padding:2px 7px;border-radius:6px;background:#191238;border:1px solid #2c2358;color:#B4ADD9;font-size:10px}
+  .b.on .m .r{color:#4ADE80;border-color:rgba(74,222,128,.4)}
+  .t{flex:1;font-size:14px;line-height:1.5}
+  .nm{font-weight:700;margin-right:6px}
+  </style></head><body>
+  <div class="hd">📖 Libreto · sincronizado</div><div id="list"></div>
+  <script>
+  let S=[],C={},D={},DONE=new Set();
+  const list=document.getElementById('list');
+  function render(){list.innerHTML=S.map((b,i)=>{const col=C[b.k]||'#A78BFA';const on=DONE.has(i);
+    return '<div class="b '+(on?'on':'')+'" data-id="'+i+'"><div class="m">pág '+b.p+
+      '<br><span class="r" data-rec="'+i+'">'+(on?'✓':'grabar')+'</span></div>'+
+      '<div class="t"><span class="nm" style="color:'+col+'">'+(D[b.k]||b.k)+':</span>'+
+      (b.t||'—').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]))+'</div></div>';}).join('');}
+  list.addEventListener('click',e=>{const r=e.target.closest('[data-rec]');if(r){parent.postMessage({t:'toggle',id:+r.dataset.rec},'*');return;}
+    const el=e.target.closest('[data-id]');if(el)parent.postMessage({t:'focus',id:+el.dataset.id},'*');});
+  window.addEventListener('message',ev=>{const d=ev.data||{};
+    if(d.t==='data'){S=d.script||[];C=d.colors||{};D=d.disp||{};render();}
+    if(d.t==='progress'){DONE=new Set(d.done||[]);render();}
+    if(d.t==='focus'){document.querySelectorAll('.b.focus').forEach(x=>x.classList.remove('focus'));
+      const el=list.querySelector('[data-id="'+d.id+'"]');if(el){el.classList.add('focus');el.scrollIntoView({block:'center',behavior:'smooth'});}}});
+  <\/script></body></html>`;
 }
 
-/* ================= util ================= */
-function color(name){ return DDLDesglose.charColor(DDLDesglose.norm(name)); }
+/* ---- foco (intervención activa) sincronizado ---- */
+function setFocus(id,remote){id=+id;FOCUS=id;
+  if($('detail')){document.querySelectorAll('.blk.focus').forEach(x=>x.classList.remove('focus'));
+    const el=document.querySelector('.blk.focus');}
+  // resaltar en detalle si está abierto
+  if(CURKEY!=null&&$('detail')){const el=[...document.querySelectorAll('.blk')].find(()=>false);}
+  if($('detail')&&CURKEY!=null)refreshDetail();
+  if(LIB&&!LIB.closed)LIB.postMessage({t:'focus',id},'*');
+  if(!remote)broadcast('focus',{id});
+}
 
+/* ================= REALTIME (tablet ↔ escritorio) ================= */
+function subscribeEp(){leaveEp();
+  CH=sb.channel('ep-'+EP.id,{config:{broadcast:{self:false}}});
+  CH.on('broadcast',{event:'focus'},({payload})=>setFocus(payload.id,true));
+  CH.on('broadcast',{event:'progress'},({payload})=>{PROGRESS=new Set(payload.done||[]);refreshProgressUI();});
+  CH.on('broadcast',{event:'chars'},async()=>{BD=await DDLDesglose.load(EP.id);buildIndex();if(!MERGE)renderBreakdown();});
+  CH.subscribe(st=>{const c=$('syncChip');if(c)c.classList.toggle('on',st==='SUBSCRIBED');});
+  addSyncChip();
+}
+function broadcast(event,payload){if(CH)CH.send({type:'broadcast',event,payload});}
+function leaveEp(){if(CH){try{sb.removeChannel(CH);}catch(e){}CH=null;}removeSyncChip();FOCUS=-1;CURKEY=null;}
+function addSyncChip(){if($('syncChip'))return;const b=document.createElement('button');
+  b.id='syncChip';b.className='chip';b.textContent='🔗 Sincronía';b.title='Los cambios se reflejan en el otro dispositivo del mismo capítulo';
+  $('who').parentNode.insertBefore(b,$('who'));}
+function removeSyncChip(){const c=$('syncChip');if(c)c.remove();}
+
+/* ================= PWA ================= */
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;$('installBtn').classList.remove('hide');});
+$('installBtn').onclick=async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$('installBtn').classList.add('hide');};
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 </script>
 </body>
 </html>
