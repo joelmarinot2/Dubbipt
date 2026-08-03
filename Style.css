@@ -1,0 +1,73 @@
+:root {
+    --bg-color: #121212;
+    --card-bg: #1e1e1e;
+    --text-main: #ffffff;
+    --accent: #A78BFA;
+    --accent-hover: #8b5cf6;
+    --error: #ef4444;
+}
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-main);
+}
+
+body.locked { overflow: hidden; }
+
+/* Auth Gate */
+.gate {
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.8);
+    display: flex; justify-content: center; align-items: center;
+    z-index: 1000;
+}
+.gate.off { display: none; }
+.gcard {
+    background: var(--card-bg); padding: 2rem;
+    border-radius: 8px; width: 100%; max-width: 400px;
+}
+.dens { display: flex; gap: 10px; margin-bottom: 20px; }
+.dens button {
+    flex: 1; padding: 10px; background: transparent;
+    border: 1px solid #444; color: white; cursor: pointer;
+}
+.dens button.on { background: var(--accent); border-color: var(--accent); }
+input {
+    width: 100%; padding: 10px; margin-bottom: 15px;
+    background: #333; border: 1px solid #555; color: white;
+    box-sizing: border-box; border-radius: 4px;
+}
+.gbtn {
+    width: 100%; padding: 12px; background: var(--accent);
+    color: white; border: none; font-weight: bold; cursor: pointer;
+    border-radius: 4px;
+}
+.gerr { color: var(--error); margin-top: 10px; font-size: 0.9em; text-align: center; }
+
+/* App UI */
+.app-container { max-width: 800px; margin: 0 auto; padding: 20px; }
+header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+#logoutBtn { padding: 8px 16px; background: #333; border: 1px solid #555; color: white; cursor: pointer; border-radius: 4px; }
+
+.dropzone {
+    border: 2px dashed #555; border-radius: 8px;
+    padding: 40px; text-align: center; cursor: pointer;
+    position: relative; transition: border-color 0.3s;
+}
+.dropzone:hover { border-color: var(--accent); }
+.dropzone input {
+    position: absolute; width: 100%; height: 100%;
+    top: 0; left: 0; opacity: 0; cursor: pointer;
+}
+
+.hidden { display: none; }
+#loading { text-align: center; margin: 20px 0; color: var(--accent); font-weight: bold; }
+
+/* Tarjetas de Personajes */
+#results { display: grid; gap: 15px; margin-top: 20px; }
+.character-card {
+    background: var(--card-bg); padding: 15px;
+    border-radius: 8px; border-left: 4px solid var(--accent);
+}
