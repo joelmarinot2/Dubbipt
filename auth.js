@@ -18,6 +18,14 @@
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const MIN_PASS = 8;
 
+  // Si el SDK de Supabase o la config no cargaron, no revientes en silencio:
+  // define un DDLAuth inerte para que index.html muestre el motivo en pantalla.
+  if (!window.supabase || !window.SUPA) {
+    window.DDLAuth = { onReady() {}, _error: 'Falta window.supabase o window.SUPA' };
+    console.error('[auth] No se puede iniciar:', window.DDLAuth._error);
+    return;
+  }
+
   // Cliente propio para el login (se expone como window.sb para el resto de la app).
   const sb = window.supabase.createClient(window.SUPA.url, window.SUPA.anonKey, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }

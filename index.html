@@ -151,13 +151,28 @@ let PROGRESS = {};    // {charKey:[páginas grabadas]}
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
 function toast(t, err){ const m=$('vmsg'); if(m){ m.textContent=t||''; m.className='msg'+(err?' err':''); } }
 
+/* ================= diagnóstico: nunca dejar la pantalla en blanco ========= */
+function fatal(msg){
+  view().innerHTML = '<div style="background:#2a1030;border:1px solid #6b2f4f;border-radius:12px;'
+    + 'padding:18px;color:#F472B6;font-size:14px;line-height:1.6">⚠️ '+esc(msg)
+    + '<br><br><span style="color:#B4ADD9">Abre la consola (F12) para ver el detalle. '
+    + 'Si acabas de subir cambios, prueba Ctrl+Shift+R.</span></div>';
+}
+window.addEventListener('error', ev => { if(!view().innerHTML.trim()) fatal('Error: '+ev.message); });
+
 /* ================= arranque (ya autenticado) ================= */
-DDLAuth.onReady((user, profile) => {
-  ME = user; PROFILE = profile;
-  $('who').innerHTML = '<b>'+esc(profile && profile.full_name || user.email)+'</b>'
-    + esc((profile && profile.role) || 'member');
-  renderShows();
-});
+(function boot(){
+  if(!window.SUPA)            return fatal('No cargó config.js (window.SUPA). Verifica que el archivo esté en la raíz.');
+  if(!window.supabase)       return fatal('No cargó el SDK de Supabase (¿bloqueó el CDN o no hay internet?).');
+  if(!window.DDLAuth)        return fatal('No cargó auth.js. Verifica que el archivo esté junto a index.html.');
+  if(!window.DDLDesglose)    return fatal('No cargó desglose-auto.js. Verifica que el archivo esté en la raíz.');
+  DDLAuth.onReady((user, profile) => {
+    ME = user; PROFILE = profile;
+    $('who').innerHTML = '<b>'+esc(profile && profile.full_name || user.email)+'</b>'
+      + esc((profile && profile.role) || 'member');
+    renderShows();
+  });
+})();
 
 /* ================= 1) PROGRAMAS ================= */
 async function renderShows(){
