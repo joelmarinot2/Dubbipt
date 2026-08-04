@@ -545,6 +545,29 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Silksc
 /* buscador con borde verde al enfocar */
 .find:focus-within{ box-shadow:0 0 0 2px #5FC85A; border-radius:14px; }
 </style>
+<style>
+/* ================= DASHBOARD (pantalla principal) ================= */
+#dashTitle{ font-family:'Silkscreen','Space Grotesk',sans-serif; color:#fff; font-size:clamp(30px,6vw,48px); letter-spacing:1px; margin:2px 0 16px; }
+#libCrumb.dashcrumb{ display:inline-flex; background:#171334; border:1px solid #2a2350; border-radius:20px; padding:5px; gap:4px; }
+#libCrumb.dashcrumb .dseg{ font-family:'Silkscreen',monospace; font-size:13px; padding:9px 18px; border-radius:16px; color:#5FC85A; }
+#libCrumb.dashcrumb .dseg.on{ background:#5FC85A; color:#123317; }
+#libCrumb.dashcrumb .dseg.ws{ color:#cfe9cf; cursor:pointer; }
+#libCrumb.dashcrumb .dseg.ws:hover{ color:#fff; }
+#libGrid.dashgrid{ border:3px solid #5FC85A; border-radius:24px; padding:22px; display:flex; flex-wrap:wrap; gap:20px; align-items:flex-start; }
+.dtile{ background:transparent !important; border:none !important; box-shadow:none !important; padding:0 !important; width:154px; }
+.dtile:hover{ transform:none !important; box-shadow:none !important; }
+.dtile .dcover{ position:relative; width:154px; height:214px; border:3px solid #5FC85A; border-radius:16px; background:radial-gradient(140px 140px at 50% 35%, rgba(95,200,90,.14), transparent 70%), #140f30; display:grid; place-items:center; overflow:hidden; cursor:pointer; transition:transform .12s; }
+.dtile .dcover:hover{ transform:translateY(-3px); }
+.dtile .dico{ font-size:48px; }
+.dtile .dplus{ font-size:70px; color:#5FC85A; line-height:1; font-family:'Silkscreen',monospace; }
+.dtile .dname{ font-family:'Silkscreen',monospace; color:#fff; font-size:14px; margin-top:11px; line-height:1.25; }
+.dtile .dsub{ font-family:'Inter',system-ui,sans-serif; color:var(--ink-faint); font-size:11px; margin-top:3px; }
+.dtile.dadd .dcover{ border-style:solid; }
+.dtile .ldel,.dtile .lren{ position:absolute; top:8px; opacity:0; border:none; background:rgba(0,0,0,.5); color:#fff; border-radius:8px; padding:3px 6px; cursor:pointer; font-size:12px; transition:opacity .12s; }
+.dtile:hover .ldel,.dtile:hover .lren{ opacity:1; }
+.dtile .ldel{ right:8px; } .dtile .lren{ right:44px; }
+@media(max-width:560px){ .dtile,.dtile .dcover{ width:44vw; } .dtile .dcover{ height:62vw; } }
+</style>
 </head>
 <body class="locked">
 <div class="appbar appbar-top"></div>
@@ -588,11 +611,12 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Silksc
   <header>
     <div class="mk">DD</div>
     <div>
-      <h1>Desglose Digital de Libreto</h1>
+      <h1>Dubbipt</h1>
     </div>
   </header>
   <div class="epline" id="epLine" style="display:none"></div>
 
+  <h1 id="dashTitle" style="display:none">Dashboard</h1>
   <div class="lib" id="lib">
     <div class="lib-head">
       <h2 id="libCrumb">📚 Programas</h2>
@@ -2715,18 +2739,27 @@ async function renderLibrary(silent){
 
     if(libView==='shows' || !LDB.showId){
       libView='shows';
-      crumb.innerHTML = '📚 Programas' + (WORKSPACE && WORKSPACE.name ? ' · <span style="color:var(--violet-2)">'+esc(WORKSPACE.name)+'</span>' : '');
-      act.style.display=''; act.textContent='＋ Nuevo programa'; act.onclick=newShow;
-      grid.innerHTML = shows.length ? '' : '<div class="lib-empty2">Aún no hay programas. Crea el primero con ＋ Nuevo programa.</div>';
+      { const dt=$('dashTitle'); if(dt) dt.style.display=''; }
+      crumb.className='dashcrumb';
+      crumb.innerHTML = '<span class="dseg on">Programas</span>'
+        + (WORKSPACE && WORKSPACE.name
+            ? '<span class="dseg ws" id="cbWs" title="Cambiar de espacio de trabajo">'+esc(WORKSPACE.name)+'</span>'
+            : '<span class="dseg ws" id="cbWs" title="Elegir espacio de trabajo">elegir espacio</span>');
+      { const w=$('cbWs'); if(w) w.onclick=()=> showWorkspacePicker(true); }
+      act.style.display='none';
+      grid.classList.add('dashgrid');
+      grid.innerHTML = shows.length ? '' : '<div class="lib-empty2">Aún no hay programas. Crea el primero con la tarjeta ＋ Nuevo Programa.</div>';
       const counts = {};
       for(const sh of shows){ counts[sh.id] = sbEps(sh.id).length; }
       for(const sh of shows){
         const n = counts[sh.id]||0;
-        const c = document.createElement('div'); c.className='fcard';
-        c.innerHTML = '<button class="ldel" title="Eliminar programa">🗑</button>'
+        const c = document.createElement('div'); c.className='fcard dtile';
+        c.innerHTML = '<div class="dcover">'
+          +'<button class="ldel" title="Eliminar programa">🗑</button>'
           +'<button class="lren" title="Renombrar programa">✏️</button>'
-          +'<span class="fi">📁</span><b>'+esc(sh.name)+'</b>'
-          +'<small>'+n+' capítulo'+(n===1?'':'s')+(sh.studio!=null?' · E'+sh.studio:' · 🌐 todos')+'</small>';
+          +'<span class="dico">📁</span></div>'
+          +'<div class="dname">'+esc(sh.name)+'</div>'
+          +'<div class="dsub">'+n+' cap'+(n===1?'':'s')+'</div>';
         c.addEventListener('click', async ev=>{
           if(ev.target.closest('.lren')){   // renombrar programa
             const nn = prompt('Nuevo nombre del programa:', sh.name);
@@ -2764,14 +2797,16 @@ async function renderLibrary(silent){
         });
         grid.appendChild(c);
       }
-      const add=document.createElement('div'); add.className='fcard newc';
-      add.innerHTML='<span class="fi">＋</span><b>Nuevo programa</b>';
+      const add=document.createElement('div'); add.className='fcard dtile dadd';
+      add.innerHTML='<div class="dcover"><span class="dplus">＋</span></div><div class="dname">Nuevo Programa</div>';
       add.addEventListener('click', newShow); grid.appendChild(add);
       updateBackBtn();
       return;
     }
 
     const sh = shows.find(x=>x.id===LDB.showId);
+    { const dt=$('dashTitle'); if(dt) dt.style.display='none'; }
+    crumb.className=''; grid.classList.remove('dashgrid');
     crumb.innerHTML = '<span class="lcb" id="cbHome">📚 Programas</span><span class="sep">/</span><span class="lcb" id="cbShow">📁 '+esc(sh?sh.name:'')+'</span>';
     act.style.display=''; act.textContent='💾 Guardar capítulo actual'; act.onclick=saveEpHere;
     const eps = sbEps(LDB.showId);
