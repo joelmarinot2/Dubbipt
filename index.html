@@ -546,7 +546,7 @@ body.compacta .pla td{padding:9px 10px}
   <div class="stats" id="stats"></div>
   <div class="toolbar" id="toolbar">
     <div class="findrow">
-      <label class="find"><span class="fi">🔍</span><input type="text" id="search" placeholder="Buscar personaje o talento..."></label>
+      <label class="find"><span class="fi">🔍</span><input type="text" id="search" placeholder="Buscar personaje o talento..."><button type="button" id="searchClear" title="Borrar búsqueda" style="display:none;border:none;background:none;color:var(--ink-faint);cursor:pointer;font-size:15px;padding:0 6px;line-height:1">✕</button></label>
       <div class="dens" id="dens" role="group" aria-label="Densidad de la vista">
         <button type="button" data-d="comoda" class="on">Cómoda</button><button type="button" data-d="compacta">Compacta</button>
       </div>
@@ -556,7 +556,6 @@ body.compacta .pla td{padding:9px 10px}
       <button class="btnv sm" id="btnMerge" title="Unir dos personajes en uno (p. ej. MARCUS (VO) + MARCUS)">🔗 Fusionar personajes</button>
       <button class="btnv sm" id="btnExport" title="Descargar el avance de grabación en Excel (por personaje y por página)">⬇ Avance</button>
       <button class="btnv sm" id="btnRefresh" title="Forzar actualización: baja la versión más nueva del capítulo (libreto y archivos) desde la nube">🔄 Actualizar</button>
-      <button class="btnv sm" id="btnKaraoke" title="Pantalla karaoke: la intervención en curso, para poner sobre Pro Tools">🎥 Karaoke</button>
           <button class="btnv sm" id="btnModoEst" title="Modo estudio: video/audio + onda + marcado de pausas">🎬 Estudio</button>
       <span class="hint">Clic en un personaje abre su libreto</span>
     </div>
@@ -845,6 +844,10 @@ async function authInit(){
 document.getElementById('btnOut').addEventListener('click', async ()=>{
   try{ if(sb) await sb.auth.signOut(); }catch(e){}
   try{ if(pop.win && !pop.win.closed) pop.win.close(); }catch(e){}
+  try{ if(typeof pop2!=='undefined' && pop2.win && pop2.win!==window && !pop2.win.closed) pop2.win.close(); }catch(e){}
+  // al cambiar de usuario: no arrastrar el libreto/capítulo del usuario anterior
+  try{ ['ddl_last_ep','ddl_last_key','ddl_last_top'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
+  try{ if(typeof idbClearAll==='function') await idbClearAll(); }catch(e){}
   location.reload();
 });
 authInit();
@@ -871,6 +874,8 @@ function charColor(name){
 }
 const NO_REC = new Set(['ORIGINAL','TODOS','X','N/A','NA']);
 const TC_RE = /^\d{1,2}\s*[:;.]\s*\d{2}/;
+const SCENE_RE = /^\s*(?:\d+[\s.\-]*)?(INT\.?\/EXT\.?|INT\.?|EXT\.?|EST\.?|ESC\.?|ESCENA|SCENE|SEQ|SEQUENCE)\b/i;
+const NON_CHAR = new Set(['INT','EXT','INTEXT','EST','ESC','ESCENA','SCENE','SEQ','SEQUENCE','FADE','FADEIN','FADEOUT','CUT','CUTTO','SMASHCUT','MATCHCUT','DISSOLVE','DISSOLVETO','CONTINUED','CONTD','THEEND','FIN','INSERT','SUPER','TITLE','TITLES','SUBTITLE','SUBTITLES','OMITTED','FLASHBACK','FLASHFORWARD','MONTAGE','INTERCUT','ANGLE','CLOSEUP','WIDESHOT','CREDITS','ACTO','ACT','MUSICA','MUSIC','SFX','AMBIENTE']);
 
 const $ = id => document.getElementById(id);
 function norm(s){
@@ -1312,6 +1317,7 @@ function autoDesgloseFromScan(){
     const pd = pageData[p]; if(!pd || !pd.marks) continue;
     pd.marks.forEach(m=>{
       const key = m.key; if(!key || key.length < 2) return;
+      if(NON_CHAR.has(key.replace(/[^A-Z0-9]/g,''))) return;
       const c = byKey[key] || (byKey[key] = { key, pages:{}, total:0 });
       c.pages[p] = (c.pages[p]||0) + 1; c.total++;
     });
@@ -1706,14 +1712,38 @@ async function scanPdf(){
         }
       });
     } else {
-      items.forEach((it,idx)=>{
-        const whole = it.str.trim().replace(/[:：]\s*$/,'').replace(/^['"“”‘’]+|['"“”‘’]+$/g,'');
-        if(whole && whole===whole.toUpperCase() && /[A-ZÁÉÍÓÚÜÑ]/.test(whole)
-           && !TC_RE.test(whole) && whole.length>=2 && whole.length<=42){
-          const li = lines.findIndex(l=>l.idxs.includes(idx));
-          marks.push({key:norm(whole), lineIdx:li, at:0, len:whole.length,
-                      segs:[{item:idx, start:Math.max(0,it.str.indexOf(whole)), len:whole.length}]});
+      // DETECCIÓN AUTOMÁTICA (sin desglose): reconoce cabeceras de personaje por
+      // RENGLÓN, descartando encabezados de escena, timecodes, números de página,
+      // acotaciones y palabras de formato (INT/EXT/CUT TO/MÚSICA/…) → menos falsos.
+      lines.forEach((line,li)=>{
+        const raw = (line.text||'').trim();
+        if(raw.length < 2) return;
+        if(SCENE_RE.test(raw)) return;
+        if(/^\d/.test(raw) && TC_RE.test(raw)) return;
+        let colonAt = -1;
+        for(let i=0;i<raw.length;i++){ const ch=raw[i]; if(ch===':'||ch==='：'){ colonAt=i; break; } }
+        let head = colonAt>=0 ? raw.slice(0,colonAt) : raw;
+        const headClean = head.replace(/[\(\[][^)\]]*[\)\]]/g,' ').replace(/['"“”‘’]/g,'').replace(/\s+/g,' ').trim();
+        if(headClean.length < 2 || headClean.length > 40) return;
+        if(!/[A-ZÁÉÍÓÚÜÑ]/.test(headClean)) return;
+        if(headClean !== headClean.toUpperCase()) return;
+        const keyN = norm(headClean);
+        const flat = keyN.replace(/[^A-Z0-9]/g,'');
+        if(!keyN || flat.length < 2) return;
+        if(NON_CHAR.has(flat)) return;
+        if(/^\d+$/.test(flat)) return;
+        if(colonAt < 0){
+          const words = headClean.split(/\s+/).filter(Boolean);
+          if(words.length > 5) return;
+          if(/[.!?¡¿,;]/.test(headClean)) return;
+        } else {
+          const after = raw.slice(colonAt+1).trim();
+          if(after && !/[A-Za-zÁÉÍÓÚÜÑ0-9¡¿"“(\[]/.test(after) && !TC_RE.test(after)) return;
         }
+        let at = line.text.indexOf(headClean);
+        if(at < 0){ at = line.text.search(/[A-ZÁÉÍÓÚÜÑ]/); if(at < 0) at = 0; }
+        const len = Math.min(headClean.length, Math.max(1, line.text.length - at));
+        marks.push({ key:keyN, lineIdx:li, at, len, segs:segsFromRange(line, at, at+len) });
       });
     }
     marks.sort((a,b)=> a.lineIdx-b.lineIdx || a.at-b.at);
@@ -2021,9 +2051,7 @@ function renderPlanilla(){
         +'<td class="pnm"><div class="nrow"><span class="cdot"></span>'
         +'<span class="nm2">'+esc(c.display)+'</span>'
         +(done?'<span class="bdg">✓</span>':'')+'</div></td>'
-        +'<td class="ploc'+(c.talent?'':' ng')+'">'+(c.talent
-            ? esc(c.talent)+(c.noRec?'<small>no se graba</small>':'')
-            : 'Sin asignar')+'</td>'
+        +'<td class="ploc'+(c.talent?'':' ng')+'"><input class="talIn" data-k="'+esc(c.key)+'" value="'+esc(c.talent||'')+'" placeholder="Asignar talento…" style="width:100%;min-width:90px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;color:inherit;font:inherit;outline:none">'+((c.noRec&&c.talent)?'<small>no se graba</small>':'')+'</td>'
         +'<td class="ptime">'+(tc||'—')+'</td>'
         +'<td><div class="prog"><span class="track"><i style="width:'+pct+'%"></i></span>'
         +'<span class="pn">'+recCount+'/'+c.pages.length+'</span></div></td></tr>';
@@ -2039,6 +2067,26 @@ function renderPlanilla(){
   box.querySelectorAll('tbody tr[data-k]').forEach(el=>{
     el.addEventListener('click', ()=> openPopup(el.dataset.k));
   });
+  box.querySelectorAll('input.talIn').forEach(inp=>{
+    inp.addEventListener('click', e=> e.stopPropagation());
+    inp.addEventListener('keydown', e=>{ e.stopPropagation(); if(e.key==='Enter') inp.blur(); });
+    inp.addEventListener('change', ()=> assignTalent(inp.dataset.k, inp.value));
+    inp.addEventListener('focus', ()=>{ inp.style.borderColor='#7C5CE0'; });
+    inp.addEventListener('blur', ()=>{ inp.style.borderColor='transparent'; });
+  });
+}
+async function assignTalent(key, val){
+  const c = charIdx[key]; if(!c) return;
+  val = (val||'').trim();
+  c.talent = val; c.noRec = NO_REC.has(norm(val));
+  try{ const raw=(window._charsRaw||[]).find(x=>x.key===key); if(raw){ raw.talent=val; raw.noRec=c.noRec; } }catch(e){}
+  try{ renderCards(); }catch(e){}
+  if(typeof currentEp!=='undefined' && currentEp && currentEp.id){
+    try{ await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+    try{ await saveEpCache(currentEp.id, new Date().toISOString()); }catch(e){}
+  }
+  try{ if(typeof pop2!=='undefined' && pop2.doc) renderLibretoChips(); }catch(e){}
+  if(typeof libMsg==='function') libMsg('🎙️ Talento: '+(val||'(sin asignar)'));
 }
 
 function renderStats(){
@@ -2107,7 +2155,8 @@ function renderCards(){
   $('empty').classList.toggle('show', shown===0);
   if(shown===0 && chars.length) $('empty').querySelector('p').textContent = 'Sin resultados para esa búsqueda.';
 }
-$('search').addEventListener('input', ()=>{ renderCards(); renderPlanilla(); });
+$('search').addEventListener('input', ()=>{ const sc=$('searchClear'); if(sc) sc.style.display=$('search').value?'':'none'; renderCards(); renderPlanilla(); });
+{ const sc=$('searchClear'); if(sc) sc.addEventListener('click', ()=>{ $('search').value=''; sc.style.display='none'; renderCards(); renderPlanilla(); $('search').focus(); }); }
 // densidad de la vista: Cómoda / Compacta
 function setDensity(d){
   document.body.classList.toggle('compacta', d==='compacta');
@@ -2118,7 +2167,6 @@ document.querySelectorAll('#dens button').forEach(x=>
   x.addEventListener('click', ()=> setDensity(x.dataset.d)));
 try{ setDensity(localStorage.getItem('ddl_density')||'comoda'); }catch(e){ setDensity('comoda'); }
 $('btnMerge').addEventListener('click', ()=> openMergeDialog());
-$('btnKaraoke').addEventListener('click', ()=> openPipOverlay(window));
 $('btnModoEst').addEventListener('click', ()=> studioToggleStrip());
 $('btnFull').addEventListener('click', ()=>{
   if(!pdfDoc && !(script && script.length)){ alert('Sube primero el libreto PDF para ver el libreto completo.'); return; }
@@ -3957,10 +4005,10 @@ function buildLibretoDoc(pc){
       <span class="sp"></span>
       <span class="goto"><span>pág.</span><input id="lGoto" type="number" min="1" placeholder="#"></span>
       <button id="lScope" title="Alcance: solo este personaje o todo el libreto">${pop2.scopeAll?'📖':'👤'}</button>
+      <select id="lCharSel" title="Resaltar un personaje" style="background:#191238;color:#ECE9FB;border:1px solid #2a2350;border-radius:8px;padding:5px 6px;font-size:12px;max-width:160px"></select>
       <button id="lTheme" title="Modo claro / oscuro">${pop2.theme==='dark'?'☀️':'🌙'}</button>
       <button id="lFontDn" title="Letra del personaje más pequeña">A−</button>
       <button id="lFontUp" title="Letra del personaje más grande">A+</button>
-      <button id="lPip" title="Vista sobre Pro Tools: ventana siempre encima">🎥</button>
       <button id="lClean" title="Vista limpia: solo el libreto">⛶</button>
       <button id="lVid" title="Video/audio del capítulo: mostrar u ocultar">🎬</button>
       <button id="lTablet" title="Modo tablet: herramientas de marcación">✏️</button>
@@ -4134,7 +4182,15 @@ function buildLibretoDoc(pc){
     ev.target.textContent = pop2.theme==='dark' ? '☀️' : '🌙';
     if(typeof syncSendTool==='function') syncSendTool('theme', pop2.theme);
   });
-  d.getElementById('lPip').addEventListener('click', ()=> openPipOverlay(pop2.win));
+  { const _sel = d.getElementById('lCharSel');
+    if(_sel) _sel.addEventListener('change', ()=>{
+      pop2.hl = _sel.value || null;
+      if(pop2.hl){ pop2.scopeAll = true; }      // mostrar todo el libreto y resaltar al elegido
+      try{ renderLibretoBlocks(); }catch(e){}
+      try{ renderLibretoChips(); }catch(e){}
+      try{ const f = pop2.doc.querySelector('.blk.mine'); if(f) f.scrollIntoView({block:'center', behavior:'smooth'}); }catch(e){}
+    });
+  }
   d.getElementById('lBack').addEventListener('click', ()=>{
     try{
       if(pop2.type==='inline'){ hideLibretoInline(); }
@@ -4317,13 +4373,14 @@ function renderLibretoBlocks(){
   // caer al libreto completo — jamás un libreto vacío
   if(pop2.key && !charIdx[pop2.key]){ pop2.key = null; pop2.scopeAll = true; }
   const key = pop2.key;
+  const highlight = pop2.hl || pop2.key;   // personaje resaltado desde el desplegable
   const c = charIdx[key];
   const pc = c ? c.color : '#A78BFA';
   const html = [];
   pop2.blockMap = [];
   let lastPage = 0;
   script.forEach((b, i)=>{
-    const mine = b.key === key;
+    const mine = b.key === highlight;
     if(!pop2.scopeAll){
       const near = mine || (script[i-1] && script[i-1].key===key) || (script[i+1] && script[i+1].key===key);
       if(!near) return;
@@ -4803,8 +4860,18 @@ function markChipCur(page){
   pop2.doc.querySelectorAll('#lChips .pgchip').forEach(x=> x.classList.toggle('cur', +x.dataset.pg===+page));
 }
 // chips de página en la ventana-libreto (para tablet/espejo)
+function fillCharSelect(){
+  if(!pop2 || !pop2.doc) return;
+  const sel = pop2.doc.getElementById('lCharSel'); if(!sel) return;
+  if(pop2.hl && !charIdx[pop2.hl]) pop2.hl = null;      // el resaltado ya no aplica a este capítulo
+  const cur = pop2.hl || '';
+  const list = chars.slice().sort((a,b)=> a.display.localeCompare(b.display,'es'));
+  sel.innerHTML = '<option value="">— Resaltar personaje —</option>' +
+    list.map(c=>'<option value="'+esc(c.key)+'"'+(c.key===cur?' selected':'')+'>'+esc(c.display)+' ('+c.totalInts+')</option>').join('');
+}
 function renderLibretoChips(){
   if(!pop2 || !pop2.doc) return;
+  try{ fillCharSelect(); }catch(e){}
   const box = pop2.doc.getElementById('lChips');
   if(!box) return;
   const c = pop2.key ? charIdx[pop2.key] : null;
