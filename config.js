@@ -1,12 +1,7 @@
 // ============================================================
-//  CONFIGURACIÓN DE SUPABASE
-//  Settings → API en tu proyecto:  Project URL  +  anon public
-//
-//  ⚠️ Estas claves apuntan a tu proyecto ACTUAL (funciona ya mismo).
-//  Para usar una BASE NUEVA (directriz 2): crea otro proyecto en
-//  Supabase, corre "esquema-v11-auth.sql" ahí, y pega aquí sus claves.
-//  La clave anon es pública y segura para el navegador: lo que protege
-//  los datos son las políticas RLS del esquema + el login.
+//  CONFIGURACIÓN DE SUPABASE · proyecto rdveoxcnrtirhxpmtmck
+//  Settings → API. La anon key es pública y segura para el navegador;
+//  lo que protege los datos son las políticas RLS + el login.
 // ============================================================
 window.SUPA = {
   url: "https://rdveoxcnrtirhxpmtmck.supabase.co",
