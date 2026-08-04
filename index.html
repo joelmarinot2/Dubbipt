@@ -507,7 +507,7 @@ body.compacta .pla td{padding:9px 10px}
     <span class="chip conn" id="hdrConn" style="display:none">● Sin conexión</span>
     <span class="hsp"></span>
     <button class="chip" id="btnSync" style="display:none" onclick="syncMenu()" title="Sincronización tablet ↔ escritorio">Sincronizar</button>
-    <button class="chip" id="btnStudio" style="display:none" onclick="showStudioPicker()" title="Cambiar de estudio o rol">Estudio</button>
+    <button class="chip" id="btnStudio" style="display:none" onclick="showWorkspacePicker(true)" title="Espacio de trabajo">Espacio</button>
     <button class="chip" id="btnInstall" onclick="ddlInstall()" title="Instalar como aplicación">Instalar app</button>
     <button class="chip" id="btnOut" style="display:none">Cerrar sesión</button>
   </div>
@@ -611,86 +611,127 @@ function authUnlock(){
     } else setTimeout(hook, 120);
   })();
 }
-/* ============ ESTUDIOS: ingreso de un clic, sin contraseña ============ */
-let STUDIO = null;
-try{ STUDIO = JSON.parse(localStorage.getItem('ddl_studio')||'null'); }catch(e){}
+/* ============ ESPACIOS DE TRABAJO (privados por cuenta) ============ */
+let WORKSPACE = null;
+try{ WORKSPACE = JSON.parse(localStorage.getItem('ddl_ws')||'null'); }catch(e){}
+let libWorkspaces = [];
+let DEVROLE = null;                 // rol del dispositivo para la sincronía (tablet/pc)
+try{ DEVROLE = localStorage.getItem('ddl_role')||null; }catch(e){}
 
-const STUDIO_COLORS = ['#A78BFA','#3FD0EE','#F0A35E','#F472B6','#4ADE80','#FACC15','#60A5FA','#FB7185'];
-
-function showStudioPicker(){
+async function libFetchWorkspaces(){
+  try{
+    let { data, error } = await sb.from('workspaces').select('*').order('created_at');
+    if(error && authErr(error) && await reAuth()){ ({data}=await sb.from('workspaces').select('*').order('created_at')); }
+    libWorkspaces = data || [];
+  }catch(e){ libWorkspaces = []; }
+  return libWorkspaces;
+}
+async function createWorkspace(name){
+  const { data, error } = await sb.from('workspaces').insert({ name:name.trim() }).select().single();
+  if(error){ libMsg('No se pudo crear el espacio: '+error.message+(/workspaces|relation/i.test(error.message||'')?' — corre esquema-original-v11.sql':'')); return null; }
+  libWorkspaces.push(data); return data;
+}
+function setWorkspace(ws){
+  WORKSPACE = ws ? { id:ws.id, name:ws.name } : null;
+  try{ localStorage.setItem('ddl_ws', JSON.stringify(WORKSPACE)); }catch(e){}
+  applyWorkspace();
+}
+function showWorkspacePicker(force){
   const old = document.getElementById('sPick'); if(old) old.remove();
-  const ov = document.createElement('div');
-  ov.id = 'sPick';
+  const ov = document.createElement('div'); ov.id='sPick';
   ov.style.cssText='position:fixed;inset:0;z-index:9998;background:rgba(8,5,20,.92);display:flex;align-items:center;justify-content:center;overflow:auto;padding:20px';
   const card = document.createElement('div');
-  card.style.cssText='background:#171232;border:1px solid #2a2350;border-radius:20px;padding:26px;width:min(560px,94vw);text-align:center';
-  card.innerHTML = '<div style="font-family:\'Space Grotesk\',sans-serif;font-size:19px;font-weight:700;color:#ECE9FB;margin-bottom:4px">¿Qué estudio eres?</div>'
-    + '<div style="font-size:13px;color:#8B84B0;margin-bottom:18px">Toca tu estudio — sin contraseña</div>'
-    + '<div id="sGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px"></div>'
-    + '<div id="sRole" style="display:none;margin-top:6px"></div>'
-    + '<div style="margin-top:20px;padding-top:14px;border-top:1px solid #241d47">'
-    +   '<button id="sReset" style="width:100%;padding:11px;border:1px solid #3a2f5e;border-radius:10px;background:#120d29;color:#C7C0E6;font-size:13px;font-weight:600;cursor:pointer">🧹 Reparar capítulos (limpiar caché de este dispositivo)</button>'
-    +   '<div style="font-size:11.5px;color:#6E678F;margin-top:7px;line-height:1.4">Úsalo si un capítulo muestra el libreto o los archivos de otro programa. Se vuelven a descargar; nada se pierde en la nube.</div>'
-    + '</div>';
-  ov.appendChild(card);
-  document.body.appendChild(ov);
-  { const rb = card.querySelector('#sReset'); if(rb) rb.onclick = ()=> ddlResetCache(); }
-  const grid = card.querySelector('#sGrid');
-  for(let n=1;n<=8;n++){
-    const b = document.createElement('button');
-    const col = STUDIO_COLORS[n-1];
-    b.style.cssText='padding:20px 8px;border:1px solid '+col+'55;border-radius:14px;background:linear-gradient(150deg,'+col+'22,transparent);color:#ECE9FB;font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:15px;cursor:pointer';
-    b.innerHTML = '<span style="display:block;font-size:22px;margin-bottom:4px;color:'+col+'">🎬</span>ESTUDIO '+n;
-    b.onclick = ()=> pickRole(n);
-    grid.appendChild(b);
-  }
-  function pickRole(n){
-    grid.style.display='none';
-    const r = card.querySelector('#sRole');
-    const col = STUDIO_COLORS[n-1];
-    r.style.display='block';
-    r.innerHTML = '<div style="font-family:\'Space Grotesk\',sans-serif;font-size:16px;font-weight:700;color:'+col+';margin:4px 0 14px">ESTUDIO '+n+' — ¿este dispositivo?</div>'
-      + '<button id="sTab" style="width:100%;padding:15px;margin-bottom:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#A78BFA,#7C5CE0);color:#160f33;font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:15px;cursor:pointer">📱 Soy la TABLET (control / trackpad)</button>'
-      + '<button id="sPc" style="width:100%;padding:15px;margin-bottom:12px;border:1px solid #2a2350;border-radius:12px;background:#191238;color:#ECE9FB;font-family:\'Space Grotesk\',sans-serif;font-weight:600;font-size:15px;cursor:pointer">💻 Soy el ESCRITORIO (muestra el libreto)</button>'
-      + '<button id="sBack" style="border:none;background:none;color:#8B84B0;font-size:12px;cursor:pointer">⬅ elegir otro estudio</button>';
-    r.querySelector('#sTab').onclick = ()=> chooseStudio(n,'tablet');
-    r.querySelector('#sPc').onclick  = ()=> chooseStudio(n,'pc');
-    r.querySelector('#sBack').onclick = ()=>{ r.style.display='none'; grid.style.display='grid'; };
-  }
-  function chooseStudio(n, role){
-    if(sync.isOn) syncDisconnect();
-    STUDIO = { n, role };
-    try{ localStorage.setItem('ddl_studio', JSON.stringify(STUDIO)); }catch(e){}
-    ov.remove();
-    applyStudio();
-  }
+  card.style.cssText='background:#171232;border:1px solid #2a2350;border-radius:20px;padding:26px;width:min(520px,94vw);text-align:center';
+  const list = libWorkspaces.map(w=>{
+    const active = WORKSPACE && WORKSPACE.id===w.id;
+    return '<div class="wsRow" data-id="'+w.id+'" style="display:flex;align-items:center;gap:10px;padding:12px 14px;margin:8px 0;border:1px solid '+(active?'#7C5CE0':'#2a2350')+';border-radius:12px;background:'+(active?'#1c1540':'#120d29')+';cursor:pointer">'
+      + '<span style="font-size:20px">🗂️</span>'
+      + '<b style="flex:1;text-align:left;font-family:\'Space Grotesk\',sans-serif;color:#ECE9FB">'+esc(w.name)+'</b>'
+      + (active?'<span style="color:#4ADE80;font-size:12px">actual</span>':'')
+      + '<button class="wsDel" data-id="'+w.id+'" title="Borrar espacio" style="border:none;background:none;color:#6E678F;cursor:pointer;font-size:15px">🗑️</button>'
+      + '</div>';
+  }).join('');
+  card.innerHTML = '<div style="font-family:\'Space Grotesk\',sans-serif;font-size:19px;font-weight:700;color:#ECE9FB;margin-bottom:4px">Espacios de trabajo</div>'
+    + '<div style="font-size:13px;color:#8B84B0;margin-bottom:16px">Cada espacio tiene sus propios programas y capítulos</div>'
+    + '<div id="wsList">'+(list||'<div style="color:#6E678F;font-size:13px;padding:10px">Aún no tienes espacios. Crea el primero abajo.</div>')+'</div>'
+    + '<div style="display:flex;gap:8px;margin-top:10px">'
+    +   '<input id="wsName" placeholder="Nombre del nuevo espacio (ej. Netflix)" style="flex:1;background:#191238;border:1px solid #2a2350;border-radius:10px;padding:11px 13px;color:#ECE9FB;font-size:14px;outline:none">'
+    +   '<button id="wsAdd" style="border:none;border-radius:10px;padding:11px 16px;background:linear-gradient(135deg,#A78BFA,#7C5CE0);color:#160f33;font-family:\'Space Grotesk\',sans-serif;font-weight:700;cursor:pointer">Crear</button>'
+    + '</div>'
+    + (WORKSPACE ? '<button id="wsClose" style="margin-top:16px;border:none;background:none;color:#8B84B0;font-size:13px;cursor:pointer">Cerrar</button>' : '');
+  ov.appendChild(card); document.body.appendChild(ov);
+  card.querySelectorAll('.wsRow').forEach(row=>{
+    row.addEventListener('click', e=>{
+      if(e.target.classList.contains('wsDel')) return;
+      const w = libWorkspaces.find(x=>x.id===row.dataset.id); if(w){ ov.remove(); setWorkspace(w); }
+    });
+  });
+  card.querySelectorAll('.wsDel').forEach(b=>{
+    b.addEventListener('click', async e=>{
+      e.stopPropagation();
+      const w = libWorkspaces.find(x=>x.id===b.dataset.id); if(!w) return;
+      if(!confirm('¿Borrar el espacio «'+w.name+'» y TODOS sus programas y capítulos?')) return;
+      try{ await sb.from('workspaces').delete().eq('id', w.id); }catch(err){ libMsg('No se pudo borrar: '+err.message); return; }
+      libWorkspaces = libWorkspaces.filter(x=>x.id!==w.id);
+      if(WORKSPACE && WORKSPACE.id===w.id){ WORKSPACE=null; try{localStorage.removeItem('ddl_ws');}catch(_){} }
+      ov.remove(); showWorkspacePicker(true);
+    });
+  });
+  const add = async ()=>{ const nm=(card.querySelector('#wsName').value||'').trim(); if(!nm) return;
+    const w = await createWorkspace(nm); if(w){ ov.remove(); setWorkspace(w); } };
+  card.querySelector('#wsAdd').onclick = add;
+  card.querySelector('#wsName').addEventListener('keydown', e=>{ if(e.key==='Enter') add(); });
+  const cl = card.querySelector('#wsClose'); if(cl) cl.onclick = ()=> ov.remove();
 }
-function applyStudio(){
-  updateStudioChip();
+function applyWorkspace(){
+  updateWorkspaceChip();
   autoSync();
-  try{ if(typeof renderLibrary==='function') renderLibrary(true); }catch(e){}
+  try{ if(typeof LDB!=='undefined') LDB.showId=null; if(typeof renderLibrary==='function') renderLibrary(true); }catch(e){}
 }
-function updateStudioChip(){
+function updateWorkspaceChip(){
   const sBtn = document.getElementById('btnSync');
-  if(sBtn) sBtn.style.display = (typeof STUDIO!=='undefined' && STUDIO && STUDIO.n) ? '' : 'none';
+  if(sBtn) sBtn.style.display = (WORKSPACE && WORKSPACE.id) ? '' : 'none';
   const b = document.getElementById('btnStudio');
   if(!b) return;
-  if(STUDIO && STUDIO.n){
-    b.style.display='';
-    b.textContent = '🎬 ESTUDIO '+STUDIO.n+' · '+(STUDIO.role==='tablet'?'📱':'💻');
-  } else b.style.display='none';
+  b.style.display='';
+  b.textContent = (WORKSPACE && WORKSPACE.id) ? ('🗂️ '+WORKSPACE.name) : '🗂️ Elegir espacio';
 }
 function autoSync(){
-  if(sb && sbUser && STUDIO && STUDIO.n && !sync.isOn && sync.role!==STUDIO.role){
-    try{ syncConnect(STUDIO.role); }catch(e){ console.error(e); }
-  } else if(sb && sbUser && STUDIO && STUDIO.n && !sync.isOn){
-    try{ syncConnect(STUDIO.role); }catch(e){ console.error(e); }
+  if(sb && sbUser && WORKSPACE && WORKSPACE.id && DEVROLE && !sync.isOn){
+    try{ syncConnect(DEVROLE); }catch(e){ console.error(e); }
   }
 }
-function ensureStudio(){
-  if(STUDIO && STUDIO.n && STUDIO.role) applyStudio();
-  else showStudioPicker();
+async function ensureWorkspace(){
+  await libFetchWorkspaces();
+  if(WORKSPACE && libWorkspaces.some(w=>w.id===WORKSPACE.id)){
+    const w = libWorkspaces.find(x=>x.id===WORKSPACE.id); WORKSPACE.name = w.name;
+    applyWorkspace();
+  } else if(libWorkspaces.length){
+    setWorkspace(libWorkspaces[0]);
+  } else {
+    updateWorkspaceChip(); showWorkspacePicker(true);
+  }
 }
+// rol del dispositivo (una vez): tablet controla / escritorio muestra
+function pickRole(){
+  const old=document.getElementById('sPick'); if(old) old.remove();
+  const ov=document.createElement('div'); ov.id='sPick';
+  ov.style.cssText='position:fixed;inset:0;z-index:9998;background:rgba(8,5,20,.92);display:flex;align-items:center;justify-content:center;padding:20px';
+  const card=document.createElement('div');
+  card.style.cssText='background:#171232;border:1px solid #2a2350;border-radius:20px;padding:26px;width:min(420px,94vw);text-align:center';
+  card.innerHTML='<div style="font-family:\'Space Grotesk\',sans-serif;font-size:17px;font-weight:700;color:#ECE9FB;margin-bottom:14px">Sincronía · ¿este dispositivo?</div>'
+    +'<button id="rTab" style="width:100%;padding:15px;margin-bottom:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#A78BFA,#7C5CE0);color:#160f33;font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:15px;cursor:pointer">📱 Soy la TABLET (control)</button>'
+    +'<button id="rPc" style="width:100%;padding:15px;border:1px solid #2a2350;border-radius:12px;background:#191238;color:#ECE9FB;font-family:\'Space Grotesk\',sans-serif;font-weight:600;font-size:15px;cursor:pointer">💻 Soy el ESCRITORIO (muestra el libreto)</button>';
+  ov.appendChild(card); document.body.appendChild(ov);
+  const choose=(role)=>{ try{localStorage.setItem('ddl_role',role);}catch(e){} DEVROLE=role; sync.role=role; ov.remove(); if(sync.isOn) syncDisconnect(); syncConnect(role); };
+  card.querySelector('#rTab').onclick=()=>choose('tablet');
+  card.querySelector('#rPc').onclick=()=>choose('pc');
+}
+// compatibilidad con nombres antiguos (siguen funcionando en el resto del código)
+function showStudioPicker(){ showWorkspacePicker(true); }
+function ensureStudio(){ ensureWorkspace(); }
+function applyStudio(){ applyWorkspace(); }
+function updateStudioChip(){ updateWorkspaceChip(); }
 
 function authErr(e){
   const m = ((e && (e.message || e.error_description || e.msg)) || '') + '';
@@ -2397,8 +2438,8 @@ async function libEnsure(){
 }
 function sbShows(){
   const all = LDB.shows || [];
-  if(!STUDIO || !STUDIO.n) return all;                     // sin estudio elegido: ver todo
-  return all.filter(sh => sh.studio == null || sh.studio === STUDIO.n);
+  if(!WORKSPACE || !WORKSPACE.id) return [];               // sin espacio elegido: nada
+  return all.filter(sh => sh.workspace_id === WORKSPACE.id);
 }
 function sbEps(showId){
   const all = LDB.epsAll || [];
@@ -2503,7 +2544,7 @@ async function renderLibrary(silent){
 
     if(libView==='shows' || !LDB.showId){
       libView='shows';
-      crumb.innerHTML = '📚 Programas' + (STUDIO && STUDIO.n ? ' · <span style="color:var(--violet-2)">Estudio '+STUDIO.n+'</span>' : '');
+      crumb.innerHTML = '📚 Programas' + (WORKSPACE && WORKSPACE.name ? ' · <span style="color:var(--violet-2)">'+esc(WORKSPACE.name)+'</span>' : '');
       act.style.display=''; act.textContent='＋ Nuevo programa'; act.onclick=newShow;
       grid.innerHTML = shows.length ? '' : '<div class="lib-empty2">Aún no hay programas. Crea el primero con ＋ Nuevo programa.</div>';
       const counts = {};
@@ -2658,14 +2699,13 @@ async function renderLibrary(silent){
 }
 
 async function newShow(){
-  if(!STUDIO || !STUDIO.n){ libMsg('Elige primero tu estudio (botón 🎬 Estudio)'); if(typeof showStudioPicker==='function') showStudioPicker(); return; }
+  if(!WORKSPACE || !WORKSPACE.id){ libMsg('Elige o crea primero un espacio de trabajo'); showWorkspacePicker(true); return; }
   const name = prompt('Nombre del programa (ej: Framework, Cien Años de Soledad):');
   if(!name || !name.trim()) return;
-  let ins = { name:name.trim(), studio: STUDIO.n };
+  let ins = { name:name.trim(), workspace_id: WORKSPACE.id };
   let r = await sb.from('shows').insert(ins).select().single();
-  if(r.error && /studio/i.test(r.error.message||'')){
-    // la base aún no tiene la columna studio: crear sin ella para no bloquear
-    r = await sb.from('shows').insert({ name:name.trim() }).select().single();
+  if(r.error && /workspace_id|column|schema/i.test(r.error.message||'')){
+    libMsg('Falta actualizar la base: corre esquema-original-v11.sql (añade workspace_id).'); return;
   }
   const { data, error } = r;
   if(error){ libMsg('No se pudo crear: '+error.message); return; }
@@ -3685,7 +3725,7 @@ function fmtTC4(sec){
 }
 function openLibretoWindow(key){
   // TABLET → según el modo elegido: trackpad, libreto convencional, o preguntar
-  if(typeof STUDIO!=='undefined' && STUDIO && STUDIO.role==='tablet' && !TP._skip){
+  if(DEVROLE==='tablet' && !TP._skip){
     const m = tabModeRaw();
     if(m==='trackpad') return openTrackpad(key);
     if(m!=='espejo')  return showTabChooser(key);   // sin preferencia guardada: elegir
@@ -3924,7 +3964,7 @@ function buildLibretoDoc(pc){
       <button id="lClean" title="Vista limpia: solo el libreto">⛶</button>
       <button id="lVid" title="Video/audio del capítulo: mostrar u ocultar">🎬</button>
       <button id="lTablet" title="Modo tablet: herramientas de marcación">✏️</button>
-      ${(typeof STUDIO!=='undefined' && STUDIO && STUDIO.role==='tablet') ? '<button id="lTpad" title="Pasar al trackpad: controlar el libreto del escritorio">🎛️</button>' : ''}
+      ${(DEVROLE==='tablet') ? '<button id="lTpad" title="Pasar al trackpad: controlar el libreto del escritorio">🎛️</button>' : ''}
       <button id="lFind" title="Buscar en el libreto">🔍</button>
       <button id="lPron" title="Pronunciaciones del libreto">🗣</button>
       <span class="conn no" id="lConn2" style="display:none"></span>
@@ -4836,10 +4876,11 @@ const sync = { channel:null, room:null, isOn:false, role:null, marks:{},
 function syncToggle(){
   if(sync.isOn){ syncDisconnect(); return; }
   if(!sb){ libMsg('La sincronía solo está en la versión nube'); return; }
-  if(!(typeof STUDIO!=='undefined' && STUDIO && STUDIO.n)){ showStudioPicker(); return; }
-  syncConnect(STUDIO.role);
+  if(!(WORKSPACE && WORKSPACE.id)){ showWorkspacePicker(true); return; }
+  if(!DEVROLE){ pickRole(); return; }
+  syncConnect(DEVROLE);
 }
-function askRole(){ showStudioPicker(); }
+function askRole(){ pickRole(); }
 function appBack(){
   const li = document.getElementById('libInline');
   if(li && li.style.display!=='none'){ hideLibretoInline(); updateBackBtn(); return; }
@@ -4884,7 +4925,7 @@ function updateFloatCtl(){
   const li = document.getElementById('libInline');
   const libOpen = li && li.style.display!=='none';
   const chooser = document.getElementById('tabChooser');
-  const isTab = (typeof STUDIO!=='undefined' && STUDIO && STUDIO.role==='tablet');
+  const isTab = (DEVROLE==='tablet');
   let show = false, txt = '';
   if(hasEp && !tpOpen && !libOpen && !chooser){
     if(isTab){ show = true; txt = (typeof tabMode==='function' && tabMode()==='espejo') ? '📜 Abrir el libreto' : '🎛️ Abrir el control'; }
@@ -4899,7 +4940,7 @@ function updateFloatCtl(){
       + 'font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:15px;cursor:pointer;'
       + 'box-shadow:0 10px 34px rgba(124,92,224,.45)';
     b.onclick = ()=>{
-      const tab = (typeof STUDIO!=='undefined' && STUDIO && STUDIO.role==='tablet');
+      const tab = (DEVROLE==='tablet');
       const k = (pop2 && pop2.key!==undefined && pop2.key && charIdx[pop2.key]) ? pop2.key : null;
       if(tab) openLibretoWindow(k);       // respeta el modo elegido (trackpad / espejo / preguntar)
       else showLibretoAgain();
@@ -4946,7 +4987,7 @@ function setTabMode(m){ try{ localStorage.setItem('ddl_tabmode', m); }catch(e){}
 function syncMenu(){
   const prev = document.getElementById('syncPop');
   if(prev){ prev.remove(); return; }
-  if(typeof STUDIO==='undefined' || !STUDIO || !STUDIO.n){ if(typeof showStudioPicker==='function') showStudioPicker(); return; }
+  if(!(WORKSPACE && WORKSPACE.id)){ showWorkspacePicker(true); return; }
   const linked = sync.isOn && sync.peers>1;
   const pop = document.createElement('div');
   pop.id = 'syncPop';
@@ -4957,18 +4998,18 @@ function syncMenu(){
     '<div style="font-weight:700;margin-bottom:4px">'
       + (linked ? '✓ Tablet y escritorio sincronizados' : (sync.isOn ? '⏳ Esperando al otro dispositivo…' : '● Sin conexión'))
     + '</div>'
-    + '<div style="color:#8B84B0;font-size:12px">Estudio '+STUDIO.n+' · '+(STUDIO.role==='tablet'?'📱 Tablet':'💻 Escritorio')+'</div>'
+    + '<div style="color:#8B84B0;font-size:12px">'+esc(WORKSPACE.name)+' · '+(DEVROLE==='tablet'?'📱 Tablet':(DEVROLE==='pc'?'💻 Escritorio':'sin rol — pulsa Sincronizar'))+'</div>'
     + '<button id="spRe" style="'+btn+'">🔄 Reconectar ahora</button>'
-    + (STUDIO.role==='tablet'
+    + (DEVROLE==='tablet'
       ? '<div style="margin-top:12px;font-weight:700;font-size:12.5px;color:#B8B2D8">MODO DE LA TABLET</div>'
         + '<button id="spTp" style="'+btn+(mode==='trackpad'?';border-color:#4ADE80;background:#12261a':'')+'">🖱️ Trackpad (control del escritorio)'+(mode==='trackpad'?' ✓':'')+'</button>'
         + '<button id="spEs" style="'+btn+(mode==='espejo'?';border-color:#4ADE80;background:#12261a':'')+'">📜 Libreto en la tablet (espejo)'+(mode==='espejo'?' ✓':'')+'</button>'
         + '<div style="color:#6E678F;font-size:11px;margin-top:4px">Se aplica al abrir un personaje o el libreto</div>'
       : '')
-    + '<button id="spSt" style="'+btn+'">🎬 Cambiar estudio / rol</button>';
+    + '<button id="spSt" style="'+btn+'">🔁 Cambiar rol (tablet / escritorio)</button>';
   document.body.appendChild(pop);
-  document.getElementById('spRe').onclick = ()=>{ pop.remove(); if(sync.role) syncConnect(sync.role); else if(typeof showStudioPicker==='function') showStudioPicker(); };
-  document.getElementById('spSt').onclick = ()=>{ pop.remove(); if(typeof showStudioPicker==='function') showStudioPicker(); };
+  document.getElementById('spRe').onclick = ()=>{ pop.remove(); if(DEVROLE) syncConnect(DEVROLE); else pickRole(); };
+  document.getElementById('spSt').onclick = ()=>{ pop.remove(); pickRole(); };
   const tp = document.getElementById('spTp'), es = document.getElementById('spEs');
   if(tp) tp.onclick = ()=>{ setTabMode('trackpad'); pop.remove(); syncMenu(); };
   if(es) es.onclick = ()=>{ setTabMode('espejo'); pop.remove(); syncMenu(); };
@@ -4977,14 +5018,14 @@ function syncMenu(){
   }), 60);
 }
 async function syncConnect(role){
-  if(role) sync.role = role;
+  if(role){ sync.role = role; DEVROLE = role; }
   if(!sync.role) return;
   if(sync._connecting) return;             // ya hay un intento en curso: no duplicar
   if(sync.isOn && sync.channel) return;    // ya conectado
   sync._connecting = true;
   // limpiar por completo cualquier canal anterior (evita canales fantasma que pelean)
   if(sync.channel){ try{ sb.removeChannel(sync.channel); }catch(e){} sync.channel = null; }
-  sync.room = 'studio:' + ((typeof STUDIO!=='undefined' && STUDIO && STUDIO.n) ? STUDIO.n : 'x');
+  sync.room = 'ws:' + ((WORKSPACE && WORKSPACE.id) ? WORKSPACE.id : 'x');
   const role0 = sync.role;
   const ch = sb.channel(sync.room, { config:{ broadcast:{ self:false, ack:false }, presence:{ key:sync.meId } } });
   sync.channel = ch;
@@ -5029,7 +5070,7 @@ async function syncConnect(role){
           if(pop2.key!==null || pop2.scopeAll) syncSendOpen(pop2.key);
           setTimeout(()=>{ if(typeof emitLibPos==='function') emitLibPos(true); }, 700);
         }
-        const eNm = (typeof STUDIO!=='undefined' && STUDIO && STUDIO.n) ? ('ESTUDIO '+STUDIO.n) : 'Estudio';
+        const eNm = (WORKSPACE && WORKSPACE.name) ? WORKSPACE.name : 'Espacio';
         libMsg((role0==='tablet' ? '📱 ' : '💻 ')+eNm+' conectado'+(role0==='tablet'?' — control listo':' — mostrando el libreto'));
       } else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT' || status==='CLOSED'){
         sync._connecting = false;
@@ -5148,7 +5189,7 @@ function isMirror(){ return sync.isOn && sync.role==='pc'; }
 function updateSyncUI(){
   const b = document.getElementById('btnSync');
   if(b){
-    const en = (typeof STUDIO!=='undefined' && STUDIO && STUDIO.n) ? ('E'+STUDIO.n+' ') : '';
+    const en = (WORKSPACE && WORKSPACE.name) ? (WORKSPACE.name.slice(0,4)+' ') : '';
     const icon = sync.role==='tablet' ? '📱' : (sync.role==='pc' ? '💻' : '🔗');
     const linked = sync.isOn && sync.peers>1;      // los dos dispositivos presentes
     const waiting = sync.isOn && sync.peers<=1;     // yo conectado, falta el otro
