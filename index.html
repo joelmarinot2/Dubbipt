@@ -16,7 +16,7 @@
   --bg:#150F30; --panel:#1E1740; --panel-2:#241C4E; --inset:#191238;
   --line:#3a2f6b; --line-soft:#2c2358;
   --ink:#EFECFB; --ink-dim:#B4ADD9; --ink-faint:#7d76a8;
-  --violet:#A78BFA; --violet-2:#C4B5FD; --glow:rgba(167,139,250,.30);
+  --violet:#5FC85A; --violet-2:#A9E6A9; --glow:rgba(95,200,90,.30);
   --ok:#4ADE80;
   --disp:'Space Grotesk',sans-serif; --body:'Inter',sans-serif;
   --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
@@ -26,7 +26,7 @@
 html,body{height:100%}
 body{
   font-family:var(--body);color:var(--ink);background:
-  radial-gradient(1100px 560px at 80% -10%, rgba(167,139,250,.13), transparent 60%),
+  radial-gradient(1100px 560px at 80% -10%, rgba(95,200,90,.13), transparent 60%),
   radial-gradient(900px 520px at -5% 105%, rgba(63,208,238,.08), transparent 55%),
   var(--bg);
   min-height:100dvh;
@@ -34,7 +34,7 @@ body{
 .wrap{max-width:1100px;margin:0 auto;padding:26px 20px 60px}
 header{display:flex;align-items:center;gap:14px;margin-bottom:22px}
 .mk{width:44px;height:44px;border-radius:12px;flex:none;display:grid;place-items:center;
-  background:linear-gradient(135deg,var(--violet),#7C5CE0);color:#160f33;
+  background:linear-gradient(135deg,var(--violet),#4CB84C);color:#160f33;
   font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:.5px;
   box-shadow:0 4px 18px var(--glow)}
 header h1{font-family:var(--disp);font-weight:700;font-size:21px;letter-spacing:.2px}
@@ -45,7 +45,7 @@ header p{font-size:13px;color:var(--ink-dim);margin-top:2px}
 .drop{border:1.5px dashed var(--line);border-radius:var(--r);background:var(--panel);
   padding:18px;cursor:pointer;transition:border-color .15s,background .15s}
 .drop:hover,.drop.over{border-color:var(--violet);background:var(--panel-2)}
-.drop.ok{border-style:solid;border-color:rgba(167,139,250,.55)}
+.drop.ok{border-style:solid;border-color:rgba(95,200,90,.55)}
 .drop .ic{font-size:22px;margin-bottom:8px}
 .drop b{font-family:var(--disp);font-size:15px;display:block}
 .drop small{color:var(--ink-dim);font-size:12.5px;display:block;margin-top:3px}
@@ -72,16 +72,16 @@ header p{font-size:13px;color:var(--ink-dim);margin-top:2px}
   padding:15px 16px 14px;cursor:pointer;transition:transform .12s,border-color .12s,box-shadow .12s;
   position:relative;overflow:hidden}
 .card:hover{transform:translateY(-2px);border-color:var(--violet);box-shadow:0 8px 24px rgba(0,0,0,.35)}
-.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cc,#A78BFA)}
+.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cc,#5FC85A)}
 .card.done{opacity:.72}
 .card .top{display:flex;align-items:baseline;gap:8px;margin-bottom:3px}
-.card h3{font-family:var(--disp);font-weight:600;font-size:15.5px;color:var(--cc,#A78BFA)}
+.card h3{font-family:var(--disp);font-weight:600;font-size:15.5px;color:var(--cc,#5FC85A)}
 .card .n{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);flex:none}
 .card .tal{font-size:13px;color:var(--ink-dim);margin-bottom:8px}
 .card .tal b{color:var(--ink);font-weight:600}
 .card .tal .ng{color:var(--ink-faint);font-style:italic}
 .bar{height:5px;border-radius:3px;background:var(--inset);margin-bottom:9px;overflow:hidden}
-.bar i{display:block;height:100%;background:var(--cc,#A78BFA);border-radius:3px;transition:width .25s}
+.bar i{display:block;height:100%;background:var(--cc,#5FC85A);border-radius:3px;transition:width .25s}
 .card.done .bar i{background:var(--ok)}
 .pgs{display:flex;flex-wrap:wrap;gap:5px}
 .pg{font-family:var(--mono);font-size:11px;padding:3px 7px;border-radius:7px;
@@ -129,7 +129,7 @@ header p{font-size:13px;color:var(--ink-dim);margin-top:2px}
   .fcard .ldel,.fcard .lren,.fcard .lmov,.fcard .lupd{opacity:1}
 }
 .fcard:hover .lren,.fcard:hover .lmov{opacity:1}
-.fcard .lren:hover{color:#A78BFA}
+.fcard .lren:hover{color:#5FC85A}
 .fcard .lmov:hover{color:#3FD0EE}
 .fcard .ldel:hover{color:#FB7185}
 .fcard.newc{border-style:dashed;background:transparent;color:var(--ink-faint)}
@@ -160,18 +160,18 @@ header p{font-size:13px;color:var(--ink-dim);margin-top:2px}
 .pla td{padding:10px 12px;border-bottom:1px solid var(--line-soft);vertical-align:middle}
 .pla tbody tr:nth-child(even) td{background:rgba(255,255,255,.014)}
 .pla tr:last-child td{border-bottom:none}
-.pla tbody tr:hover td{background:rgba(167,139,250,.07)}
+.pla tbody tr:hover td{background:rgba(95,200,90,.07)}
 .pla tr.done td{background:rgba(74,222,128,.055)}
 .pla .pnm{min-width:190px}
 .pla .pnm .nrow{display:flex;align-items:center;gap:8px;white-space:nowrap}
-.pla .pnm .cdot{width:11px;height:11px;border-radius:4px;background:var(--pc,#A78BFA);flex:none;
+.pla .pnm .cdot{width:11px;height:11px;border-radius:4px;background:var(--pc,#5FC85A);flex:none;
   box-shadow:0 0 8px var(--pc)}
 .pla .pnm .nm2{font-family:var(--disp);font-weight:600;font-size:12.5px;color:var(--ink)}
 .pla tr.done .pnm .nm2{color:var(--ok)}
 .pla .bdg{font-size:9px;font-weight:700;letter-spacing:.6px;padding:2px 7px;border-radius:99px;
   background:rgba(74,222,128,.16);color:var(--ok);border:1px solid rgba(74,222,128,.4)}
 .pla .pbar{height:4px;border-radius:2px;background:var(--inset);margin-top:6px;overflow:hidden;max-width:170px}
-.pla .pbar i{display:block;height:100%;background:var(--pc,#A78BFA)}
+.pla .pbar i{display:block;height:100%;background:var(--pc,#5FC85A)}
 .pla tr.done .pbar i{background:var(--ok)}
 .pla .ptime{font-family:var(--mono);font-size:11px;color:var(--violet-2);white-space:nowrap}
 .pla .ploc{white-space:nowrap;color:var(--ink)}
@@ -183,7 +183,7 @@ header p{font-size:13px;color:var(--ink-dim);margin-top:2px}
   cursor:pointer;line-height:1.15;transition:transform .08s,background .08s}
 .pla .pcell b{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink)}
 .pla .pcell i{font-style:normal;font-family:var(--mono);font-size:9px;color:var(--ink-faint)}
-.pla .pcell:hover{background:var(--pc,#A78BFA);transform:translateY(-1px);border-color:transparent}
+.pla .pcell:hover{background:var(--pc,#5FC85A);transform:translateY(-1px);border-color:transparent}
 .pla .pcell:hover b,.pla .pcell:hover i{color:#160f33}
 .pla .pcell.rec{border-color:rgba(74,222,128,.45);background:rgba(74,222,128,.08)}
 .pla .pcell.rec b{color:var(--ok);text-decoration:line-through}
@@ -204,13 +204,13 @@ header p{font-size:13px;color:var(--ink-dim);margin-top:2px}
 /* ===== acceso ===== */
 body.locked .wrap{filter:blur(7px);pointer-events:none;user-select:none}
 .gate{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(900px 500px at 70% 20%, rgba(167,139,250,.16), transparent 60%), rgba(10,6,26,.88);
+  background:radial-gradient(900px 500px at 70% 20%, rgba(95,200,90,.16), transparent 60%), rgba(10,6,26,.88);
   backdrop-filter:blur(4px)}
 .gate.off{display:none}
 .gcard{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:30px 30px 24px;
   width:min(360px,92vw);box-shadow:0 24px 70px rgba(0,0,0,.6)}
 .gcard .glogo{width:52px;height:52px;border-radius:14px;margin:0 auto 14px;display:grid;place-items:center;
-  background:linear-gradient(135deg,var(--violet),#7C5CE0);color:#160f33;
+  background:linear-gradient(135deg,var(--violet),#4CB84C);color:#160f33;
   font-family:var(--disp);font-weight:700;font-size:18px;box-shadow:0 6px 22px var(--glow)}
 .gcard h2{font-family:var(--disp);font-size:17px;font-weight:700;text-align:center;margin-bottom:4px}
 .gcard p{font-size:12.5px;color:var(--ink-dim);text-align:center;margin-bottom:18px}
@@ -223,7 +223,7 @@ body.locked .wrap{filter:blur(7px);pointer-events:none;user-select:none}
 .gcard .keep{display:flex;align-items:center;gap:8px;margin:14px 2px 6px;font-size:12.5px;color:var(--ink-dim);cursor:pointer}
 .gcard .keep input{accent-color:var(--violet)}
 .gbtn{width:100%;margin-top:12px;border:none;border-radius:11px;padding:12px;cursor:pointer;
-  background:linear-gradient(135deg,var(--violet),#7C5CE0);color:#160f33;
+  background:linear-gradient(135deg,var(--violet),#4CB84C);color:#160f33;
   font-family:var(--disp);font-weight:700;font-size:14px;letter-spacing:.3px}
 .gbtn:hover{filter:brightness(1.08)}
 .gerr{min-height:16px;font-size:12px;color:#FB7185;text-align:center;margin-top:10px}
@@ -235,23 +235,23 @@ body.locked .wrap{filter:blur(7px);pointer-events:none;user-select:none}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 .card:focus-visible,button:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
 .libback{display:block;width:100%;text-align:left;padding:13px 16px;margin:0 0 12px;border-radius:12px;
-  border:1px solid #2a2350;background:#191238;color:#C9B8FF;font-family:'Space Grotesk',sans-serif;
+  border:1px solid #2a2350;background:#191238;color:#A9E6A9;font-family:'Space Grotesk',sans-serif;
   font-weight:700;font-size:15px;cursor:pointer;grid-column:1/-1}
-.libback:hover{border-color:#A78BFA}
+.libback:hover{border-color:#5FC85A}
 .fcard .edl{position:absolute;left:10px;top:10px;display:flex;gap:6px;z-index:2}
 .fcard .dlb{border:1px solid #2a2350;background:#191238;color:#B8B2D8;border-radius:8px;
   padding:3px 8px;font-size:12px;cursor:pointer;line-height:1}
-.fcard .dlb:hover{border-color:#A78BFA;color:#ECE9FB}
+.fcard .dlb:hover{border-color:#5FC85A;color:#ECE9FB}
 #btnSync{background:linear-gradient(135deg,#FB7185,#E11D48)!important;color:#fff!important;
   font-weight:800!important;border:none!important;animation:pulseS 1.6s infinite}
 #btnSync.wait{background:linear-gradient(135deg,#FBBF24,#F59E0B)!important;color:#3a2600!important;animation:pulseA 1.6s infinite}
 #btnSync.on{background:linear-gradient(135deg,#4ADE80,#22C55E)!important;color:#08240f!important;animation:none}
 @keyframes pulseS{0%,100%{box-shadow:0 0 0 0 rgba(251,113,133,.55)}55%{box-shadow:0 0 0 9px rgba(251,113,133,0)}}
 @keyframes pulseA{0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.5)}55%{box-shadow:0 0 0 8px rgba(251,191,36,0)}}
-.card .allbtn{border:1px solid var(--cc,#A78BFA);background:transparent;color:var(--cc,#A78BFA);
+.card .allbtn{border:1px solid var(--cc,#5FC85A);background:transparent;color:var(--cc,#5FC85A);
   border-radius:9px;padding:3px 9px;font-size:12px;font-weight:800;cursor:pointer;
   margin-left:8px;flex:none;line-height:1.3}
-.card .allbtn:hover{background:var(--cc,#A78BFA);color:#160f33}
+.card .allbtn:hover{background:var(--cc,#5FC85A);color:#160f33}
 .card.done .allbtn{border-color:#4ADE80;color:#4ADE80}
 .card.done .allbtn:hover{background:#4ADE80;color:#08240f}
 .mgov{position:fixed;inset:0;z-index:9997;background:rgba(8,5,20,.9);display:flex;align-items:center;justify-content:center;padding:18px}
@@ -260,10 +260,10 @@ body.locked .wrap{filter:blur(7px);pointer-events:none;user-select:none}
 .mgcard .sub{color:#8B84B0;font-size:13px;margin-bottom:16px}
 .mgrow{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
 .mgrow select{flex:1;min-width:180px;background:#0f0b26;border:1px solid #2a2350;color:#ECE9FB;border-radius:10px;padding:11px 12px;font-size:14px}
-.mgplus{color:#A78BFA;font-weight:800;font-size:18px}
+.mgplus{color:#5FC85A;font-weight:800;font-size:18px}
 .mgbtns{display:flex;gap:10px;margin-top:6px}
 .mgbtn{flex:1;padding:12px;border-radius:11px;border:none;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;cursor:pointer}
-.mgbtn.go{background:linear-gradient(135deg,#A78BFA,#7C5CE0);color:#160f33}
+.mgbtn.go{background:linear-gradient(135deg,#5FC85A,#4CB84C);color:#160f33}
 .mgbtn.cancel{background:#191238;color:#ECE9FB;border:1px solid #2a2350}
 .mglist{margin-top:16px;border-top:1px solid #2a2350;padding-top:12px}
 .mglist h4{color:#8B84B0;font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px}
@@ -283,7 +283,7 @@ body.locked .wrap{filter:blur(7px);pointer-events:none;user-select:none}
 :root{ --serif:'Fraunces',Georgia,serif; --card:#16112e; --hair:#262048; }
 body{
   background:
-    radial-gradient(900px 480px at 85% -6%, rgba(167,139,250,.20), transparent 60%),
+    radial-gradient(900px 480px at 85% -6%, rgba(95,200,90,.20), transparent 60%),
     linear-gradient(160deg,#2a1f62 0%,#221a52 34%,#1a1442 100%);
 }
 .wrap{max-width:1140px;margin:18px auto;padding:0 18px 34px;background:var(--card);
@@ -352,7 +352,7 @@ header h1{font-family:var(--serif);font-weight:600;font-size:clamp(21px,3.4vw,27
 .pla td{padding:14px 10px;border-bottom:1px solid var(--hair)}
 .pla tbody tr:nth-child(even) td{background:transparent}
 .pla tbody tr{cursor:pointer}
-.pla tbody tr:hover td{background:rgba(167,139,250,.06)}
+.pla tbody tr:hover td{background:rgba(95,200,90,.06)}
 .pla tr.done td{background:transparent}
 .pla .pnm .cdot{width:8px;height:8px;border-radius:99px;box-shadow:none}
 .pla .pnm .nm2{font-size:13px;font-weight:600;letter-spacing:.2px}
@@ -361,7 +361,7 @@ header h1{font-family:var(--serif);font-weight:600;font-size:clamp(21px,3.4vw,27
 .pla .ploc.ng{font-style:italic}
 .pla .prog{display:flex;align-items:center;gap:12px;min-width:200px}
 .pla .prog .track{flex:1;max-width:170px;height:5px;border-radius:99px;background:var(--inset);overflow:hidden}
-.pla .prog .track i{display:block;height:100%;border-radius:99px;background:var(--pc,#A78BFA)}
+.pla .prog .track i{display:block;height:100%;border-radius:99px;background:var(--pc,#5FC85A)}
 .pla tr.done .prog .track i{background:var(--ok)}
 .pla .prog .pn{font-family:var(--mono);font-size:11.5px;color:var(--ink-dim);white-space:nowrap}
 
@@ -387,11 +387,11 @@ body.compacta .pla td{padding:9px 10px}
   align-items:center; justify-content:center; transition:transform .08s, background .15s, border-color .15s; }
 .st-transport .tbtn:hover{ background:#241a4d; border-color:#6d5bd0; }
 .st-transport .tbtn:active{ transform:scale(.92); }
-.st-transport .tbtn:focus-visible{ outline:2px solid #a78bfa; outline-offset:2px; }
-.st-transport .tbtn.play{ width:52px; background:linear-gradient(135deg,#7c6cf5,#5b46c8); border:none; font-size:19px; }
+.st-transport .tbtn:focus-visible{ outline:2px solid #5fc85a; outline-offset:2px; }
+.st-transport .tbtn.play{ width:52px; background:linear-gradient(135deg,#4CB84C,#3f9e3c); border:none; font-size:19px; }
 .st-transport .tbtn.play:hover{ filter:brightness(1.08); }
 .st-transport .ttime{ font-family:'DM Mono','SFMono-Regular',monospace; font-size:13px;
-  color:#c4b5fd; letter-spacing:.02em; white-space:nowrap; }
+  color:#a9e6a9; letter-spacing:.02em; white-space:nowrap; }
 .st-transport .ttime b{ color:#fff; font-weight:600; }
 .st-transport .tspacer{ flex:1; }
 .st-transport .trate{ background:#191238; border:1px solid #2b2358; color:#ece9fb;
@@ -399,18 +399,18 @@ body.compacta .pla td{padding:9px 10px}
 #stWave{ flex:0 0 auto; width:100%; height:96px; background:#120c28;
   cursor:crosshair; display:none; border-top:1px solid #241d4d; }
 /* botones del modo estudio: base + estados */
-.st-btn{ border:1px solid #6d5bd0; background:linear-gradient(135deg,#7c6cf5,#5b46c8);
+.st-btn{ border:1px solid #6d5bd0; background:linear-gradient(135deg,#4CB84C,#3f9e3c);
   color:#fff; border-radius:10px; padding:7px 13px; font-size:12.5px; font-weight:600;
   cursor:pointer; line-height:1; transition:transform .08s, filter .15s, box-shadow .15s;
   box-shadow:0 1px 0 rgba(255,255,255,.08) inset, 0 2px 6px rgba(91,70,200,.25); }
 .st-btn:hover{ filter:brightness(1.1); box-shadow:0 2px 12px rgba(124,108,245,.45); }
 .st-btn:active{ transform:translateY(1px) scale(.98); }
-.st-btn:focus-visible{ outline:2px solid #a78bfa; outline-offset:2px; }
+.st-btn:focus-visible{ outline:2px solid #5fc85a; outline-offset:2px; }
 .st-btn.ghost{ background:#191238; border-color:#2b2358; color:#cdc6f0; box-shadow:none; }
 .st-btn.ghost:hover{ background:#241a4d; border-color:#6d5bd0; color:#fff; }
 .st-btn.on{ background:linear-gradient(135deg,#4ade80,#22c55e); border-color:#22c55e; color:#08240f; }
 .st-name{ opacity:.7; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.st-msg{ flex:1; min-width:120px; color:#c4b5fd; font-size:12px; }
+.st-msg{ flex:1; min-width:120px; color:#a9e6a9; font-size:12px; }
 .st-tc{ width:88px; background:#191238; border:1px solid #2a2350; color:#fff;
   border-radius:8px; padding:5px 7px; font-size:12.5px;
   font-family:'DM Mono',monospace; }
@@ -423,15 +423,15 @@ body.compacta .pla td{padding:9px 10px}
 .st-transport .tnum{ width:52px; background:#0f0a26; border:1px solid #2b2358; color:#ece9fb;
   border-radius:7px; padding:5px 6px; font-size:12px; font-family:ui-monospace,monospace; text-align:center; }
 .st-transport .tnum.wide{ width:88px; }
-.st-transport .tnum:focus{ outline:none; border-color:#7c6cf5; box-shadow:0 0 0 3px rgba(124,108,245,.28); }
+.st-transport .tnum:focus{ outline:none; border-color:#4CB84C; box-shadow:0 0 0 3px rgba(124,108,245,.28); }
 
 /* ── agarradera para estirar el alto de la onda ── */
 #stWaveGrip{ flex:0 0 9px; cursor:row-resize; background:#171040; position:relative; touch-action:none; }
 #stWaveGrip::before{ content:''; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-  width:46px; height:3px; border-radius:3px; background:#5b46c8; }
+  width:46px; height:3px; border-radius:3px; background:#3f9e3c; }
 #stWaveGrip:hover{ background:#241a54; }
-#stWaveGrip:hover::before, #stWaveGrip.drag::before{ background:#a78bfa; }
-#stWaveGrip.drag{ background:#7c6cf5; }
+#stWaveGrip:hover::before, #stWaveGrip.drag::before{ background:#5fc85a; }
+#stWaveGrip.drag{ background:#4CB84C; }
 
 /* ── vista limpia: sin las herramientas del video ── */
 #stLeft.stclean #stStrip, #stLeft.stclean #stCfgRow{ display:none !important; }
@@ -440,10 +440,10 @@ body.compacta .pla td{padding:9px 10px}
 #stSplit{ display:none; flex:0 0 9px; cursor:col-resize; background:#171040;
   position:relative; z-index:3; transition:background .12s; touch-action:none; }
 #stSplit::before{ content:''; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-  width:3px; height:52px; border-radius:3px; background:#5b46c8; }
+  width:3px; height:52px; border-radius:3px; background:#3f9e3c; }
 #stSplit:hover{ background:#241a54; }
-#stSplit:hover::before{ background:#a78bfa; }
-#stSplit.drag{ background:#7c6cf5; }
+#stSplit:hover::before{ background:#5fc85a; }
+#stSplit.drag{ background:#4CB84C; }
 #stSplit.drag::before{ background:#fff; }
 
 /* ── escenario del video (columna izquierda, escritorio) ── */
@@ -477,28 +477,102 @@ body.compacta .pla td{padding:9px 10px}
 <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
 <link rel="icon" type="image/png" sizes="64x64" href="data:image/png;base64,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">
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADwUlEQVR4nL2Xvc/cRBDGf7O79n1EBAUK6OgCoowQggZEQRGFKhUoQEWDKCIklColEg0SgoKSGhqK8CEkOiSIREnJX4GI3nvvvB9DsbZvz2ffe/eCmJPPd7vreR4/szMey/PPvM2I6djgf2RS/nGq6f8CHmJIJrDFPAF8aqlMjE86kU6BI8A7qooAIrtgqt28tDSOIqPuYmxFW1AjgjGWytU4WyFiWvBEiB4fGlKKPZlM5TARp6oHGCigGGOoqzmuBa6rOdY6hJYAiRgDjV8ToieEhsavSSm1BKZJOCVNTHXgltlswXJ+laqaYcRijMl314VBFWsdztUkjXi/QdbCerMipXiQhGNUgDxmjGFeL7kyf5xZvcAYQxZWymX9mBjBYrBi8xqF9easVUJHSZRZsA8+W7JcXOXXP76YUGnaXnvhXrttlfMDJIZ1gC7m83rBcvEYdTU7GRzg9Zs3SCny43e/oZoKEgMCu1mQf9fVrAWfY40F4OtP/STYmx9VI6PbzauLREyB9WbFUIWBAoqI4GyFszVGDPshOs66q4wYnM3ZA0pOupLAQAFrLNY5xBhUQNr58bu8mIIKiDFY5zDGEGLYWVVkQT5XrqZ2M4wYZJAhP3z75yTcrdvXB/htXVTFiKF2MypXE4KnDINREt2BKNbaHHdRus9F4GPz2h+a/RqLtZ3fLabTgQJ90VAuHf9Sga3/7FdVKYtvkQXlWWEAfuv29UkV9uTf8zf0WxDYZkGOS0qRpBHVtC21l7AtrIIqSWP7oEo7mVBkQZbGx4YQPbZ42h2+0ykC2p/7p2VsSIPCt1cHGn/Oxq9wrsaK29b9S5pqLkIbv6Lx51lZhE6jvUqYYiCEhpRCmw2nAXYV8/q1twD4WX8npdZnDAz3lul2ZXckTTR+TePXxBg42C5MgJf2wZ3Pen+pjX957NQBJW+WTXPG2flfrP0ZITYngd/9+OW9uXvvfcWmOcubm0EdGOsHYgycrx/lXF6eXgtKEp/ff9j7LGPf2Ug/kC1Ez2rzCEW58dwd6mrJzTf2766zZ598Z+d/B9yZFt+7BPb6gYJEaFjp3yiJK/PI9w9+wRibnxNStlnKT/qQu+9+OQr+4SevTmLI00+8dIHGuY7X9SI3prZum9Kqb81VlRg9jV9z//1vBuCvHPQuT1178ah3AhFBxGCNpapmOFsP2vIG7zfEkWp3yJyi+ztjjIIqaCCmgI9N2xX3/NqKt/PWdYzbqa74YjJdw7kL2K842lf3XnCUCgcoXfZCKfqBf0vidHCAfwAJikZBjt2FIwAAAABJRU5ErkJggg==">
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* ===== Login estilo Dubbipt ===== */
+#gate{ position:fixed; inset:0; z-index:9000; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  background:radial-gradient(1200px 760px at 50% 28%, #3b3690 0%, #2c2770 46%, #201c50 100%);
+  font-family:'Silkscreen','Space Grotesk',monospace; }
+#gate.off, body:not(.locked) #gate{ display:none !important; }
+#gate .dl-bar{ position:fixed; left:0; right:0; height:14px; background:#5FC85A; z-index:1; }
+#gate .dl-top{ top:0; } #gate .dl-bot{ bottom:0; }
+#gate .dl-brand{ text-align:center; margin-bottom:20px; z-index:2; }
+#gate .dl-logo{ width:70px; height:88px; margin:0 auto 12px; position:relative; }
+#gate .dl-logo::before{ content:''; position:absolute; left:0; top:0; width:52px; height:88px; border:13px solid #5FC85A; border-radius:3px; box-sizing:border-box; }
+#gate .dl-logo::after{ content:''; position:absolute; right:0; top:20px; width:20px; height:48px; background:#5FC85A; border-radius:3px; }
+#gate .dl-name{ display:inline-block; background:#5FC85A; color:#fff; font-size:clamp(24px,5vw,34px); letter-spacing:1px; padding:6px 22px; border-radius:30px; text-shadow:2px 2px 0 rgba(0,0,0,.22); }
+#gate .gcard{ position:relative; width:min(430px,92vw); background:rgba(22,18,46,.94); border:2px solid #5FC85A; border-radius:26px; padding:22px 22px 26px; z-index:2; box-shadow:26px 26px 0 rgba(255,255,255,.045); }
+#gate .dl-tabs{ display:flex; gap:8px; background:#161334; border-radius:16px; padding:6px; margin-bottom:18px; }
+#gate .dl-tabs button{ flex:1; border:none; background:transparent; color:#5FC85A; font-family:'Silkscreen',monospace; font-size:14px; padding:12px 8px; border-radius:12px; cursor:pointer; }
+#gate .dl-tabs button.on{ background:#5FC85A; color:#123317; }
+#gate label{ display:block; color:#fff; font-size:13px; margin:14px 0 7px; font-family:'Silkscreen',monospace; letter-spacing:.5px; }
+#gate input{ width:100%; background:#221d47; border:2px solid transparent; border-radius:22px; padding:14px 18px; color:#fff; font-size:14px; font-family:'Silkscreen',monospace; outline:none; }
+#gate input:focus{ border-color:#5FC85A; }
+#gate .gbtn{ width:100%; margin-top:22px; border:none; border-radius:26px; padding:15px; background:#5FC85A; color:#123317; font-family:'Silkscreen',monospace; font-size:16px; letter-spacing:.5px; cursor:pointer; box-shadow:0 6px 0 #3f9e3c; }
+#gate .gbtn:active{ transform:translateY(3px); box-shadow:0 3px 0 #3f9e3c; }
+#gate .gbtn:disabled{ opacity:.7; }
+#gate .gerr{ color:#FF9BD0; font-size:11px; margin-top:12px; min-height:14px; font-family:'Silkscreen',monospace; line-height:1.5; }
+#gate.shake .gcard{ animation:dlshake .4s; }
+@keyframes dlshake{ 0%,100%{transform:translateX(0)} 25%{transform:translateX(-7px)} 75%{transform:translateX(7px)} }
+body.locked #verBox{ position:fixed; left:16px; bottom:26px; z-index:9001; background:#5FC85A; color:#123317;
+  font-family:'Silkscreen',monospace; font-size:12px; padding:8px 16px; border-radius:20px; }
+body:not(.locked) #verBox{ display:none; }
+</style>
+<style>
+/* ================= TEMA DUBBIPT (toda la interfaz) ================= */
+:root{ --disp:'Silkscreen','Space Grotesk',sans-serif; }
+body{
+  background:
+    radial-gradient(1200px 780px at 50% -8%, rgba(95,200,90,.10), transparent 55%),
+    radial-gradient(1000px 640px at 100% 112%, rgba(95,200,90,.06), transparent 55%),
+    radial-gradient(1300px 980px at 50% 30%, #2c2770 0%, #241f5e 46%, #1b1746 100%) !important;
+}
+/* barras verdes arriba y abajo (como el login); ocultas mientras el login está activo */
+.appbar{ position:fixed; left:0; right:0; height:9px; background:#5FC85A; z-index:55; pointer-events:none; }
+.appbar-top{ top:0; } .appbar-bot{ bottom:0; }
+body.locked .appbar{ display:none; }
+
+/* títulos y números en tipografía pixel */
+h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Silkscreen','Space Grotesk',sans-serif; }
+.mk{ font-family:'Silkscreen',monospace !important; font-size:13px !important; }
+
+/* botones tipo pastilla con relieve */
+.btnv{ border-radius:22px !important; font-family:'Silkscreen',monospace; letter-spacing:.3px; }
+.btnv.pri{ background:#5FC85A !important; color:#123317 !important; border:none !important; box-shadow:0 5px 0 #3f9e3c; }
+.btnv.pri:hover{ filter:brightness(1.04); }
+.btnv.pri:active{ transform:translateY(3px); box-shadow:0 2px 0 #3f9e3c; }
+.chip{ border-radius:20px !important; font-family:'Silkscreen',monospace; }
+.chip.on{ background:#5FC85A !important; color:#123317 !important; border-color:#5FC85A !important; }
+
+/* contenedores un poco más redondeados */
+.card,.ccard,.pla,.drop,.stat,.uploads>.drop{ border-radius:18px !important; }
+.pla-head h2{ letter-spacing:.3px; }
+
+/* mantener LEGIBLE lo denso: valores de tablas, inputs y buscador */
+.pla table td, .pla table th, #search, input, textarea, select, .find, .drop small, .drop .file-ok{
+  font-family:'Inter',system-ui,sans-serif !important;
+}
+/* buscador con borde verde al enfocar */
+.find:focus-within{ box-shadow:0 0 0 2px #5FC85A; border-radius:14px; }
+</style>
 </head>
 <body class="locked">
+<div class="appbar appbar-top"></div>
+<div class="appbar appbar-bot"></div>
 <div id="verBox">v…</div>
 <div class="gate" id="gate">
+  <div class="dl-bar dl-top"></div>
+  <div class="dl-bar dl-bot"></div>
+  <div class="dl-brand">
+    <div class="dl-logo"></div>
+    <div class="dl-name">Dubbipt</div>
+  </div>
   <form class="gcard" id="gform" autocomplete="off">
-    <div class="glogo">DD</div>
-    <h2>Desglose Digital de Libreto</h2>
-    <p id="gsub">Inicia sesión para continuar</p>
+    <div class="dl-tabs">
+      <button type="button" id="gTabLogin" class="on">Entrar</button>
+      <button type="button" id="gTabReg">Crea cuenta</button>
+    </div>
+    <p id="gsub" style="display:none"></p>
     <div id="gNameRow" style="display:none">
       <label for="gFull">Nombre</label>
-      <input type="text" id="gFull" placeholder="Tu nombre">
+      <input type="text" id="gFull" placeholder="">
     </div>
     <label for="gUser">Correo</label>
-    <input type="email" id="gUser" spellcheck="false" autofocus placeholder="tu@estudio.com">
+    <input type="email" id="gUser" spellcheck="false" autofocus placeholder="">
     <label for="gPass">Contraseña</label>
     <input type="password" id="gPass">
-    <button class="gbtn" type="submit" id="gSubmit">Entrar</button>
     <div class="gerr" id="gErr"></div>
-    <div style="margin-top:14px;font-size:13px;color:#8B84B0">
-      <span id="gToggleTxt">¿No tienes cuenta?</span>
-      <a id="gToggle" style="color:#C4B5FD;cursor:pointer;font-weight:600;text-decoration:underline">Crear una</a>
-    </div>
+    <button class="gbtn" type="submit" id="gSubmit">Entrar</button>
   </form>
 </div>
 <div class="wrap">
@@ -575,7 +649,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
 });
-console.log('%cDesglose Digital de Libreto '+APP_VERSION, 'color:#A78BFA;font-weight:bold');
+console.log('%cDesglose Digital de Libreto '+APP_VERSION, 'color:#5FC85A;font-weight:bold');
 
 /* ================= acceso (Supabase) ================= */
 let sb = null, sbUser = null;
@@ -643,7 +717,7 @@ function showWorkspacePicker(force){
   card.style.cssText='background:#171232;border:1px solid #2a2350;border-radius:20px;padding:26px;width:min(520px,94vw);text-align:center';
   const list = libWorkspaces.map(w=>{
     const active = WORKSPACE && WORKSPACE.id===w.id;
-    return '<div class="wsRow" data-id="'+w.id+'" style="display:flex;align-items:center;gap:10px;padding:12px 14px;margin:8px 0;border:1px solid '+(active?'#7C5CE0':'#2a2350')+';border-radius:12px;background:'+(active?'#1c1540':'#120d29')+';cursor:pointer">'
+    return '<div class="wsRow" data-id="'+w.id+'" style="display:flex;align-items:center;gap:10px;padding:12px 14px;margin:8px 0;border:1px solid '+(active?'#4CB84C':'#2a2350')+';border-radius:12px;background:'+(active?'#1c1540':'#120d29')+';cursor:pointer">'
       + '<span style="font-size:20px">🗂️</span>'
       + '<b style="flex:1;text-align:left;font-family:\'Space Grotesk\',sans-serif;color:#ECE9FB">'+esc(w.name)+'</b>'
       + (active?'<span style="color:#4ADE80;font-size:12px">actual</span>':'')
@@ -655,7 +729,7 @@ function showWorkspacePicker(force){
     + '<div id="wsList">'+(list||'<div style="color:#6E678F;font-size:13px;padding:10px">Aún no tienes espacios. Crea el primero abajo.</div>')+'</div>'
     + '<div style="display:flex;gap:8px;margin-top:10px">'
     +   '<input id="wsName" placeholder="Nombre del nuevo espacio (ej. Netflix)" style="flex:1;background:#191238;border:1px solid #2a2350;border-radius:10px;padding:11px 13px;color:#ECE9FB;font-size:14px;outline:none">'
-    +   '<button id="wsAdd" style="border:none;border-radius:10px;padding:11px 16px;background:linear-gradient(135deg,#A78BFA,#7C5CE0);color:#160f33;font-family:\'Space Grotesk\',sans-serif;font-weight:700;cursor:pointer">Crear</button>'
+    +   '<button id="wsAdd" style="border:none;border-radius:10px;padding:11px 16px;background:linear-gradient(135deg,#5FC85A,#4CB84C);color:#160f33;font-family:\'Space Grotesk\',sans-serif;font-weight:700;cursor:pointer">Crear</button>'
     + '</div>'
     + (WORKSPACE ? '<button id="wsClose" style="margin-top:16px;border:none;background:none;color:#8B84B0;font-size:13px;cursor:pointer">Cerrar</button>' : '');
   ov.appendChild(card); document.body.appendChild(ov);
@@ -719,7 +793,7 @@ function pickRole(){
   const card=document.createElement('div');
   card.style.cssText='background:#171232;border:1px solid #2a2350;border-radius:20px;padding:26px;width:min(420px,94vw);text-align:center';
   card.innerHTML='<div style="font-family:\'Space Grotesk\',sans-serif;font-size:17px;font-weight:700;color:#ECE9FB;margin-bottom:14px">Sincronía · ¿este dispositivo?</div>'
-    +'<button id="rTab" style="width:100%;padding:15px;margin-bottom:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#A78BFA,#7C5CE0);color:#160f33;font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:15px;cursor:pointer">📱 Soy la TABLET (control)</button>'
+    +'<button id="rTab" style="width:100%;padding:15px;margin-bottom:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#5FC85A,#4CB84C);color:#160f33;font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:15px;cursor:pointer">📱 Soy la TABLET (control)</button>'
     +'<button id="rPc" style="width:100%;padding:15px;border:1px solid #2a2350;border-radius:12px;background:#191238;color:#ECE9FB;font-family:\'Space Grotesk\',sans-serif;font-weight:600;font-size:15px;cursor:pointer">💻 Soy el ESCRITORIO (muestra el libreto)</button>';
   ov.appendChild(card); document.body.appendChild(ov);
   const choose=(role)=>{ try{localStorage.setItem('ddl_role',role);}catch(e){} DEVROLE=role; sync.role=role; ov.remove(); if(sync.isOn) syncDisconnect(); syncConnect(role); };
@@ -731,6 +805,28 @@ function showStudioPicker(){ showWorkspacePicker(true); }
 function ensureStudio(){ ensureWorkspace(); }
 function applyStudio(){ applyWorkspace(); }
 function updateStudioChip(){ updateWorkspaceChip(); }
+// Al iniciar sesión: preguntar SIEMPRE el rol del dispositivo, ajustar y seguir.
+function postLogin(){ askRoleAtLogin(()=> ensureWorkspace()); }
+function askRoleAtLogin(done){
+  const old=document.getElementById('sPick'); if(old) old.remove();
+  const ov=document.createElement('div'); ov.id='sPick';
+  ov.style.cssText='position:fixed;inset:0;z-index:9998;background:rgba(8,5,20,.92);display:flex;align-items:center;justify-content:center;padding:20px';
+  const card=document.createElement('div');
+  card.style.cssText='background:#171232;border:1px solid #2a2350;border-radius:20px;padding:26px;width:min(440px,94vw);text-align:center';
+  card.innerHTML='<div style="font-family:\'Space Grotesk\',sans-serif;font-size:18px;font-weight:700;color:#ECE9FB;margin-bottom:4px">¿Este dispositivo es…?</div>'
+    +'<div style="font-size:13px;color:#8B84B0;margin-bottom:18px">Para adaptar la vista y la sincronía</div>'
+    +'<button id="rTab" style="width:100%;padding:16px;margin-bottom:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#5FC85A,#4CB84C);color:#160f33;font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:15px;cursor:pointer">📱 TABLET (control / marcación)</button>'
+    +'<button id="rPc" style="width:100%;padding:16px;border:1px solid #2a2350;border-radius:12px;background:#191238;color:#ECE9FB;font-family:\'Space Grotesk\',sans-serif;font-weight:600;font-size:15px;cursor:pointer">💻 ESCRITORIO (muestra el libreto)</button>';
+  ov.appendChild(card); document.body.appendChild(ov);
+  const choose=(role)=>{ try{localStorage.setItem('ddl_role',role);}catch(e){} DEVROLE=role; try{sync.role=role;}catch(e){} ov.remove(); try{ applyDeviceRole(); }catch(e){} if(typeof done==='function') done(); };
+  card.querySelector('#rTab').onclick=()=>choose('tablet');
+  card.querySelector('#rPc').onclick=()=>choose('pc');
+}
+function applyDeviceRole(){
+  try{ document.body.classList.toggle('is-tablet', DEVROLE==='tablet'); }catch(e){}
+  try{ updateWorkspaceChip(); }catch(e){}
+  try{ if(typeof pop2!=='undefined' && pop2.doc){ renderLibretoBlocks(); renderLibretoChips(); } }catch(e){}
+}
 
 function authErr(e){
   const m = ((e && (e.message || e.error_description || e.msg)) || '') + '';
@@ -767,7 +863,7 @@ function showOfflineGate(msg){
   if(err && msg) err.textContent = msg;
   const b = document.createElement('button');
   b.type = 'button'; b.id = 'btnOffline'; b.className = 'gbtn';
-  b.style.cssText = 'margin-top:12px;background:transparent;border:1.5px solid #7C5CE0;color:#C4B5FD';
+  b.style.cssText = 'margin-top:12px;background:transparent;border:1.5px solid #4CB84C;color:#A9E6A9';
   b.textContent = '🔌 Entrar sin conexión (modo local)';
   b.addEventListener('click', enterOffline);
   form.appendChild(b);
@@ -775,7 +871,7 @@ function showOfflineGate(msg){
 function enterOffline(){
   window.OFFLINE = true;
   sbUser = { id:'offline', email:'modo-local' };
-  authUnlock(); renderLibrary(); if(typeof ensureStudio==='function') ensureStudio();
+  authUnlock(); renderLibrary(); postLogin();
   window.addEventListener('online', ()=> location.reload());   // al volver la red, reentrar con sesión real
   setTimeout(()=>{ if(typeof libMsg==='function') libMsg('🔌 Modo sin conexión — todo queda guardado en este equipo'); }, 600);
 }
@@ -790,25 +886,26 @@ async function authInit(){
       const t = await sb.from('shows').select('id').limit(1);
       if(t.error && authErr(t.error)) await reAuth();
     }catch(e){}
-    authUnlock(); renderLibrary(); ensureStudio();
+    authUnlock(); renderLibrary(); postLogin();
     return;
   }
   // formulario de INICIO DE SESIÓN / REGISTRO (cuentas reales)
   const form = document.getElementById('gform');
   let mode = 'login';   // 'login' | 'signup'
   const gsub=document.getElementById('gsub'), gName=document.getElementById('gNameRow'),
-        gSub=document.getElementById('gSubmit'), gTog=document.getElementById('gToggle'),
-        gTogTxt=document.getElementById('gToggleTxt');
+        gSub=document.getElementById('gSubmit'),
+        gTabL=document.getElementById('gTabLogin'), gTabR=document.getElementById('gTabReg');
   function setMode(m){
-    mode=m;
-    if(m==='signup'){ gName.style.display=''; gSub.textContent='Crear cuenta';
-      gsub.textContent='Crea tu cuenta del estudio'; gTogTxt.textContent='¿Ya tienes cuenta?'; gTog.textContent='Iniciar sesión'; }
-    else { gName.style.display='none'; gSub.textContent='Entrar';
-      gsub.textContent='Inicia sesión para continuar'; gTogTxt.textContent='¿No tienes cuenta?'; gTog.textContent='Crear una'; }
-    document.getElementById('gErr').textContent='';
+    mode=m; const signup=(m==='signup');
+    gName.style.display = signup?'':'none';
+    gSub.textContent = signup?'Crear cuenta':'Entrar';
+    if(gTabL) gTabL.classList.toggle('on', !signup);
+    if(gTabR) gTabR.classList.toggle('on', signup);
+    document.getElementById('gErr').style.color=''; document.getElementById('gErr').textContent='';
   }
-  gTog.addEventListener('click', ()=> setMode(mode==='login'?'signup':'login'));
-  function shake(){ const c=form; c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); }
+  if(gTabL) gTabL.addEventListener('click', ()=> setMode('login'));
+  if(gTabR) gTabR.addEventListener('click', ()=> setMode('signup'));
+  function shake(){ const g=document.getElementById('gate'); g.classList.remove('shake'); void g.offsetWidth; g.classList.add('shake'); }
   form.addEventListener('submit', async ev=>{
     ev.preventDefault();
     const email = document.getElementById('gUser').value.trim();
@@ -823,13 +920,13 @@ async function authInit(){
       if(mode==='signup'){
         const { data, error } = await sb.auth.signUp({ email, password:pass, options:{ data:{ full_name:full } } });
         if(error){ shake(); err.textContent = /registered/i.test(error.message)?'Ese correo ya tiene cuenta. Inicia sesión.':error.message; return; }
-        if(data.session){ sbUser=data.session.user; authUnlock(); renderLibrary(); ensureStudio(); }
+        if(data.session){ sbUser=data.session.user; authUnlock(); renderLibrary(); postLogin(); }
         else { err.style.color='#4ADE80'; err.textContent='Cuenta creada. Revisa tu correo para confirmar y luego inicia sesión.'; setMode('login'); }
       } else {
         const { data, error } = await sb.auth.signInWithPassword({ email, password:pass });
         if(error || !data.session){ shake(); err.textContent = /confirm/i.test((error&&error.message)||'')?'Confirma tu correo antes de entrar':'Correo o contraseña incorrectos';
           document.getElementById('gPass').value=''; document.getElementById('gPass').focus(); return; }
-        sbUser=data.user; authUnlock(); renderLibrary(); ensureStudio();
+        sbUser=data.user; authUnlock(); renderLibrary(); postLogin();
       }
     } finally { btn.disabled=false; btn.textContent=old; }
   });
@@ -862,7 +959,7 @@ let progress = {};       // key -> Set(pages grabadas)
 const pop = { win:null, type:null, key:null, pageIdx:0, viewPage:null, navAll:false, zoom:1.0, lineGrow:1.3, fitMode:'both', els:null, rendering:false,
               prompter:false, _tpEff:null, _tpPause:0, _tpRaf:0, _navAt:0, _renderSeq:0 };
 
-const PALETTE = ['#A78BFA','#3FD0EE','#F0A35E','#F472B6','#4ADE80','#FACC15',
+const PALETTE = ['#5FC85A','#3FD0EE','#F0A35E','#F472B6','#4ADE80','#FACC15',
                  '#60A5FA','#FB7185','#2DD4BF','#C084FC','#FB923C','#A3E635'];
 /* color ESTABLE por personaje: antes se asignaba por posición en la lista, así
    que al fusionar o añadir un personaje TODOS cambiaban de color. Ahora sale de
@@ -1484,7 +1581,7 @@ function parseDesglose(wb){
       key, display:c.display.trim(), talent,
       pages, totalInts: pages.reduce((s,x)=>s+x.ints,0),
       noRec: NO_REC.has(norm(talent)),
-      color:'#A78BFA'
+      color:'#5FC85A'
     };
     chars.push(obj); charIdx[key]=obj;
   });
@@ -1878,7 +1975,7 @@ function buildScriptAD(){
   for(const b of script) pagMap.set(b.page, (pagMap.get(b.page)||0)+1);
   const obj = {
     key: AD_KEY, display:'AUDIODESCRIPCIÓN', name:'AUDIODESCRIPCIÓN', talent:'',
-    color: (typeof charColor==='function' ? charColor(AD_KEY) : '#A78BFA'),
+    color: (typeof charColor==='function' ? charColor(AD_KEY) : '#5FC85A'),
     pages: [...pagMap.entries()].sort((a,b)=>a[0]-b[0]).map(([p,ints])=>({ p, page:p, ints, count:ints })),
     totalInts: script.length, noRec:false
   };
@@ -2050,7 +2147,9 @@ function renderPlanilla(){
       html += '<tr style="--pc:'+c.color+'"'+(done?' class="done"':'')+' data-k="'+esc(c.key)+'" title="Abrir el libreto de '+esc(c.display)+'">'
         +'<td class="pnm"><div class="nrow"><span class="cdot"></span>'
         +'<span class="nm2">'+esc(c.display)+'</span>'
-        +(done?'<span class="bdg">✓</span>':'')+'</div></td>'
+        +(done?'<span class="bdg">✓</span>':'')
+        +'<button class="delChar" data-k="'+esc(c.key)+'" title="Eliminar personaje del desglose" style="margin-left:auto;border:none;background:none;color:#7d76a8;cursor:pointer;font-size:14px;padding:0 4px">🗑</button>'
+        +'</div></td>'
         +'<td class="ploc'+(c.talent?'':' ng')+'"><input class="talIn" data-k="'+esc(c.key)+'" value="'+esc(c.talent||'')+'" placeholder="Asignar talento…" style="width:100%;min-width:90px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;color:inherit;font:inherit;outline:none">'+((c.noRec&&c.talent)?'<small>no se graba</small>':'')+'</td>'
         +'<td class="ptime">'+(tc||'—')+'</td>'
         +'<td><div class="prog"><span class="track"><i style="width:'+pct+'%"></i></span>'
@@ -2071,9 +2170,33 @@ function renderPlanilla(){
     inp.addEventListener('click', e=> e.stopPropagation());
     inp.addEventListener('keydown', e=>{ e.stopPropagation(); if(e.key==='Enter') inp.blur(); });
     inp.addEventListener('change', ()=> assignTalent(inp.dataset.k, inp.value));
-    inp.addEventListener('focus', ()=>{ inp.style.borderColor='#7C5CE0'; });
+    inp.addEventListener('focus', ()=>{ inp.style.borderColor='#4CB84C'; });
     inp.addEventListener('blur', ()=>{ inp.style.borderColor='transparent'; });
   });
+  box.querySelectorAll('button.delChar').forEach(b=>{
+    b.addEventListener('click', e=>{ e.stopPropagation(); removeChar(b.dataset.k); });
+  });
+}
+function removeChar(key){
+  const c = charIdx[key]; if(!c) return;
+  if(!confirm('¿Eliminar el personaje «'+c.display+'» del desglose?\n(Se puede recuperar rehaciendo el desglose del guion.)')) return;
+  chars = chars.filter(x=>x.key!==key);
+  delete charIdx[key];
+  try{ window._charsRaw = (window._charsRaw||[]).filter(x=>x.key!==key); }catch(e){}
+  try{
+    script = (script||[]).filter(b=> b.key!==key);
+    script.forEach((b,i)=> b.idx=i);
+    scriptByKey = {}; script.forEach(b=>{ if(b.key) (scriptByKey[b.key]=scriptByKey[b.key]||[]).push(b.idx); });
+    window._script = script;
+  }catch(e){}
+  try{ delete occByChar[key]; delete charMarks[key]; if(progress[key]) delete progress[key]; }catch(e){}
+  try{ rebuild(); }catch(e){}
+  try{ if(typeof pop2!=='undefined' && pop2.doc){ if(pop2.key===key){ pop2.key=null; pop2.hl=null; pop2.scopeAll=true; } renderLibretoBlocks(); renderLibretoChips(); } }catch(e){}
+  if(typeof currentEp!=='undefined' && currentEp && currentEp.id){
+    try{ epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+    try{ saveEpCache(currentEp.id, new Date().toISOString()); }catch(e){}
+  }
+  if(typeof libMsg==='function') libMsg('🗑 Personaje eliminado: '+c.display);
 }
 async function assignTalent(key, val){
   const c = charIdx[key]; if(!c) return;
@@ -2284,7 +2407,7 @@ function updatePopup(){
   if(!pop.win || pop.win.closed || !pop.els) return;
   const e = pop.els;
   if(!pop.key){   // ===== modo libreto completo =====
-    e.d.body.style.setProperty('--cc', '#A78BFA');
+    e.d.body.style.setProperty('--cc', '#5FC85A');
     e.d.title = 'Libreto completo';
     e.name.textContent = 'Libreto completo';
     e.tal.textContent = pdfDoc ? ('pág. '+(pop.viewPage||1)+' / '+numPages) : 'sube el PDF';
@@ -2413,9 +2536,9 @@ function taskPanelEl(){
     + '#taskPanel.on{display:block}'
     + '#taskPanel .tp-t{font-family:Space Grotesk,sans-serif;font-weight:700;font-size:14.5px}'
     + '#taskPanel .tp-k{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A90BC;font-family:ui-monospace,monospace}'
-    + '#taskPanel .tp-s{font-family:ui-monospace,monospace;font-size:12px;color:#C4B5FD;min-height:1.2em;margin-top:4px}'
+    + '#taskPanel .tp-s{font-family:ui-monospace,monospace;font-size:12px;color:#A9E6A9;min-height:1.2em;margin-top:4px}'
     + '#taskPanel .tp-b{height:6px;background:#2A2150;border-radius:4px;margin-top:9px;overflow:hidden}'
-    + '#taskPanel .tp-f{height:100%;width:0;background:linear-gradient(90deg,#7C5CE0,#A78BFA);transition:width .25s}'
+    + '#taskPanel .tp-f{height:100%;width:0;background:linear-gradient(90deg,#4CB84C,#5FC85A);transition:width .25s}'
     + '#taskPanel.load .tp-f{background:linear-gradient(90deg,#10B981,#4ADE80)}';
   document.head.appendChild(st);
   p = document.createElement('div'); p.id = 'taskPanel';
@@ -3539,20 +3662,20 @@ const LIB_CSS = `
 body{font-family:'Inter',system-ui,sans-serif;overflow:hidden;height:100vh}
 /* ---- tema oscuro (por defecto) ---- */
 body.dark{--bg:#0d0a1e;--head:#171232;--card:#181334;--card-b:#2a2350;--ink:#ECE9FB;
-  --dim:#8B84B0;--tcc:#C9B8FF;--sep:#3a3168}
+  --dim:#8B84B0;--tcc:#A9E6A9;--sep:#3a3168}
 /* ---- tema claro ---- */
 body.light{--bg:#f4f2fb;--head:#ffffff;--card:#ffffff;--card-b:#e2ddf2;--ink:#1e1a35;
   --dim:#736d94;--tcc:#6d4ee0;--sep:#d8d2ee}
 body{background:var(--bg);color:var(--ink)}
 .lh{display:flex;align-items:center;gap:9px;padding:9px 13px;background:var(--head);
   border-bottom:1px solid var(--card-b);position:sticky;top:0;z-index:10;flex-wrap:wrap}
-.lh .dot{width:12px;height:12px;border-radius:4px;background:var(--pc,#A78BFA);box-shadow:0 0 10px var(--pc)}
+.lh .dot{width:12px;height:12px;border-radius:4px;background:var(--pc,#5FC85A);box-shadow:0 0 10px var(--pc)}
 .lh h2{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;white-space:nowrap}
 .lh .sp{flex:1}
 .lh button{border:1px solid var(--card-b);background:transparent;color:var(--ink);border-radius:9px;
   padding:6px 10px;font-size:13px;cursor:pointer;font-family:inherit}
-.lh button:hover{border-color:#A78BFA}
-.lh button.lbk{background:linear-gradient(135deg,#A78BFA,#7C5CE0);color:#160f33;border:none;font-weight:700;padding:7px 14px;margin-right:4px;box-shadow:0 4px 14px rgba(124,92,224,.45)}
+.lh button:hover{border-color:#5FC85A}
+.lh button.lbk{background:linear-gradient(135deg,#5FC85A,#4CB84C);color:#160f33;border:none;font-weight:700;padding:7px 14px;margin-right:4px;box-shadow:0 4px 14px rgba(124,92,224,.45)}
 .lh button.lbk:hover{filter:brightness(1.06)}
 .lh button.on{background:#4ADE80;color:#0b2413;border-color:transparent;font-weight:700}
 .lh .goto{display:flex;align-items:center;gap:4px}
@@ -3585,11 +3708,11 @@ body.light .blk.mine .tc{color:#B45309;text-shadow:none}
 .blk .tx{font-size:17px;line-height:1.55;color:var(--ink);white-space:normal;
   overflow-wrap:break-word;word-break:break-word}
 /* intervención del personaje activo: caja resaltada en pastel + texto negrita */
-body.dark .blk.mine{background:linear-gradient(135deg,rgba(167,139,250,.34),rgba(167,139,250,.18));
-  border:1px solid var(--pc,#C9B8FF);box-shadow:0 2px 12px rgba(167,139,250,.22)}
+body.dark .blk.mine{background:linear-gradient(135deg,rgba(95,200,90,.34),rgba(95,200,90,.18));
+  border:1px solid var(--pc,#A9E6A9);box-shadow:0 2px 12px rgba(95,200,90,.22)}
 body.light .blk.mine{background:linear-gradient(135deg,rgba(140,105,255,.24),rgba(140,105,255,.12));
   border:1px solid var(--pc,#8C69FF);box-shadow:0 2px 12px rgba(140,105,255,.18)}
-.blk.mine .who{color:var(--pc,#A78BFA)}
+.blk.mine .who{color:var(--pc,#5FC85A)}
 .blk.mine .tx{font-weight:800;font-size:var(--minefs,19px)}
 body.light .blk.mine .tx{color:#1a1530}
 body.dark .blk.mine .tx{color:#FFFFFF}
@@ -3598,8 +3721,8 @@ body.dark .blk.mine .tx{color:#FFFFFF}
 .blk.narr .tx{font-style:italic;font-size:15px;color:var(--dim)}
 .blk.narr .who{display:none}
 /* caja activa (punto de lectura) */
-.blk.active{transform:scale(1.008);box-shadow:0 0 0 1px var(--pc,#C9B8FF),0 8px 22px rgba(0,0,0,.28)}
-body.dark .blk.mine.active{background:linear-gradient(135deg,rgba(167,139,250,.34),rgba(167,139,250,.18))}
+.blk.active{transform:scale(1.008);box-shadow:0 0 0 1px var(--pc,#A9E6A9),0 8px 22px rgba(0,0,0,.28)}
+body.dark .blk.mine.active{background:linear-gradient(135deg,rgba(95,200,90,.34),rgba(95,200,90,.18))}
 body.light .blk.mine.active{background:linear-gradient(135deg,rgba(140,105,255,.22),rgba(140,105,255,.10))}
 /* barra inferior */
 .lbar{position:fixed;bottom:0;left:0;right:0;display:flex;gap:7px;align-items:center;justify-content:center;
@@ -3607,27 +3730,27 @@ body.light .blk.mine.active{background:linear-gradient(135deg,rgba(140,105,255,.
 .lbar span{color:var(--dim);font-size:11px}
 .lbar button{border:1px solid var(--card-b);background:transparent;color:var(--tcc);border-radius:8px;
   padding:5px 11px;font-size:12px;cursor:pointer;font-family:inherit}
-.lbar button:hover{border-color:#A78BFA}
-.lbar button.act{background:var(--pc,#A78BFA);color:#160f33;border-color:transparent;font-weight:700}
+.lbar button:hover{border-color:#5FC85A}
+.lbar button.act{background:var(--pc,#5FC85A);color:#160f33;border-color:transparent;font-weight:700}
 .readline{position:fixed;left:0;right:0;top:42%;height:0;z-index:5;pointer-events:none;display:none}
 .readline::after{content:'';display:block;height:2px;margin:0 14px;border-radius:2px;
-  background:linear-gradient(90deg,transparent,var(--pc,#C9B8FF),transparent);opacity:.6;box-shadow:0 0 12px var(--pc)}
+  background:linear-gradient(90deg,transparent,var(--pc,#A9E6A9),transparent);opacity:.6;box-shadow:0 0 12px var(--pc)}
 body.tpon .readline{display:block}
-.blk.centerhi{box-shadow:0 0 0 3px var(--pc,#A78BFA)}
-body.light .blk.centerhi{box-shadow:0 0 0 3px var(--pc,#7C5CE0)}
+.blk.centerhi{box-shadow:0 0 0 3px var(--pc,#5FC85A)}
+body.light .blk.centerhi{box-shadow:0 0 0 3px var(--pc,#4CB84C)}
 .blk.tapsel{animation:tapselA .52s ease}
-@keyframes tapselA{0%{box-shadow:0 0 0 5px var(--pc,#A78BFA)}100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}}
+@keyframes tapselA{0%{box-shadow:0 0 0 5px var(--pc,#5FC85A)}100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}}
 .conn{font-size:11px;font-weight:700;letter-spacing:.4px;padding:4px 10px;border-radius:99px;border:1px solid;white-space:nowrap}
 .lfind{display:none;align-items:center;gap:8px;padding:9px 13px;background:var(--head);
   border-bottom:1px solid var(--card-b);position:sticky;top:52px;z-index:15}
 body.finding .lfind{display:flex}
 .lfind input{flex:1;min-width:0;background:var(--card);border:1px solid var(--card-b);color:var(--ink);
   border-radius:9px;padding:9px 12px;font-size:15px;outline:none}
-.lfind input:focus{border-color:var(--pc,#A78BFA)}
+.lfind input:focus{border-color:var(--pc,#5FC85A)}
 .lfcount{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap;min-width:44px;text-align:center}
 .lfind button{border:1px solid var(--card-b);background:var(--card);color:var(--ink);border-radius:8px;
   padding:8px 11px;font-size:13px;cursor:pointer;flex:none}
-.lfind button:hover{border-color:var(--pc,#A78BFA)}
+.lfind button:hover{border-color:var(--pc,#5FC85A)}
 ::highlight(libsearch){background:#FDE047;color:#111;border-radius:2px}
 ::highlight(libsearchcur){background:#FB923C;color:#111}
 body.dark ::highlight(libsearch){background:#FDE047;color:#111}
@@ -3638,15 +3761,15 @@ body.dark ::highlight(libsearch){background:#FDE047;color:#111}
 body.haschips .lchips{display:flex}
 .lchips .pgchip{flex:none;font-family:ui-monospace,monospace;font-size:12px;padding:5px 11px;border-radius:8px;
   border:1px solid var(--card-b);background:var(--card);color:var(--ink);cursor:pointer;font-weight:600}
-.lchips .pgchip:hover{border-color:#A78BFA}
+.lchips .pgchip:hover{border-color:#5FC85A}
 .lchips .pgchip.rec{background:rgba(74,222,128,.16);border-color:rgba(74,222,128,.5);color:#4ADE80;text-decoration:line-through}
-.lchips .pgchip.cur{background:var(--pc,#A78BFA);color:#160f33;border-color:transparent;font-weight:700}
+.lchips .pgchip.cur{background:var(--pc,#5FC85A);color:#160f33;border-color:transparent;font-weight:700}
 .lchips .ctabs{display:none}
 body.haschips .lchips .ctabs{display:flex;gap:4px;position:sticky;top:0;background:var(--head);
   padding:3px;z-index:2;border-radius:9px;margin-bottom:3px}
 .lchips .ctabs span{flex:1;text-align:center;font-size:10px;font-weight:700;letter-spacing:.5px;
   color:var(--dim);padding:6px 2px;border-radius:7px;cursor:pointer;text-transform:uppercase}
-.lchips .ctabs span.on{background:var(--pc,#A78BFA);color:#160f33}
+.lchips .ctabs span.on{background:var(--pc,#5FC85A);color:#160f33}
 .lchips .pgchip.tcchip{font-size:10.5px;letter-spacing:0;padding:6px 3px}
 .pronov{position:fixed;inset:0;z-index:60;background:rgba(8,5,20,.55);display:flex;justify-content:flex-end}
 .pronsheet{width:min(330px,90vw);height:100%;background:var(--head);border-left:1px solid var(--card-b);
@@ -3711,8 +3834,8 @@ body.haschips.rclosed .ltools{transform:translateX(100%)}
 .ltools button{border:1px solid var(--card-b);background:var(--card);color:var(--ink);border-radius:9px;
   padding:10px 9px;font-size:13px;cursor:pointer;font-family:inherit;text-align:left}
 .ltools .trow button{flex:1;text-align:center}
-.ltools button:hover{border-color:#A78BFA}
-.ltools button.on{background:var(--pc,#A78BFA);color:#160f33;border-color:transparent;font-weight:700}
+.ltools button:hover{border-color:#5FC85A}
+.ltools button.on{background:var(--pc,#5FC85A);color:#160f33;border-color:transparent;font-weight:700}
 .ltools button.grn{background:linear-gradient(135deg,#4ADE80,#22C55E);color:#08240f;border:none;font-weight:700;text-align:center}
 .ltools input{border:1px solid var(--card-b);background:var(--bg);color:var(--ink);border-radius:8px;
   padding:9px;font-family:ui-monospace,monospace;font-size:13px;text-align:center}
@@ -3747,20 +3870,20 @@ body.mirror .lbar .goto{opacity:.4;pointer-events:none}
 .blk .tx .wd{border-radius:4px;padding:0 1px;transition:background .1s}
 /* audiodescripción: [referencias de diálogo/sonido] — no se narran */
 .blk .tx .wd.cue{color:#7DD3FC;font-style:italic;opacity:.85}
-.blk .tx .wd.acc{text-decoration:underline;text-decoration-color:var(--pc,#A78BFA);text-decoration-thickness:3px;text-underline-offset:3px;font-weight:800}
+.blk .tx .wd.acc{text-decoration:underline;text-decoration-color:var(--pc,#5FC85A);text-decoration-thickness:3px;text-underline-offset:3px;font-weight:800}
 .blk .tx .wd.prn{color:#67E8F9;font-weight:700}
 .blk .tx .wd.pr{color:#22D3EE;font-weight:700}
 body.light .blk .tx .wd.prn{color:#0891B2}
 body.light .blk .tx .wd.pr{color:#0E7490}
-body.marking .blk.active .tx .wd{cursor:pointer;background:rgba(167,139,250,.10)}
+body.marking .blk.active .tx .wd{cursor:pointer;background:rgba(95,200,90,.10)}
 body.marking[data-mode='pause'] .blk.active .tx .wd:hover{background:rgba(245,158,11,.3);box-shadow:-3px 0 0 #F59E0B}
-body.marking[data-mode='accent'] .blk.active .tx .wd:hover{background:rgba(167,139,250,.3)}
-.blk .tx[contenteditable="true"]{outline:2px dashed var(--pc,#A78BFA);outline-offset:4px;border-radius:6px;padding:4px}
+body.marking[data-mode='accent'] .blk.active .tx .wd:hover{background:rgba(95,200,90,.3)}
+.blk .tx[contenteditable="true"]{outline:2px dashed var(--pc,#5FC85A);outline-offset:4px;border-radius:6px;padding:4px}
 .blk .mtools{display:none;gap:6px;margin-top:9px;flex-wrap:wrap}
 .blk.active .mtools{display:flex}
 body.tablet .blk .mtools{display:flex}
 .mtools button{border:1px solid var(--card-b);background:var(--card);color:var(--tcc);border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit}
-.mtools button:hover{border-color:#A78BFA}
+.mtools button:hover{border-color:#5FC85A}
 .mtools button.edit.on{background:#4ADE80;color:#0b2413;border-color:transparent;font-weight:700}
 `;
 
@@ -3809,7 +3932,7 @@ function openLibretoInline(key){
   pop2.win = win; pop2.key = key; pop2.type = 'inline';
   ddlRememberOpen(key);
   const c = key ? charIdx[key] : null;
-  try{ buildLibretoDoc(c ? c.color : '#A78BFA'); }
+  try{ buildLibretoDoc(c ? c.color : '#5FC85A'); }
   catch(e){ console.error('libreto inline', e); return null; }
   try{ win.focus(); }catch(e){}
   return win;
@@ -4184,8 +4307,10 @@ function buildLibretoDoc(pc){
   });
   { const _sel = d.getElementById('lCharSel');
     if(_sel) _sel.addEventListener('change', ()=>{
-      pop2.hl = _sel.value || null;
-      if(pop2.hl){ pop2.scopeAll = true; }      // mostrar todo el libreto y resaltar al elegido
+      pop2.key = _sel.value || null;   // cambiar el personaje activo → chips/páginas se actualizan
+      pop2.hl = pop2.key;
+      pop2.scopeAll = true;            // mostrar todo el libreto y resaltar al elegido
+      try{ if(typeof pop2.doc.querySelector('.lh h2')!=='undefined'){ const h=pop2.doc.querySelector('.lh h2'); if(h) h.textContent = (pop2.key&&charIdx[pop2.key])?charIdx[pop2.key].display:'Libreto'; } }catch(e){}
       try{ renderLibretoBlocks(); }catch(e){}
       try{ renderLibretoChips(); }catch(e){}
       try{ const f = pop2.doc.querySelector('.blk.mine'); if(f) f.scrollIntoView({block:'center', behavior:'smooth'}); }catch(e){}
@@ -4375,7 +4500,7 @@ function renderLibretoBlocks(){
   const key = pop2.key;
   const highlight = pop2.hl || pop2.key;   // personaje resaltado desde el desplegable
   const c = charIdx[key];
-  const pc = c ? c.color : '#A78BFA';
+  const pc = c ? c.color : '#5FC85A';
   const html = [];
   pop2.blockMap = [];
   let lastPage = 0;
@@ -4864,7 +4989,7 @@ function fillCharSelect(){
   if(!pop2 || !pop2.doc) return;
   const sel = pop2.doc.getElementById('lCharSel'); if(!sel) return;
   if(pop2.hl && !charIdx[pop2.hl]) pop2.hl = null;      // el resaltado ya no aplica a este capítulo
-  const cur = pop2.hl || '';
+  const cur = pop2.hl || pop2.key || '';
   const list = chars.slice().sort((a,b)=> a.display.localeCompare(b.display,'es'));
   sel.innerHTML = '<option value="">— Resaltar personaje —</option>' +
     list.map(c=>'<option value="'+esc(c.key)+'"'+(c.key===cur?' selected':'')+'>'+esc(c.display)+' ('+c.totalInts+')</option>').join('');
@@ -5003,7 +5128,7 @@ function updateFloatCtl(){
     b = document.createElement('button');
     b.id = 'floatCtl';
     b.style.cssText = 'position:fixed;right:16px;bottom:18px;z-index:9500;border:none;border-radius:999px;'
-      + 'padding:14px 20px;background:linear-gradient(135deg,#A78BFA,#7C5CE0);color:#160f33;'
+      + 'padding:14px 20px;background:linear-gradient(135deg,#5FC85A,#4CB84C);color:#160f33;'
       + 'font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:15px;cursor:pointer;'
       + 'box-shadow:0 10px 34px rgba(124,92,224,.45)';
     b.onclick = ()=>{
@@ -5037,7 +5162,7 @@ function showTabChooser(key){
         <div style="font-size:12.5px;color:#8B84B0;margin-top:3px">Manera convencional: el libreto se abre aquí y se sincroniza con el escritorio</div>
       </button>
       <label style="display:flex;align-items:center;gap:8px;margin-top:14px;color:#B8B2D8;font-size:13.5px;cursor:pointer">
-        <input id="tcRem" type="checkbox" checked style="width:17px;height:17px;accent-color:#A78BFA"> Recordar mi elección (puedes cambiarla en 🔗 Sincronizar)
+        <input id="tcRem" type="checkbox" checked style="width:17px;height:17px;accent-color:#5FC85A"> Recordar mi elección (puedes cambiarla en 🔗 Sincronizar)
       </label>
     </div>`;
   document.body.appendChild(ov);
@@ -5380,12 +5505,12 @@ function showOpenLibretoPrompt(key){
   if(!el){
     el = document.createElement('div');
     el.id = 'openLibPrompt';
-    el.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:9997;background:#171232;border:1px solid #7C5CE0;color:#ECE9FB;padding:14px 18px;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.5);display:flex;gap:12px;align-items:center;font-size:14px;max-width:92vw;flex-wrap:wrap;justify-content:center';
+    el.style.cssText = 'position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:9997;background:#171232;border:1px solid #4CB84C;color:#ECE9FB;padding:14px 18px;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.5);display:flex;gap:12px;align-items:center;font-size:14px;max-width:92vw;flex-wrap:wrap;justify-content:center';
     document.body.appendChild(el);
   }
   const nm = (key && charIdx[key]) ? charIdx[key].display : 'el libreto completo';
   el.innerHTML = '<span>📄 La tablet abrió <b>'+esc(nm)+'</b> — tu navegador bloqueó la ventana.</span>'
-    + '<button id="openLibBtn" style="border:none;border-radius:10px;padding:10px 16px;background:linear-gradient(135deg,#A78BFA,#7C5CE0);color:#160f33;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap">▶ Mostrar libreto aquí</button>';
+    + '<button id="openLibBtn" style="border:none;border-radius:10px;padding:10px 16px;background:linear-gradient(135deg,#5FC85A,#4CB84C);color:#160f33;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap">▶ Mostrar libreto aquí</button>';
   el.querySelector('#openLibBtn').onclick = ()=>{
     const w = openLibretoWindow(sync._pendingOpenKey);   // ESTO sí es un gesto del usuario
     if(w){ hideOpenLibretoPrompt(); if(typeof ensureMirrorLoop==='function') ensureMirrorLoop(); }
@@ -5455,7 +5580,7 @@ function buildTrackpad(){
         <div style="font-size:clamp(14px,4.2vw,16px);font-weight:600;color:#8B84B0">Desliza para mover el libreto</div>
         <div style="font-size:clamp(11.5px,3.4vw,13px);margin-top:6px">Toca para seleccionar la caja resaltada</div>
       </div>
-      <div id="tpFlash" style="position:absolute;inset:0;background:#A78BFA;opacity:0;pointer-events:none;transition:opacity .18s"></div>
+      <div id="tpFlash" style="position:absolute;inset:0;background:#5FC85A;opacity:0;pointer-events:none;transition:opacity .18s"></div>
     </div>
     <div style="flex:none;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:#120d29;border-top:1px solid #241d47">
       <button class="tpb" data-cmd="pageup">▲ Anterior</button>
@@ -5896,7 +6021,7 @@ function pipMount(pw, real){
       margin-bottom:3px}
     .ln.cur .meta .tc{font-family:ui-monospace,monospace;font-weight:800;color:#FFB020;
       font-size:calc(var(--fs) * .6);letter-spacing:.5px}
-    .ln.cur .meta .who{font-weight:700;color:#C9B8FF;font-size:calc(var(--fs) * .5);
+    .ln.cur .meta .who{font-weight:700;color:#A9E6A9;font-size:calc(var(--fs) * .5);
       letter-spacing:.6px;text-transform:uppercase}
     /* barrido karaoke: el texto de la línea actual se pinta de ámbar según avanza */
     .ln.cur .txt{
@@ -6557,7 +6682,7 @@ function studioInjectCurCss(){
   try{
     const doc = pop2.doc; if(!doc || doc.getElementById('stCurCss')) return;
     const stl = doc.createElement('style'); stl.id='stCurCss';
-    stl.textContent = '.blk.stcur{outline:2px solid #7c6cf5;outline-offset:-2px;border-radius:12px}'
+    stl.textContent = '.blk.stcur{outline:2px solid #4CB84C;outline-offset:-2px;border-radius:12px}'
       +'.stcps{font-size:10px;margin-left:6px;opacity:.95;font-weight:600}'
       +'.cps-ok{color:#4ade80}.cps-fast{color:#fbbf24}.cps-vfast{color:#f87171}'
       +'.bhead .tc{cursor:pointer}';
@@ -7175,7 +7300,7 @@ function stWavePaint(){
       g.lineTo(x, mid + cl(r)*amp);
     }
     g.closePath();
-    g.fillStyle = '#5b46c8'; g.fill();
+    g.fillStyle = '#3f9e3c'; g.fill();
     // aviso de recorte cuando el Expand View saca la onda del recuadro
     if(recorte.length){
       g.fillStyle = '#fbbf24';
@@ -7210,7 +7335,7 @@ function stWavePaint(){
   // barra de posición dentro del total
   if(dur && span < dur){
     g.fillStyle='rgba(255,255,255,.09)'; g.fillRect(0,H-3,W,3);
-    g.fillStyle='#a78bfa'; g.fillRect(t0/dur*W, H-3, Math.max(6, span/dur*W), 3);
+    g.fillStyle='#5fc85a'; g.fillRect(t0/dur*W, H-3, Math.max(6, span/dur*W), 3);
   }
 }
 
