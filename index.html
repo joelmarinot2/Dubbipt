@@ -611,6 +611,154 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Silksc
 .card .tal .meta{ display:none; }
 .card .bar, .card .pgs{ display:none !important; }
 </style>
+<style>
+/* ===== Selector de dispositivo (imagen 3) ===== */
+#rolePick{ position:fixed; inset:0; z-index:9600; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px;
+  background:radial-gradient(1200px 760px at 50% 28%, #3b3690 0%, #2c2770 46%, #201c50 100%); font-family:'RetroPix',monospace; padding:20px; }
+#rolePick .rp-bar{ position:fixed; left:0; right:0; height:14px; background:#5FC85A; }
+#rolePick .rp-bar.t{ top:0 } #rolePick .rp-bar.b{ bottom:0 }
+#rolePick .rp-logo{ width:70px; height:88px; position:relative; margin-bottom:2px; }
+#rolePick .rp-logo::before{ content:''; position:absolute; left:0; top:0; width:52px; height:88px; border:13px solid #5FC85A; border-radius:3px; box-sizing:border-box; }
+#rolePick .rp-logo::after{ content:''; position:absolute; right:0; top:20px; width:20px; height:48px; background:#5FC85A; border-radius:3px; }
+#rolePick .rp-card{ width:min(720px,94vw); background:#5FC85A; border-radius:34px; padding:24px 26px 30px; }
+#rolePick .rp-title{ text-align:center; color:#123317; font-size:20px; }
+#rolePick .rp-sub{ text-align:center; color:#123317; font-size:15px; margin:8px 0 22px; }
+#rolePick .rp-opts{ display:flex; gap:22px; }
+#rolePick .rp-opt{ flex:1; background:#181433; border:3px solid transparent; border-radius:26px; padding:26px 16px 20px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:16px; color:#fff; font-family:'RetroPix',monospace; transition:transform .1s, border-color .1s; }
+#rolePick .rp-opt:hover{ transform:translateY(-3px); border-color:#123317; }
+#rolePick .rp-opt svg{ width:120px; height:120px; }
+#rolePick .rp-opt .lab{ font-size:15px; text-align:center; line-height:1.5; }
+#rolePick .rp-logout{ width:min(720px,94vw); background:transparent; border:2px solid #5FC85A; border-radius:26px; padding:16px; color:#8fe08f; font-family:'RetroPix',monospace; font-size:16px; cursor:pointer; }
+#rolePick .rp-logout:hover{ background:rgba(95,200,90,.10); color:#bff5bf; }
+@media(max-width:560px){ #rolePick .rp-opts{ flex-direction:column } #rolePick .rp-opt svg{ width:90px; height:90px } }
+</style>
+<style>
+/* ===== Modal Espacios de trabajo (imagen 6) ===== */
+.wscard{ width:min(560px,94vw); }
+.wscard .dlgtitle{ font-size:30px; margin-bottom:22px; }
+#wsList{ display:flex; flex-direction:column; gap:14px; margin-bottom:16px; }
+.wsrow{ position:relative; display:flex; align-items:center; }
+.wsrow .wsname{ flex:1; background:#5FC85A; border:none; border-radius:24px; padding:16px 52px; color:#123317; font-family:'RetroPix',monospace; font-size:16px; cursor:pointer; text-align:center; }
+.wsrow .wsname:hover{ filter:brightness(1.06); }
+.wsrow .wsedit,.wsrow .wsdel{ position:absolute; border:none; background:transparent; cursor:pointer; padding:6px; display:grid; place-items:center; }
+.wsrow .wsedit{ right:50px; }
+.wsrow .wsdel{ right:14px; }
+.wscard .wsnew{ width:100%; background:transparent; border:2px solid #5FC85A; border-radius:24px; padding:16px; color:#8fe08f; font-family:'RetroPix',monospace; font-size:15px; cursor:pointer; }
+.wscard .wsnew:hover{ background:rgba(95,200,90,.10); color:#bff5bf; }
+.wscard .wsclose{ display:block; width:100%; margin-top:12px; background:transparent; border:none; color:#8B84B0; font-family:'RetroPix',monospace; font-size:13px; cursor:pointer; }
+.wscard .wsempty{ color:#8B84B0; text-align:center; padding:10px; font-size:13px; }
+</style>
+<style>
+/* ===== Barra de navegación verde (imagen dashboard) ===== */
+.hdrbar{ display:none !important; }
+#topbar{ position:relative; display:flex; align-items:center; gap:12px; background:#5FC85A; border-radius:28px; padding:8px 12px; margin:6px 0 24px; min-height:58px; }
+#topbar .tb-left{ display:flex; align-items:center; gap:10px; background:#140f30; border-radius:22px; padding:8px 14px; z-index:2; }
+#topbar .tb-dev{ color:#8fe08f; font-family:'RetroPix',monospace; font-size:13px; white-space:nowrap; }
+#topbar .tb-sync{ background:#ff3b3b; color:#fff; border:none; border-radius:16px; padding:9px 15px; font-family:'RetroPix',monospace; font-size:12px; cursor:pointer; }
+#topbar .tb-sync.on{ background:#2fbf4a; }
+#topbar .tb-icon{ background:#140f30; color:#8fe08f; border:none; border-radius:14px; padding:6px 12px; cursor:pointer; font-size:18px; }
+#topbar .tb-brand{ position:absolute; left:0; right:0; text-align:center; color:#fff; font-family:'RetroPix',monospace; font-size:24px; letter-spacing:1px; pointer-events:none; text-shadow:1px 1px 0 rgba(0,0,0,.18); }
+#topbar .tb-right{ margin-left:auto; position:relative; z-index:2; }
+#topbar .tb-user{ background:#140f30; color:#8fe08f; border:none; border-radius:22px; padding:13px 24px; font-family:'RetroPix',monospace; font-size:14px; cursor:pointer; }
+#topbar .tb-user:hover{ color:#bff5bf; }
+#topbar .tb-menu{ display:none; position:absolute; right:0; top:calc(100% + 8px); background:#5FC85A; border-radius:14px; overflow:hidden; min-width:210px; box-shadow:0 12px 30px rgba(0,0,0,.45); z-index:80; }
+#topbar .tb-menu.open{ display:block; }
+#topbar .tb-menu button{ display:block; width:100%; text-align:left; background:transparent; border:none; color:#123317; font-family:'RetroPix',monospace; font-size:13px; padding:14px 18px; cursor:pointer; border-bottom:1px solid rgba(0,0,0,.12); }
+#topbar .tb-menu button:last-child{ border-bottom:none; }
+#topbar .tb-menu button:hover{ background:rgba(0,0,0,.14); }
+@media(max-width:640px){ #topbar .tb-brand{ font-size:18px; } #topbar .tb-dev{ font-size:11px; } #topbar .tb-user{ padding:10px 14px; } }
+</style>
+<style>
+/* ===== Crear Programa / modales · ajuste al mockup (imagen 7) ===== */
+.dlgcard{ width:min(620px,94vw) !important; background:#1e1a40 !important; border:4px solid #5FC85A !important; border-radius:30px !important; padding:28px 30px 32px !important; }
+.dlgtitle{ font-size:30px !important; margin-bottom:24px !important; }
+.dlgfield{ background:#241f52 !important; border-radius:30px !important; padding:6px 16px !important; margin-bottom:20px !important; }
+.dlgfield input{ padding:18px 10px !important; font-size:15px !important; color:#fff !important; }
+.dlgfield input::placeholder{ color:#b9b3e0; }
+.dlglabel{ color:#fff !important; font-size:15px !important; margin:8px 0 12px !important; }
+.dlgdrop{ border:2.5px solid #5FC85A !important; border-radius:28px !important; min-height:96px !important; background:transparent !important; margin-bottom:6px !important; }
+.dlgdrop .pl{ color:#5FC85A !important; font-size:40px !important; }
+.dlgbtn{ display:block; width:62% !important; margin:24px auto 0 !important; border-radius:26px !important; }
+@media(max-width:560px){ .dlgbtn{ width:90% !important; } .dlgcard{ padding:22px 18px 24px !important; } }
+</style>
+<style>
+/* ===== Cabecera de programa con portada (imagen 8) ===== */
+#progHeader{ margin:6px 0 0; }
+#progHeader .ph-inner{ position:relative; border:3px solid #5FC85A; border-bottom:none; border-radius:24px 24px 0 0; background:#241f52; background-size:cover; background-position:center; padding:24px 26px 22px; min-height:186px; overflow:hidden; }
+#progHeader .ph-edit{ position:absolute; top:18px; right:20px; width:48px; height:34px; border:2px solid #5FC85A; border-radius:18px; background:rgba(20,15,48,.45); color:#eaffea; cursor:pointer; }
+#progHeader .ph-ws{ display:inline-block; background:#3aa03a; color:#eafff0; font-family:'RetroPix',monospace; font-size:12px; padding:7px 16px; border-radius:14px; }
+#progHeader .ph-title{ color:#fff; font-family:'RetroPix',monospace; font-size:34px; margin:14px 0 16px; text-shadow:2px 2px 0 rgba(0,0,0,.45); }
+#progHeader .ph-back{ background:#5FC85A; color:#123317; border:none; border-radius:22px; padding:11px 24px; font-family:'RetroPix',monospace; font-size:15px; cursor:pointer; }
+#libGrid.epsgrid{ border-top-left-radius:0 !important; border-top-right-radius:0 !important; border-top:none !important; margin-top:0 !important; }
+/* ===== Carpetas de episodio ===== */
+.etile{ background:transparent !important; border:none !important; box-shadow:none !important; padding:0 !important; width:184px; }
+.etile:hover{ transform:none !important; box-shadow:none !important; }
+.etile .ecover{ position:relative; height:150px; border:3px solid #5FC85A; border-radius:12px; background:#140f30; display:grid; place-items:center; cursor:pointer; transition:transform .1s; }
+.etile .ecover:hover{ transform:translateY(-3px); }
+.etile .ecover::before{ content:''; position:absolute; top:-15px; left:16px; width:74px; height:17px; border:3px solid #5FC85A; border-bottom:none; border-radius:9px 9px 0 0; background:#140f30; }
+.etile .enum{ font-family:'RetroPix',monospace; font-size:46px; color:#5FC85A; }
+.etile .eplus{ font-family:'RetroPix',monospace; font-size:56px; color:#5FC85A; line-height:1; }
+.etile .ename{ font-family:'RetroPix',monospace; color:#fff; font-size:15px; margin-top:12px; }
+.etile.act .ecover{ box-shadow:0 0 0 3px rgba(95,200,90,.45); }
+.etile .ldel,.etile .lren,.etile .lupd{ position:absolute; top:8px; opacity:0; border:none; background:rgba(0,0,0,.55); color:#fff; border-radius:8px; padding:3px 6px; cursor:pointer; font-size:12px; transition:opacity .12s; z-index:2; }
+.etile:hover .ldel,.etile:hover .lren,.etile:hover .lupd{ opacity:1; }
+.etile .ldel{ right:8px; } .etile .lren{ right:44px; } .etile .lupd{ right:80px; }
+/* ===== Modal Nuevo episodio (imagen 9) ===== */
+.dlghint{ text-align:center; color:#b9b3e0; font-family:'RetroPix',monospace; font-size:13px; margin:8px 0 2px; }
+.dlgdrop.tall{ min-height:150px !important; }
+.dlgdrop .nefile{ color:#cfe9cf; font-family:'RetroPix',monospace; font-size:13px; padding:0 12px; text-align:center; }
+</style>
+<style>
+/* ===== Ajuste Nuevo episodio (imagen 9) ===== */
+.dlgfield.nef{ display:flex; align-items:center; }
+.dlgfield.nef .nepfx{ color:#fff; font-family:'RetroPix',monospace; font-size:15px; padding-left:8px; margin-right:8px; white-space:nowrap; }
+.dlgfield.nef input{ flex:1; }
+.dlgdrop.tall{ min-height:192px !important; border-radius:30px !important; }
+.dlgdrop.tall .pl{ font-size:42px !important; }
+.dlghint{ color:#e6e2ff !important; }
+</style>
+<style>
+/* ===== Pantalla de revisión del desglose (imagen 10) ===== */
+#drvOv{ position:fixed; inset:0; z-index:9700; background:rgba(10,7,26,.92); display:flex; align-items:center; justify-content:center; padding:20px; }
+.drv-card{ width:min(960px,96vw); max-height:88vh; background:#1e1a40; border:4px solid #5FC85A; border-radius:30px; padding:22px 26px 24px; display:flex; flex-direction:column; }
+.drv-top{ position:relative; display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:6px; }
+.drv-back{ position:absolute; left:0; top:0; width:46px; height:46px; border-radius:50%; background:#5FC85A; border:none; color:#123317; font-size:22px; cursor:pointer; }
+.drv-title{ font-family:'RetroPix',monospace; color:#fff; font-size:30px; }
+.drv-epname{ background:#5FC85A; color:#123317; font-family:'RetroPix',monospace; font-size:15px; padding:10px 20px; border-radius:20px; }
+.drv-heads{ display:grid; grid-template-columns:1fr 1.2fr 92px 60px; gap:14px; margin:16px 0 8px; }
+.drv-heads span{ text-align:center; color:#fff; font-family:'RetroPix',monospace; font-size:15px; }
+.drv-list{ flex:1; overflow-y:auto; padding-right:6px; display:flex; flex-direction:column; gap:14px; }
+.drv-list::-webkit-scrollbar{ width:8px; } .drv-list::-webkit-scrollbar-thumb{ background:#5FC85A; border-radius:8px; }
+.drv-row{ display:grid; grid-template-columns:1fr 1.2fr 92px 60px; gap:14px; align-items:center; }
+.drv-name{ background:#140f30; color:#fff; font-family:'RetroPix',monospace; font-size:14px; text-align:center; padding:16px 10px; border-radius:24px; }
+.drv-tal{ background:#5FC85A; color:#123317; font-family:'RetroPix',monospace; font-size:14px; text-align:center; padding:15px 10px; border:none; border-radius:24px; outline:none; }
+.drv-tal::placeholder{ color:#1c4a24; }
+.drv-tal:focus{ box-shadow:0 0 0 3px rgba(18,51,23,.35) inset; }
+.drv-ints{ border:2px solid #5FC85A; color:#cfe9cf; font-family:'RetroPix',monospace; font-size:14px; text-align:center; padding:12px 6px; border-radius:20px; }
+.drv-del{ background:#ff3b3b; border:none; border-radius:16px; padding:12px 8px; cursor:pointer; display:grid; place-items:center; }
+.drv-del:hover{ filter:brightness(1.08); }
+.drv-save{ margin-top:16px; width:100%; background:#5FC85A; color:#123317; border:none; border-radius:26px; padding:16px; font-family:'RetroPix',monospace; font-size:17px; cursor:pointer; box-shadow:0 5px 0 #3f9e3c; }
+.drv-save:active{ transform:translateY(3px); box-shadow:0 2px 0 #3f9e3c; }
+@media(max-width:640px){ .drv-heads,.drv-row{ grid-template-columns:1fr 1fr 62px 48px; gap:8px; } .drv-title{ font-size:22px; } }
+</style>
+<style>
+/* ===== Vista de episodio / casting (imagen 10) ===== */
+.dens{ display:none !important; }
+#planilla{ display:none !important; }              /* solo se ven las cajas de personaje */
+.actrow{ gap:14px; }
+.actrow .hint{ display:none !important; }
+.actrow .act-g{ background:#2f6b34 !important; color:#dff5df !important; border:none !important; border-radius:22px !important; padding:14px 22px !important; font-family:'RetroPix',monospace !important; font-size:14px !important; box-shadow:none !important; }
+.actrow .act-g:hover{ background:#3a8040 !important; }
+/* buscador estilo mockup */
+.find{ background:#152036 !important; border:none !important; border-bottom:2px solid #5FC85A !important; border-radius:14px 14px 0 0 !important; padding:14px 16px !important; }
+.find input{ color:#eafff0 !important; font-family:'RetroPix',monospace !important; }
+.find input::placeholder{ color:#7fae7f !important; }
+.find .fi{ color:#5FC85A; }
+/* stats: solo «Personajes», como el mockup */
+.stats .stat:not(:first-child){ display:none !important; }
+.stats .stat{ background:transparent !important; border:none !important; padding:0 !important; color:#fff !important; font-family:'RetroPix',monospace !important; }
+.stats .stat b{ display:block; font-size:34px; color:#fff; margin:0 0 2px; }
+</style>
 </head>
 <body class="locked">
 <div class="appbar appbar-top"></div>
@@ -651,15 +799,27 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Silksc
     <button class="chip" id="btnInstall" onclick="ddlInstall()" title="Instalar como aplicación">Instalar app</button>
     <button class="chip" id="btnOut" style="display:none">Cerrar sesión</button>
   </div>
-  <header>
-    <div class="mk">DD</div>
-    <div>
-      <h1>Dubbipt</h1>
+  <div id="topbar">
+    <div class="tb-left">
+      <button id="btnBack2" class="tb-icon" style="display:none" onclick="appBack()" title="Atrás">‹</button>
+      <span class="tb-dev" id="devStat">● Listo</span>
+      <button class="tb-sync" id="syncChip" onclick="syncMenu()" title="Sincronización tablet ↔ escritorio">sincronización</button>
     </div>
-  </header>
+    <div class="tb-brand">Dubbipt</div>
+    <div class="tb-right">
+      <button class="tb-user" id="userBtn" onclick="toggleUserMenu(event)">Usuario ▾</button>
+      <div class="tb-menu" id="userMenu">
+        <button onclick="closeUserMenu();showWorkspacePicker(true)">Espacios de trabajo</button>
+        <button onclick="closeUserMenu();if(typeof ddlInstall===&quot;function&quot;)ddlInstall()">Instalar app</button>
+        <button onclick="closeUserMenu();document.getElementById('btnOut').click()">Cerrar Sesión</button>
+      </div>
+    </div>
+    <span id="who" style="display:none"></span>
+  </div>
   <div class="epline" id="epLine" style="display:none"></div>
 
   <h1 id="dashTitle" style="display:none">Dashboard</h1>
+  <div id="progHeader" style="display:none"></div>
   <div class="lib" id="lib">
     <div class="lib-head">
       <h2 id="libCrumb">📚 Programas</h2>
@@ -687,18 +847,19 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Silksc
   <div class="stats" id="stats"></div>
   <div class="toolbar" id="toolbar">
     <div class="findrow">
-      <label class="find"><span class="fi">🔍</span><input type="text" id="search" placeholder="Buscar personaje o talento..."><button type="button" id="searchClear" title="Borrar búsqueda" style="display:none;border:none;background:none;color:var(--ink-faint);cursor:pointer;font-size:15px;padding:0 6px;line-height:1">✕</button></label>
+      <label class="find"><span class="fi">🔍</span><input type="text" id="search" placeholder="Busca personaje o talento"><button type="button" id="searchClear" title="Borrar búsqueda" style="display:none;border:none;background:none;color:var(--ink-faint);cursor:pointer;font-size:15px;padding:0 6px;line-height:1">✕</button></label>
       <div class="dens" id="dens" role="group" aria-label="Densidad de la vista">
         <button type="button" data-d="comoda" class="on">Cómoda</button><button type="button" data-d="compacta">Compacta</button>
       </div>
     </div>
     <div class="actrow">
-      <button class="btnv sm" id="btnFull" title="Abrir el libreto completo, sin filtrar por personaje">📖 Libreto completo</button>
-      <button class="btnv sm" id="btnMerge" title="Unir dos personajes en uno (p. ej. MARCUS (VO) + MARCUS)">🔗 Fusionar personajes</button>
-      <button class="btnv sm" id="btnExport" title="Descargar el avance de grabación en Excel (por personaje y por página)">⬇ Avance</button>
-      <button class="btnv sm" id="btnRefresh" title="Forzar actualización: baja la versión más nueva del capítulo (libreto y archivos) desde la nube">🔄 Actualizar</button>
-          <button class="btnv sm" id="btnModoEst" title="Modo estudio: video/audio + onda + marcado de pausas">🎬 Estudio</button>
-      <span class="hint">Clic en un personaje abre su libreto</span>
+      <button class="btnv sm act-g" id="btnFull" title="Abrir el libreto completo, sin filtrar por personaje">Libreto Completo</button>
+      <button class="btnv sm act-g" id="btnMerge" title="Unir dos personajes en uno (p. ej. MARCUS (VO) + MARCUS)">Fusionar Personajes</button>
+      <button class="btnv sm act-g" id="btnEditEp" onclick="editEpisode()" title="Editar el desglose del episodio (talentos / quitar personajes)">Editar Episodio</button>
+      <button class="btnv sm act-g" id="btnModoEst" title="Modo estudio: video/audio + onda + marcado de pausas">Video Estudio</button>
+      <button class="btnv sm" id="btnExport" style="display:none" title="Avance">⬇ Avance</button>
+      <button class="btnv sm" id="btnRefresh" style="display:none" title="Actualizar">🔄 Actualizar</button>
+      <span class="hint" style="display:none">Clic en un personaje abre su libreto</span>
     </div>
   </div>
   <div class="cards" id="cards"></div>
@@ -777,51 +938,52 @@ function setWorkspace(ws){
   applyWorkspace();
 }
 function showWorkspacePicker(force){
-  const old = document.getElementById('sPick'); if(old) old.remove();
-  const ov = document.createElement('div'); ov.id='sPick';
-  ov.style.cssText='position:fixed;inset:0;z-index:9998;background:rgba(8,5,20,.92);display:flex;align-items:center;justify-content:center;overflow:auto;padding:20px';
-  const card = document.createElement('div');
-  card.style.cssText='background:#171232;border:1px solid #2a2350;border-radius:20px;padding:26px;width:min(520px,94vw);text-align:center';
-  const list = libWorkspaces.map(w=>{
-    const active = WORKSPACE && WORKSPACE.id===w.id;
-    return '<div class="wsRow" data-id="'+w.id+'" style="display:flex;align-items:center;gap:10px;padding:12px 14px;margin:8px 0;border:1px solid '+(active?'#4CB84C':'#2a2350')+';border-radius:12px;background:'+(active?'#1c1540':'#120d29')+';cursor:pointer">'
-      + '<span style="font-size:20px">🗂️</span>'
-      + '<b style="flex:1;text-align:left;font-family:\'Space Grotesk\',sans-serif;color:#ECE9FB">'+esc(w.name)+'</b>'
-      + (active?'<span style="color:#4ADE80;font-size:12px">actual</span>':'')
-      + '<button class="wsDel" data-id="'+w.id+'" title="Borrar espacio" style="border:none;background:none;color:#6E678F;cursor:pointer;font-size:15px">🗑️</button>'
-      + '</div>';
-  }).join('');
-  card.innerHTML = '<div style="font-family:\'Space Grotesk\',sans-serif;font-size:19px;font-weight:700;color:#ECE9FB;margin-bottom:4px">Espacios de trabajo</div>'
-    + '<div style="font-size:13px;color:#8B84B0;margin-bottom:16px">Cada espacio tiene sus propios programas y capítulos</div>'
-    + '<div id="wsList">'+(list||'<div style="color:#6E678F;font-size:13px;padding:10px">Aún no tienes espacios. Crea el primero abajo.</div>')+'</div>'
-    + '<div style="display:flex;gap:8px;margin-top:10px">'
-    +   '<input id="wsName" placeholder="Nombre del nuevo espacio (ej. Netflix)" style="flex:1;background:#191238;border:1px solid #2a2350;border-radius:10px;padding:11px 13px;color:#ECE9FB;font-size:14px;outline:none">'
-    +   '<button id="wsAdd" style="border:none;border-radius:10px;padding:11px 16px;background:linear-gradient(135deg,#5FC85A,#4CB84C);color:#160f33;font-family:\'Space Grotesk\',sans-serif;font-weight:700;cursor:pointer">Crear</button>'
-    + '</div>'
-    + (WORKSPACE ? '<button id="wsClose" style="margin-top:16px;border:none;background:none;color:#8B84B0;font-size:13px;cursor:pointer">Cerrar</button>' : '');
-  ov.appendChild(card); document.body.appendChild(ov);
-  card.querySelectorAll('.wsRow').forEach(row=>{
-    row.addEventListener('click', e=>{
-      if(e.target.classList.contains('wsDel')) return;
-      const w = libWorkspaces.find(x=>x.id===row.dataset.id); if(w){ ov.remove(); setWorkspace(w); }
-    });
+  const old=document.getElementById('wsPickOv'); if(old) old.remove();
+  const PEN='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#123317" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  const TRASH='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF4D4D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>';
+  const ov=document.createElement('div'); ov.id='wsPickOv'; ov.className='dlgov';
+  const rows = libWorkspaces.map(w=>
+    '<div class="wsrow">'
+    +'<button class="wsname" data-id="'+w.id+'">'+esc(w.name)+'</button>'
+    +'<button class="wsedit" data-id="'+w.id+'" title="Renombrar">'+PEN+'</button>'
+    +'<button class="wsdel" data-id="'+w.id+'" title="Borrar">'+TRASH+'</button>'
+    +'</div>').join('');
+  ov.innerHTML='<div class="dlgcard wscard">'
+    +'<h2 class="dlgtitle">Espacios de trabajo</h2>'
+    +'<div id="wsList">'+(rows||'<div class="wsempty">Aún no tienes espacios. Crea el primero.</div>')+'</div>'
+    +'<button class="wsnew" id="wsNew">Crear un nuevo</button>'
+    +'<div id="wsCreate" style="display:none;margin-top:12px">'
+    +  '<div class="dlgfield"><input id="wsNewName" placeholder="Nombre del espacio"></div>'
+    +  '<button class="dlgbtn" id="wsNewGo">Crear</button>'
+    +'</div>'
+    +(WORKSPACE?'<button class="wsclose" id="wsClose">Cerrar</button>':'')
+    +'</div>';
+  document.body.appendChild(ov);
+  ov.addEventListener('mousedown', e=>{ if(e.target===ov && WORKSPACE) ov.remove(); });
+  const q=(sel)=>ov.querySelector(sel);
+  ov.querySelectorAll('.wsname').forEach(b=> b.onclick=()=>{ const w=libWorkspaces.find(x=>x.id===b.dataset.id); if(w){ ov.remove(); setWorkspace(w); } });
+  ov.querySelectorAll('.wsedit').forEach(b=> b.onclick=async(e)=>{ e.stopPropagation();
+    const w=libWorkspaces.find(x=>x.id===b.dataset.id); if(!w) return;
+    const nm=prompt('Nuevo nombre del espacio:', w.name); if(!nm||!nm.trim()||nm.trim()===w.name) return;
+    const {error}=await sb.from('workspaces').update({name:nm.trim()}).eq('id',w.id);
+    if(error){ libMsg('No se pudo renombrar: '+error.message); return; }
+    w.name=nm.trim();
+    if(WORKSPACE&&WORKSPACE.id===w.id){ WORKSPACE.name=w.name; try{localStorage.setItem('ddl_ws',JSON.stringify(WORKSPACE));}catch(_){}; updateWorkspaceChip(); try{renderLibrary(true);}catch(_){} }
+    showWorkspacePicker(true);
   });
-  card.querySelectorAll('.wsDel').forEach(b=>{
-    b.addEventListener('click', async e=>{
-      e.stopPropagation();
-      const w = libWorkspaces.find(x=>x.id===b.dataset.id); if(!w) return;
-      if(!confirm('¿Borrar el espacio «'+w.name+'» y TODOS sus programas y capítulos?')) return;
-      try{ await sb.from('workspaces').delete().eq('id', w.id); }catch(err){ libMsg('No se pudo borrar: '+err.message); return; }
-      libWorkspaces = libWorkspaces.filter(x=>x.id!==w.id);
-      if(WORKSPACE && WORKSPACE.id===w.id){ WORKSPACE=null; try{localStorage.removeItem('ddl_ws');}catch(_){} }
-      ov.remove(); showWorkspacePicker(true);
-    });
+  ov.querySelectorAll('.wsdel').forEach(b=> b.onclick=async(e)=>{ e.stopPropagation();
+    const w=libWorkspaces.find(x=>x.id===b.dataset.id); if(!w) return;
+    if(!confirm('¿Borrar el espacio «'+w.name+'» y TODOS sus programas y capítulos?')) return;
+    try{ await sb.from('workspaces').delete().eq('id',w.id); }catch(err){ libMsg('No se pudo borrar: '+err.message); return; }
+    libWorkspaces=libWorkspaces.filter(x=>x.id!==w.id);
+    if(WORKSPACE&&WORKSPACE.id===w.id){ WORKSPACE=null; try{localStorage.removeItem('ddl_ws');}catch(_){}}
+    showWorkspacePicker(true);
   });
-  const add = async ()=>{ const nm=(card.querySelector('#wsName').value||'').trim(); if(!nm) return;
-    const w = await createWorkspace(nm); if(w){ ov.remove(); setWorkspace(w); } };
-  card.querySelector('#wsAdd').onclick = add;
-  card.querySelector('#wsName').addEventListener('keydown', e=>{ if(e.key==='Enter') add(); });
-  const cl = card.querySelector('#wsClose'); if(cl) cl.onclick = ()=> ov.remove();
+  const nb=q('#wsNew'); if(nb) nb.onclick=()=>{ q('#wsCreate').style.display=''; nb.style.display='none'; const i=q('#wsNewName'); if(i) i.focus(); };
+  const doCreate=async()=>{ const nm=(q('#wsNewName').value||'').trim(); if(!nm) return; const w=await createWorkspace(nm); if(w){ ov.remove(); setWorkspace(w); } };
+  const gob=q('#wsNewGo'); if(gob) gob.onclick=doCreate;
+  const ni=q('#wsNewName'); if(ni) ni.addEventListener('keydown', e=>{ if(e.key==='Enter') doCreate(); });
+  const cl=q('#wsClose'); if(cl) cl.onclick=()=> ov.remove();
 }
 function applyWorkspace(){
   updateWorkspaceChip();
@@ -875,22 +1037,36 @@ function updateStudioChip(){ updateWorkspaceChip(); }
 // Al iniciar sesión: preguntar SIEMPRE el rol del dispositivo, ajustar y seguir.
 function postLogin(){ askRoleAtLogin(()=> ensureWorkspace()); }
 function askRoleAtLogin(done){
-  const old=document.getElementById('sPick'); if(old) old.remove();
-  const ov=document.createElement('div'); ov.id='sPick';
-  ov.style.cssText='position:fixed;inset:0;z-index:9998;background:rgba(8,5,20,.92);display:flex;align-items:center;justify-content:center;padding:20px';
-  const card=document.createElement('div');
-  card.style.cssText='background:#171232;border:1px solid #2a2350;border-radius:20px;padding:26px;width:min(440px,94vw);text-align:center';
-  card.innerHTML='<div style="font-family:\'Space Grotesk\',sans-serif;font-size:18px;font-weight:700;color:#ECE9FB;margin-bottom:4px">¿Este dispositivo es…?</div>'
-    +'<div style="font-size:13px;color:#8B84B0;margin-bottom:18px">Para adaptar la vista y la sincronía</div>'
-    +'<button id="rTab" style="width:100%;padding:16px;margin-bottom:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#5FC85A,#4CB84C);color:#160f33;font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:15px;cursor:pointer">📱 TABLET (control / marcación)</button>'
-    +'<button id="rPc" style="width:100%;padding:16px;border:1px solid #2a2350;border-radius:12px;background:#191238;color:#ECE9FB;font-family:\'Space Grotesk\',sans-serif;font-weight:600;font-size:15px;cursor:pointer">💻 ESCRITORIO (muestra el libreto)</button>';
-  ov.appendChild(card); document.body.appendChild(ov);
+  const old=document.getElementById('rolePick'); if(old) old.remove();
+  const ov=document.createElement('div'); ov.id='rolePick';
+  const tabletSVG='<svg viewBox="0 0 100 132" fill="none" stroke="#5FC85A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><rect x="12" y="8" width="76" height="116" rx="11"/><rect x="24" y="27" width="52" height="78" rx="4"/><circle cx="42" cy="17.5" r="1.8" fill="#5FC85A" stroke="none"/><circle cx="50" cy="17.5" r="1.8" fill="#5FC85A" stroke="none"/><line x1="44" y1="114" x2="56" y2="114"/></svg>';
+  const deskSVG='<svg viewBox="0 0 150 132" fill="none" stroke="#5FC85A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><rect x="12" y="14" width="126" height="84" rx="9"/><rect x="24" y="27" width="102" height="58" rx="3"/><line x1="75" y1="98" x2="75" y2="114"/><rect x="52" y="114" width="46" height="8" rx="4"/></svg>';
+  ov.innerHTML =
+    '<div class="rp-bar t"></div><div class="rp-bar b"></div>'
+    +'<div class="rp-logo"></div>'
+    +'<div class="rp-card">'
+    +  '<div class="rp-title">\u00bfEste dispositivo es\u2026?</div>'
+    +  '<div class="rp-sub">Para adaptar la vista y la sincron\u00eda</div>'
+    +  '<div class="rp-opts">'
+    +    '<button class="rp-opt" id="rTab">'+tabletSVG+'<span class="lab">Tablet<br>(Control)</span></button>'
+    +    '<button class="rp-opt" id="rPc">'+deskSVG+'<span class="lab">Escritorio<br>(Muestra Libreto)</span></button>'
+    +  '</div>'
+    +'</div>'
+    +'<button class="rp-logout" id="rpOut">Cerrar sesi\u00f3n</button>';
+  document.body.appendChild(ov);
   const choose=(role)=>{ try{localStorage.setItem('ddl_role',role);}catch(e){} DEVROLE=role; try{sync.role=role;}catch(e){} ov.remove(); try{ applyDeviceRole(); }catch(e){} if(typeof done==='function') done(); };
-  card.querySelector('#rTab').onclick=()=>choose('tablet');
-  card.querySelector('#rPc').onclick=()=>choose('pc');
+  ov.querySelector('#rTab').onclick=()=>choose('tablet');
+  ov.querySelector('#rPc').onclick=()=>choose('pc');
+  ov.querySelector('#rpOut').onclick=async ()=>{
+    try{ if(sb) await sb.auth.signOut(); }catch(e){}
+    try{ ['ddl_last_ep','ddl_last_key','ddl_last_top'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
+    try{ if(typeof idbClearAll==='function') await idbClearAll(); }catch(e){}
+    location.reload();
+  };
 }
 function applyDeviceRole(){
   try{ document.body.classList.toggle('is-tablet', DEVROLE==='tablet'); }catch(e){}
+  try{ const d=document.getElementById('devStat'); if(d) d.textContent = DEVROLE==='tablet' ? '● Tablet Lista' : (DEVROLE==='pc' ? '● Escritorio Listo' : '● Listo'); }catch(e){}
   try{ updateWorkspaceChip(); }catch(e){}
   try{ if(typeof pop2!=='undefined' && pop2.doc){ renderLibretoBlocks(); renderLibretoChips(); } }catch(e){}
 }
@@ -2784,6 +2960,9 @@ async function renderLibrary(silent){
     if(libView==='shows' || !LDB.showId){
       libView='shows';
       { const dt=$('dashTitle'); if(dt) dt.style.display=''; }
+      { const lh=document.querySelector('.lib-head'); if(lh) lh.style.display=''; }
+      { const ph=$('progHeader'); if(ph) ph.style.display='none'; }
+      grid.classList.remove('epsgrid');
       crumb.className='dashcrumb';
       crumb.innerHTML = '<span class="dseg on">Programas</span>'
         + (WORKSPACE && WORKSPACE.name
@@ -2851,9 +3030,10 @@ async function renderLibrary(silent){
 
     const sh = shows.find(x=>x.id===LDB.showId);
     { const dt=$('dashTitle'); if(dt) dt.style.display='none'; }
-    crumb.className=''; grid.classList.remove('dashgrid');
-    crumb.innerHTML = '<span class="lcb" id="cbHome">📚 Programas</span><span class="sep">/</span><span class="lcb" id="cbShow">📁 '+esc(sh?sh.name:'')+'</span>';
-    act.style.display=''; act.textContent='💾 Guardar capítulo actual'; act.onclick=saveEpHere;
+    { const lh=document.querySelector('.lib-head'); if(lh) lh.style.display='none'; }
+    grid.classList.add('dashgrid'); grid.classList.add('epsgrid');
+    renderProgHeader(sh);
+    act.style.display='none';
     const eps = sbEps(LDB.showId);
     grid.innerHTML = eps.length ? '' : '<div class="lib-empty2">Sin capítulos todavía — usa el panel «⬆️ Cargar un capítulo» de abajo.</div>';
     const back = document.createElement('button');
@@ -2874,21 +3054,14 @@ async function renderLibrary(silent){
     }
     for(const ep of eps){
       const c=document.createElement('div');
-      c.className='fcard'+(currentEp && currentEp.id===ep.id?' act':'');
-      c.innerHTML='<button class="ldel" title="Eliminar capítulo">🗑</button>'
+      c.className='fcard etile'+(currentEp && currentEp.id===ep.id?' act':'');
+      c.innerHTML='<div class="ecover">'
+        +'<button class="ldel" title="Eliminar capítulo">🗑</button>'
         +'<button class="lren" title="Renombrar capítulo">✏️</button>'
-        +'<button class="lmov" title="Mover a otro programa">📦</button>'
-        +'<button class="lupd" title="Actualizar: bajar la versión más nueva del capítulo desde la nube">🔄</button>'
-        +'<div class="edl">'
-        +(ep.pdf_path?'<button class="dlb" data-k="pdf" title="Descargar el libreto PDF">⬇📄</button>':'')
-        +(ep.xls_path?'<button class="dlb" data-k="xls" title="Descargar el desglose">⬇📊</button>':'')
+        +'<button class="lupd" title="Actualizar desde la nube">🔄</button>'
+        +'<span class="enum">'+(eps.indexOf(ep)+1)+'</span>'
         +'</div>'
-        +'<span class="fi">🎬</span><b>'+esc(ep.name)+'</b>'
-        +(LDB.dataEps ? (LDB.dataEps.has(ep.id)
-            ? ' <span title="Tiene libreto rápido en la nube: abre al instante" style="font-size:12px">⚡</span>'
-            : ' <span title="SIN libreto rápido en la nube: pulsa 🔄 para optimizarlo" style="font-size:12px;opacity:.85">🐢</span>') : '')
-        +'<small>'+(ep.pdf_name?'PDF ✓':'sin PDF')+' · '+esc(ep.xls_name||'')+'</small>'
-        +'<div class="bopen">▶ Abrir desglose</div>';
+        +'<div class="ename">'+esc(ep.name)+'</div>';
       c.addEventListener('click', async ev=>{
         const dl = ev.target.closest('.dlb');
         if(dl){ ev.stopPropagation(); downloadEpFile(ep, dl.dataset.k); return; }
@@ -2935,9 +3108,9 @@ async function renderLibrary(silent){
       });
       grid.appendChild(c);
     }
-    const add=document.createElement('div'); add.className='fcard newc';
-    add.innerHTML='<span class="fi">＋</span><b>Guardar capítulo</b><small>desde lo cargado abajo</small>';
-    add.addEventListener('click', saveEpHere); grid.appendChild(add);
+    const add=document.createElement('div'); add.className='fcard etile eadd';
+    add.innerHTML='<div class="ecover"><span class="eplus">＋</span></div><div class="ename">Nuevo Episodio</div>';
+    add.addEventListener('click', newEpisodeModal); grid.appendChild(add);
     const home=document.getElementById('cbHome');
     if(home) home.addEventListener('click', ()=>{ LDB.browse=true; libView='shows'; LDB.showId=null; renderLibrary(true); });
     const cbs = document.getElementById('cbShow');
@@ -2959,6 +3132,123 @@ function dlgOpen(html){
   ov.addEventListener('mousedown', e=>{ if(e.target===ov) close(); });
   return { ov, card:ov.querySelector('.dlgcard'), close };
 }
+function renderProgHeader(sh){
+  const ph=document.getElementById('progHeader'); if(!ph) return;
+  ph.style.display='';
+  const bn = sh && sh.banner_path ? pubUrl(sh.banner_path) : '';
+  ph.innerHTML =
+    '<div class="ph-inner"'+(bn?' style="background-image:linear-gradient(rgba(20,15,48,.5),rgba(20,15,48,.72)),url(\''+bn+'\')"':'')+'>'
+    +'<button class="ph-edit" id="phEdit" title="Editar programa">\u270F\uFE0F</button>'
+    +'<span class="ph-ws">'+esc((WORKSPACE&&WORKSPACE.name)||'')+'</span>'
+    +'<h1 class="ph-title">'+esc(sh?sh.name:'')+'</h1>'
+    +'<button class="ph-back" id="phBack">\u2039 Episodios</button>'
+    +'</div>';
+  const pb=document.getElementById('phBack'); if(pb) pb.onclick=()=>{ LDB.browse=true; libView='shows'; LDB.showId=null; renderLibrary(true); };
+  const pe=document.getElementById('phEdit'); if(pe) pe.onclick=()=> editShow(sh);
+}
+function editShow(sh){
+  if(!sh) return;
+  const nn=prompt('Nombre del programa:', sh.name);
+  if(nn && nn.trim() && nn.trim()!==sh.name){
+    sb.from('shows').update({name:nn.trim()}).eq('id',sh.id).then(async()=>{ await libFetchAll(); renderLibrary(true); });
+  }
+}
+function editEpisode(){
+  if(!chars || !chars.length){ libMsg('Abre un episodio con desglose primero'); return; }
+  const nm = (currentEp && currentEp.name) ? currentEp.name : 'Episodio';
+  showDesgloseReview(nm, async ()=>{
+    if(currentEp && currentEp.id){
+      try{ await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+      try{ await saveEpCache(currentEp.id, new Date().toISOString()); }catch(e){}
+      if(typeof libPing==='function') libPing('ep', currentEp.id, currentEp.showId);
+      libMsg('✔ Desglose actualizado');
+    }
+  });
+}
+async function loadFileForEp(file){
+  if(/\.(xlsx|xlsm|xls)$/i.test(file.name)){ await loadXls(file); return; }
+  const buf = await file.arrayBuffer();
+  if(/\.docx$/i.test(file.name) || (file.type||'').includes('word')){ await loadDocx(buf, file.name); }
+  else { await loadPdfBuf(buf, file.name); }
+}
+function showDesgloseReview(epName, onSave){
+  const old=document.getElementById('drvOv'); if(old) old.remove();
+  const TRASH='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>';
+  let rows = chars.slice().sort((a,b)=> b.totalInts-a.totalInts || a.display.localeCompare(b.display,'es'))
+    .map(c=>({ key:c.key, display:c.display, talent:c.talent||'', ints:c.totalInts, del:false }));
+  const ov=document.createElement('div'); ov.id='drvOv';
+  ov.innerHTML='<div class="drv-card">'
+    +'<div class="drv-top"><button class="drv-back" id="drvBack" title="Cancelar">\u2039</button>'
+    +'<span class="drv-title">Desglose</span><span class="drv-epname">'+esc(epName||'')+'</span></div>'
+    +'<div class="drv-heads"><span>Personajes</span><span>Talento</span><span>Intervenciones</span><span></span></div>'
+    +'<div class="drv-list" id="drvList"></div>'
+    +'<button class="drv-save" id="drvSave">Guardar desglose</button>'
+    +'</div>';
+  document.body.appendChild(ov);
+  const list=ov.querySelector('#drvList');
+  function draw(){
+    list.innerHTML = rows.filter(r=>!r.del).map(r=>{
+      const i = rows.indexOf(r);
+      return '<div class="drv-row">'
+        +'<div class="drv-name">'+esc(r.display)+'</div>'
+        +'<input class="drv-tal" data-i="'+i+'" value="'+esc(r.talent)+'" placeholder="Asignar talento\u2026">'
+        +'<div class="drv-ints">'+r.ints+'</div>'
+        +'<button class="drv-del" data-i="'+i+'" title="Eliminar personaje">'+TRASH+'</button>'
+        +'</div>';
+    }).join('') || '<div style="color:#8B84B0;text-align:center;padding:24px;font-family:\'RetroPix\',monospace">No se detectaron personajes.</div>';
+  }
+  draw();
+  list.addEventListener('input', e=>{ const t=e.target; if(t.classList.contains('drv-tal')) rows[+t.dataset.i].talent=t.value; });
+  list.addEventListener('click', e=>{ const b=e.target.closest('.drv-del'); if(b){ rows[+b.dataset.i].del=true; draw(); } });
+  ov.querySelector('#drvBack').onclick=()=> ov.remove();
+  ov.querySelector('#drvSave').onclick=async ()=>{
+    const alive = rows.filter(r=>!r.del);
+    const keep = new Set(alive.map(r=>r.key));
+    alive.forEach(r=>{ const c=charIdx[r.key]; if(c){ c.talent=(r.talent||'').trim(); c.noRec=NO_REC.has(norm(c.talent)); } });
+    chars = chars.filter(c=>keep.has(c.key));
+    charIdx={}; chars.forEach(c=>charIdx[c.key]=c);
+    script = (script||[]).filter(b=>keep.has(b.key)); script.forEach((b,i)=> b.idx=i);
+    scriptByKey={}; script.forEach(b=>{ if(b.key)(scriptByKey[b.key]=scriptByKey[b.key]||[]).push(b.idx); });
+    try{ window._charsRaw=(window._charsRaw||[]).filter(c=>keep.has(c.key)); }catch(_){}
+    try{ Object.keys(occByChar||{}).forEach(k=>{ if(!keep.has(k)) delete occByChar[k]; }); }catch(_){}
+    try{ Object.keys(charMarks||{}).forEach(k=>{ if(!keep.has(k)) delete charMarks[k]; }); }catch(_){}
+    try{ rebuild(); }catch(_){}
+    const btn=ov.querySelector('#drvSave'); btn.disabled=true; btn.textContent='Guardando\u2026';
+    try{ if(typeof onSave==='function') await onSave(); ov.remove(); }
+    catch(e){ btn.disabled=false; btn.textContent='Guardar desglose'; libMsg('No se pudo guardar: '+(e.message||e)); }
+  };
+}
+function newEpisodeModal(){
+  if(!LDB.showId){ libMsg('Entra en un programa primero'); return; }
+  const { card, close } = dlgOpen(
+    '<h2 class="dlgtitle">Nuevo episodio</h2>'
+    +'<div class="dlgfield nef"><span class="nepfx">Nombre:</span><input id="neName" placeholder="" spellcheck="false"></div>'
+    +'<div class="dlglabel">Subir libreto</div>'
+    +'<label class="dlgdrop tall" id="neD"><span class="pl" id="nePl">\uFF0B</span><span class="nefile" id="neFile"></span><input type="file" id="neFile2" accept="application/pdf,.pdf,.docx,.xlsx,.xlsm,.xls"></label>'
+    +'<div class="dlghint">Word, PDF, Excel</div>'
+    +'<div class="dlgerr" id="neErr"></div>'
+    +'<button class="dlgbtn" id="neGo">Crear Episodio</button>'
+  );
+  const q=(id)=>card.querySelector('#'+id);
+  q('neFile2').addEventListener('change', ()=>{ const f=q('neFile2').files[0]; if(f){ const pl=q('nePl'); if(pl) pl.style.display='none'; q('neFile').textContent='\uD83D\uDCC4 '+f.name; } });
+  q('neGo').addEventListener('click', async ()=>{
+    const name=(q('neName').value||'').trim();
+    if(!name){ q('neErr').textContent='Escribe el nombre del episodio'; return; }
+    const file=q('neFile2').files[0];
+    if(!file){ q('neErr').textContent='Sube el libreto (PDF, Word o Excel)'; return; }
+    const btn=q('neGo'); btn.disabled=true; btn.textContent='Creando\u2026';
+    try{
+      currentEp=null;
+      await loadFileForEp(file);
+      close();
+      showDesgloseReview(name, async ()=>{ window._epNameOverride = name; await saveEpHere(); });
+    }catch(e){ btn.disabled=false; btn.textContent='Crear Episodio'; q('neErr').textContent='Error: '+(e.message||e); }
+  });
+  setTimeout(()=>{ const n=q('neName'); if(n) n.focus(); },60);
+}
+function toggleUserMenu(e){ if(e) e.stopPropagation(); const m=document.getElementById('userMenu'); if(m) m.classList.toggle('open'); }
+function closeUserMenu(){ const m=document.getElementById('userMenu'); if(m) m.classList.remove('open'); }
+document.addEventListener('click', ()=> closeUserMenu());
 async function newShow(){
   if(!WORKSPACE || !WORKSPACE.id){ libMsg('Elige o crea primero un espacio de trabajo'); showWorkspacePicker(true); return; }
   const { card, close } = dlgOpen(
@@ -3499,7 +3789,8 @@ async function saveEpHere(){
   }
   const sug = ((lastXlsBuf ? xlsFileName : (pdfName||xlsFileName))||'capítulo')
     .replace(/\.(xlsm|xlsx|xls|pdf)$/i,'').replace(/_/g,' ');
-  const name = prompt('Nombre del capítulo:', (!esNuevo && currentEp) ? currentEp.name : sug);
+  const name = (window._epNameOverride!=null && window._epNameOverride!=='') ? window._epNameOverride : prompt('Nombre del capítulo:', (!esNuevo && currentEp) ? currentEp.name : sug);
+  window._epNameOverride = null;
   if(!name || !name.trim()) return;
   if(esNuevo && !lastPdfBuf && lastXlsBuf){
     if(!confirm('Este capítulo se guardaría SIN el libreto PDF (solo el desglose).\n¿Seguro? Puedes cargar el PDF abajo y volver a guardar.')) return;
