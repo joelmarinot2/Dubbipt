@@ -82,6 +82,64 @@ create policy libretos_write  on storage.objects for insert to authenticated wit
 create policy libretos_update on storage.objects for update to authenticated using (bucket_id='libretos');
 create policy libretos_delete on storage.objects for delete to authenticated using (bucket_id='libretos');
 
+
+-- ════════════════════════════════════════════════════════════════
+--  ESPACIOS DE TRABAJO (privados por cuenta) — reemplazan a los estudios
+-- ════════════════════════════════════════════════════════════════
+create table if not exists public.workspaces (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  owner uuid not null default auth.uid(),
+  created_at timestamptz default now()
+);
+alter table public.workspaces enable row level security;
+drop policy if exists ws_owner on public.workspaces;
+create policy ws_owner on public.workspaces for all to authenticated
+  using (owner = auth.uid()) with check (owner = auth.uid());
+
+-- cada programa pertenece a un espacio
+alter table public.shows add column if not exists workspace_id uuid references public.workspaces(id) on delete cascade;
+create index if not exists shows_ws_idx on public.shows(workspace_id);
+
+-- ── RLS privado: solo ves lo que está en TUS espacios ──
+drop policy if exists shows_all on public.shows;
+drop policy if exists shows_rw  on public.shows;
+create policy shows_rw on public.shows for all to authenticated
+  using ( workspace_id in (select id from public.workspaces where owner = auth.uid()) )
+  with check ( workspace_id in (select id from public.workspaces where owner = auth.uid()) );
+
+drop policy if exists eps_all on public.episodes;
+drop policy if exists eps_rw  on public.episodes;
+create policy eps_rw on public.episodes for all to authenticated
+  using ( show_id in (select id from public.shows where workspace_id in (select id from public.workspaces where owner = auth.uid())) )
+  with check ( show_id in (select id from public.shows where workspace_id in (select id from public.workspaces where owner = auth.uid())) );
+
+drop policy if exists epdata_all on public.episode_data;
+drop policy if exists epdata_rw  on public.episode_data;
+create policy epdata_rw on public.episode_data for all to authenticated
+  using ( show_id is null or show_id in (select id from public.shows where workspace_id in (select id from public.workspaces where owner = auth.uid())) )
+  with check ( show_id is null or show_id in (select id from public.shows where workspace_id in (select id from public.workspaces where owner = auth.uid())) );
+
+
+-- ════════════════════════════════════════════════════════════════
+--  PORTADAS DE PROGRAMA (carátula vertical + portada horizontal)
+-- ════════════════════════════════════════════════════════════════
+alter table public.shows add column if not exists cover_path  text;   -- carátula (tarjeta)
+alter table public.shows add column if not exists banner_path text;   -- portada (cabecera)
+
+-- bucket PÚBLICO para las imágenes (URL directa, sin firmar)
+insert into storage.buckets (id, name, public) values ('portadas','portadas', true)
+on conflict (id) do nothing;
+
+drop policy if exists portadas_read   on storage.objects;
+drop policy if exists portadas_write  on storage.objects;
+drop policy if exists portadas_update on storage.objects;
+drop policy if exists portadas_delete on storage.objects;
+create policy portadas_read   on storage.objects for select using (bucket_id='portadas');
+create policy portadas_write  on storage.objects for insert to authenticated with check (bucket_id='portadas');
+create policy portadas_update on storage.objects for update to authenticated using (bucket_id='portadas');
+create policy portadas_delete on storage.objects for delete to authenticated using (bucket_id='portadas');
+
 -- ════════════════════════════════════════════════════════════════
 --  LOGIN REAL · perfiles de usuario (role) creados al registrarse
 -- ════════════════════════════════════════════════════════════════
