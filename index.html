@@ -809,6 +809,17 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
 #progHeader + .lib .lib-head{ margin:0 !important; }
 #libGrid.epsgrid{ margin-top:0 !important; }
 </style>
+<style>
+/* barra de navegación continua (sin corchetes que dejaban huecos) */
+#topbar::before, #topbar::after{ display:none !important; }
+#topbar{ border-radius:34px !important; }
+/* unión cabecera de programa ↔ panel de episodios (sin huecos laterales) */
+#progHeader{ margin:6px 0 0 !important; }
+#progHeader .ph-inner{ margin:0 !important; }
+#progHeader + .lib{ padding:0 !important; margin-top:0 !important; background:transparent !important; }
+#progHeader + .lib .lib-head{ display:none !important; }
+#progHeader + .lib #libGrid.epsgrid{ margin:0 !important; border-top:none !important; border-top-left-radius:0 !important; border-top-right-radius:0 !important; }
+</style>
 </head>
 <body class="locked">
 <div class="appbar appbar-top"></div>
@@ -3300,6 +3311,28 @@ function newEpisodeModal(){
   });
   setTimeout(()=>{ const n=q('neName'); if(n) n.focus(); },60);
 }
+function toggleLibColorPanel(d){
+  try{
+    let p = d.getElementById('lColorPanel');
+    if(p){ p.remove(); return; }
+    const cs = d.defaultView.getComputedStyle(d.documentElement);
+    const hl = (localStorage.getItem('ddl_hl') || '#5FC85A');
+    const bg = (localStorage.getItem('ddl_libbg') || (cs.getPropertyValue('--libbg')||'#201c50')).trim() || '#201c50';
+    p = d.createElement('div'); p.id='lColorPanel';
+    p.style.cssText='position:fixed;top:74px;right:16px;z-index:99;background:#171232;border:2px solid #5FC85A;border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 14px 34px rgba(0,0,0,.55);font-family:system-ui;color:#fff;font-size:13px;min-width:180px';
+    p.innerHTML='<b style="font-size:14px">Colores del libreto</b>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px">Resaltado <input type="color" id="lcHl" value="'+hl+'" style="width:44px;height:30px;border:none;background:none;cursor:pointer"></label>'
+      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px">Fondo <input type="color" id="lcBg" value="'+bg+'" style="width:44px;height:30px;border:none;background:none;cursor:pointer"></label>'
+      +'<button id="lcClose" style="margin-top:4px;border:none;background:#5FC85A;color:#123317;border-radius:10px;padding:8px;cursor:pointer;font-weight:700">Cerrar</button>';
+    d.body.appendChild(p);
+    const apply=()=>{ const h=p.querySelector('#lcHl').value, b=p.querySelector('#lcBg').value;
+      d.documentElement.style.setProperty('--hl',h); d.documentElement.style.setProperty('--libbg',b);
+      try{ localStorage.setItem('ddl_hl',h); localStorage.setItem('ddl_libbg',b); }catch(e){} };
+    p.querySelector('#lcHl').addEventListener('input', apply);
+    p.querySelector('#lcBg').addEventListener('input', apply);
+    p.querySelector('#lcClose').onclick=()=> p.remove();
+  }catch(e){ console.error('color panel', e); }
+}
 function libretoColors(){
   const hl = localStorage.getItem('ddl_hl') || '#5FC85A';
   const bg = localStorage.getItem('ddl_libbg') || '#201c50';
@@ -4150,17 +4183,20 @@ body.dark{ background:var(--libbg,#201c50) !important; }
 .lh .goto input{ width:44px !important; background:transparent !important; border:none !important; color:#eafff0 !important; }
 #lScope{ background:#123317 !important; color:#8CF08C !important; border:none !important; border-radius:12px !important; }
 #lCharSel{ background:#140f30 !important; color:#8CF08C !important; border:none !important; border-radius:16px !important; padding:8px 14px !important; }
-#lTheme,#lFontDn,#lFontUp,#lClean,#lVid,#lTablet,#lTpad,#lFind,#lPron,#lConn2,#lLive{ display:none !important; }
+#lVid,#lTpad,#lConn2,#lLive{ display:none !important; }
+.lh > button:not(.lbk){ background:#123317 !important; color:#8CF08C !important; border:none !important; border-radius:14px !important; padding:8px 11px !important; font-size:13px !important; }
+.lh > button:not(.lbk):hover{ background:#1c4a24 !important; }
+#lColor{ color:#fff !important; }
 /* Página N centrada con divisores */
 .pgsep{ display:flex !important; align-items:center; gap:14px; max-width:var(--boxw,900px); margin:20px auto !important; }
 .pgsep::before,.pgsep::after{ content:''; flex:1; height:2px; background:rgba(255,255,255,.14); }
 .pgsep span{ background:#140f30; color:#fff; padding:10px 26px; border-radius:22px; font-family:'Open Serif',serif; font-size:16px; }
 /* Cajas de diálogo */
-.blk{ position:relative; background:#140f30 !important; border:2px solid transparent !important; border-radius:16px !important; padding:18px 160px 18px 20px !important; }
-.blk .bhead{ margin-bottom:6px !important; }
-.blk .tc{ color:#8b84b0 !important; font-size:15px !important; font-weight:700 !important; }
-.blk .who{ position:absolute !important; right:22px; top:50%; transform:translateY(-50%); color:#6E678F !important; font-size:22px !important; font-family:'Open Serif',serif !important; text-align:right; max-width:130px; }
-.blk .tx{ color:#e8e4f5 !important; font-size:17px !important; }
+.blk{ position:relative; background:#140f30 !important; border:2px solid transparent !important; border-radius:16px !important; padding:16px 20px !important; }
+.blk .bhead{ display:flex !important; justify-content:space-between !important; align-items:flex-start !important; gap:14px !important; margin-bottom:6px !important; }
+.blk .tc{ color:#8b84b0 !important; font-size:15px !important; font-weight:700 !important; flex:0 0 auto; }
+.blk .who{ position:static !important; transform:none !important; color:#6E678F !important; font-size:18px !important; font-family:'Open Serif',serif !important; text-align:right; max-width:52%; line-height:1.18; word-break:break-word; }
+.blk .tx{ color:#e8e4f5 !important; font-size:17px !important; clear:both; }
 .blk.mine{ border-color:var(--hl,#5FC85A) !important; background:#140f30 !important; }
 .blk.mine .tc{ color:var(--hl,#5FC85A) !important; font-size:16px !important; font-weight:800 !important; text-shadow:none !important; }
 .blk.mine .who{ color:#fff !important; }
@@ -4654,7 +4690,7 @@ function buildLibretoDoc(pc){
       <button id="lTablet" title="Modo tablet: herramientas de marcación">✏️</button>
       ${(DEVROLE==='tablet') ? '<button id="lTpad" title="Pasar al trackpad: controlar el libreto del escritorio">🎛️</button>' : ''}
       <button id="lFind" title="Buscar en el libreto">🔍</button>
-      <button id="lPron" title="Pronunciaciones del libreto">🗣</button>
+      <button id="lPron" title="Pronunciaciones del libreto">🗣</button>\n      <button id="lColor" title="Colores del libreto (resaltado y fondo)">🎨</button>
       <span class="conn no" id="lConn2" style="display:none"></span>
       <span class="live" id="lLive"></span>
     </div>
@@ -4903,6 +4939,7 @@ function buildLibretoDoc(pc){
   });
   d.getElementById('lPron').addEventListener('click', ()=> openPronPanel());
   d.getElementById('lFind').addEventListener('click', ()=> openLibFind());
+  try{ const _lc=d.getElementById('lColor'); if(_lc) _lc.addEventListener('click', ()=> toggleLibColorPanel(d)); }catch(e){}
   d.getElementById('lFindClose').addEventListener('click', ()=> closeLibFind());
   d.getElementById('lFindNext').addEventListener('click', ()=> libFindGo(libSearch.cur+1));
   d.getElementById('lFindPrev').addEventListener('click', ()=> libFindGo(libSearch.cur-1));
