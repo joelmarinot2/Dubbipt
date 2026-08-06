@@ -2400,7 +2400,7 @@ function segsFromRange(line, from, to){
 }
 
 /* ================= tablero principal ================= */
-function rebuild(){
+function rebuild(){ try{ if(currentEp && currentEp.id) document.body.classList.add('ep-open'); }catch(e){}
   try{ renderStats(); }catch(err){ console.error(err); }
   try{ renderCards(); }catch(err){ console.error(err); }
   try{ renderPlanilla(); }catch(err){ console.error(err); }
@@ -3631,6 +3631,7 @@ async function openEpisodeFromJson(ep){
     if(typeof syncSendEp==='function') syncSendEp();
     libMsg('📂 '+(ep.name||'Capítulo')+' abierto');
     renderLibrary();
+    _epOpen(true);
     (async ()=>{ try{ await cloudLoadProgress(); loadProgress(); rebuild();
       if(typeof loadCloudMarks==='function') await loadCloudMarks();
       if(typeof pop2!=='undefined' && pop2.doc){ refreshOpenLibretoForEpisode(); } }catch(e){} })();
@@ -3674,6 +3675,7 @@ async function openEpisode(id){
     setTimeout(()=> taskDone('✓ abierto'), 420);
     libMsg('📂 '+(currentEp.name||'Capítulo')+' abierto');
     renderLibrary();
+    _epOpen(true);
   };
   const bg = ()=>{ return (async ()=>{ try{
       // SIEMPRE al abrir: si los archivos cambiaron en la nube, actualizar solo
