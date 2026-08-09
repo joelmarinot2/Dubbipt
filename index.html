@@ -829,6 +829,22 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
 .actrow .act-nav{ background:#241f52 !important; color:#cfe9cf !important; border:2px solid #5FC85A !important; border-radius:22px !important; padding:12px 20px !important; font-family:'Open Serif',serif !important; font-size:14px !important; box-shadow:none !important; }
 .actrow .act-nav:hover{ background:#2c2666 !important; }
 </style>
+<style>
+#tutOv{ position:fixed; inset:0; z-index:9800; background:rgba(10,7,26,.9); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:20px; font-family:'Open Serif',serif; }
+.tut-card{ position:relative; width:min(520px,94vw); background:#1e1a40; border:3px solid #5FC85A; border-radius:26px; padding:30px 28px 24px; text-align:center; box-shadow:0 24px 70px rgba(0,0,0,.55); }
+.tut-skip{ position:absolute; top:16px; right:18px; background:none; border:none; color:#8B84B0; cursor:pointer; font-size:13px; font-family:'Open Serif',serif; }
+.tut-ic{ font-size:56px; margin-bottom:8px; line-height:1; }
+.tut-t{ color:#fff; font-size:22px; margin-bottom:10px; }
+.tut-d{ color:#c9c5ec; font-size:15px; line-height:1.55; min-height:74px; }
+.tut-d b{ color:#eafff0; }
+.tut-dots{ display:flex; gap:7px; justify-content:center; margin:16px 0 18px; }
+.tut-dots span{ width:8px; height:8px; border-radius:50%; background:#3a3568; transition:all .15s; }
+.tut-dots span.on{ background:#5FC85A; width:22px; border-radius:5px; }
+.tut-nav{ display:flex; justify-content:space-between; gap:10px; }
+.tut-prev{ background:transparent; border:2px solid #3a3568; color:#c9c5ec; border-radius:20px; padding:12px 18px; cursor:pointer; font-family:'Open Serif',serif; }
+.tut-next{ background:#5FC85A; border:none; color:#123317; border-radius:20px; padding:12px 26px; cursor:pointer; font-weight:700; font-family:'Open Serif',serif; box-shadow:0 4px 0 #3f9e3c; }
+.tut-next:active{ transform:translateY(2px); box-shadow:0 2px 0 #3f9e3c; }
+</style>
 </head>
 <body class="locked">
 <div class="appbar appbar-top"></div>
@@ -879,6 +895,7 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
       <button class="tb-user" id="userBtn" onclick="toggleUserMenu(event)">Usuario ▾</button>
       <div class="tb-menu" id="userMenu">
         <button onclick="closeUserMenu();showWorkspacePicker(true)">Espacios de trabajo</button>
+        <button onclick="closeUserMenu();showTutorial()">Tutorial</button>
         <button onclick="closeUserMenu();if(typeof ddlInstall===&quot;function&quot;)ddlInstall()">Instalar app</button>
         <button onclick="closeUserMenu();document.getElementById('btnOut').click()">Cerrar Sesión</button>
       </div>
@@ -1234,7 +1251,7 @@ async function authInit(){
       if(mode==='signup'){
         const { data, error } = await sb.auth.signUp({ email, password:pass, options:{ data:{ full_name:full } } });
         if(error){ shake(); err.textContent = /registered/i.test(error.message)?'Ese correo ya tiene cuenta. Inicia sesión.':error.message; return; }
-        if(data.session){ sbUser=data.session.user; authUnlock(); renderLibrary(); postLogin(); }
+        if(data.session){ sbUser=data.session.user; authUnlock(); renderLibrary(); showTutorial(()=> postLogin()); }
         else { err.style.color='#4ADE80'; err.textContent='Cuenta creada. Revisa tu correo para confirmar y luego inicia sesión.'; setMode('login'); }
       } else {
         const { data, error } = await sb.auth.signInWithPassword({ email, password:pass });
@@ -1722,8 +1739,80 @@ async function loadPdfBuf(buf, name){
    ============================================================ */
 // Tras escanear el PDF, si NO hay desglose cargado (Excel), construye la lista
 // de personajes a partir de las cabeceras detectadas en el propio libreto.
+// ── Conteo de intervenciones según reglas del libreto ──
+// 1 intervención = 12 palabras habladas (ceil, mínimo 1). Las palabras dentro de
+// paréntesis (acotaciones) NO cuentan como habladas; un bloque con SOLO acotación
+// vale 1; un bloque vacío vale 0.
+function contarIntervenciones(dial){
+  const t = (dial||'').replace(/\s+/g,' ').trim();
+  if(!t) return 0;
+  const habladas = t.replace(/[\(\[][^)\]]*[\)\]]/g,' ').replace(/\s+/g,' ').trim();
+  const nPal = habladas ? habladas.split(/\s+/).filter(w=>/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9]/.test(w)).length : 0;
+  if(nPal > 0) return Math.max(1, Math.ceil(nPal/12));
+  if(/[\(\[][^)\]]*[\)\]]/.test(t)) return 1;   // solo acotación
+  return 1;                                          // algún texto suelto
+}
+// separa "NOMBRE" de un posible diálogo en la misma línea
+function separaNombreDialogo(line){
+  const words = (line||'').trim().split(/\s+/);
+  let ni=0; const nameW=[];
+  for(; ni<words.length; ni++){
+    const w=words[ni]; if(!w) continue;
+    if(/^[\(\[¡¿"“‘'\u2014\-]/.test(w)) break;              // empieza acotación/diálogo
+    const wp = w.replace(/[\(\[][^)\]]*[\)\]]/g,'');
+    if(/[a-záéíóúüñ]/.test(wp)) break;                          // palabra con minúscula → diálogo
+    nameW.push(w);
+  }
+  return { name: nameW.join(' ').trim(), dial: words.slice(ni).join(' ').trim() };
+}
+// Genera el desglose recorriendo los bloques  timecode → NOMBRE → diálogo.
+function desgloseByRules(){
+  const TC = /^\s*\d{1,2}:\d{2}:\d{2}(?::\d{2})?\s*$/;
+  const seq=[];
+  for(let p=1;p<=numPages;p++){
+    const pd=pageData[p]; if(!pd||!pd.lines) continue;
+    pd.lines.forEach(l=> seq.push({p, text:(l.text||'').trim()}));
+  }
+  if(!seq.length) return false;
+  const order=[]; const byName={};
+  let i=0;
+  while(i<seq.length){
+    if(!TC.test(seq[i].text)){ i++; continue; }
+    const tc = seq[i].text.trim();
+    let j=i+1; while(j<seq.length && !seq[j].text) j++;
+    if(j>=seq.length) break;
+    if(TC.test(seq[j].text)){ i=j; continue; }          // dos timecodes seguidos: sin nombre
+    const sp = separaNombreDialogo(seq[j].text);
+    const name = sp.name; const page = seq[j].p;
+    let k=j+1; let dial=sp.dial;
+    while(k<seq.length && !TC.test(seq[k].text)){
+      if(seq[k].text) dial += (dial?' ':'') + seq[k].text;
+      k++;
+    }
+    const esNombre = name && name.length>=1 && name===name.toUpperCase() && /[A-ZÁÉÍÓÚÜÑ0-9]/.test(name);
+    if(esNombre){
+      const ints = contarIntervenciones(dial);
+      if(ints>0){
+        if(!byName[name]){ byName[name] = { key:name, firstTC:tc, pages:{} }; order.push(name); }
+        byName[name].pages[page] = (byName[name].pages[page]||0) + ints;
+      }
+    }
+    i = k;
+  }
+  if(!order.length) return false;
+  chars = order.map(nm=>{ const c=byName[nm];
+    return { key:c.key, display:c.key, talent:'',
+      pages:Object.keys(c.pages).map(p=>({p:+p, ints:c.pages[p]})).sort((a,b)=>a.p-b.p),
+      totalInts:Object.values(c.pages).reduce((s,x)=>s+x,0),
+      firstTC:c.firstTC, color:charColor(c.key), noRec:NO_REC.has(c.key) };
+  });
+  charIdx={}; chars.forEach(c=> charIdx[c.key]=c);
+  window._charsRaw = chars.map(c=>({...c, pages:c.pages.map(p=>({...p}))}));
+  return true;
+}
 function autoDesgloseFromScan(){
   if(chars && chars.length) return;             // ya hay desglose (Excel o capítulo hidratado)
+  if(desgloseByRules()){ buildScript(); loadProgress(); return; }   // conteo por reglas del libreto
   const byKey = {};
   for(const p in pageData){
     const pd = pageData[p]; if(!pd || !pd.marks) continue;
@@ -3364,6 +3453,39 @@ function libretoColors(){
     try{ if(typeof pop2!=='undefined' && pop2.doc){ pop2.doc.documentElement.style.setProperty('--hl',h); pop2.doc.documentElement.style.setProperty('--libbg',b); } }catch(e){}
     close(); if(typeof libMsg==='function') libMsg('🎨 Colores del libreto guardados');
   };
+}
+function showTutorial(onDone){
+  const old=document.getElementById('tutOv'); if(old) old.remove();
+  const slides=[
+    {ic:'\uD83D\uDC4B', t:'Bienvenido a Dubbipt', d:'Genera el desglose de personajes autom\u00e1ticamente desde el guion y trabaja tus doblajes. Te mostramos lo esencial en un minuto.'},
+    {ic:'\uD83D\uDCF1', t:'Elige tu dispositivo', d:'Al entrar eliges si este equipo es <b>Tablet</b> (control) o <b>Escritorio</b> (muestra el libreto). Puedes cambiarlo cuando quieras.'},
+    {ic:'\uD83D\uDDC2\uFE0F', t:'Crea un espacio de trabajo', d:'Agrupa tus programas por cliente o estudio. En <b>Usuario \u2192 Espacios de trabajo</b> puedes crear, renombrar o borrar.'},
+    {ic:'\uD83C\uDFAC', t:'Crea un programa', d:'Pulsa <b>\uFF0B Nuevo Programa</b>, ponle nombre y, si quieres, sube su <b>car\u00e1tula</b> y <b>portada</b>.'},
+    {ic:'\uD83D\uDCC4', t:'Crea un episodio', d:'Dentro del programa, <b>\uFF0B Nuevo Episodio</b>: escribe el nombre y sube el guion (<b>PDF, Word o Excel</b>). El desglose se genera solo.'},
+    {ic:'\u2705', t:'Revisa el desglose', d:'Antes de entrar, asigna el <b>talento</b> de cada personaje y quita los que no correspondan. Luego pulsa <b>Guardar desglose</b>.'},
+    {ic:'\uD83C\uDF99\uFE0F', t:'Trabaja el episodio', d:'Ver\u00e1s las <b>cajas de personaje</b> (marca el check al grabar), abre el <b>libreto</b> para leer y marcar, y <b>sincroniza</b> tablet \u2194 escritorio.'},
+    {ic:'\uD83D\uDE80', t:'\u00a1Listo!', d:'Ya puedes empezar. Puedes volver a ver este tutorial en <b>Usuario \u2192 Tutorial</b>.'}
+  ];
+  let idx=0;
+  const ov=document.createElement('div'); ov.id='tutOv'; document.body.appendChild(ov);
+  function finish(){ try{localStorage.setItem('ddl_tut_done','1');}catch(e){} ov.remove(); if(typeof onDone==='function') onDone(); }
+  function render(){
+    const s=slides[idx], last=idx===slides.length-1;
+    ov.innerHTML='<div class="tut-card">'
+      +'<button class="tut-skip" id="tutSkip">Saltar</button>'
+      +'<div class="tut-ic">'+s.ic+'</div>'
+      +'<div class="tut-t">'+s.t+'</div>'
+      +'<div class="tut-d">'+s.d+'</div>'
+      +'<div class="tut-dots">'+slides.map((_,i)=>'<span class="'+(i===idx?'on':'')+'"></span>').join('')+'</div>'
+      +'<div class="tut-nav">'
+      +  '<button class="tut-prev" id="tutPrev"'+(idx===0?' style="visibility:hidden"':'')+'>\u2039 Anterior</button>'
+      +  '<button class="tut-next" id="tutNext">'+(last?'Empezar':'Siguiente \u203a')+'</button>'
+      +'</div></div>';
+    ov.querySelector('#tutSkip').onclick=finish;
+    ov.querySelector('#tutPrev').onclick=()=>{ if(idx>0){idx--; render();} };
+    ov.querySelector('#tutNext').onclick=()=>{ if(last) finish(); else { idx++; render(); } };
+  }
+  render();
 }
 function toggleUserMenu(e){ if(e) e.stopPropagation(); const m=document.getElementById('userMenu'); if(m) m.classList.toggle('open'); }
 function closeUserMenu(){ const m=document.getElementById('userMenu'); if(m) m.classList.remove('open'); }
