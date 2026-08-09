@@ -846,6 +846,9 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
 .tut-next{ background:#5FC85A; border:none; color:#123317; border-radius:20px; padding:12px 26px; cursor:pointer; font-weight:700; font-family:'Open Serif',serif; box-shadow:0 4px 0 #3f9e3c; }
 .tut-next:active{ transform:translateY(2px); box-shadow:0 2px 0 #3f9e3c; }
 </style>
+<style>
+.actrow .act-g.on{ background:#5FC85A !important; color:#123317 !important; }
+</style>
 </head>
 <body class="locked">
 <div class="appbar appbar-top"></div>
@@ -946,7 +949,8 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
       <button class="btnv sm act-g" id="btnMerge" title="Unir dos personajes en uno (p. ej. MARCUS (VO) + MARCUS)">Fusionar Personajes</button>
       <button class="btnv sm act-g" id="btnEditEp" onclick="editEpisode()" title="Editar el desglose del episodio (talentos / quitar personajes)">Editar Episodio</button>
       <button class="btnv sm act-g" id="btnModoEst" title="Modo estudio: video/audio + onda + marcado de pausas">Video Estudio</button>
-      <button class="btnv sm act-g" id="btnSort" onclick="toggleSort()" title="Ordenar por intervenciones o alfabético">\u21c5 Intervenciones</button>
+      <button class="btnv sm act-g on" id="btnSortInts" onclick="setSort('ints')" title="Ordenar por número de intervenciones">Por intervenciones</button>
+      <button class="btnv sm act-g" id="btnSortAbc" onclick="setSort('abc')" title="Ordenar alfabéticamente (A–Z)">A\u2013Z</button>
       <button class="btnv sm act-g" id="btnCasting" onclick="document.getElementById('castingFile').click()" title="Asignar casting desde un Excel (personaje → talento)">Asignar casting</button>
       <input type="file" id="castingFile" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="if(this.files[0]) assignCastingFromExcel(this.files[0]); this.value=''">
       <button class="btnv sm" id="btnExport" style="display:none" title="Avance">⬇ Avance</button>
@@ -1380,6 +1384,7 @@ function markAllPages(key){
   progTouched(key);
   saveProgress();
   renderCards();
+  if(typeof renderStats==='function') renderStats();
   if(typeof renderPlanilla==='function') renderPlanilla();
   if(typeof pop2!=='undefined' && pop2 && pop2.key===key && pop2.doc){
     if(typeof libretoApplyRecorded==='function') libretoApplyRecorded();
@@ -2599,6 +2604,7 @@ function removeChar(key){
   }catch(e){}
   try{ delete occByChar[key]; delete charMarks[key]; if(progress[key]) delete progress[key]; }catch(e){}
   try{ rebuild(); }catch(e){}
+  try{ if(typeof renderStats==='function') renderStats(); }catch(e){}
   try{ if(typeof pop2!=='undefined' && pop2.doc){ if(pop2.key===key){ pop2.key=null; pop2.hl=null; pop2.scopeAll=true; } renderLibretoBlocks(); renderLibretoChips(); } }catch(e){}
   if(typeof currentEp!=='undefined' && currentEp && currentEp.id){
     try{ epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
@@ -3349,11 +3355,13 @@ function sortedChars(){
   else list.sort((a,b)=> (b.totalInts||0)-(a.totalInts||0) || (a.display||'').localeCompare(b.display||'','es'));
   return list;
 }
-function toggleSort(){
-  window._sortMode = (window._sortMode==='abc') ? 'ints' : 'abc';
-  const b=document.getElementById('btnSort'); if(b) b.textContent = (window._sortMode==='abc') ? 'A\u2013Z' : '\u21c5 Intervenciones';
+function setSort(mode){
+  window._sortMode = (mode==='abc') ? 'abc' : 'ints';
+  const bi=document.getElementById('btnSortInts'), ba=document.getElementById('btnSortAbc');
+  if(bi) bi.classList.toggle('on', window._sortMode==='ints');
+  if(ba) ba.classList.toggle('on', window._sortMode==='abc');
   try{ renderCards(); }catch(e){}
-  try{ renderPlanilla(); }catch(e){}
+  try{ if(typeof renderPlanilla==='function') renderPlanilla(); }catch(e){}
 }
 function findCharKey(name){
   const n = norm(name); if(!n) return null;
