@@ -755,8 +755,9 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Silksc
 .find input{ color:#eafff0 !important; font-family:'Open Serif',monospace !important; }
 .find input::placeholder{ color:#7fae7f !important; }
 .find .fi{ color:#5FC85A; }
-/* stats: solo «Personajes», como el mockup */
-.stats .stat:not(:first-child){ display:none !important; }
+/* stats: Personajes + Completados */
+.stats .stat:nth-child(n+3){ display:none !important; }
+.stats .stat.ok b{ color:#5FC85A !important; }
 .stats .stat{ background:transparent !important; border:none !important; padding:0 !important; color:#fff !important; font-family:'Open Serif',monospace !important; }
 .stats .stat b{ display:block; font-size:34px; color:#fff; margin:0 0 2px; }
 </style>
@@ -945,6 +946,9 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
       <button class="btnv sm act-g" id="btnMerge" title="Unir dos personajes en uno (p. ej. MARCUS (VO) + MARCUS)">Fusionar Personajes</button>
       <button class="btnv sm act-g" id="btnEditEp" onclick="editEpisode()" title="Editar el desglose del episodio (talentos / quitar personajes)">Editar Episodio</button>
       <button class="btnv sm act-g" id="btnModoEst" title="Modo estudio: video/audio + onda + marcado de pausas">Video Estudio</button>
+      <button class="btnv sm act-g" id="btnSort" onclick="toggleSort()" title="Ordenar por intervenciones o alfabético">\u21c5 Intervenciones</button>
+      <button class="btnv sm act-g" id="btnCasting" onclick="document.getElementById('castingFile').click()" title="Asignar casting desde un Excel (personaje → talento)">Asignar casting</button>
+      <input type="file" id="castingFile" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="if(this.files[0]) assignCastingFromExcel(this.files[0]); this.value=''">
       <button class="btnv sm" id="btnExport" style="display:none" title="Avance">⬇ Avance</button>
       <button class="btnv sm" id="btnRefresh" style="display:none" title="Actualizar">🔄 Actualizar</button>
       <span class="hint" style="display:none">Clic en un personaje abre su libreto</span>
@@ -2620,7 +2624,7 @@ function renderStats(){
   if(!chars.length){ $('stats').classList.remove('show'); updateEpLine(); return; }
   const doneChars = chars.filter(c=>isCharDone(c)).length;
   let pgTot=0, pgRec=0;
-  for(const c of chars){
+  for(const c of sortedChars()){
     pgTot += c.pages.length;
     const r = recSet(c.key);
     pgRec += c.pages.filter(pg=>r.has(pg.p)).length;
@@ -2648,7 +2652,7 @@ function renderCards(){
   const q = norm($('search').value||'');
   const box = $('cards'); box.innerHTML='';
   let shown=0;
-  for(const c of chars){
+  for(const c of sortedChars()){
     if(q && !c.key.includes(q) && !norm(c.talent).includes(q)) continue;
     shown++;
     const rec = recSet(c.key);
@@ -3308,10 +3312,92 @@ function renderProgHeader(sh){
 }
 function editShow(sh){
   if(!sh) return;
-  const nn=prompt('Nombre del programa:', sh.name);
-  if(nn && nn.trim() && nn.trim()!==sh.name){
-    sb.from('shows').update({name:nn.trim()}).eq('id',sh.id).then(async()=>{ await libFetchAll(); renderLibrary(true); });
-  }
+  const { card, close } = dlgOpen(
+    '<h2 class="dlgtitle">Editar Programa</h2>'
+    +'<div class="dlgfield"><input id="epName" value="'+esc(sh.name||'')+'" placeholder="Nombre"></div>'
+    +'<div class="dlglabel">Cambiar carátula</div>'
+    +'<label class="dlgdrop" id="epCarD"><span class="pl">\uFF0B</span><img id="epCarImg" alt=""'+(sh.cover_path?(' src="'+pubUrl(sh.cover_path)+'" style="display:block"'):'')+'><input type="file" id="epCar" accept="image/*"></label>'
+    +'<div class="dlglabel">Cambiar portada</div>'
+    +'<label class="dlgdrop wide" id="epPorD"><span class="pl">\uFF0B</span><img id="epPorImg" alt=""'+(sh.banner_path?(' src="'+pubUrl(sh.banner_path)+'" style="display:block"'):'')+'><input type="file" id="epPor" accept="image/*"></label>'
+    +'<div class="dlgerr" id="epErr"></div>'
+    +'<button class="dlgbtn" id="epGo">Guardar</button>'
+  );
+  const q=(id)=>card.querySelector('#'+id);
+  if(sh.cover_path){ const pl=q('epCarD').querySelector('.pl'); if(pl) pl.style.display='none'; }
+  if(sh.banner_path){ const pl=q('epPorD').querySelector('.pl'); if(pl) pl.style.display='none'; }
+  function prev(inp,img){ inp.addEventListener('change',()=>{ const f=inp.files[0]; if(f){ img.src=URL.createObjectURL(f); img.style.display='block'; const pl=inp.parentNode.querySelector('.pl'); if(pl) pl.style.display='none'; } }); }
+  prev(q('epCar'),q('epCarImg')); prev(q('epPor'),q('epPorImg'));
+  q('epGo').addEventListener('click', async ()=>{
+    const name=(q('epName').value||'').trim(); if(!name){ q('epErr').textContent='Escribe el nombre'; return; }
+    const btn=q('epGo'); btn.disabled=true; btn.textContent='Guardando\u2026';
+    const up=async(inp,kind)=>{ const f=inp.files[0]; if(!f) return null;
+      const ext=((f.name.split('.').pop())||'jpg').toLowerCase(); const path='covers/'+sh.id+'/'+kind+'.'+ext;
+      const u=await sb.storage.from('portadas').upload(path,f,{upsert:true,contentType:f.type||undefined});
+      return u.error?null:path; };
+    const patch={ name };
+    try{ const cp=await up(q('epCar'),'caratula'); if(cp) patch.cover_path=cp;
+         const bp=await up(q('epPor'),'portada'); if(bp) patch.banner_path=bp; }catch(e){ console.warn('cover',e); }
+    const { error } = await sb.from('shows').update(patch).eq('id', sh.id);
+    if(error){ btn.disabled=false; btn.textContent='Guardar'; q('epErr').textContent=error.message; return; }
+    close(); await libFetchAll(); renderLibrary(true);
+  });
+  setTimeout(()=>{ const n=q('epName'); if(n) n.focus(); }, 60);
+}
+function sortedChars(){
+  const list = chars.slice();
+  if(window._sortMode==='abc') list.sort((a,b)=> (a.display||'').localeCompare(b.display||'','es'));
+  else list.sort((a,b)=> (b.totalInts||0)-(a.totalInts||0) || (a.display||'').localeCompare(b.display||'','es'));
+  return list;
+}
+function toggleSort(){
+  window._sortMode = (window._sortMode==='abc') ? 'ints' : 'abc';
+  const b=document.getElementById('btnSort'); if(b) b.textContent = (window._sortMode==='abc') ? 'A\u2013Z' : '\u21c5 Intervenciones';
+  try{ renderCards(); }catch(e){}
+  try{ renderPlanilla(); }catch(e){}
+}
+function findCharKey(name){
+  const n = norm(name); if(!n) return null;
+  if(charIdx[name]) return name;
+  for(const c of chars){ if(norm(c.display)===n || norm(c.key)===n) return c.key; }
+  for(const c of chars){ const d=norm(c.display); if(d && (d.includes(n) || n.includes(d))) return c.key; }
+  return null;
+}
+async function assignCastingFromExcel(file){
+  try{
+    if(typeof XLSX==='undefined'){ libMsg('Falta la librería de Excel'); return; }
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    if(!rows.length){ libMsg('El Excel está vacío'); return; }
+    let cChar=-1, cTal=-1, headerRow=-1;
+    for(let r=0;r<Math.min(6,rows.length);r++){
+      const row=(rows[r]||[]).map(x=>(''+x).toLowerCase());
+      const ic=row.findIndex(x=>/personaje|character|nombre/.test(x));
+      const it=row.findIndex(x=>/talento|talent|actor|actriz|voz|reparto|casting/.test(x));
+      if(ic>=0 && it>=0){ cChar=ic; cTal=it; headerRow=r; break; }
+    }
+    if(cChar<0||cTal<0){ cChar=0; cTal=1; headerRow=0; }   // sin cabeceras: col A=personaje, col B=talento
+    let applied=0, miss=0;
+    for(let r=headerRow+1; r<rows.length; r++){
+      const nm=(''+((rows[r]||[])[cChar]||'')).trim();
+      const tal=(''+((rows[r]||[])[cTal]||'')).trim();
+      if(!nm) continue;
+      const key = findCharKey(nm);
+      if(key && charIdx[key]){
+        charIdx[key].talent = tal; charIdx[key].noRec = NO_REC.has(norm(tal));
+        try{ const raw=(window._charsRaw||[]).find(x=>x.key===key); if(raw){ raw.talent=tal; raw.noRec=charIdx[key].noRec; } }catch(e){}
+        applied++;
+      } else miss++;
+    }
+    try{ renderCards(); }catch(e){}
+    try{ renderPlanilla(); }catch(e){}
+    if(typeof currentEp!=='undefined' && currentEp && currentEp.id){
+      try{ await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+      try{ await saveEpCache(currentEp.id, new Date().toISOString()); }catch(e){}
+    }
+    libMsg('🎙️ Casting asignado a '+applied+' personaje'+(applied===1?'':'s')+(miss?(' · '+miss+' sin coincidencia'):''));
+  }catch(e){ libMsg('No se pudo leer el Excel: '+(e.message||e)); }
 }
 function goPrograms(){
   try{ document.body.classList.remove('ep-open'); }catch(e){}
