@@ -1,29 +1,63 @@
-// Service worker · Desglose Digital de Libreto (v11 · auth + desglose auto)
-const CACHE = 'ddl-shell-v13';
+// Service Worker · Dubbipt  (VERSION autogenerada en cada build)
+const VERSION = '2026-08-09T06:16';
+const CACHE   = 'dubbipt-' + VERSION;
+
 const SHELL = [
-  './','./config.js','./manifest.json','./icon-192.png','./icon-512.png','./apple-touch-icon.png',
+  './', './config.js', './manifest.json',
+  './icon-192.png', './icon-512.png', './apple-touch-icon.png',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
   'https://cdn.jsdelivr.net/npm/mammoth@1.7.2/mammoth.browser.min.js',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
-  'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap'
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
 ];
+
+async function networkFirst(req) {
+  const cache = await caches.open(CACHE);
+  try {
+    const res = await fetch(req, { cache: 'no-store' });
+    if (res && res.ok) cache.put(req, res.clone());
+    return res;
+  } catch (e) {
+    return (await cache.match(req)) || (await cache.match('./')) || Response.error();
+  }
+}
+
+async function staleWhileRevalidate(req) {
+  const cache = await caches.open(CACHE);
+  const hit = await cache.match(req);
+  const net = fetch(req).then(res => {
+    if (res && res.ok) cache.put(req, res.clone());
+    return res;
+  }).catch(() => hit);
+  return hit || net;
+}
+
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).catch(()=>{})).then(()=> self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).catch(() => {})).then(() => self.skipWaiting()));
 });
+
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(()=> self.clients.claim()));
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
+    await self.clients.claim();
+  })());
 });
+
+self.addEventListener('message', e => { if (e.data === 'SKIP_WAITING') self.skipWaiting(); });
+
 self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-  if (e.request.method !== 'GET') return;
-  if (e.request.mode === 'navigate') {
-    e.respondWith(fetch(e.request).then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put('./', copy).catch(()=>{})); return res; }).catch(() => caches.match('./')));
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+
+  if (url.hostname.includes('supabase') || /\/(rest|auth|storage|realtime)\//.test(url.pathname)) return;
+
+  if (req.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('/config.js')) {
+    e.respondWith(networkFirst(req));
     return;
   }
-  if (url.hostname.includes('supabase') || url.pathname.includes('/rest/') ||
-      url.pathname.includes('/auth/') || url.pathname.includes('/storage/') || url.pathname.includes('/realtime/')) return;
-  if (url.pathname.endsWith('/config.js')) { e.respondWith(fetch(e.request).catch(() => caches.match(e.request))); return; }
-  e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request).then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)).catch(()=>{}); return res; }).catch(() => hit)));
+
+  e.respondWith(staleWhileRevalidate(req));
 });
