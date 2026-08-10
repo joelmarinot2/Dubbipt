@@ -467,7 +467,7 @@ body.compacta .pla td{padding:9px 10px}
   #stSplit::before{ width:52px; height:3px; }
 }
 </style>
-<link rel="manifest" href="/manifest.json">
+<link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#140F30">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -507,7 +507,12 @@ body.compacta .pla td{padding:9px 10px}
 @keyframes dlshake{ 0%,100%{transform:translateX(0)} 25%{transform:translateX(-7px)} 75%{transform:translateX(7px)} }
 body.locked #verBox{ position:fixed; left:16px; bottom:26px; z-index:9001; background:#5FC85A; color:#123317;
   font-family:'Silkscreen',monospace; font-size:12px; padding:8px 16px; border-radius:20px; }
-body:not(.locked) #verBox{ display:none; }
+/* La versión permanece VISIBLE en toda la app (no solo en el login): badge
+   discreto y consistente, fijo abajo-izquierda, presente en cada pantalla. */
+body:not(.locked) #verBox{ display:block; left:12px; bottom:12px; z-index:9990;
+  background:rgba(20,15,48,.82); color:#8fe08f; border:1px solid #2f6b34;
+  font-family:'Silkscreen','Space Grotesk',monospace; font-size:10.5px; letter-spacing:.3px;
+  padding:5px 11px; border-radius:12px; opacity:.85; backdrop-filter:blur(4px); }
 </style>
 <style>
 /* ================= TEMA DUBBIPT (toda la interfaz) ================= */
@@ -894,7 +899,7 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
       <span class="tb-dev" id="devStat">● Listo</span>
       <button class="tb-sync" id="syncChip" onclick="syncMenu()" title="Sincronización tablet ↔ escritorio">sincronización</button>
     </div>
-    <div class="tb-brand">Dubbipt</div>
+    <div class="tb-brand">Dubbipt <span class="tb-ver" id="tbVer"></span></div>
     <div class="tb-right">
       <button class="tb-user" id="userBtn" onclick="toggleUserMenu(event)">Usuario ▾</button>
       <div class="tb-menu" id="userMenu">
@@ -1324,7 +1329,7 @@ function norm(s){
   return String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
     .replace(/\s+/g,' ').replace(/[:：]\s*$/,'').trim();
 }
-function esc(s){ return String(s).replace(/[&<>"]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+function esc(s){ return String(s).replace(/[&<>"'\/]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#47;'}[m])); }
 
 /* ================= persistencia (segura) ================= */
 let currentEp = null;   // {id, showId, name} cuando se abre desde la biblioteca
@@ -1415,7 +1420,7 @@ function exportAvance(){
     }
     const grec = progress._pages || new Set();
     const pgRows = [['PÁGINA','GRABADA (libreto completo)']];
-    const maxPg = numPages || Math.max(0, ...script.map(b=>b.page||0));
+    const maxPg = numPages || script.reduce((m,b)=> Math.max(m, b.page||0), 0);
     for(let p=1;p<=maxPg;p++) pgRows.push([p, grec.has(p)?'✓':'']);
     const wb = XLSX.utils.book_new();
     const ws1 = XLSX.utils.aoa_to_sheet(rows);
@@ -1597,8 +1602,14 @@ function cloudSaveProgress(){
       const obj = {}; for(const k in progress) obj[k] = [...progress[k]];
       if(charMerges && Object.keys(charMerges).length) obj._merges = JSON.stringify(charMerges);
       if(_rpcProgress){
+        // parche = claves tocadas; las presentes llevan su Set, las eliminadas
+        // llevan null (tombstone) para que el servidor las BORRE. Antes las
+        // desmarcas nunca viajaban y otros equipos las conservaban para siempre.
         const patch = {};
-        for(const k of _progDirty) if(obj[k]!==undefined) patch[k] = obj[k];
+        for(const k of _progDirty){
+          if(obj[k]!==undefined) patch[k] = obj[k];
+          else patch[k] = null;
+        }
         _progDirty.clear();
         const { error } = await sb.rpc('merge_episode_progress', { p_id: currentEp.id, p_patch: Object.keys(patch).length?patch:obj });
         if(error){
@@ -2596,6 +2607,34 @@ function renderPlanilla(){
     b.addEventListener('click', e=>{ e.stopPropagation(); removeChar(b.dataset.k); });
   });
 }
+/* Remapea sync.marks cuando script se filtra y reindexa.
+   sync.marks está indexado por si (índice posicional). Si script cambia sin
+   migrar las claves, las marcas se pegan a la línea equivocada y se persisten
+   así en la nube. Recibe la lista ORIGINAL de bloques (con su idx viejo) y la
+   nueva lista tras el filtro (aún sin reindexar). Devuelve el nuevo mapa,
+   preserva claves especiales (p. ej. _tcOff) y borra las huérfanas. */
+function remapSyncMarks(scriptAntes, scriptDespues){
+  try{
+    if(!sync || !sync.marks) return;
+    const oldToNew = new Map();
+    const nuevosPorRef = new Set(scriptDespues);
+    scriptAntes.forEach((b, oldIdx)=>{
+      if(!nuevosPorRef.has(b)) return;
+      oldToNew.set(oldIdx, scriptDespues.indexOf(b));
+    });
+    const nm = {};
+    for(const k of Object.keys(sync.marks)){
+      if(/^[a-zA-Z_]/.test(k)){ nm[k] = sync.marks[k]; continue; }   // claves especiales
+      const oi = +k; if(!Number.isFinite(oi)) continue;
+      const ni = oldToNew.get(oi);
+      if(ni!=null && ni>=0) nm[ni] = sync.marks[oi];
+    }
+    sync.marks = nm;
+    if(typeof _marksDirty!=='undefined'){ _marksDirty.clear(); Object.keys(nm).forEach(k=> _marksDirty.add(/^\d+$/.test(k)?+k:k)); }
+    if(typeof cloudSaveMarks==='function') cloudSaveMarks();
+  }catch(e){ console.warn('remapSyncMarks', e); }
+}
+
 function removeChar(key){
   const c = charIdx[key]; if(!c) return;
   if(!confirm('¿Eliminar el personaje «'+c.display+'» del desglose?\n(Se puede recuperar rehaciendo el desglose del guion.)')) return;
@@ -2603,12 +2642,16 @@ function removeChar(key){
   delete charIdx[key];
   try{ window._charsRaw = (window._charsRaw||[]).filter(x=>x.key!==key); }catch(e){}
   try{
-    script = (script||[]).filter(b=> b.key!==key);
+    const scriptAntes = script || [];
+    const scriptDespues = scriptAntes.filter(b=> b.key!==key);
+    remapSyncMarks(scriptAntes, scriptDespues);
+    script = scriptDespues;
     script.forEach((b,i)=> b.idx=i);
     scriptByKey = {}; script.forEach(b=>{ if(b.key) (scriptByKey[b.key]=scriptByKey[b.key]||[]).push(b.idx); });
     window._script = script;
   }catch(e){}
-  try{ delete occByChar[key]; delete charMarks[key]; if(progress[key]) delete progress[key]; }catch(e){}
+  try{ delete occByChar[key]; delete charMarks[key]; if(progress[key]){ delete progress[key]; progTouched(key); } }catch(e){}
+  try{ saveProgress(); }catch(e){}
   try{ rebuild(); }catch(e){}
   try{ if(typeof renderStats==='function') renderStats(); }catch(e){}
   try{ if(typeof pop2!=='undefined' && pop2.doc){ if(pop2.key===key){ pop2.key=null; pop2.hl=null; pop2.scopeAll=true; } renderLibretoBlocks(); renderLibretoChips(); } }catch(e){}
@@ -3313,12 +3356,17 @@ function renderProgHeader(sh){
   ph.style.display='';
   const bn = sh && sh.banner_path ? pubUrl(sh.banner_path) : '';
   ph.innerHTML =
-    '<div class="ph-inner"'+(bn?' style="background-image:linear-gradient(rgba(20,15,48,.5),rgba(20,15,48,.72)),url(\''+bn+'\')"':'')+'>'
+    '<div class="ph-inner">'
     +'<button class="ph-edit" id="phEdit" title="Editar programa">\u270F\uFE0F</button>'
     +'<span class="ph-ws">'+esc((WORKSPACE&&WORKSPACE.name)||'')+'</span>'
     +'<h1 class="ph-title">'+esc(sh?sh.name:'')+'</h1>'
     +'<button class="ph-back" id="phBack">\u2039 Episodios</button>'
     +'</div>';
+  // La portada se aplica por propiedad (no por concatenación en la cadena HTML):
+  // así una URL con comillas/paréntesis no puede romper el CSS ni inyectar nada.
+  if(bn){ const inner = ph.querySelector('.ph-inner');
+    if(inner) inner.style.backgroundImage =
+      "linear-gradient(rgba(20,15,48,.5),rgba(20,15,48,.72)),url('"+encodeURI(bn).replace(/'/g,'%27')+"')"; }
   const pb=document.getElementById('phBack'); if(pb) pb.onclick=()=>{ try{document.body.classList.remove('ep-open');}catch(e){} LDB.browse=true; libView='shows'; LDB.showId=null; renderLibrary(true); };
   const pe=document.getElementById('phEdit'); if(pe) pe.onclick=()=> editShow(sh);
 }
@@ -3475,7 +3523,8 @@ function showDesgloseReview(epName, onSave){
     alive.forEach(r=>{ const c=charIdx[r.key]; if(c){ c.talent=(r.talent||'').trim(); c.noRec=NO_REC.has(norm(c.talent)); } });
     chars = chars.filter(c=>keep.has(c.key));
     charIdx={}; chars.forEach(c=>charIdx[c.key]=c);
-    script = (script||[]).filter(b=>keep.has(b.key)); script.forEach((b,i)=> b.idx=i);
+    { const _sa = script || []; const _sd = _sa.filter(b=>keep.has(b.key)); remapSyncMarks(_sa, _sd); script = _sd; }
+    script.forEach((b,i)=> b.idx=i);
     scriptByKey={}; script.forEach(b=>{ if(b.key)(scriptByKey[b.key]=scriptByKey[b.key]||[]).push(b.idx); });
     try{ window._charsRaw=(window._charsRaw||[]).filter(c=>keep.has(c.key)); }catch(_){}
     try{ Object.keys(occByChar||{}).forEach(k=>{ if(!keep.has(k)) delete occByChar[k]; }); }catch(_){}
@@ -4142,7 +4191,7 @@ async function saveEpHere(){
   libMsg('Subiendo a la nube…');
   try{
     taskStep('2/4 · Subiendo XLS/PDF a la nube…', 30);
-    const epId = esNuevo ? (crypto.randomUUID ? crypto.randomUUID() : uid()) : currentEp.id;
+    const epId = esNuevo ? uid() : currentEp.id;
     const base = LDB.showId+'/'+epId+'/';
     let xlsPath=null, pdfPath=null;
     const rlsMsg = (que)=>'❌ Supabase está BLOQUEANDO la subida de '+que+' (permisos del almacenamiento). Corre storage_setup.sql en SQL Editor — o sigue INSTRUCCIONES_STORAGE.md (2 min, una sola vez).';
@@ -4190,7 +4239,27 @@ async function saveEpHere(){
   }catch(err){ taskFail(err.message); libMsg('Error al subir: '+err.message); }
   renderLibrary();
 }
-const uid = ()=> Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+/* UUID v4 REAL. La columna episodes.id es de tipo uuid: el respaldo anterior
+   (Date+random en base36) no era un UUID y el insert fallaba. crypto.randomUUID
+   no existe en contextos no seguros (HTTP), así que aquí va el equivalente. */
+const uid = ()=>{
+  try{
+    if(crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    if(crypto && typeof crypto.getRandomValues === 'function'){
+      const b = new Uint8Array(16);
+      crypto.getRandomValues(b);
+      b[6] = (b[6] & 0x0f) | 0x40;   // versión 4
+      b[8] = (b[8] & 0x3f) | 0x80;   // variante RFC 4122
+      const h = [...b].map(x=> x.toString(16).padStart(2,'0')).join('');
+      return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
+    }
+  }catch(e){}
+  // último recurso: UUID v4 con Math.random (formato válido)
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, ch=>{
+    const r = Math.random()*16|0;
+    return (ch==='x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+};
 
 /* ================================================================
    📡 BIBLIOTECA EN VIVO — lo que sube un equipo aparece en el otro
@@ -4371,7 +4440,7 @@ async function ddlDiag(){
     // no basta con que el archivo exista: debe ser un JSON de manifiesto válido
     // (antes un manifest.json VACÍO pasaba el diagnóstico y la app no era instalable)
     try{
-      const r = await fetch('/manifest.json', {cache:'no-store'});
+      const r = await fetch('./manifest.json', {cache:'no-store'});
       if(!r.ok) return false;
       const j = await r.json();
       return !!(j && j.name && Array.isArray(j.icons) && j.icons.length && j.display);
@@ -4379,9 +4448,9 @@ async function ddlDiag(){
   }
   const rows = [];
   rows.push([await chkManifest(), 'manifest.json válido (nombre + iconos)']);
-  rows.push([await chk('/icon-192.png'), 'icon-192.png']);
-  rows.push([await chk('/icon-512.png'), 'icon-512.png']);
-  rows.push([await chk('/sw.js'), 'sw.js']);
+  rows.push([await chk('./icon-192.png'), 'icon-192.png']);
+  rows.push([await chk('./icon-512.png'), 'icon-512.png']);
+  rows.push([await chk('./sw.js'), 'sw.js']);
   rows.push([!!(navigator.serviceWorker && navigator.serviceWorker.controller), 'service worker activo']);
   return rows;
 }
@@ -7049,8 +7118,9 @@ function onRemoteSaveAll(p){
     if(typeof libretoApplyRecorded==='function') libretoApplyRecorded();
     if(typeof refreshLibretoChips==='function') refreshLibretoChips();
   }
-  libMsg(p.recorded ? '✓ '+charIdx[p.key].display+' completado (desde el otro dispositivo)'
-                    : '↺ '+charIdx[p.key].display+' desmarcado (desde el otro dispositivo)');
+  { const nom = p.key==='_pages' ? 'Libreto completo' : ((charIdx[p.key] && charIdx[p.key].display) || p.key);
+    libMsg(p.recorded ? '✓ '+nom+' completado (desde el otro dispositivo)'
+                      : '↺ '+nom+' desmarcado (desde el otro dispositivo)'); }
 }
 function syncSendSave(key, page, recorded){
   if(!isTablet() || !sync.channel) return;
@@ -7656,7 +7726,15 @@ function studioAttach(blob, name, offerCloud){
     studioSetTc0(script[0].tcEff);
     stMsg('TC inicial ajustado al primer TC del libreto ('+stFmtTC(script[0].tcEff)+') — cámbialo si tu video inicia en otro');
   }
-  idbSet('media:'+studio.epId, { name, blob, tc0: studioTc0() });
+  // Persistir en IndexedDB SOLO si el archivo es razonable. Un video de varios GB
+  // agota la cuota del origen y puede provocar el desalojo de TODA la caché
+  // (incluidos los libretos). Los videos grandes se mantienen solo en memoria.
+  try{
+    const MAX_IDB = 250*1024*1024;   // 250 MB
+    if(blob.size <= MAX_IDB){ idbSet('media:'+studio.epId, { name, blob, tc0: studioTc0() }); }
+    else { try{ idbDel('media:'+studio.epId); }catch(e){}
+      stMsg('ℹ️ El medio ('+Math.round(blob.size/1048576)+' MB) es muy grande para guardarlo en este equipo — se usa solo en esta sesión'); }
+  }catch(e){}
   if(offerCloud && !studio.isVideo && !window.OFFLINE){
     if(confirm('¿Subir este audio a la nube para que lo tengan todos los equipos?\n(el video nunca se sube: pesa demasiado)')){
       const ext = (name.match(/\.\w+$/)||['.mp3'])[0];
@@ -7747,7 +7825,13 @@ function studioEnvEnsure(dur){
 function studioLiveTap(){
   const el = studioEl();
   if(!el) return null;
-  if(studio.tap && studio.tapEl === el) return studio.tap;
+  // createMediaElementSource solo puede llamarse UNA vez por elemento. Antes se
+  // guardaba un único tap; al alternar video↔audio↔video se reintentaba sobre un
+  // elemento ya "tapeado" → InvalidStateError silencioso y la onda dejaba de
+  // funcionar. Ahora cacheamos un tap POR elemento y reusamos el existente.
+  studio.taps = studio.taps || new WeakMap();
+  const cached = studio.taps.get(el);
+  if(cached){ studio.tap = cached; studio.tapEl = el; return cached; }
   try{
     const AC = window.AudioContext || window.webkitAudioContext;
     if(!AC) return null;
@@ -7758,9 +7842,10 @@ function studioLiveTap(){
     const g = ac.createGain(); g.gain.value = 1;
     src.connect(an); an.connect(g); g.connect(ac.destination);   // el audio sigue oyéndose
     try{ if(ac.state === 'suspended') ac.resume(); }catch(e){}   // que no se quede mudo un instante
-    studio.tap = { ac, src, an, g, buf: new Float32Array(an.fftSize) };
-    studio.tapEl = el;
-    return studio.tap;
+    const tap = { ac, src, an, g, buf: new Float32Array(an.fftSize) };
+    studio.taps.set(el, tap);
+    studio.tap = tap; studio.tapEl = el;
+    return tap;
   }catch(e){ console.warn('tap de audio', e); return null; }
 }
 function studioCapture(){
