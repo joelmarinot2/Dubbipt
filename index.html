@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -504,10 +504,6 @@ body.compacta .pla td{padding:9px 10px}
 #gate .gbtn:disabled{ opacity:.7; }
 #gate .gerr{ color:#FF9BD0; font-size:11px; margin-top:12px; min-height:14px; font-family:'Silkscreen',monospace; line-height:1.5; }
 #gate.shake .gcard{ animation:dlshake .4s; }
-#gate .gdivider{ display:flex; align-items:center; gap:10px; margin:16px 0 8px; color:#4a4670; font-size:11px; font-family:'Inter',sans-serif; }
-#gate .gdivider::before,#gate .gdivider::after{ content:''; flex:1; height:1px; background:#2a2460; }
-#gate .gbtn-google{ display:flex; align-items:center; justify-content:center; gap:10px; width:100%; border:1px solid #2a2460; background:rgba(255,255,255,.04); color:#e8e4ff; border-radius:26px; padding:13px; font-family:'Inter',sans-serif; font-size:14px; cursor:pointer; transition:background .12s,border-color .12s; }
-#gate .gbtn-google:hover{ background:rgba(255,255,255,.09); border-color:#5FC85A; }
 @keyframes dlshake{ 0%,100%{transform:translateX(0)} 25%{transform:translateX(-7px)} 75%{transform:translateX(7px)} }
 body.locked #verBox{ position:fixed; left:16px; bottom:26px; z-index:9001; background:#5FC85A; color:#123317;
   font-family:'Silkscreen',monospace; font-size:12px; padding:8px 16px; border-radius:20px; }
@@ -664,20 +660,8 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Silksc
 #topbar{ position:relative; display:flex; align-items:center; gap:12px; background:#5FC85A; border-radius:28px; padding:8px 12px; margin:6px 0 24px; min-height:58px; }
 #topbar .tb-left{ display:flex; align-items:center; gap:10px; background:#140f30; border-radius:22px; padding:8px 14px; z-index:2; }
 #topbar .tb-dev{ color:#8fe08f; font-family:'Open Serif',monospace; font-size:13px; white-space:nowrap; }
-#topbar .tb-sync{ background:#ff3b3b; color:#fff; border:none; border-radius:16px; padding:9px 15px; font-family:'Open Serif',monospace; font-size:12px; cursor:pointer; transition:all .2s ease; }
-#topbar .tb-sync.wait{ background:#facc15; color:#1a1538; font-weight:700; }
-#topbar .tb-sync.on, #topbar .tb-sync.linked{
-  background: linear-gradient(135deg,#4ADE80,#22C55E) !important;
-  color: #08240F !important;
-  font-weight: 800 !important;
-  border: 1.5px solid #8CF08C !important;
-  box-shadow: 0 0 16px rgba(74, 222, 128, 0.7) !important;
-  animation: syncPulseGlow 2s infinite ease-in-out !important;
-}
-@keyframes syncPulseGlow{
-  0%, 100%{ box-shadow: 0 0 10px rgba(74,222,128,.5); transform: scale(1); }
-  50%{ box-shadow: 0 0 20px rgba(74,222,128,.95); transform: scale(1.04); }
-}
+#topbar .tb-sync{ background:#ff3b3b; color:#fff; border:none; border-radius:16px; padding:9px 15px; font-family:'Open Serif',monospace; font-size:12px; cursor:pointer; }
+#topbar .tb-sync.on{ background:#2fbf4a; }
 #topbar .tb-icon{ background:#140f30; color:#8fe08f; border:none; border-radius:14px; padding:6px 12px; cursor:pointer; font-size:18px; }
 #topbar .tb-brand{ position:absolute; left:0; right:0; text-align:center; color:#fff; font-family:'Open Serif',monospace; font-size:24px; letter-spacing:1px; pointer-events:none; text-shadow:1px 1px 0 rgba(0,0,0,.18); }
 #topbar .tb-right{ margin-left:auto; position:relative; z-index:2; }
@@ -767,15 +751,10 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Silksc
 /* ===== Vista de episodio / casting (imagen 10) ===== */
 .dens{ display:none !important; }
 #planilla{ display:none !important; }              /* solo se ven las cajas de personaje */
-.actrow{ gap:8px; flex-wrap:wrap; align-items:center; }
+.actrow{ gap:14px; }
 .actrow .hint{ display:none !important; }
-.act-cluster{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-.act-divider{ width:1px; height:24px; background:#3a3060; border-radius:1px; flex-shrink:0; margin:0 4px; }
 .actrow .act-g{ background:#2f6b34 !important; color:#dff5df !important; border:none !important; border-radius:22px !important; padding:14px 22px !important; font-family:'Open Serif',monospace !important; font-size:14px !important; box-shadow:none !important; }
 .actrow .act-g:hover{ background:#3a8040 !important; }
-.actrow .act-g.pri{ background:#22C55E !important; color:#06210f !important; border:none !important; font-weight:700 !important; box-shadow:0 4px 0 #15803d !important; }
-.actrow .act-g.pri:hover{ background:#16a34a !important; filter:brightness(1.05) !important; }
-.actrow .act-g.pri:active{ transform:translateY(2px) !important; box-shadow:0 2px 0 #15803d !important; }
 /* buscador estilo mockup */
 .find{ background:#152036 !important; border:none !important; border-bottom:2px solid #5FC85A !important; border-radius:14px 14px 0 0 !important; padding:14px 16px !important; }
 .find input{ color:#eafff0 !important; font-family:'Open Serif',monospace !important; }
@@ -874,41 +853,12 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
 </style>
 <style>
 .actrow .act-g.on{ background:#5FC85A !important; color:#123317 !important; }
-
-/* ===== TOAST SYSTEM ===== */
-#toastBox{ position:fixed; top:18px; right:18px; z-index:9999; display:flex; flex-direction:column; gap:10px; pointer-events:none; }
-.toast{ background:#1e1b40; border:1px solid #3a3060; border-radius:16px; padding:14px 18px; color:#e8e4ff; font-size:13px; font-family:'Inter',system-ui,sans-serif; box-shadow:0 8px 28px rgba(0,0,0,.5); display:flex; align-items:center; gap:12px; pointer-events:all; min-width:240px; max-width:360px; animation:toastIn .22s cubic-bezier(.34,1.56,.64,1); }
-.toast.out{ animation:toastOut .2s ease forwards; }
-.toast-msg{ flex:1; line-height:1.4; }
-.toast-undo{ background:none; border:1px solid #5FC85A; color:#5FC85A; border-radius:10px; padding:5px 12px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; font-family:'Silkscreen',monospace; }
-.toast-undo:hover{ background:#5FC85A; color:#123317; }
-.toast-close{ background:none; border:none; color:#6b6890; cursor:pointer; font-size:16px; padding:0 0 0 4px; line-height:1; }
-.toast-close:hover{ color:#e8e4ff; }
-@keyframes toastIn{ from{ opacity:0; transform:translateX(60px) scale(.92); } to{ opacity:1; transform:none; } }
-@keyframes toastOut{ from{ opacity:1; transform:none; } to{ opacity:0; transform:translateX(60px) scale(.92); } }
-
-/* ===== FILTER CHIPS ===== */
-.filter-chips{ display:flex; flex-wrap:wrap; gap:8px; padding:10px 0 4px; }
-.fchip{ background:var(--inset); border:1px solid var(--line-soft); color:var(--ink-dim); border-radius:20px; padding:6px 14px; font-size:12px; cursor:pointer; font-family:'Silkscreen',monospace; transition:background .12s,border-color .12s,color .12s; white-space:nowrap; }
-.fchip:hover{ border-color:var(--violet); color:var(--ink); }
-.fchip.on{ background:#5FC85A; border-color:#5FC85A; color:#123317; font-weight:700; }
-
-/* ===== ANALYSIS PROGRESS ===== */
-.analysis-progress{ margin:0 0 8px; }
-.analysis-progress-bar{ height:5px; background:#2a2060; border-radius:3px; overflow:hidden; margin-top:6px; }
-.analysis-progress-bar-fill{ height:100%; background:#5FC85A; border-radius:3px; transition:width .3s; }
-
-/* ===== PROGRAMS PAGE PROGRESS BAR ===== */
-.dtile .prog-bar{ height:4px; background:#2a2060; border-radius:2px; overflow:hidden; margin-top:8px; }
-.dtile .prog-bar-fill{ height:100%; background:#5FC85A; border-radius:2px; transition:width .3s; }
-.dtile .dsub{ font-family:'Inter',system-ui,sans-serif; font-size:10.5px; color:var(--ink-faint); margin-top:4px; }
 </style>
 </head>
 <body class="locked">
 <div class="appbar appbar-top"></div>
 <div class="appbar appbar-bot"></div>
 <div id="verBox">v…</div>
-<div id="toastBox" role="status" aria-live="polite" aria-atomic="true"></div>
 <div class="gate" id="gate">
   <div class="dl-bar dl-top"></div>
   <div class="dl-bar dl-bot"></div>
@@ -931,17 +881,12 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
     <input type="password" id="gPass">
     <div class="gerr" id="gErr"></div>
     <button class="gbtn" type="submit" id="gSubmit">Entrar</button>
-    <div class="gdivider"><span>o continúa con</span></div>
-    <button type="button" class="gbtn-google" id="gGoogle" aria-label="Iniciar sesión con Google">
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58Z" fill="#EA4335"/></svg>
-      Google
-    </button>
   </form>
 </div>
 <div class="wrap">
   <div class="hdrbar">
     <button id="btnBack" class="chip" style="display:none" onclick="appBack()" title="Ir atrás">← Atrás</button>
-    <span class="chip conn" id="hdrConn" style="display:none" role="status" aria-live="polite">● Sin conexión</span>
+    <span class="chip conn" id="hdrConn" style="display:none">● Sin conexión</span>
     <span class="hsp"></span>
     <button class="chip" id="btnSync" style="display:none" onclick="syncMenu()" title="Sincronización tablet ↔ escritorio">Sincronizar</button>
     <button class="chip" id="btnStudio" style="display:none" onclick="showWorkspacePicker(true)" title="Espacio de trabajo">Espacio</button>
@@ -993,7 +938,7 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
   </div>
   </div>
 
-  <div class="loading" id="loading"><div class="spin"></div><span id="loadMsg">Analizando…</span><div class="analysis-progress" id="analysisProg" style="display:none"><div class="analysis-progress-bar"><div class="analysis-progress-bar-fill" id="analysisProgFill" style="width:0%"></div></div></div></div>
+  <div class="loading" id="loading"><div class="spin"></div><span id="loadMsg">Analizando…</span></div>
   <div class="stats" id="stats"></div>
   <div class="toolbar" id="toolbar">
     <div class="findrow">
@@ -1003,34 +948,20 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
       </div>
     </div>
     <div class="actrow">
-      <div class="act-cluster" aria-label="Navegar">
-        <button class="btnv sm act-nav" id="btnEpsBack" onclick="appBack()" title="Volver a los episodios" aria-label="Volver a los episodios">‹ Episodios</button>
-        <button class="btnv sm act-nav" id="btnToPrograms" onclick="goPrograms()" title="Ir a Programas" aria-label="Ir a Programas">📚 Programas</button>
-      </div>
-      <div class="act-divider" aria-hidden="true"></div>
-      <div class="act-cluster" aria-label="Editar">
-        <button class="btnv sm act-g" id="btnFull" title="Abrir el libreto completo, sin filtrar por personaje" aria-label="Libreto completo">Libreto Completo</button>
-        <button class="btnv sm act-g" id="btnMerge" title="Unir dos personajes en uno (p. ej. MARCUS (VO) + MARCUS)" aria-label="Fusionar personajes">Fusionar Personajes</button>
-        <button class="btnv sm act-g" id="btnEditEp" onclick="editEpisode()" title="Editar el desglose del episodio (talentos / quitar personajes)" aria-label="Editar episodio">Editar Episodio</button>
-        <button class="btnv sm act-g" id="btnModoEst" title="Modo estudio: video/audio + onda + marcado de pausas" aria-label="Video estudio">Video Estudio</button>
-      </div>
-      <div class="act-divider" aria-hidden="true"></div>
-      <div class="act-cluster" aria-label="Producir">
-        <button class="btnv sm act-g on" id="btnSortInts" onclick="setSort('ints')" title="Ordenar por número de intervenciones" aria-label="Ordenar por intervenciones">Por intervenciones</button>
-        <button class="btnv sm act-g" id="btnSortAbc" onclick="setSort('abc')" title="Ordenar alfabéticamente (A–Z)" aria-label="Ordenar de A a Z">A–Z</button>
-        <button class="btnv sm act-g pri" id="btnCasting" onclick="document.getElementById('castingFile').click()" title="Asignar casting desde un Excel (personaje → talento)" aria-label="Asignar casting">🎭 Asignar casting</button>
-      </div>
+      <button class="btnv sm act-nav" id="btnEpsBack" onclick="appBack()" title="Volver a los episodios">‹ Episodios</button>
+      <button class="btnv sm act-nav" id="btnToPrograms" onclick="goPrograms()" title="Ir a Programas">📚 Programas</button>
+      <button class="btnv sm act-g" id="btnFull" title="Abrir el libreto completo, sin filtrar por personaje">Libreto Completo</button>
+      <button class="btnv sm act-g" id="btnMerge" title="Unir dos personajes en uno (p. ej. MARCUS (VO) + MARCUS)">Fusionar Personajes</button>
+      <button class="btnv sm act-g" id="btnEditEp" onclick="editEpisode()" title="Editar el desglose del episodio (talentos / quitar personajes)">Editar Episodio</button>
+      <button class="btnv sm act-g" id="btnModoEst" title="Modo estudio: video/audio + onda + marcado de pausas">Video Estudio</button>
+      <button class="btnv sm act-g on" id="btnSortInts" onclick="setSort('ints')" title="Ordenar por número de intervenciones">Por intervenciones</button>
+      <button class="btnv sm act-g" id="btnSortAbc" onclick="setSort('abc')" title="Ordenar alfabéticamente (A–Z)">A\u2013Z</button>
+      <button class="btnv sm act-g" id="btnCasting" onclick="document.getElementById('castingFile').click()" title="Asignar casting desde un Excel (personaje → talento)">Asignar casting</button>
       <input type="file" id="castingFile" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="if(this.files[0]) assignCastingFromExcel(this.files[0]); this.value=''">
-      <button class="btnv sm" id="btnExport" style="display:none" title="Avance" aria-label="Descargar avance">⬇ Avance</button>
-      <button class="btnv sm" id="btnRefresh" style="display:none" title="Actualizar" aria-label="Actualizar">🔄 Actualizar</button>
+      <button class="btnv sm" id="btnExport" style="display:none" title="Avance">⬇ Avance</button>
+      <button class="btnv sm" id="btnRefresh" style="display:none" title="Actualizar">🔄 Actualizar</button>
       <span class="hint" style="display:none">Clic en un personaje abre su libreto</span>
     </div>
-  </div>
-  <div class="filter-chips" id="filterChips" style="display:none">
-    <button class="fchip on" data-filter="all">Todos</button>
-    <button class="fchip" data-filter="unassigned">Sin asignar</button>
-    <button class="fchip" data-filter="assigned">Asignado</button>
-    <button class="fchip" data-filter="heavy">≥10 intervenciones</button>
   </div>
   <div class="cards" id="cards"></div>
   <div id="planilla"></div>
@@ -1338,28 +1269,18 @@ async function authInit(){
     try{
       if(mode==='signup'){
         const { data, error } = await sb.auth.signUp({ email, password:pass, options:{ data:{ full_name:full } } });
-        if(error){ shake(); err.textContent = sbErrMsg(error); return; }
+        if(error){ shake(); err.textContent = /registered/i.test(error.message)?'Ese correo ya tiene cuenta. Inicia sesión.':error.message; return; }
         if(data.session){ sbUser=data.session.user; authUnlock(); renderLibrary(); showTutorial(()=> postLogin()); }
         else { err.style.color='#4ADE80'; err.textContent='Cuenta creada. Revisa tu correo para confirmar y luego inicia sesión.'; setMode('login'); }
       } else {
         const { data, error } = await sb.auth.signInWithPassword({ email, password:pass });
-        if(error || !data.session){ shake(); err.textContent = error ? sbErrMsg(error) : 'Correo o contraseña incorrectos';
+        if(error || !data.session){ shake(); err.textContent = /confirm/i.test((error&&error.message)||'')?'Confirma tu correo antes de entrar':'Correo o contraseña incorrectos';
           document.getElementById('gPass').value=''; document.getElementById('gPass').focus(); return; }
         sbUser=data.user; authUnlock(); renderLibrary(); postLogin();
       }
     } finally { btn.disabled=false; btn.textContent=old; }
   });
   document.getElementById('gUser').focus();
-  const gG = document.getElementById('gGoogle');
-  if(gG) gG.addEventListener('click', async ()=>{
-    try{
-      gG.disabled=true; gG.textContent='Conectando…';
-      const { error } = await sb.auth.signInWithOAuth({ provider:'google',
-        options:{ redirectTo: window.location.origin + window.location.pathname } });
-      if(error){ document.getElementById('gErr').textContent = sbErrMsg(error); }
-    }catch(e){ document.getElementById('gErr').textContent = sbErrMsg(e); }
-    finally{ gG.disabled=false; gG.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path d="M17.64 9.205c0-.639-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z" fill="#34A853"/><path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58Z" fill="#EA4335"/></svg> Google'; }
-  });
   }catch(e){
     console.warn('authInit sin red:', e);
     showOfflineGate('Sin conexión con la nube — puedes trabajar con la caché local');
@@ -1458,13 +1379,10 @@ function openMergeDialog(){
     if(!confirm('¿Fusionar «'+bn+'» dentro de «'+an+'»?\nQuedará todo bajo «'+an+'».')) return;
     mergeCharacters(pk, ak);
     ov.remove();
-    if(typeof showToast==='function') showToast('🔗 «'+bn+'» fusionado en «'+an+'»', {duration:4000});
-    else libMsg('🔗 «'+bn+'» fusionado en «'+an+'»');
+    libMsg('🔗 «'+bn+'» fusionado en «'+an+'»');
   });
   ov.querySelectorAll('.un').forEach(b=> b.addEventListener('click', ()=>{
-    unmergeCharacter(b.dataset.pk); ov.remove();
-    if(typeof showToast==='function') showToast('↩ Fusión deshecha', {duration:3000});
-    else libMsg('↩ Fusión deshecha');
+    unmergeCharacter(b.dataset.pk); ov.remove(); libMsg('↩ Fusión deshecha');
   }));
 }
 function markAllPages(key){
@@ -2237,14 +2155,8 @@ async function scanPdf(){
         .then(t=>{ _contents[pp]=t; })
         .catch(()=>{ _contents[pp]={items:[]}; });
     }));
-    try{
-      libMsg('Analizando guion… Página '+e0+' / '+numPages);
-      const pct = Math.round(100*e0/numPages);
-      const pg = document.getElementById('analysisProg'), pf = document.getElementById('analysisProgFill');
-      if(pg){ pg.style.display='block'; } if(pf){ pf.style.width=pct+'%'; }
-    }catch(e){}
+    try{ libMsg('Leyendo libreto… '+e0+'/'+numPages); }catch(e){}
   }
-  try{ const pg=document.getElementById('analysisProg'); if(pg) pg.style.display='none'; }catch(e){}
   for(let p=1;p<=numPages;p++){
     const tc = _contents[p];
     const items = tc.items.map(it=>({str:it.str||'', transform:it.transform, width:it.width}));
@@ -2723,7 +2635,9 @@ function remapSyncMarks(scriptAntes, scriptDespues){
   }catch(e){ console.warn('remapSyncMarks', e); }
 }
 
-function _doRemoveChar(key){
+function removeChar(key){
+  const c = charIdx[key]; if(!c) return;
+  if(!confirm('¿Eliminar el personaje «'+c.display+'» del desglose?\n(Se puede recuperar rehaciendo el desglose del guion.)')) return;
   chars = chars.filter(x=>x.key!==key);
   delete charIdx[key];
   try{ window._charsRaw = (window._charsRaw||[]).filter(x=>x.key!==key); }catch(e){}
@@ -2745,33 +2659,7 @@ function _doRemoveChar(key){
     try{ epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
     try{ saveEpCache(currentEp.id, new Date().toISOString()); }catch(e){}
   }
-}
-function removeChar(key){
-  const c = charIdx[key]; if(!c) return;
-  const snapshot = {
-    chars: JSON.parse(JSON.stringify(chars)),
-    charIdx: JSON.parse(JSON.stringify(charIdx)),
-    script: JSON.parse(JSON.stringify(script||[])),
-    progress: JSON.parse(JSON.stringify(typeof progress!=='undefined'?progress:{}))
-  };
-  _doRemoveChar(key);
-  if(typeof showToast==='function'){
-    showToast('🗑 «'+c.display+'» eliminado', {
-      duration: 5500,
-      undo: ()=>{
-        chars = snapshot.chars;
-        charIdx = snapshot.charIdx;
-        script = snapshot.script;
-        if(typeof progress!=='undefined') progress = snapshot.progress;
-        window._script = script;
-        try{ rebuild(); }catch(e){}
-        try{ if(typeof renderStats==='function') renderStats(); }catch(e){}
-        showToast('↩ «'+c.display+'» restaurado', {duration:2500, icon:'✅'});
-      }
-    });
-  } else {
-    if(typeof libMsg==='function') libMsg('🗑 Personaje eliminado: '+c.display);
-  }
+  if(typeof libMsg==='function') libMsg('🗑 Personaje eliminado: '+c.display);
 }
 async function assignTalent(key, val){
   const c = charIdx[key]; if(!c) return;
@@ -2815,17 +2703,12 @@ function updateEpLine(){
 }
 function isCharDone(c){ const r=recSet(c.key); return c.pages.length>0 && c.pages.every(pg=>r.has(pg.p)); }
 
-let _cardFilter = 'all';
-
 function renderCards(){
   const q = norm($('search').value||'');
   const box = $('cards'); box.innerHTML='';
   let shown=0;
   for(const c of sortedChars()){
     if(q && !c.key.includes(q) && !norm(c.talent).includes(q)) continue;
-    if(_cardFilter==='unassigned' && c.talent) continue;
-    if(_cardFilter==='assigned' && !c.talent) continue;
-    if(_cardFilter==='heavy' && c.totalInts < 10) continue;
     shown++;
     const rec = recSet(c.key);
     const done = isCharDone(c);
@@ -2857,7 +2740,6 @@ function renderCards(){
   }
   $('empty').classList.toggle('show', shown===0);
   if(shown===0 && chars.length) $('empty').querySelector('p').textContent = 'Sin resultados para esa búsqueda.';
-  const fc = $('filterChips'); if(fc) fc.style.display = chars.length ? 'flex' : 'none';
 }
 $('search').addEventListener('input', ()=>{ const sc=$('searchClear'); if(sc) sc.style.display=$('search').value?'':'none'; renderCards(); renderPlanilla(); });
 { const sc=$('searchClear'); if(sc) sc.addEventListener('click', ()=>{ $('search').value=''; sc.style.display='none'; renderCards(); renderPlanilla(); $('search').focus(); }); }
@@ -2870,16 +2752,6 @@ function setDensity(d){
 document.querySelectorAll('#dens button').forEach(x=>
   x.addEventListener('click', ()=> setDensity(x.dataset.d)));
 try{ setDensity(localStorage.getItem('ddl_density')||'comoda'); }catch(e){ setDensity('comoda'); }
-
-// filter chips
-document.querySelectorAll('.fchip').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    _cardFilter = btn.dataset.filter;
-    document.querySelectorAll('.fchip').forEach(x=> x.classList.toggle('on', x===btn));
-    renderCards();
-  });
-});
-
 $('btnMerge').addEventListener('click', ()=> openMergeDialog());
 $('btnModoEst').addEventListener('click', ()=> studioToggleStrip());
 $('btnFull').addEventListener('click', ()=>{
@@ -3113,52 +2985,6 @@ const LDB = { showId:null, browse:false };
 let libView = 'shows';
 function libMsg(t){ const el=$('libMsg'); if(el){ el.textContent=t||''; if(t) setTimeout(()=>{ if(el.textContent===t) el.textContent=''; },3800); } }
 
-function sbErrMsg(err){
-  const m = (err && (err.message || err.msg || String(err))) || '';
-  if(/already registered|already.*exists/i.test(m)) return 'Ese correo ya tiene cuenta. Inicia sesión.';
-  if(/confirm/i.test(m)) return 'Confirma tu correo antes de entrar.';
-  if(/invalid.*password|invalid.*credentials|incorrect/i.test(m)) return 'Correo o contraseña incorrectos.';
-  if(/too many requests|rate.?limit/i.test(m)) return 'Demasiados intentos. Espera unos minutos.';
-  if(/network|fetch|connection/i.test(m)) return 'Sin conexión con la nube. Revisa tu internet.';
-  if(/storage.*not found|object.*not found/i.test(m)) return 'Archivo no encontrado en la nube.';
-  if(/row.level|security|permission|unauthorized|forbidden/i.test(m)) return 'Sin permiso para esta acción.';
-  if(/duplicate.*key|violates.*unique/i.test(m)) return 'Ya existe un registro con ese dato.';
-  if(/timeout/i.test(m)) return 'Tiempo de espera agotado. Intenta de nuevo.';
-  if(/jwt.*expired|session.*expired/i.test(m)) return 'Sesión expirada. Vuelve a iniciar sesión.';
-  return m || 'Error desconocido.';
-}
-
-/* ---- showToast(msg, opts) ---- */
-/* opts: { duration:4000, undo:fn, icon:'' } */
-function showToast(msg, opts){
-  opts = opts || {};
-  const box = document.getElementById('toastBox');
-  if(!box) return;
-  const t = document.createElement('div');
-  t.className = 'toast';
-  const icon = opts.icon !== undefined ? opts.icon : '';
-  t.innerHTML = '<span class="toast-msg">'+(icon?icon+' ':'')+msg+'</span>';
-  if(opts.undo){
-    const ub = document.createElement('button');
-    ub.className = 'toast-undo'; ub.textContent = 'Deshacer';
-    ub.addEventListener('click', ()=>{ opts.undo(); dismissToast(t); });
-    t.appendChild(ub);
-  }
-  const cb = document.createElement('button');
-  cb.className = 'toast-close'; cb.textContent = '✕'; cb.setAttribute('aria-label', 'Cerrar aviso');
-  cb.addEventListener('click', ()=> dismissToast(t));
-  t.appendChild(cb);
-  box.appendChild(t);
-  const dur = opts.duration !== undefined ? opts.duration : 4500;
-  const tid = setTimeout(()=> dismissToast(t), dur);
-  t._tid = tid;
-}
-function dismissToast(t){
-  clearTimeout(t._tid);
-  t.classList.add('out');
-  setTimeout(()=>{ try{ t.parentNode && t.parentNode.removeChild(t); }catch(e){} }, 220);
-}
-
 /* ════════ PANEL DE TAREAS — dos tableros separados ════════
    ⬆️ CARGA  (subir capítulo: procesar → subir archivos → guardar → optimizar)
    📂 APERTURA (abrir programa/capítulo: caché → nube → hidratar → pintar)
@@ -3369,10 +3195,6 @@ async function renderLibrary(silent){
       for(const sh of shows){ counts[sh.id] = sbEps(sh.id).length; }
       for(const sh of shows){
         const n = counts[sh.id]||0;
-        // Count completed episodes (those with episode_data or a recorded flag)
-        const eps = sbEps(sh.id);
-        const done = eps.filter(e=> e._done || (typeof idbGet==='function' && false)).length; // extendable
-        const pct = n > 0 ? Math.round(100*done/n) : 0;
         const c = document.createElement('div'); c.className='fcard dtile';
         c.innerHTML = '<div class="dcover">'
           +'<button class="ldel" title="Eliminar programa">🗑</button>'
@@ -3380,8 +3202,7 @@ async function renderLibrary(silent){
           + (sh.cover_path ? '<img class="dcov" src="'+pubUrl(sh.cover_path)+'" alt="">' : '<span class="dico">📁</span>')
           +'</div>'
           +'<div class="dname">'+esc(sh.name)+'</div>'
-          +'<div class="dsub">'+n+' cap'+(n===1?'':'s')+(done>0?' · '+done+' grabado'+(done===1?'':'s'):'')+'</div>'
-          +(n>0?'<div class="prog-bar"><div class="prog-bar-fill" style="width:'+pct+'%"></div></div>':'');
+          +'<div class="dsub">'+n+' cap'+(n===1?'':'s')+'</div>';
         c.addEventListener('click', async ev=>{
           if(ev.target.closest('.lren')){   // renombrar programa
             const nn = prompt('Nuevo nombre del programa:', sh.name);
@@ -4685,7 +4506,6 @@ body.dark{ background:var(--libbg,#201c50) !important; }
 .lh > button:not(.lbk){ background:#123317 !important; color:#8CF08C !important; border:none !important; border-radius:14px !important; padding:8px 11px !important; font-size:13px !important; }
 .lh > button:not(.lbk):hover{ background:#1c4a24 !important; }
 #lColor{ color:#fff !important; }
-.ltoolsep{ width:1px; height:20px; background:rgba(0,0,0,.25); border-radius:1px; flex-shrink:0; margin:0 2px; display:inline-block; align-self:center; }
 /* Página N centrada con divisores */
 .pgsep{ display:flex !important; align-items:center; gap:14px; max-width:var(--boxw,900px); margin:20px auto !important; }
 .pgsep::before,.pgsep::after{ content:''; flex:1; height:2px; background:rgba(255,255,255,.14); }
@@ -4861,7 +4681,6 @@ body.deskchips .lchips .pgchip{text-align:center}
 body.deskchips .lwrap{padding-right:104px}
 body.deskchips:not(.mirror) .lrec{display:block}
 body.mirror .lrec{display:none!important}
-body.deskchips.single-device .lrec, body.single-device .lrec, body.mirror.single-device .lrec{display:block!important}
 body.deskchips.nochips .lchips{display:none}
 body.deskchips.nochips .lwrap{padding-right:20px}
 /* vista limpia (escritorio): solo el libreto con el personaje resaltado */
@@ -4910,41 +4729,17 @@ body.haschips.lclosed .lwrap{padding-left:20px}
 body.haschips.rclosed .lwrap{padding-right:20px}
 body.haschips .mtools{display:none!important}
 body.haschips .lrec{display:block!important;bottom:16px}
-.blk.rec{
-  position:relative!important;
-  background:rgba(34, 197, 94, 0.22)!important;
-  border-color:#4ADE80!important;
-  border-left:6px solid #4ADE80!important;
-  box-shadow:inset 0 0 12px rgba(74,222,128,0.15), 0 2px 8px rgba(0,0,0,0.2)!important;
-}
-.blk.rec::after{
-  content:'✓ COMPLETADO';
-  position:absolute;
-  top:10px;
-  right:14px;
-  font-size:11px;
-  font-weight:800;
-  letter-spacing:.6px;
-  color:#08240F;
-  background:#4ADE80;
-  border:1px solid #8CF08C;
-  border-radius:8px;
-  padding:3px 10px;
-  box-shadow:0 2px 8px rgba(0,0,0,0.3);
-  z-index:5;
-}
-.blk.rec .bhead{padding-right:125px!important}
-.blk.rec .tx{color:#A9E6A9!important;text-decoration:line-through rgba(74,222,128,0.7);text-decoration-thickness:2px;opacity:0.85}
-.blk.rec .who{color:#A9E6A9!important;opacity:0.9}
-.blk.rec .tc{color:#4ADE80!important}
-body.dark .blk.mine.rec, body.light .blk.mine.rec{
-  background:linear-gradient(135deg,rgba(74,222,128,.32),rgba(34,197,94,.18))!important;
-  border-color:#4ADE80!important;
-  border-left:6px solid #4ADE80!important;
-  box-shadow:0 2px 14px rgba(74,222,128,.28)!important;
-}
-body.dark .blk.rec{border-color:#4ADE80!important}
-body.light .blk.rec{border-color:#22C55E!important}
+.blk.rec{position:relative}
+.blk.rec::after{content:'✓ grabada';position:absolute;top:10px;right:14px;font-size:10px;font-weight:700;
+  letter-spacing:.5px;color:#4ADE80;background:rgba(74,222,128,.14);border:1px solid rgba(74,222,128,.4);
+  border-radius:99px;padding:2px 8px}
+body.dark .blk.mine.rec{background:linear-gradient(135deg,rgba(74,222,128,.30),rgba(34,197,94,.14));
+  border-color:#4ADE80;box-shadow:0 2px 12px rgba(74,222,128,.22)}
+body.light .blk.mine.rec{background:linear-gradient(135deg,rgba(74,222,128,.26),rgba(34,197,94,.12));
+  border-color:#22C55E;box-shadow:0 2px 12px rgba(34,197,94,.18)}
+body.dark .blk.rec{border-color:rgba(74,222,128,.5)}
+body.light .blk.rec{border-color:rgba(74,222,128,.55)}
+.blk.mine.rec .tc{color:#4ADE80!important}
 /* modo espejo: sin herramientas de marcación (solo la tablet marca) */
 /* el espejo también marca: regla body.mirror .mtools{display:none} eliminada en v9.1.2 */
 body.mirror .lbar .goto{opacity:.4;pointer-events:none}
@@ -5094,47 +4889,15 @@ function refreshOpenLibretoForEpisode(){
 async function libEmptyAction(what, silent){
   const ep = (typeof currentEp!=='undefined') ? currentEp : null;
   if(!ep) return;
-  // Validar que los identificadores sean utilizables antes de iniciar cualquier petición
-  if(!ep.id || !ep.showId){
-    if(typeof pop2!=='undefined'){ pop2._searchDone = true; clearTimeout(pop2._retryT); }
-    return;
-  }
-  // Evitar búsquedas concurrentes
-  if(typeof pop2!=='undefined' && pop2._searching) return;
-  if(typeof pop2!=='undefined') pop2._searching = true;
-
   const say = (t)=>{ try{ const m = pop2 && pop2.win && pop2.win.document && pop2.win.document.getElementById('emsg');
     if(m) m.textContent = t; }catch(e){}
     if(!silent) libMsg(t); };
-
-  // Marca la búsqueda como terminada y cancela reintentos pendientes
-  const stopRetrying = ()=>{
-    if(typeof pop2!=='undefined'){
-      pop2._searchDone = true;
-      pop2._searching = false;
-      clearTimeout(pop2._retryT);
-    }
-  };
-
-  if(window.OFFLINE){ say('🔌 Sin conexión — no se puede buscar en la nube'); stopRetrying(); return; }
+  if(window.OFFLINE){ say('🔌 Sin conexión — no se puede buscar en la nube'); return; }
   if(what==='cloud'){
     say('🔍 Buscando el libreto en la nube…');
     try{
-      // 1) la fila REAL del capítulo — con timeout explícito de 5 segundos
-      let row = null;
-      try{
-        const res = await Promise.race([
-          sb.from('episodes').select('*').eq('id', ep.id).maybeSingle(),
-          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
-        ]);
-        row = res && res.data || null;
-      }catch(fetchErr){
-        say(fetchErr && fetchErr.message === 'timeout'
-          ? '⚠️ Tiempo de espera agotado (5 s) buscando el libreto'
-          : '⚠️ Error de conexión: ' + (fetchErr && fetchErr.message || fetchErr));
-        stopRetrying();
-        return;
-      }
+      // 1) la fila REAL del capítulo en la base de datos (comparar con la memoria)
+      const { data:row } = await sb.from('episodes').select('*').eq('id', ep.id).maybeSingle();
       if(row){
         const i = (LDB.epsAll||[]).findIndex(e=> e.id===row.id);
         if(i>=0) LDB.epsAll[i] = row; else (LDB.epsAll = LDB.epsAll||[]).push(row);
@@ -5145,10 +4908,6 @@ async function libEmptyAction(what, silent){
         loadProgress(); rebuild();
         try{ openLibretoInline((pop2.key && charIdx[pop2.key]) ? pop2.key : null); }catch(e){}
         say('✅ Libreto cargado desde la nube');
-        // No llamamos stopRetrying() aquí: si openLibretoInline falló silenciosamente,
-        // el reintento pendiente llamará buildLibretoDoc de nuevo y lo renderizará.
-        // stopRetrying() se activa solo si no hay libreto en absoluto.
-        if(typeof pop2!=='undefined') pop2._searching = false;
         return;
       }
       // 3) la fila real SÍ tiene PDF/json → descargar y procesar ahora
@@ -5157,44 +4916,10 @@ async function libEmptyAction(what, silent){
         pop2._retryN = 0;
         await openEpisode(ep.id);
         try{ if(script && script.length) openLibretoInline((pop2.key && charIdx[pop2.key]) ? pop2.key : null); }catch(e){}
-        stopRetrying();
         return;
       }
-      // 4) Auto-búsqueda exhaustiva en la carpeta de Storage si la ruta en DB no estaba sincronizada
-      if(ep.showId && ep.id){
-        say('🔍 Escaneando carpeta del capítulo en la nube…');
-        const folder = ep.showId+'/'+ep.id;
-        let fl = null;
-        try{
-          const listRes = await Promise.race([
-            sb.storage.from('libretos').list(folder),
-            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
-          ]);
-          fl = listRes && listRes.data || null;
-        }catch(listErr){
-          say(listErr && listErr.message === 'timeout'
-            ? '⚠️ Tiempo de espera agotado (5 s) escaneando la carpeta'
-            : '⚠️ Error escaneando: ' + (listErr && listErr.message || listErr));
-          stopRetrying();
-          return;
-        }
-        const validFiles = (fl||[]).filter(f=> /\.pdf$|\.docx?$|\.json$/i.test(f.name));
-        if(validFiles && validFiles.length){
-          const targetFile = validFiles[0];
-          const fullPath = folder+'/'+targetFile.name;
-          say('⏳ Libreto encontrado ('+targetFile.name+') — descargando y vinculando…');
-          try{ await sb.from('episodes').update({ pdf_path: fullPath }).eq('id', ep.id); }catch(_){}
-          if(row) row.pdf_path = fullPath;
-          await openEpisode(ep.id);
-          try{ if(script && script.length) openLibretoInline((pop2.key && charIdx[pop2.key]) ? pop2.key : null); }catch(e){}
-          say('✅ Libreto recuperado y cargado correctamente');
-          stopRetrying();
-          return;
-        }
-      }
       say('⚠️ No hay libreto en la nube para este capítulo — sube el PDF en «⬆️ Cargar un capítulo» y vuelve a guardarlo');
-    }catch(e){ say('⚠️ ' + (typeof sbErrMsg==='function' ? sbErrMsg(e) : (e && e.message || e))); }
-    stopRetrying();
+    }catch(e){ say('⚠️ Error buscando: ' + (e && e.message || e)); }
     return;
   }
   if(what==='pick'){
@@ -5202,15 +4927,15 @@ async function libEmptyAction(what, silent){
       say('📂 Listando los archivos de este capítulo en la nube…');
       const { data:fl } = await sb.storage.from('libretos').list(ep.showId+'/'+ep.id);
       const pdfs = (fl||[]).filter(f=> /\.pdf$/i.test(f.name));
-      if(!pdfs.length){ say('⚠️ No hay ningún PDF guardado en la carpeta de este capítulo'); if(typeof pop2!=='undefined') pop2._searching = false; return; }
+      if(!pdfs.length){ say('⚠️ No hay ningún PDF guardado en la carpeta de este capítulo'); return; }
       const sel = prompt('PDFs guardados en la nube para este capítulo:\n\n'
         + pdfs.map((f,i)=> (i+1)+') '+f.name).join('\n')
         + '\n\nEscribe el número del que quieres cargar:', '1');
-      if(sel===null){ say(''); if(typeof pop2!=='undefined') pop2._searching = false; return; }
+      if(sel===null){ say(''); return; }
       const f = pdfs[Math.max(0, Math.min(pdfs.length-1, (parseInt(sel,10)||1)-1))];
       say('⏳ Descargando '+f.name+'…');
       const dl = await sb.storage.from('libretos').download(ep.showId+'/'+ep.id+'/'+f.name);
-      if(!dl || !dl.data){ say('⚠️ No se pudo descargar '+f.name); if(typeof pop2!=='undefined') pop2._searching = false; return; }
+      if(!dl || !dl.data){ say('⚠️ No se pudo descargar '+f.name); return; }
       await loadPdfBuf(await dl.data.arrayBuffer(), f.name);
       window._dataEpId = ep.id;
       try{ saveEpCache(ep.id); }catch(e){}
@@ -5219,55 +4944,48 @@ async function libEmptyAction(what, silent){
       try{ openLibretoInline((pop2.key && charIdx[pop2.key]) ? pop2.key : null); }catch(e){}
       say('✅ Libreto cargado: '+f.name);
     }catch(e){ say('⚠️ Error: ' + (e && e.message || e)); }
-    if(typeof pop2!=='undefined') pop2._searching = false;
   }
 }
 
 function buildLibretoDoc(pc){
   const d = pop2.win.document;
   if(!script || !script.length){
-    // Detener si la búsqueda ya terminó de forma definitiva (encontrado o confirmado ausente)
-    if(pop2._searchDone) return;
-
-    if (!(pop2._retryN > 0)) {
-      const row = (typeof currentEp!=='undefined' && currentEp) ? ((LDB.epsAll||[]).find(e=> e.id===currentEp.id)||null) : null;
-      const sinFuente = row && !row.pdf_path && !row.json_path;
-      const btn = 'style="border:1px solid #4c1d95;background:#2e1065;color:#f5f3ff;border-radius:10px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer"';
-      d.documentElement.innerHTML = '<head><meta charset="utf-8"><title>Libreto</title></head>'
-        +'<body style="margin:0;background:#0b0718;color:#e8e4f5;font-family:system-ui;min-height:100vh">'
-        +'<div style="padding:14px"><button id="ebk" '+btn+'>← Atrás</button></div>'
-        +'<div style="display:flex;align-items:center;justify-content:center;height:70vh"><div style="text-align:center;max-width:480px;padding:0 20px">'
-        +'<div style="font-size:40px">⏳</div>'
-        +'<p style="opacity:.92">Buscando y cargando el libreto automáticamente desde la nube…</p>'
-        +'<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px">'
-        +'<button id="ecld" '+btn+'>🔄 Buscar libreto en la nube</button>'
-        +'<button id="epick" '+btn+'>📂 Elegir archivo manualmente</button>'
-        +'</div><div id="emsg" style="margin-top:14px;font-size:13px;color:#A9E6A9;min-height:18px">Cargando…</div>'
-        +'</div></div></body>';
-      try{ d.getElementById('ebk').onclick = ()=>{ try{ if(pop2.type==='inline' && typeof hideLibretoInline==='function') hideLibretoInline(); else if(pop2.win && pop2.win!==window) window.close(); }catch(e){} }; }catch(e){}
-      // Al reintentar manualmente, limpiar el flag para permitir una nueva búsqueda
-      try{ d.getElementById('ecld').onclick = ()=>{ pop2._searchDone = false; pop2._retryN = 0; libEmptyAction('cloud'); }; }catch(e){}
-      try{ d.getElementById('epick').onclick = ()=>{ libEmptyAction('pick'); }; }catch(e){}
-
-      // Auto-búsqueda inmediata en la nube al abrir (una sola vez)
-      setTimeout(()=>{ try{ libEmptyAction('cloud', true); }catch(e){} }, 100);
-    }
-
-    // Máximo 3 reintentos (~7.5 s) como red de seguridad mientras libEmptyAction trabaja.
-    // El reintento siempre llama buildLibretoDoc: si script ya está cargado, renderiza;
-    // si aún está vacío, entra en el bloque de espera. No condicionamos con !script aquí
-    // porque eso impediría el render cuando epDataFetch cargó el script pero el primer
-    // openLibretoInline falló silenciosamente.
-    pop2._retryN = (pop2._retryN||0)+1;
-    if(pop2._retryN < 3 && !pop2._searchDone){
-      clearTimeout(pop2._retryT);
-      pop2._retryT = setTimeout(()=>{ try{ if(pop2.win && !pop2._searchDone) buildLibretoDoc(pc); }catch(e){} }, 2500);
-    } else if(!pop2._searchDone){
-      try{ if(d.getElementById('emsg')) d.getElementById('emsg').textContent = '⚠️ Tiempo de espera agotado. Busca manualmente.'; }catch(e){}
+    // Pantalla de espera MEJORADA: botón Atrás, búsqueda REAL en la nube (la fila
+    // en memoria puede estar vieja y decir «sin PDF» aunque sí lo tenga), elegir
+    // el archivo manualmente, y reintento repetido mientras haya fuente.
+    const row = (typeof currentEp!=='undefined' && currentEp) ? ((LDB.epsAll||[]).find(e=> e.id===currentEp.id)||null) : null;
+    const sinFuente = row && !row.pdf_path && !row.json_path;
+    const btn = 'style="border:1px solid #4c1d95;background:#2e1065;color:#f5f3ff;border-radius:10px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer"';
+    d.documentElement.innerHTML = '<head><meta charset="utf-8"><title>Libreto</title></head>'
+      +'<body style="margin:0;background:#0b0718;color:#e8e4f5;font-family:system-ui;min-height:100vh">'
+      +'<div style="padding:14px"><button id="ebk" '+btn+'>← Atrás</button></div>'
+      +'<div style="display:flex;align-items:center;justify-content:center;height:70vh"><div style="text-align:center;max-width:480px;padding:0 20px">'
+      +'<div style="font-size:40px">'+(sinFuente?'📄':'⏳')+'</div>'
+      +(sinFuente
+        ? '<p style="opacity:.92">Este equipo cree que el capítulo se guardó <b>sin libreto PDF</b>, pero puede ser un dato desactualizado: búscalo de verdad en la nube.</p>'
+        : '<p style="opacity:.92">Este capítulo aún no tiene libreto procesado.<br>Se está preparando en segundo plano — se abrirá solo en unos segundos…</p>')
+      +'<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px">'
+      +'<button id="ecld" '+btn+'>🔄 Buscar libreto en la nube</button>'
+      +'<button id="epick" '+btn+'>📂 Elegir archivo manualmente</button>'
+      +'</div><div id="emsg" style="margin-top:14px;font-size:13px;opacity:.75;min-height:18px"></div>'
+      +'</div></div></body>';
+    try{ d.getElementById('ebk').onclick = ()=>{ try{ if(pop2.type==='inline' && typeof hideLibretoInline==='function') hideLibretoInline(); else if(pop2.win && pop2.win!==window) window.close(); }catch(e){} }; }catch(e){}
+    try{ d.getElementById('ecld').onclick = ()=>{ libEmptyAction('cloud'); }; }catch(e){}
+    try{ d.getElementById('epick').onclick = ()=>{ libEmptyAction('pick'); }; }catch(e){}
+    if(!sinFuente){
+      pop2._retryN = (pop2._retryN||0)+1;
+      if(pop2._retryN < 90){   // ~3 min reintentando (PDFs grandes tardan)
+        clearTimeout(pop2._retryT);
+        pop2._retryT = setTimeout(()=>{ try{ if(pop2.win) buildLibretoDoc(pc); }catch(e){} }, 2000);
+      }
+    }else if(!window.OFFLINE && pop2._dbCheckedEp !== (currentEp && currentEp.id)){
+      // AUTO-VERIFICACIÓN una vez por capítulo: quizá la fila en memoria está vieja
+      pop2._dbCheckedEp = currentEp && currentEp.id;
+      setTimeout(()=>{ try{ libEmptyAction('cloud', true); }catch(e){} }, 400);
     }
     return;
   }
-  pop2._retryN = 0; pop2._dbCheckedEp = null; pop2._searchDone = false; pop2._searching = false; clearTimeout(pop2._retryT);
+  pop2._retryN = 0; pop2._dbCheckedEp = null; clearTimeout(pop2._retryT);
   d.documentElement.innerHTML = '<head><meta charset="utf-8"><title>Libreto</title>'
     +'<link rel="preconnect" href="https://fonts.googleapis.com">'
     +'<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></head><body></body>';
@@ -5289,22 +5007,19 @@ function buildLibretoDoc(pc){
       <span class="conn no" id="lConn">● sin conexión</span>
       <span class="sp"></span>
       <span class="goto"><span>pág.</span><input id="lGoto" type="number" min="1" placeholder="#"></span>
-      <button id="lScope" title="Alcance: solo este personaje o todo el libreto" aria-label="Cambiar alcance">${pop2.scopeAll?'📖':'👤'}</button>
-      <select id="lCharSel" title="Resaltar un personaje" aria-label="Resaltar personaje" style="background:#191238;color:#ECE9FB;border:1px solid #2a2350;border-radius:8px;padding:5px 6px;font-size:12px;max-width:160px"></select>
-      <span class="ltoolsep" aria-hidden="true"></span>
-      <button id="lTheme" title="Modo claro / oscuro" aria-label="Cambiar tema">${pop2.theme==='dark'?'☀️':'🌙'}</button>
-      <button id="lFontDn" title="Letra del personaje más pequeña" aria-label="Reducir letra">A−</button>
-      <button id="lFontUp" title="Letra del personaje más grande" aria-label="Aumentar letra">A+</button>
-      <button id="lClean" title="Vista limpia: solo el libreto" aria-label="Vista limpia">⛶</button>
-      <button id="lColor" title="Colores del libreto (resaltado y fondo)" aria-label="Colores">🎨</button>
-      <span class="ltoolsep" aria-hidden="true"></span>
-      <button id="lVid" title="Video/audio del capítulo: mostrar u ocultar" aria-label="Mostrar video">🎬</button>
-      <button id="lTablet" title="Modo tablet: herramientas de marcación" aria-label="Modo tablet">✏️</button>
-      ${(DEVROLE==='tablet') ? '<button id="lTpad" title="Pasar al trackpad: controlar el libreto del escritorio" aria-label="Trackpad">🎛️</button>' : ''}
-      <button id="lFind" title="Buscar en el libreto" aria-label="Buscar">🔍</button>
-      <button id="lPron" title="Pronunciaciones del libreto" aria-label="Pronunciaciones">🗣</button>
-      <span class="conn no" id="lConn2" style="display:none" role="status" aria-live="polite"></span>
-      <span class="live" id="lLive" role="status" aria-live="polite"></span>
+      <button id="lScope" title="Alcance: solo este personaje o todo el libreto">${pop2.scopeAll?'📖':'👤'}</button>
+      <select id="lCharSel" title="Resaltar un personaje" style="background:#191238;color:#ECE9FB;border:1px solid #2a2350;border-radius:8px;padding:5px 6px;font-size:12px;max-width:160px"></select>
+      <button id="lTheme" title="Modo claro / oscuro">${pop2.theme==='dark'?'☀️':'🌙'}</button>
+      <button id="lFontDn" title="Letra del personaje más pequeña">A−</button>
+      <button id="lFontUp" title="Letra del personaje más grande">A+</button>
+      <button id="lClean" title="Vista limpia: solo el libreto">⛶</button>
+      <button id="lVid" title="Video/audio del capítulo: mostrar u ocultar">🎬</button>
+      <button id="lTablet" title="Modo tablet: herramientas de marcación">✏️</button>
+      ${(DEVROLE==='tablet') ? '<button id="lTpad" title="Pasar al trackpad: controlar el libreto del escritorio">🎛️</button>' : ''}
+      <button id="lFind" title="Buscar en el libreto">🔍</button>
+      <button id="lPron" title="Pronunciaciones del libreto">🗣</button>\n      <button id="lColor" title="Colores del libreto (resaltado y fondo)">🎨</button>
+      <span class="conn no" id="lConn2" style="display:none"></span>
+      <span class="live" id="lLive"></span>
     </div>
     <div class="lfind" id="lFindBar">
       <input id="lFindInput" type="text" placeholder="Buscar palabra…" autocomplete="off">
@@ -5559,30 +5274,6 @@ function buildLibretoDoc(pc){
     fi.addEventListener('input', ()=>{ clearTimeout(ft); ft = setTimeout(()=> runLibFind(fi.value), 180); });
     fi.addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); if(libSearch.ranges.length) libFindGo(libSearch.cur + (e.shiftKey?-1:1)); else runLibFind(fi.value); } if(e.key==='Escape') closeLibFind(); });
   }
-  // ---- atajos de teclado: flechas = navegar riel, 1-4 = ancho de columna ----
-  d.addEventListener('keydown', (ev)=>{
-    const tag = (ev.target.tagName||'').toUpperCase();
-    if(tag==='INPUT'||tag==='TEXTAREA'||ev.target.isContentEditable) return;
-    if(ev.key==='ArrowLeft'||ev.key==='ArrowRight'){
-      ev.preventDefault();
-      const chips = [...d.querySelectorAll('#lChips .pgchip[data-pg]')];
-      if(!chips.length) return;
-      const curIdx = chips.findIndex(x=>x.classList.contains('cur'));
-      const next = ev.key==='ArrowRight'
-        ? (curIdx<0 ? 0 : Math.min(curIdx+1, chips.length-1))
-        : (curIdx<=0 ? 0 : curIdx-1);
-      const pg = +chips[next].dataset.pg;
-      gotoLibretoPage(pg);
-      if(typeof syncSendPos==='function') syncSendPos({ page:pg });
-    }
-    if(ev.key==='1'||ev.key==='2'||ev.key==='3'||ev.key==='4'){
-      const ws = ['560','760','1040','full'];
-      const w = ws[+ev.key-1];
-      pop2.boxw = w;
-      d.documentElement.style.setProperty('--boxw', w==='full'?'96%':w+'px');
-      markWidthBtn();
-    }
-  });
   // refresco del estado: conexión (verde/rojo), 👁 y 🎬
   clearInterval(pop2._stTmr);
   pop2._stTmr = setInterval(()=>{
@@ -5717,7 +5408,6 @@ function renderLibretoBlocks(){
       + ((tc||who) ? '<div class="bhead">'+(tc?'<span class="tc" title="Clic: saltar el video aquí">'+tc+'</span>':'')+(who?'<span class="who">'+esc(who)+'</span>':'')+(window._stCps?stCpsBadge(i):'')+'</div>' : '')
       + (txt ? '<div class="tx">'+applyMarks(i, txt)+'</div>' : '')
       + '<div class="mtools">'
-        + '<button data-act="rec" data-si="'+i+'">✓ Completar</button>'
         + '<button class="edit" data-si="'+i+'">✏️ Editar</button>'
         + '<button data-act="pause" data-si="'+i+'">/ Pausa</button>'
         + '<button data-act="accent" data-si="'+i+'">á Acento</button>'
@@ -5765,18 +5455,6 @@ function renderLibretoBlocks(){
     const si = +btn.dataset.si;   // marca desde cualquier dispositivo (se sincroniza)
     const act = btn.dataset.act;
     const txEl = pop2.doc.querySelector('.blk[data-si="'+si+'"] .tx');
-
-    if(act==='rec'){
-      const b = script[si];
-      if(b){
-        pop.key = pop2.key; pop.viewPage = b.page;
-        const c = charIdx[pop2.key];
-        if(c){ const pi = c.pages.findIndex(x=>x.p===b.page); if(pi>=0) pop.pageIdx = pi; markCurrent(); }
-        else { markPageGlobal(b.page); }
-        if(typeof refreshLibretoChips==='function') refreshLibretoChips();
-      }
-      return;
-    }
 
     if(btn.classList.contains('edit')){
       const editing = txEl.getAttribute('contenteditable')==='true';
@@ -6582,89 +6260,48 @@ function isTablet(){ return sync.isOn && sync.role==='tablet'; }
 function isMirror(){ return sync.isOn && sync.role==='pc'; }
 
 function updateSyncUI(){
-  const linked = sync.isOn && sync.peers > 1;      // los dos dispositivos presentes
-  const waiting = sync.isOn && sync.peers <= 1;     // yo conectado, falta el otro
-  const singleDevice = !sync.isOn || sync.peers <= 1;
-
-  // 1. Botón e indicador en la barra principal (#topbar)
-  const sc = document.getElementById('syncChip');
-  if(sc){
-    sc.classList.toggle('on', linked);
-    sc.classList.toggle('linked', linked);
-    sc.classList.toggle('wait', waiting);
-    if(linked){
-      sc.textContent = '✓ 2 Dispositivos Conectados';
-      sc.title = 'Tablet y Escritorio conectados simultáneamente';
-    } else if(waiting){
-      sc.textContent = '● 1 Dispositivo (esperando)';
-      sc.title = 'Sincronización activa - esperando al segundo dispositivo';
-    } else {
-      sc.textContent = 'sincronización';
-      sc.title = 'Sincronización tablet ↔ escritorio';
-    }
-  }
-
-  const ds = document.getElementById('devStat');
-  if(ds){
-    if(linked){
-      ds.textContent = '● Sincronizado (2 Dispositivos)';
-      ds.style.color = '#4ADE80';
-    } else if(waiting){
-      ds.textContent = DEVROLE==='tablet' ? '● Tablet (falta escritorio)' : '● Escritorio Listo (1 disp.)';
-      ds.style.color = '#FACC15';
-    } else {
-      ds.textContent = DEVROLE==='tablet' ? '● Tablet Lista' : (DEVROLE==='pc' ? '● Escritorio Listo' : '● Listo');
-      ds.style.color = '#8fe08f';
-    }
-  }
-
-  // 2. Botón e indicador secundario (#btnSync / #hdrConn)
   const b = document.getElementById('btnSync');
   if(b){
     const en = (WORKSPACE && WORKSPACE.name) ? (WORKSPACE.name.slice(0,4)+' ') : '';
+    const icon = sync.role==='tablet' ? '📱' : (sync.role==='pc' ? '💻' : '🔗');
+    const linked = sync.isOn && sync.peers>1;      // los dos dispositivos presentes
+    const waiting = sync.isOn && sync.peers<=1;     // yo conectado, falta el otro
     b.classList.toggle('on', linked);
-    b.classList.toggle('linked', linked);
     b.classList.toggle('wait', waiting);
     if(linked){
-      b.textContent = '✓ '+en+(sync.role==='tablet'?'Tablet':'Escritorio')+' · 2 disp. sincronizados';
+      b.textContent = '✓ '+en+(sync.role==='tablet'?'Tablet':'Escritorio')+' · sincronizado';
     } else if(sync.role==='pc'){
+      // el ESCRITORIO funciona solo; conectar una tablet es OPCIONAL → no alarmar
       b.classList.remove('wait');
-      b.textContent = '💻 '+en+'Escritorio · listo (1 disp.)';
+      b.textContent = '💻 '+en+'Escritorio · listo · tablet opcional';
     } else if(sync.role==='tablet'){
       b.textContent = '📱 '+en+'Tablet · conecta el escritorio';
     } else {
       b.textContent = '🔗 Sincronizar';
     }
   }
-
+  // chip del encabezado: ● Sincronizado / Esperando / Conectando
   { const hc = document.getElementById('hdrConn');
     if(hc){
+      const linked = sync.isOn && sync.peers>1;
       if(!sync.role && !sync.isOn){ hc.style.display='none'; }
       else{
         hc.style.display='';
-        if(linked){ hc.classList.add('ok', 'linked'); hc.classList.remove('wait'); hc.textContent='● 2 Dispositivos Conectados'; }
+        if(linked){ hc.classList.add('ok'); hc.classList.remove('wait'); hc.textContent='● Sincronizado'; }
         else if(sync.role==='pc'){ hc.classList.add('ok'); hc.classList.remove('wait'); hc.textContent='● Escritorio listo'; }
         else if(sync.role==='tablet'){ hc.classList.remove('ok'); hc.classList.add('wait'); hc.textContent='● Falta el escritorio'; }
         else { hc.classList.remove('ok','wait'); hc.textContent='● Conectando…'; }
       }
     }
   }
-
-  // 3. Libreto (iframe / documento pop2.doc) y renderizado condicional de escritorio
   if(pop2 && pop2.doc){
     const cn = pop2.doc.getElementById('lConn');
     if(cn){
-      cn.textContent = linked ? '● 2 Dispositivos Conectados' : (sync.isOn ? '● esperando al otro dispositivo' : '● sin conexión');
-      cn.className = 'conn' + (linked ? ' ok linked' : (sync.isOn ? ' wait' : ' no'));
+      const linked = sync.isOn && sync.peers>1;
+      cn.textContent = linked ? '● control conectado' : (sync.isOn ? '● esperando a la tablet' : '● sin conexión');
+      cn.className = 'conn' + (linked ? '' : ' no');
     }
-    pop2.doc.body.classList.toggle('single-device', singleDevice);
-    pop2.doc.body.classList.toggle('dual-device', linked);
-    if(sync.role==='pc' && sync.isOn && linked){
-      pop2.doc.body.classList.add('mirror');
-    } else if(sync.role==='pc' && singleDevice){
-      // En escritorio con 1 solo dispositivo conectado, quitar mirror para mostrar botón de completar
-      pop2.doc.body.classList.remove('mirror');
-    }
+    if(sync.role==='pc' && sync.isOn) pop2.doc.body.classList.add('mirror');
   }
   try{ if(typeof trackpadUpdateConn==='function') trackpadUpdateConn(); }catch(e){}
 }
