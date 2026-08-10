@@ -4926,15 +4926,47 @@ function refreshOpenLibretoForEpisode(){
 async function libEmptyAction(what, silent){
   const ep = (typeof currentEp!=='undefined') ? currentEp : null;
   if(!ep) return;
+  // Validar que los identificadores sean utilizables antes de iniciar cualquier petición
+  if(!ep.id || !ep.showId){
+    if(typeof pop2!=='undefined'){ pop2._searchDone = true; clearTimeout(pop2._retryT); }
+    return;
+  }
+  // Evitar búsquedas concurrentes
+  if(typeof pop2!=='undefined' && pop2._searching) return;
+  if(typeof pop2!=='undefined') pop2._searching = true;
+
   const say = (t)=>{ try{ const m = pop2 && pop2.win && pop2.win.document && pop2.win.document.getElementById('emsg');
     if(m) m.textContent = t; }catch(e){}
     if(!silent) libMsg(t); };
-  if(window.OFFLINE){ say('🔌 Sin conexión — no se puede buscar en la nube'); return; }
+
+  // Marca la búsqueda como terminada y cancela reintentos pendientes
+  const stopRetrying = ()=>{
+    if(typeof pop2!=='undefined'){
+      pop2._searchDone = true;
+      pop2._searching = false;
+      clearTimeout(pop2._retryT);
+    }
+  };
+
+  if(window.OFFLINE){ say('🔌 Sin conexión — no se puede buscar en la nube'); stopRetrying(); return; }
   if(what==='cloud'){
     say('🔍 Buscando el libreto en la nube…');
     try{
-      // 1) la fila REAL del capítulo en la base de datos (comparar con la memoria)
-      const { data:row } = await sb.from('episodes').select('*').eq('id', ep.id).maybeSingle();
+      // 1) la fila REAL del capítulo — con timeout explícito de 5 segundos
+      let row = null;
+      try{
+        const res = await Promise.race([
+          sb.from('episodes').select('*').eq('id', ep.id).maybeSingle(),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
+        ]);
+        row = res && res.data || null;
+      }catch(fetchErr){
+        say(fetchErr && fetchErr.message === 'timeout'
+          ? '⚠️ Tiempo de espera agotado (5 s) buscando el libreto'
+          : '⚠️ Error de conexión: ' + (fetchErr && fetchErr.message || fetchErr));
+        stopRetrying();
+        return;
+      }
       if(row){
         const i = (LDB.epsAll||[]).findIndex(e=> e.id===row.id);
         if(i>=0) LDB.epsAll[i] = row; else (LDB.epsAll = LDB.epsAll||[]).push(row);
@@ -4945,6 +4977,7 @@ async function libEmptyAction(what, silent){
         loadProgress(); rebuild();
         try{ openLibretoInline((pop2.key && charIdx[pop2.key]) ? pop2.key : null); }catch(e){}
         say('✅ Libreto cargado desde la nube');
+        stopRetrying();
         return;
       }
       // 3) la fila real SÍ tiene PDF/json → descargar y procesar ahora
@@ -4953,13 +4986,27 @@ async function libEmptyAction(what, silent){
         pop2._retryN = 0;
         await openEpisode(ep.id);
         try{ if(script && script.length) openLibretoInline((pop2.key && charIdx[pop2.key]) ? pop2.key : null); }catch(e){}
+        stopRetrying();
         return;
       }
       // 4) Auto-búsqueda exhaustiva en la carpeta de Storage si la ruta en DB no estaba sincronizada
       if(ep.showId && ep.id){
         say('🔍 Escaneando carpeta del capítulo en la nube…');
         const folder = ep.showId+'/'+ep.id;
-        const { data:fl } = await sb.storage.from('libretos').list(folder);
+        let fl = null;
+        try{
+          const listRes = await Promise.race([
+            sb.storage.from('libretos').list(folder),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))
+          ]);
+          fl = listRes && listRes.data || null;
+        }catch(listErr){
+          say(listErr && listErr.message === 'timeout'
+            ? '⚠️ Tiempo de espera agotado (5 s) escaneando la carpeta'
+            : '⚠️ Error escaneando: ' + (listErr && listErr.message || listErr));
+          stopRetrying();
+          return;
+        }
         const validFiles = (fl||[]).filter(f=> /\.pdf$|\.docx?$|\.json$/i.test(f.name));
         if(validFiles && validFiles.length){
           const targetFile = validFiles[0];
@@ -4970,11 +5017,13 @@ async function libEmptyAction(what, silent){
           await openEpisode(ep.id);
           try{ if(script && script.length) openLibretoInline((pop2.key && charIdx[pop2.key]) ? pop2.key : null); }catch(e){}
           say('✅ Libreto recuperado y cargado correctamente');
+          stopRetrying();
           return;
         }
       }
       say('⚠️ No hay libreto en la nube para este capítulo — sube el PDF en «⬆️ Cargar un capítulo» y vuelve a guardarlo');
     }catch(e){ say('⚠️ Error buscando: ' + (e && e.message || e)); }
+    stopRetrying();
     return;
   }
   if(what==='pick'){
@@ -4982,15 +5031,15 @@ async function libEmptyAction(what, silent){
       say('📂 Listando los archivos de este capítulo en la nube…');
       const { data:fl } = await sb.storage.from('libretos').list(ep.showId+'/'+ep.id);
       const pdfs = (fl||[]).filter(f=> /\.pdf$/i.test(f.name));
-      if(!pdfs.length){ say('⚠️ No hay ningún PDF guardado en la carpeta de este capítulo'); return; }
+      if(!pdfs.length){ say('⚠️ No hay ningún PDF guardado en la carpeta de este capítulo'); if(typeof pop2!=='undefined') pop2._searching = false; return; }
       const sel = prompt('PDFs guardados en la nube para este capítulo:\n\n'
         + pdfs.map((f,i)=> (i+1)+') '+f.name).join('\n')
         + '\n\nEscribe el número del que quieres cargar:', '1');
-      if(sel===null){ say(''); return; }
+      if(sel===null){ say(''); if(typeof pop2!=='undefined') pop2._searching = false; return; }
       const f = pdfs[Math.max(0, Math.min(pdfs.length-1, (parseInt(sel,10)||1)-1))];
       say('⏳ Descargando '+f.name+'…');
       const dl = await sb.storage.from('libretos').download(ep.showId+'/'+ep.id+'/'+f.name);
-      if(!dl || !dl.data){ say('⚠️ No se pudo descargar '+f.name); return; }
+      if(!dl || !dl.data){ say('⚠️ No se pudo descargar '+f.name); if(typeof pop2!=='undefined') pop2._searching = false; return; }
       await loadPdfBuf(await dl.data.arrayBuffer(), f.name);
       window._dataEpId = ep.id;
       try{ saveEpCache(ep.id); }catch(e){}
@@ -4999,12 +5048,16 @@ async function libEmptyAction(what, silent){
       try{ openLibretoInline((pop2.key && charIdx[pop2.key]) ? pop2.key : null); }catch(e){}
       say('✅ Libreto cargado: '+f.name);
     }catch(e){ say('⚠️ Error: ' + (e && e.message || e)); }
+    if(typeof pop2!=='undefined') pop2._searching = false;
   }
 }
 
 function buildLibretoDoc(pc){
   const d = pop2.win.document;
   if(!script || !script.length){
+    // Detener si la búsqueda ya terminó de forma definitiva (encontrado o confirmado ausente)
+    if(pop2._searchDone) return;
+
     if (!(pop2._retryN > 0)) {
       const row = (typeof currentEp!=='undefined' && currentEp) ? ((LDB.epsAll||[]).find(e=> e.id===currentEp.id)||null) : null;
       const sinFuente = row && !row.pdf_path && !row.json_path;
@@ -5021,24 +5074,25 @@ function buildLibretoDoc(pc){
         +'</div><div id="emsg" style="margin-top:14px;font-size:13px;color:#A9E6A9;min-height:18px">Cargando…</div>'
         +'</div></div></body>';
       try{ d.getElementById('ebk').onclick = ()=>{ try{ if(pop2.type==='inline' && typeof hideLibretoInline==='function') hideLibretoInline(); else if(pop2.win && pop2.win!==window) window.close(); }catch(e){} }; }catch(e){}
-      try{ d.getElementById('ecld').onclick = ()=>{ libEmptyAction('cloud'); }; }catch(e){}
+      // Al reintentar manualmente, limpiar el flag para permitir una nueva búsqueda
+      try{ d.getElementById('ecld').onclick = ()=>{ pop2._searchDone = false; pop2._retryN = 0; libEmptyAction('cloud'); }; }catch(e){}
       try{ d.getElementById('epick').onclick = ()=>{ libEmptyAction('pick'); }; }catch(e){}
 
-      // Auto-búsqueda inmediata en la nube al abrir
+      // Auto-búsqueda inmediata en la nube al abrir (una sola vez)
       setTimeout(()=>{ try{ libEmptyAction('cloud', true); }catch(e){} }, 100);
     }
 
-    // Reintento periódico continuo mientras script esté vacío
+    // Máximo 3 reintentos (~7.5 s) como red de seguridad mientras libEmptyAction trabaja
     pop2._retryN = (pop2._retryN||0)+1;
-    if(pop2._retryN < 40){
+    if(pop2._retryN < 3 && !pop2._searchDone){
       clearTimeout(pop2._retryT);
-      pop2._retryT = setTimeout(()=>{ try{ if(pop2.win && (!script || !script.length)) buildLibretoDoc(pc); }catch(e){} }, 2500);
-    } else {
+      pop2._retryT = setTimeout(()=>{ try{ if(pop2.win && (!script || !script.length) && !pop2._searchDone) buildLibretoDoc(pc); }catch(e){} }, 2500);
+    } else if(!pop2._searchDone){
       try{ if(d.getElementById('emsg')) d.getElementById('emsg').textContent = '⚠️ Tiempo de espera agotado. Busca manualmente.'; }catch(e){}
     }
     return;
   }
-  pop2._retryN = 0; pop2._dbCheckedEp = null; clearTimeout(pop2._retryT);
+  pop2._retryN = 0; pop2._dbCheckedEp = null; pop2._searchDone = false; pop2._searching = false; clearTimeout(pop2._retryT);
   d.documentElement.innerHTML = '<head><meta charset="utf-8"><title>Libreto</title>'
     +'<link rel="preconnect" href="https://fonts.googleapis.com">'
     +'<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></head><body></body>';
