@@ -4977,7 +4977,10 @@ async function libEmptyAction(what, silent){
         loadProgress(); rebuild();
         try{ openLibretoInline((pop2.key && charIdx[pop2.key]) ? pop2.key : null); }catch(e){}
         say('✅ Libreto cargado desde la nube');
-        stopRetrying();
+        // No llamamos stopRetrying() aquí: si openLibretoInline falló silenciosamente,
+        // el reintento pendiente llamará buildLibretoDoc de nuevo y lo renderizará.
+        // stopRetrying() se activa solo si no hay libreto en absoluto.
+        if(typeof pop2!=='undefined') pop2._searching = false;
         return;
       }
       // 3) la fila real SÍ tiene PDF/json → descargar y procesar ahora
@@ -5082,11 +5085,15 @@ function buildLibretoDoc(pc){
       setTimeout(()=>{ try{ libEmptyAction('cloud', true); }catch(e){} }, 100);
     }
 
-    // Máximo 3 reintentos (~7.5 s) como red de seguridad mientras libEmptyAction trabaja
+    // Máximo 3 reintentos (~7.5 s) como red de seguridad mientras libEmptyAction trabaja.
+    // El reintento siempre llama buildLibretoDoc: si script ya está cargado, renderiza;
+    // si aún está vacío, entra en el bloque de espera. No condicionamos con !script aquí
+    // porque eso impediría el render cuando epDataFetch cargó el script pero el primer
+    // openLibretoInline falló silenciosamente.
     pop2._retryN = (pop2._retryN||0)+1;
     if(pop2._retryN < 3 && !pop2._searchDone){
       clearTimeout(pop2._retryT);
-      pop2._retryT = setTimeout(()=>{ try{ if(pop2.win && (!script || !script.length) && !pop2._searchDone) buildLibretoDoc(pc); }catch(e){} }, 2500);
+      pop2._retryT = setTimeout(()=>{ try{ if(pop2.win && !pop2._searchDone) buildLibretoDoc(pc); }catch(e){} }, 2500);
     } else if(!pop2._searchDone){
       try{ if(d.getElementById('emsg')) d.getElementById('emsg').textContent = '⚠️ Tiempo de espera agotado. Busca manualmente.'; }catch(e){}
     }
