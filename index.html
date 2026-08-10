@@ -660,8 +660,20 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Silksc
 #topbar{ position:relative; display:flex; align-items:center; gap:12px; background:#5FC85A; border-radius:28px; padding:8px 12px; margin:6px 0 24px; min-height:58px; }
 #topbar .tb-left{ display:flex; align-items:center; gap:10px; background:#140f30; border-radius:22px; padding:8px 14px; z-index:2; }
 #topbar .tb-dev{ color:#8fe08f; font-family:'Open Serif',monospace; font-size:13px; white-space:nowrap; }
-#topbar .tb-sync{ background:#ff3b3b; color:#fff; border:none; border-radius:16px; padding:9px 15px; font-family:'Open Serif',monospace; font-size:12px; cursor:pointer; }
-#topbar .tb-sync.on{ background:#2fbf4a; }
+#topbar .tb-sync{ background:#ff3b3b; color:#fff; border:none; border-radius:16px; padding:9px 15px; font-family:'Open Serif',monospace; font-size:12px; cursor:pointer; transition:all .2s ease; }
+#topbar .tb-sync.wait{ background:#facc15; color:#1a1538; font-weight:700; }
+#topbar .tb-sync.on, #topbar .tb-sync.linked{
+  background: linear-gradient(135deg,#4ADE80,#22C55E) !important;
+  color: #08240F !important;
+  font-weight: 800 !important;
+  border: 1.5px solid #8CF08C !important;
+  box-shadow: 0 0 16px rgba(74, 222, 128, 0.7) !important;
+  animation: syncPulseGlow 2s infinite ease-in-out !important;
+}
+@keyframes syncPulseGlow{
+  0%, 100%{ box-shadow: 0 0 10px rgba(74,222,128,.5); transform: scale(1); }
+  50%{ box-shadow: 0 0 20px rgba(74,222,128,.95); transform: scale(1.04); }
+}
 #topbar .tb-icon{ background:#140f30; color:#8fe08f; border:none; border-radius:14px; padding:6px 12px; cursor:pointer; font-size:18px; }
 #topbar .tb-brand{ position:absolute; left:0; right:0; text-align:center; color:#fff; font-family:'Open Serif',monospace; font-size:24px; letter-spacing:1px; pointer-events:none; text-shadow:1px 1px 0 rgba(0,0,0,.18); }
 #topbar .tb-right{ margin-left:auto; position:relative; z-index:2; }
@@ -4681,6 +4693,7 @@ body.deskchips .lchips .pgchip{text-align:center}
 body.deskchips .lwrap{padding-right:104px}
 body.deskchips:not(.mirror) .lrec{display:block}
 body.mirror .lrec{display:none!important}
+body.deskchips.single-device .lrec, body.single-device .lrec, body.mirror.single-device .lrec{display:block!important}
 body.deskchips.nochips .lchips{display:none}
 body.deskchips.nochips .lwrap{padding-right:20px}
 /* vista limpia (escritorio): solo el libreto con el personaje resaltado */
@@ -4729,17 +4742,41 @@ body.haschips.lclosed .lwrap{padding-left:20px}
 body.haschips.rclosed .lwrap{padding-right:20px}
 body.haschips .mtools{display:none!important}
 body.haschips .lrec{display:block!important;bottom:16px}
-.blk.rec{position:relative}
-.blk.rec::after{content:'✓ grabada';position:absolute;top:10px;right:14px;font-size:10px;font-weight:700;
-  letter-spacing:.5px;color:#4ADE80;background:rgba(74,222,128,.14);border:1px solid rgba(74,222,128,.4);
-  border-radius:99px;padding:2px 8px}
-body.dark .blk.mine.rec{background:linear-gradient(135deg,rgba(74,222,128,.30),rgba(34,197,94,.14));
-  border-color:#4ADE80;box-shadow:0 2px 12px rgba(74,222,128,.22)}
-body.light .blk.mine.rec{background:linear-gradient(135deg,rgba(74,222,128,.26),rgba(34,197,94,.12));
-  border-color:#22C55E;box-shadow:0 2px 12px rgba(34,197,94,.18)}
-body.dark .blk.rec{border-color:rgba(74,222,128,.5)}
-body.light .blk.rec{border-color:rgba(74,222,128,.55)}
-.blk.mine.rec .tc{color:#4ADE80!important}
+.blk.rec{
+  position:relative!important;
+  background:rgba(34, 197, 94, 0.22)!important;
+  border-color:#4ADE80!important;
+  border-left:6px solid #4ADE80!important;
+  box-shadow:inset 0 0 12px rgba(74,222,128,0.15), 0 2px 8px rgba(0,0,0,0.2)!important;
+}
+.blk.rec::after{
+  content:'✓ COMPLETADO';
+  position:absolute;
+  top:10px;
+  right:14px;
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.6px;
+  color:#08240F;
+  background:#4ADE80;
+  border:1px solid #8CF08C;
+  border-radius:8px;
+  padding:3px 10px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.3);
+  z-index:5;
+}
+.blk.rec .bhead{padding-right:125px!important}
+.blk.rec .tx{color:#A9E6A9!important;text-decoration:line-through rgba(74,222,128,0.7);text-decoration-thickness:2px;opacity:0.85}
+.blk.rec .who{color:#A9E6A9!important;opacity:0.9}
+.blk.rec .tc{color:#4ADE80!important}
+body.dark .blk.mine.rec, body.light .blk.mine.rec{
+  background:linear-gradient(135deg,rgba(74,222,128,.32),rgba(34,197,94,.18))!important;
+  border-color:#4ADE80!important;
+  border-left:6px solid #4ADE80!important;
+  box-shadow:0 2px 14px rgba(74,222,128,.28)!important;
+}
+body.dark .blk.rec{border-color:#4ADE80!important}
+body.light .blk.rec{border-color:#22C55E!important}
 /* modo espejo: sin herramientas de marcación (solo la tablet marca) */
 /* el espejo también marca: regla body.mirror .mtools{display:none} eliminada en v9.1.2 */
 body.mirror .lbar .goto{opacity:.4;pointer-events:none}
@@ -5408,6 +5445,7 @@ function renderLibretoBlocks(){
       + ((tc||who) ? '<div class="bhead">'+(tc?'<span class="tc" title="Clic: saltar el video aquí">'+tc+'</span>':'')+(who?'<span class="who">'+esc(who)+'</span>':'')+(window._stCps?stCpsBadge(i):'')+'</div>' : '')
       + (txt ? '<div class="tx">'+applyMarks(i, txt)+'</div>' : '')
       + '<div class="mtools">'
+        + '<button data-act="rec" data-si="'+i+'">✓ Completar</button>'
         + '<button class="edit" data-si="'+i+'">✏️ Editar</button>'
         + '<button data-act="pause" data-si="'+i+'">/ Pausa</button>'
         + '<button data-act="accent" data-si="'+i+'">á Acento</button>'
@@ -5455,6 +5493,18 @@ function renderLibretoBlocks(){
     const si = +btn.dataset.si;   // marca desde cualquier dispositivo (se sincroniza)
     const act = btn.dataset.act;
     const txEl = pop2.doc.querySelector('.blk[data-si="'+si+'"] .tx');
+
+    if(act==='rec'){
+      const b = script[si];
+      if(b){
+        pop.key = pop2.key; pop.viewPage = b.page;
+        const c = charIdx[pop2.key];
+        if(c){ const pi = c.pages.findIndex(x=>x.p===b.page); if(pi>=0) pop.pageIdx = pi; markCurrent(); }
+        else { markPageGlobal(b.page); }
+        if(typeof refreshLibretoChips==='function') refreshLibretoChips();
+      }
+      return;
+    }
 
     if(btn.classList.contains('edit')){
       const editing = txEl.getAttribute('contenteditable')==='true';
@@ -6260,48 +6310,89 @@ function isTablet(){ return sync.isOn && sync.role==='tablet'; }
 function isMirror(){ return sync.isOn && sync.role==='pc'; }
 
 function updateSyncUI(){
+  const linked = sync.isOn && sync.peers > 1;      // los dos dispositivos presentes
+  const waiting = sync.isOn && sync.peers <= 1;     // yo conectado, falta el otro
+  const singleDevice = !sync.isOn || sync.peers <= 1;
+
+  // 1. Botón e indicador en la barra principal (#topbar)
+  const sc = document.getElementById('syncChip');
+  if(sc){
+    sc.classList.toggle('on', linked);
+    sc.classList.toggle('linked', linked);
+    sc.classList.toggle('wait', waiting);
+    if(linked){
+      sc.textContent = '✓ 2 Dispositivos Conectados';
+      sc.title = 'Tablet y Escritorio conectados simultáneamente';
+    } else if(waiting){
+      sc.textContent = '● 1 Dispositivo (esperando)';
+      sc.title = 'Sincronización activa - esperando al segundo dispositivo';
+    } else {
+      sc.textContent = 'sincronización';
+      sc.title = 'Sincronización tablet ↔ escritorio';
+    }
+  }
+
+  const ds = document.getElementById('devStat');
+  if(ds){
+    if(linked){
+      ds.textContent = '● Sincronizado (2 Dispositivos)';
+      ds.style.color = '#4ADE80';
+    } else if(waiting){
+      ds.textContent = DEVROLE==='tablet' ? '● Tablet (falta escritorio)' : '● Escritorio Listo (1 disp.)';
+      ds.style.color = '#FACC15';
+    } else {
+      ds.textContent = DEVROLE==='tablet' ? '● Tablet Lista' : (DEVROLE==='pc' ? '● Escritorio Listo' : '● Listo');
+      ds.style.color = '#8fe08f';
+    }
+  }
+
+  // 2. Botón e indicador secundario (#btnSync / #hdrConn)
   const b = document.getElementById('btnSync');
   if(b){
     const en = (WORKSPACE && WORKSPACE.name) ? (WORKSPACE.name.slice(0,4)+' ') : '';
-    const icon = sync.role==='tablet' ? '📱' : (sync.role==='pc' ? '💻' : '🔗');
-    const linked = sync.isOn && sync.peers>1;      // los dos dispositivos presentes
-    const waiting = sync.isOn && sync.peers<=1;     // yo conectado, falta el otro
     b.classList.toggle('on', linked);
+    b.classList.toggle('linked', linked);
     b.classList.toggle('wait', waiting);
     if(linked){
-      b.textContent = '✓ '+en+(sync.role==='tablet'?'Tablet':'Escritorio')+' · sincronizado';
+      b.textContent = '✓ '+en+(sync.role==='tablet'?'Tablet':'Escritorio')+' · 2 disp. sincronizados';
     } else if(sync.role==='pc'){
-      // el ESCRITORIO funciona solo; conectar una tablet es OPCIONAL → no alarmar
       b.classList.remove('wait');
-      b.textContent = '💻 '+en+'Escritorio · listo · tablet opcional';
+      b.textContent = '💻 '+en+'Escritorio · listo (1 disp.)';
     } else if(sync.role==='tablet'){
       b.textContent = '📱 '+en+'Tablet · conecta el escritorio';
     } else {
       b.textContent = '🔗 Sincronizar';
     }
   }
-  // chip del encabezado: ● Sincronizado / Esperando / Conectando
+
   { const hc = document.getElementById('hdrConn');
     if(hc){
-      const linked = sync.isOn && sync.peers>1;
       if(!sync.role && !sync.isOn){ hc.style.display='none'; }
       else{
         hc.style.display='';
-        if(linked){ hc.classList.add('ok'); hc.classList.remove('wait'); hc.textContent='● Sincronizado'; }
+        if(linked){ hc.classList.add('ok', 'linked'); hc.classList.remove('wait'); hc.textContent='● 2 Dispositivos Conectados'; }
         else if(sync.role==='pc'){ hc.classList.add('ok'); hc.classList.remove('wait'); hc.textContent='● Escritorio listo'; }
         else if(sync.role==='tablet'){ hc.classList.remove('ok'); hc.classList.add('wait'); hc.textContent='● Falta el escritorio'; }
         else { hc.classList.remove('ok','wait'); hc.textContent='● Conectando…'; }
       }
     }
   }
+
+  // 3. Libreto (iframe / documento pop2.doc) y renderizado condicional de escritorio
   if(pop2 && pop2.doc){
     const cn = pop2.doc.getElementById('lConn');
     if(cn){
-      const linked = sync.isOn && sync.peers>1;
-      cn.textContent = linked ? '● control conectado' : (sync.isOn ? '● esperando a la tablet' : '● sin conexión');
-      cn.className = 'conn' + (linked ? '' : ' no');
+      cn.textContent = linked ? '● 2 Dispositivos Conectados' : (sync.isOn ? '● esperando al otro dispositivo' : '● sin conexión');
+      cn.className = 'conn' + (linked ? ' ok linked' : (sync.isOn ? ' wait' : ' no'));
     }
-    if(sync.role==='pc' && sync.isOn) pop2.doc.body.classList.add('mirror');
+    pop2.doc.body.classList.toggle('single-device', singleDevice);
+    pop2.doc.body.classList.toggle('dual-device', linked);
+    if(sync.role==='pc' && sync.isOn && linked){
+      pop2.doc.body.classList.add('mirror');
+    } else if(sync.role==='pc' && singleDevice){
+      // En escritorio con 1 solo dispositivo conectado, quitar mirror para mostrar botón de completar
+      pop2.doc.body.classList.remove('mirror');
+    }
   }
   try{ if(typeof trackpadUpdateConn==='function') trackpadUpdateConn(); }catch(e){}
 }
