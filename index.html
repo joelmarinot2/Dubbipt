@@ -5005,32 +5005,36 @@ async function libEmptyAction(what, silent){
 function buildLibretoDoc(pc){
   const d = pop2.win.document;
   if(!script || !script.length){
-    const row = (typeof currentEp!=='undefined' && currentEp) ? ((LDB.epsAll||[]).find(e=> e.id===currentEp.id)||null) : null;
-    const sinFuente = row && !row.pdf_path && !row.json_path;
-    const btn = 'style="border:1px solid #4c1d95;background:#2e1065;color:#f5f3ff;border-radius:10px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer"';
-    d.documentElement.innerHTML = '<head><meta charset="utf-8"><title>Libreto</title></head>'
-      +'<body style="margin:0;background:#0b0718;color:#e8e4f5;font-family:system-ui;min-height:100vh">'
-      +'<div style="padding:14px"><button id="ebk" '+btn+'>← Atrás</button></div>'
-      +'<div style="display:flex;align-items:center;justify-content:center;height:70vh"><div style="text-align:center;max-width:480px;padding:0 20px">'
-      +'<div style="font-size:40px">⏳</div>'
-      +'<p style="opacity:.92">Buscando y cargando el libreto automáticamente desde la nube…</p>'
-      +'<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px">'
-      +'<button id="ecld" '+btn+'>🔄 Buscar libreto en la nube</button>'
-      +'<button id="epick" '+btn+'>📂 Elegir archivo manualmente</button>'
-      +'</div><div id="emsg" style="margin-top:14px;font-size:13px;color:#A9E6A9;min-height:18px">Cargando…</div>'
-      +'</div></div></body>';
-    try{ d.getElementById('ebk').onclick = ()=>{ try{ if(pop2.type==='inline' && typeof hideLibretoInline==='function') hideLibretoInline(); else if(pop2.win && pop2.win!==window) window.close(); }catch(e){} }; }catch(e){}
-    try{ d.getElementById('ecld').onclick = ()=>{ libEmptyAction('cloud'); }; }catch(e){}
-    try{ d.getElementById('epick').onclick = ()=>{ libEmptyAction('pick'); }; }catch(e){}
+    if (!(pop2._retryN > 0)) {
+      const row = (typeof currentEp!=='undefined' && currentEp) ? ((LDB.epsAll||[]).find(e=> e.id===currentEp.id)||null) : null;
+      const sinFuente = row && !row.pdf_path && !row.json_path;
+      const btn = 'style="border:1px solid #4c1d95;background:#2e1065;color:#f5f3ff;border-radius:10px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer"';
+      d.documentElement.innerHTML = '<head><meta charset="utf-8"><title>Libreto</title></head>'
+        +'<body style="margin:0;background:#0b0718;color:#e8e4f5;font-family:system-ui;min-height:100vh">'
+        +'<div style="padding:14px"><button id="ebk" '+btn+'>← Atrás</button></div>'
+        +'<div style="display:flex;align-items:center;justify-content:center;height:70vh"><div style="text-align:center;max-width:480px;padding:0 20px">'
+        +'<div style="font-size:40px">⏳</div>'
+        +'<p style="opacity:.92">Buscando y cargando el libreto automáticamente desde la nube…</p>'
+        +'<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px">'
+        +'<button id="ecld" '+btn+'>🔄 Buscar libreto en la nube</button>'
+        +'<button id="epick" '+btn+'>📂 Elegir archivo manualmente</button>'
+        +'</div><div id="emsg" style="margin-top:14px;font-size:13px;color:#A9E6A9;min-height:18px">Cargando…</div>'
+        +'</div></div></body>';
+      try{ d.getElementById('ebk').onclick = ()=>{ try{ if(pop2.type==='inline' && typeof hideLibretoInline==='function') hideLibretoInline(); else if(pop2.win && pop2.win!==window) window.close(); }catch(e){} }; }catch(e){}
+      try{ d.getElementById('ecld').onclick = ()=>{ libEmptyAction('cloud'); }; }catch(e){}
+      try{ d.getElementById('epick').onclick = ()=>{ libEmptyAction('pick'); }; }catch(e){}
 
-    // Auto-búsqueda inmediata en la nube al abrir
-    setTimeout(()=>{ try{ libEmptyAction('cloud', true); }catch(e){} }, 100);
+      // Auto-búsqueda inmediata en la nube al abrir
+      setTimeout(()=>{ try{ libEmptyAction('cloud', true); }catch(e){} }, 100);
+    }
 
     // Reintento periódico continuo mientras script esté vacío
     pop2._retryN = (pop2._retryN||0)+1;
     if(pop2._retryN < 40){
       clearTimeout(pop2._retryT);
       pop2._retryT = setTimeout(()=>{ try{ if(pop2.win && (!script || !script.length)) buildLibretoDoc(pc); }catch(e){} }, 2500);
+    } else {
+      try{ if(d.getElementById('emsg')) d.getElementById('emsg').textContent = '⚠️ Tiempo de espera agotado. Busca manualmente.'; }catch(e){}
     }
     return;
   }
