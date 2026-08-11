@@ -655,24 +655,57 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .wscard .wsempty{ color:#8B84B0; text-align:center; padding:10px; font-size:13px; }
 </style>
 <style>
-/* ===== Barra de navegación verde (imagen dashboard) ===== */
+/* ===== Módulo 0 · Barra de navegación superior (rediseño) ===== */
 .hdrbar{ display:none !important; }
-#topbar{ position:relative; display:flex; align-items:center; gap:12px; background:#5FC85A; border-radius:28px; padding:8px 12px; margin:6px 0 24px; min-height:58px; }
-#topbar .tb-left{ display:flex; align-items:center; gap:10px; background:#140f30; border-radius:22px; padding:8px 14px; z-index:2; }
-#topbar .tb-dev{ color:#8fe08f; font-family:'Open Serif',monospace; font-size:13px; white-space:nowrap; }
-#topbar .tb-sync{ background:#ff3b3b; color:#fff; border:none; border-radius:16px; padding:9px 15px; font-family:'Open Serif',monospace; font-size:12px; cursor:pointer; }
-#topbar .tb-sync.on{ background:#2fbf4a; }
-#topbar .tb-icon{ background:#140f30; color:#8fe08f; border:none; border-radius:14px; padding:6px 12px; cursor:pointer; font-size:18px; }
-#topbar .tb-brand{ position:absolute; left:0; right:0; text-align:center; color:#fff; font-family:'Open Serif',monospace; font-size:24px; letter-spacing:1px; pointer-events:none; text-shadow:1px 1px 0 rgba(0,0,0,.18); }
-#topbar .tb-right{ margin-left:auto; position:relative; z-index:2; }
-#topbar .tb-user{ background:#140f30; color:#8fe08f; border:none; border-radius:22px; padding:13px 24px; font-family:'Open Serif',monospace; font-size:14px; cursor:pointer; }
-#topbar .tb-user:hover{ color:#bff5bf; }
-#topbar .tb-menu{ display:none; position:absolute; right:0; top:calc(100% + 8px); background:#5FC85A; border-radius:14px; overflow:hidden; min-width:210px; box-shadow:0 12px 30px rgba(0,0,0,.45); z-index:80; }
+#topbar{ position:relative; display:flex; align-items:center; gap:14px;
+  background:linear-gradient(180deg,#141a16,#0f1211);
+  border:1px solid #23312a; border-radius:16px; padding:10px 16px; margin:6px 0 22px; min-height:60px; }
+#topbar .tb-left{ display:flex; align-items:center; gap:16px; background:transparent; border:none; padding:0; z-index:2; }
+/* marca compacta (cuadro "D") */
+#topbar .tb-mk{ width:34px; height:34px; border-radius:9px; display:grid; place-items:center; flex:none;
+  background:#0f1512; border:1px solid #2b4636; color:#4ADE80; font-family:'Inter',sans-serif; font-weight:800; font-size:14px; }
+/* pestaña de sección con subrayado verde */
+#topbar .tb-tab{ position:relative; background:transparent; border:none; color:#f2f3f5;
+  font-family:'Inter',sans-serif; font-weight:700; font-size:15px; padding:6px 2px 12px; cursor:pointer; }
+#topbar .tb-tab::after{ content:''; position:absolute; left:0; right:0; bottom:0; height:2.5px; border-radius:2px; background:#22C55E; }
+#topbar .tb-tab:hover{ color:#fff; }
+/* zona derecha */
+#topbar .tb-right{ margin-left:auto; display:flex; align-items:center; gap:14px; position:relative; z-index:2; }
+#topbar .tb-loc{ display:flex; align-items:center; gap:7px; color:#9CA3AF; font-family:'Inter',sans-serif; font-size:13.5px; white-space:nowrap; }
+#topbar .tb-loc .sep{ color:#4b5563; }
+#topbar .tb-loc b{ color:#f2f3f5; font-weight:700; }
+#topbar .tb-dev{ display:flex; align-items:center; gap:7px; color:#9CA3AF; font-family:'Inter',sans-serif; font-size:13px; white-space:nowrap; }
+#topbar .tb-dev::before{ content:''; width:8px; height:8px; border-radius:50%; background:#4ADE80; box-shadow:0 0 8px rgba(74,222,128,.7); }
+#topbar .tb-dev.off::before{ background:#6b7280; box-shadow:none; }
+#topbar .tb-divider{ width:1px; height:24px; background:#23312a; }
+/* botones de icono (campana, engranaje) */
+#topbar .tb-icon{ width:38px; height:38px; display:grid; place-items:center; background:#0f1512; color:#c7c9cd;
+  border:1px solid #23312a; border-radius:10px; cursor:pointer; font-size:16px; padding:0; transition:border-color .12s,color .12s; }
+#topbar .tb-icon:hover{ border-color:#4ADE80; color:#fff; }
+/* avatar/usuario */
+#topbar .tb-user{ width:38px; height:38px; display:grid; place-items:center; background:#1c2f24; color:#4ADE80;
+  border:1px solid #2b4636; border-radius:10px; font-family:'Inter',sans-serif; font-weight:700; font-size:13px; cursor:pointer; padding:0; }
+#topbar .tb-user:hover{ filter:brightness(1.12); }
+/* la marca central antigua queda oculta */
+#topbar .tb-brand{ display:none !important; }
+/* menú de configuración (dropdown) */
+#topbar .tb-menu{ display:none; position:absolute; right:0; top:calc(100% + 10px); background:#15171a;
+  border:1px solid #2c3036; border-radius:12px; overflow:hidden; min-width:230px;
+  box-shadow:0 16px 40px rgba(0,0,0,.5); z-index:80; padding:6px; }
 #topbar .tb-menu.open{ display:block; }
-#topbar .tb-menu button{ display:block; width:100%; text-align:left; background:transparent; border:none; color:#123317; font-family:'Open Serif',monospace; font-size:13px; padding:14px 18px; cursor:pointer; border-bottom:1px solid rgba(0,0,0,.12); }
-#topbar .tb-menu button:last-child{ border-bottom:none; }
-#topbar .tb-menu button:hover{ background:rgba(0,0,0,.14); }
-@media(max-width:640px){ #topbar .tb-brand{ font-size:18px; } #topbar .tb-dev{ font-size:11px; } #topbar .tb-user{ padding:10px 14px; } }
+#topbar .tb-menu .mh{ font-family:'Inter',sans-serif; font-size:10.5px; letter-spacing:.6px; text-transform:uppercase;
+  color:#6b7280; padding:10px 12px 6px; }
+#topbar .tb-menu button{ display:block; width:100%; text-align:left; background:transparent; border:none; color:#f2f3f5;
+  font-family:'Inter',sans-serif; font-weight:600; font-size:13.5px; padding:10px 12px; cursor:pointer; border-radius:8px; }
+#topbar .tb-menu button:hover{ background:#1c1e22; }
+#topbar .tb-menu .mdiv{ height:1px; background:#23262b; margin:6px 8px; }
+#topbar .tb-menu button.danger{ color:#F87171; }
+#topbar .tb-menu button.danger:hover{ background:rgba(248,113,113,.10); }
+@media(max-width:720px){
+  #topbar{ flex-wrap:wrap; gap:10px; }
+  #topbar .tb-loc{ display:none; }
+  #topbar .tb-right{ gap:9px; }
+}
 </style>
 <style>
 /* ===== Crear Programa / modales · ajuste al mockup (imagen 7) ===== */
@@ -939,20 +972,30 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
   </div>
   <div id="topbar">
     <div class="tb-left">
-      <button id="btnBack2" class="tb-icon" style="display:none" onclick="appBack()" title="Atrás">‹</button>
-      <span class="tb-dev" id="devStat" role="status" aria-live="polite">● Listo</span>
-      <button class="tb-sync" id="syncChip" onclick="syncMenu()" title="Sincronización tablet ↔ escritorio" aria-label="Estado de sincronización entre tablet y escritorio">sincronización</button>
+      <div class="tb-mk" aria-hidden="true">D</div>
+      <button class="tb-tab" id="tabPrograms" onclick="goPrograms()" title="Ir a Programas">Programas</button>
     </div>
-    <div class="tb-brand">Dubbipt <span class="tb-ver" id="tbVer"></span></div>
     <div class="tb-right">
-      <button class="tb-user" id="userBtn" onclick="toggleUserMenu(event)">Usuario ▾</button>
-      <div class="tb-menu" id="userMenu">
-        <button onclick="closeUserMenu();showWorkspacePicker(true)">Espacios de trabajo</button>
-        <button onclick="closeUserMenu();showTutorial()">Tutorial</button>
-        <button onclick="closeUserMenu();if(typeof ddlInstall===&quot;function&quot;)ddlInstall()">Instalar app</button>
-        <button onclick="closeUserMenu();document.getElementById('btnOut').click()">Cerrar Sesión</button>
+      <span class="tb-loc" id="tbLoc" style="display:none">
+        <span id="tbLocShow"></span><span class="sep">/</span><b id="tbLocEp"></b>
+      </span>
+      <span class="tb-dev" id="devStat" role="status" aria-live="polite">Listo</span>
+      <button class="tb-sync" id="syncChip" onclick="syncMenu()" title="Sincronización tablet ↔ escritorio" aria-label="Estado de sincronización entre tablet y escritorio" style="display:none">sincronización</button>
+      <div class="tb-divider" aria-hidden="true"></div>
+      <button class="tb-icon" id="btnNotif" onclick="toggleNotif(event)" title="Notificaciones" aria-label="Notificaciones">🔔</button>
+      <button class="tb-icon" id="userBtn" onclick="toggleUserMenu(event)" title="Configuración" aria-label="Configuración y cuenta">⚙</button>
+      <button class="tb-user" id="avatarBtn" onclick="toggleUserMenu(event)" title="Tu cuenta" aria-label="Tu cuenta">JP</button>
+      <div class="tb-menu" id="userMenu" role="menu">
+        <div class="mh">Configuración</div>
+        <button role="menuitem" onclick="closeUserMenu();showAccountProfile()">Perfil de la cuenta</button>
+        <button role="menuitem" onclick="closeUserMenu();showWorkspacePicker(true)">Espacio de trabajo</button>
+        <div class="mdiv" aria-hidden="true"></div>
+        <button role="menuitem" onclick="closeUserMenu();showTutorial()">Ayuda y documentación</button>
+        <button role="menuitem" class="danger" onclick="closeUserMenu();document.getElementById('btnOut').click()">Cerrar sesión</button>
       </div>
     </div>
+    <span id="btnBack2" style="display:none"></span>
+    <span class="tb-brand" style="display:none">Dubbipt <span class="tb-ver" id="tbVer"></span></span>
     <span id="who" style="display:none"></span>
   </div>
   <div class="epline" id="epLine" style="display:none"></div>
@@ -1175,6 +1218,7 @@ function authUnlock(){
   (function hook(){
     if(typeof ddlWorkerStart==='function' && typeof libBoot==='function'){
       try{ ddlWorkerStart(); libBoot(); }catch(e){ console.error(e); }
+      try{ refreshTopbar(); }catch(e){}
     } else setTimeout(hook, 120);
   })();
 }
@@ -1332,10 +1376,48 @@ function askRoleAtLogin(done){
 }
 function applyDeviceRole(){
   try{ document.body.classList.toggle('is-tablet', DEVROLE==='tablet'); }catch(e){}
-  try{ const d=document.getElementById('devStat'); if(d) d.textContent = DEVROLE==='tablet' ? '● Tablet Lista' : (DEVROLE==='pc' ? '● Escritorio Listo' : '● Listo'); }catch(e){}
+  try{ const d=document.getElementById('devStat'); if(d){ d.textContent = DEVROLE==='tablet' ? 'Tablet Lista' : (DEVROLE==='pc' ? 'Escritorio Listo' : 'Listo'); d.classList.toggle('off', !DEVROLE); } }catch(e){}
   try{ updateWorkspaceChip(); }catch(e){}
+  try{ refreshTopbar(); }catch(e){}
   try{ if(typeof pop2!=='undefined' && pop2.doc){ renderLibretoBlocks(); renderLibretoChips(); } }catch(e){}
 }
+/* ===== Módulo 0 · relleno dinámico de la barra superior ===== */
+function refreshTopbar(){
+  try{
+    // ubicación actual: Programa / Episodio (a la derecha)
+    const loc = document.getElementById('tbLoc');
+    const showEl = document.getElementById('tbLocShow'), epEl = document.getElementById('tbLocEp');
+    let showName = '';
+    try{ const sh = (typeof sbShows==='function') ? (sbShows().find(x=>x.id===LDB.showId)) : null; if(sh) showName = sh.name; }catch(e){}
+    const epName = (typeof currentEp!=='undefined' && currentEp && currentEp.name) ? currentEp.name : '';
+    if(loc){
+      if(showName || epName){
+        loc.style.display='';
+        if(showEl) showEl.textContent = showName || '';
+        loc.querySelector('.sep').style.display = (showName && epName) ? '' : 'none';
+        if(epEl) epEl.textContent = epName || '';
+      } else { loc.style.display='none'; }
+    }
+    // pestaña "Programas": activa cuando estás en el dashboard
+    const tab = document.getElementById('tabPrograms');
+    if(tab){ const onDash = !(typeof currentEp!=='undefined' && currentEp) && !(LDB && LDB.showId);
+      tab.style.opacity = onDash ? '1' : '.72'; }
+    // avatar con iniciales del usuario
+    const av = document.getElementById('avatarBtn');
+    if(av){ av.textContent = topbarInitials(); }
+  }catch(e){ console.warn('refreshTopbar', e); }
+}
+function topbarInitials(){
+  let name = '';
+  try{ if(typeof DDLAuth!=='undefined' && DDLAuth.profile && DDLAuth.profile.full_name) name = DDLAuth.profile.full_name; }catch(e){}
+  try{ if(!name && typeof sbUser!=='undefined' && sbUser){ name = (sbUser.user_metadata && sbUser.user_metadata.full_name) || sbUser.email || ''; } }catch(e){}
+  if(!name) return 'DD';
+  const parts = name.replace(/@.*/,'').split(/[.\s_-]+/).filter(Boolean);
+  const ini = ((parts[0]||'')[0]||'') + ((parts[1]||'')[0]||'');
+  return (ini||name[0]||'D').toUpperCase().slice(0,2);
+}
+// stub de notificaciones (se completa con el sistema de toasts replicados por realtime)
+function toggleNotif(e){ if(e) e.stopPropagation(); if(typeof DDL_UI!=='undefined') DDL_UI.toast('No tienes notificaciones nuevas'); }
 
 function authErr(e){
   const m = ((e && (e.message || e.error_description || e.msg)) || '') + '';
@@ -3346,6 +3428,7 @@ async function precacheShow(showId){
 }
 async function renderLibrary(silent){
   if((!sb || !sbUser) && !window.OFFLINE) return;
+  try{ refreshTopbar(); }catch(e){}
   const grid = $('libGrid'), crumb = $('libCrumb'), act = $('libAction'), lib = $('lib');
   try{
     if(!silent) await libEnsure();
@@ -3659,6 +3742,11 @@ function goPrograms(){
   try{ LDB.browse=true; libView='shows'; LDB.showId=null; }catch(e){}
   try{ renderLibrary(true); }catch(e){}
   try{ updateBackBtn(); }catch(e){}
+  try{ refreshTopbar(); }catch(e){}
+}
+// stub para esta fase — la pantalla real de Perfil llega en la fase siguiente
+function showAccountProfile(){
+  if(typeof DDL_UI!=='undefined') DDL_UI.toast('Perfil de la cuenta — próximamente');
 }
 function editEpisode(){
   if(!chars || !chars.length){ libMsg('Abre un episodio con desglose primero'); return; }
@@ -3946,7 +4034,7 @@ async function ddlResetCache(){
   location.reload();
 }
 // reconstruir todo el estado desde la caché (sin descargar ni re-procesar)
-function _epOpen(v){ try{ document.body.classList.toggle('ep-open', !!v); }catch(e){} }
+function _epOpen(v){ try{ document.body.classList.toggle('ep-open', !!v); }catch(e){} try{ refreshTopbar(); }catch(e){} }
 function hydrateEpisode(d){ _epOpen(true);
   chars = d.chars || [];
   charIdx = {}; chars.forEach(c=> charIdx[c.key] = c);
