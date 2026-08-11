@@ -715,24 +715,33 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 </style>
 <style>
 /* ===== Selector de dispositivo (imagen 3) ===== */
-#rolePick{ position:fixed; inset:0; z-index:9600; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px;
-  background:radial-gradient(1200px 760px at 50% 28%, #3b3690 0%, #2c2770 46%, #201c50 100%); font-family:'Open Serif',monospace; padding:20px; }
-#rolePick .rp-bar{ position:fixed; left:0; right:0; height:14px; background:#5FC85A; }
-#rolePick .rp-bar.t{ top:0 } #rolePick .rp-bar.b{ bottom:0 }
-#rolePick .rp-logo{ width:70px; height:88px; position:relative; margin-bottom:2px; }
-#rolePick .rp-logo::before{ content:''; position:absolute; left:0; top:0; width:52px; height:88px; border:13px solid #5FC85A; border-radius:3px; box-sizing:border-box; }
-#rolePick .rp-logo::after{ content:''; position:absolute; right:0; top:20px; width:20px; height:48px; background:#5FC85A; border-radius:3px; }
-#rolePick .rp-card{ width:min(720px,94vw); background:#5FC85A; border-radius:34px; padding:24px 26px 30px; }
-#rolePick .rp-title{ text-align:center; color:#123317; font-size:20px; }
-#rolePick .rp-sub{ text-align:center; color:#123317; font-size:15px; margin:8px 0 22px; }
-#rolePick .rp-opts{ display:flex; gap:22px; }
-#rolePick .rp-opt{ flex:1; background:#181433; border:3px solid transparent; border-radius:26px; padding:26px 16px 20px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:16px; color:#fff; font-family:'Open Serif',monospace; transition:transform .1s, border-color .1s; }
-#rolePick .rp-opt:hover{ transform:translateY(-3px); border-color:#123317; }
-#rolePick .rp-opt svg{ width:120px; height:120px; }
-#rolePick .rp-opt .lab{ font-size:15px; text-align:center; line-height:1.5; }
-#rolePick .rp-logout{ width:min(720px,94vw); background:transparent; border:2px solid #5FC85A; border-radius:26px; padding:16px; color:#8fe08f; font-family:'Open Serif',monospace; font-size:16px; cursor:pointer; }
-#rolePick .rp-logout:hover{ background:rgba(95,200,90,.10); color:#bff5bf; }
-@media(max-width:560px){ #rolePick .rp-opts{ flex-direction:column } #rolePick .rp-opt svg{ width:90px; height:90px } }
+/* ===== Selector de dispositivo · mismo fondo que el login ===== */
+#rolePick{ position:fixed; inset:0; z-index:9600; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px;
+  background:
+    radial-gradient(1100px 700px at 10% 0%, rgba(34,197,94,.30), transparent 52%),
+    radial-gradient(800px 600px at 8% 8%, rgba(22,163,74,.18), transparent 60%),
+    #0b0c0e;
+  background-attachment:fixed; font-family:'Inter',sans-serif; padding:24px; }
+#rolePick .rp-bar{ display:none; }
+#rolePick .rp-logo{ display:none; }
+/* logo (img inyectada por JS) */
+#rolePick .rp-logoimg{ height:90px; width:auto; display:block; }
+/* tarjeta */
+#rolePick .rp-card{ width:min(660px,96vw); background:#111316; border:1px solid #23262b; border-radius:16px; padding:24px 24px 22px; }
+#rolePick .rp-title{ text-align:center; color:#f2f3f5; font-family:'Inter',sans-serif; font-weight:700; font-size:17px; margin-bottom:4px; }
+#rolePick .rp-sub{ text-align:center; color:#8b8f97; font-family:'Inter',sans-serif; font-size:13.5px; margin:4px 0 20px; }
+#rolePick .rp-opts{ display:flex; gap:14px; }
+#rolePick .rp-opt{ flex:1; background:#0f1215; border:1.5px solid #23262b; border-radius:14px; padding:22px 16px 18px; cursor:pointer;
+  display:flex; flex-direction:column; align-items:center; gap:14px; transition:transform .12s,border-color .12s; }
+#rolePick .rp-opt:hover{ transform:translateY(-3px); border-color:#22C55E; }
+#rolePick .rp-opt svg{ width:100px; height:100px; }
+#rolePick .rp-opt .lab{ font-size:14px; font-weight:600; color:#f2f3f5; font-family:'Inter',sans-serif; text-align:center; line-height:1.5; }
+#rolePick .rp-opt .lab small{ display:block; color:#8b8f97; font-weight:400; font-size:12px; margin-top:3px; }
+/* botón Cerrar sesión */
+#rolePick .rp-logout{ width:min(660px,96vw); background:transparent; border:1px solid #2c3036; border-radius:11px;
+  padding:13px; color:#8b8f97; font-family:'Inter',sans-serif; font-weight:600; font-size:14px; cursor:pointer; }
+#rolePick .rp-logout:hover{ border-color:#3a3f46; color:#f2f3f5; }
+@media(max-width:560px){ #rolePick .rp-opts{ flex-direction:column } #rolePick .rp-opt svg{ width:72px; height:72px } }
 </style>
 <style>
 /* ===== Modal Espacios de trabajo (imagen 6) ===== */
@@ -1457,8 +1466,9 @@ function authUnlock(){
 let WORKSPACE = null;
 try{ WORKSPACE = JSON.parse(localStorage.getItem('ddl_ws')||'null'); }catch(e){}
 let libWorkspaces = [];
-let DEVROLE = null;                 // rol del dispositivo para la sincronía (tablet/pc)
-try{ DEVROLE = localStorage.getItem('ddl_role')||null; }catch(e){}
+let DEVROLE = null;                 // rol del dispositivo — siempre se elige al iniciar sesión
+// NOTA: no cargamos ddl_role de localStorage para que el selector aparezca en CADA sesión.
+// (El rol anterior queda en storage como sugerencia futura, pero no lo aplicamos automáticamente.)
 
 async function libFetchWorkspaces(){
   try{
@@ -1621,20 +1631,22 @@ function postLogin(){ askRoleAtLogin(()=> ensureWorkspace()); }
 function askRoleAtLogin(done){
   const old=document.getElementById('rolePick'); if(old) old.remove();
   const ov=document.createElement('div'); ov.id='rolePick';
-  const tabletSVG='<svg viewBox="0 0 100 132" fill="none" stroke="#5FC85A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><rect x="12" y="8" width="76" height="116" rx="11"/><rect x="24" y="27" width="52" height="78" rx="4"/><circle cx="42" cy="17.5" r="1.8" fill="#5FC85A" stroke="none"/><circle cx="50" cy="17.5" r="1.8" fill="#5FC85A" stroke="none"/><line x1="44" y1="114" x2="56" y2="114"/></svg>';
-  const deskSVG='<svg viewBox="0 0 150 132" fill="none" stroke="#5FC85A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><rect x="12" y="14" width="126" height="84" rx="9"/><rect x="24" y="27" width="102" height="58" rx="3"/><line x1="75" y1="98" x2="75" y2="114"/><rect x="52" y="114" width="46" height="8" rx="4"/></svg>';
+  // SVGs con colores del nuevo tema (verde sobre fondo oscuro)
+  const tabletSVG='<svg viewBox="0 0 100 132" fill="none" stroke="#22C55E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><rect x="12" y="8" width="76" height="116" rx="11"/><rect x="24" y="27" width="52" height="78" rx="4"/><circle cx="42" cy="17.5" r="1.8" fill="#22C55E" stroke="none"/><circle cx="50" cy="17.5" r="1.8" fill="#22C55E" stroke="none"/><line x1="44" y1="114" x2="56" y2="114"/></svg>';
+  const deskSVG='<svg viewBox="0 0 150 132" fill="none" stroke="#22C55E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><rect x="12" y="14" width="126" height="84" rx="9"/><rect x="24" y="27" width="102" height="58" rx="3"/><line x1="75" y1="98" x2="75" y2="114"/><rect x="52" y="114" width="46" height="8" rx="4"/></svg>';
+  // logo real de Dubbipt (mismo que el login)
+  const logoSrc = (document.querySelector('#gate .gbrand img') || {}).src || '';
   ov.innerHTML =
-    '<div class="rp-bar t"></div><div class="rp-bar b"></div>'
-    +'<div class="dubbipt-logo" style="margin:0 auto 8px"></div>'
+    (logoSrc ? '<img class="rp-logoimg" src="'+logoSrc+'" alt="Dubbipt">' : '')
     +'<div class="rp-card">'
-    +  '<div class="rp-title">\u00bfEste dispositivo es\u2026?</div>'
-    +  '<div class="rp-sub">Para adaptar la vista y la sincron\u00eda</div>'
+    +  '<div class="rp-title">¿Este dispositivo es…?</div>'
+    +  '<div class="rp-sub">Para adaptar la vista y la sincronía</div>'
     +  '<div class="rp-opts">'
-    +    '<button class="rp-opt" id="rTab">'+tabletSVG+'<span class="lab">Tablet<br>(Control)</span></button>'
-    +    '<button class="rp-opt" id="rPc">'+deskSVG+'<span class="lab">Escritorio<br>(Muestra Libreto)</span></button>'
+    +    '<button class="rp-opt" id="rTab">'+tabletSVG+'<span class="lab">Tablet<small>Control</small></span></button>'
+    +    '<button class="rp-opt" id="rPc">'+deskSVG+'<span class="lab">Escritorio<small>Muestra Libreto</small></span></button>'
     +  '</div>'
     +'</div>'
-    +'<button class="rp-logout" id="rpOut">Cerrar sesi\u00f3n</button>';
+    +'<button class="rp-logout" id="rpOut">Cerrar sesión</button>';
   document.body.appendChild(ov);
   const choose=(role)=>{ try{localStorage.setItem('ddl_role',role);}catch(e){} DEVROLE=role; try{sync.role=role;}catch(e){} ov.remove(); try{ applyDeviceRole(); }catch(e){} if(typeof done==='function') done(); };
   ov.querySelector('#rTab').onclick=()=>choose('tablet');
