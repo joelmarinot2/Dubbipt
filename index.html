@@ -493,8 +493,9 @@ body.compacta .pla td{padding:9px 10px}
   box-shadow:0 30px 80px rgba(0,0,0,.55); }
 /* marca dentro de la tarjeta */
 #gate .gbrand{ text-align:center; margin-bottom:22px; }
-#gate .gbrand .gmk{ width:44px; height:44px; margin:0 auto 8px; border-radius:12px; display:grid; place-items:center;
-  background:#0f1512; border:1px solid #2b4636; color:#4ADE80; font-size:22px; }
+#gate .gbrand .gmk{ width:auto; height:44px; margin:0 auto 10px; display:grid; place-items:center;
+  background:transparent; border:none; }
+#gate .gbrand .gmk .ddl-logo-ico{ height:44px; }
 #gate .gbrand .gnm{ font-family:'Inter',sans-serif; font-weight:700; font-size:18px; color:#f2f3f5; letter-spacing:.3px; }
 /* pestañas Iniciar sesión / Crear cuenta */
 #gate .dl-tabs{ display:flex; gap:4px; background:#0f1215; border:1px solid #23262b; border-radius:11px; padding:4px; margin-bottom:20px; }
@@ -660,20 +661,45 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 /* ===== Carátula en las tarjetas del Dashboard ===== */
 .dtile .dcover .dcov{ width:100%; height:100%; object-fit:cover; }
 
-/* ===== Tarjetas de personaje estilo imagen 10 ===== */
-.card{ border:none !important; border-radius:16px !important; padding:0 !important; overflow:hidden; position:relative; background:var(--cc) !important; }
-.card:hover{ transform:translateY(-3px); }
-.card .top{ display:flex; align-items:center; gap:10px; padding:14px 16px 10px; }
-.card .top h3{ color:#fff !important; font-family:'Open Serif',monospace; font-size:17px; flex:1; text-shadow:1px 1px 0 rgba(0,0,0,.35); }
-.card .top .n{ color:#fff; font-family:'Open Serif',monospace; font-size:15px; text-shadow:1px 1px 0 rgba(0,0,0,.35); margin-right:26px; }
-.card .allbtn{ position:absolute; top:12px; right:12px; width:30px; height:30px; border-radius:50%; border:3px solid rgba(0,0,0,.35); background:rgba(0,0,0,.28); color:#eaffea; display:grid; place-items:center; font-size:15px; cursor:pointer; padding:0; }
-.card .allbtn.on{ background:#0f2415; color:#8CF08C; }
-.card .tal{ display:flex; align-items:center; gap:8px; background:#140f30; margin:0 !important; padding:12px 16px; color:var(--cc); font-size:14px; }
-.card .tal b{ color:var(--cc); }
-.card .tal .ng{ color:#8b84b0; }
-.card .tal .tc{ margin-left:auto; color:#fff; font-family:ui-monospace,monospace; font-size:14px; }
+/* ===== Módulo 10 · Tarjetas de personaje (rediseño) ===== */
+.card{ border:1.5px solid var(--cc) !important; border-radius:14px !important; padding:0 !important; overflow:hidden;
+  position:relative; background:#15171a !important; transition:transform .12s, box-shadow .12s; }
+.card:hover{ transform:translateY(-3px); box-shadow:0 10px 30px rgba(0,0,0,.4); }
+.card.done{ opacity:1 !important; border-color:#22C55E !important; background:linear-gradient(180deg,rgba(34,197,94,.10),transparent),#141a16 !important; }
+/* fila superior: "N intervenciones" + checkbox */
+.card .top{ display:flex; align-items:flex-start; gap:10px; padding:14px 16px 6px; }
+.card .top .ints-lab{ font-family:'Inter',sans-serif; font-size:11px; color:#8b8f97; font-weight:500; }
+.card .top h3{ display:none; }  /* el nombre se reubica debajo */
+.card .top .n{ display:none; }
+.card .allbtn{ position:absolute; top:12px; right:12px; width:26px; height:26px; border-radius:7px;
+  border:1px solid #3a3f46; background:transparent; color:transparent; display:grid; place-items:center;
+  font-size:13px; cursor:pointer; padding:0; transition:all .12s; }
+.card .allbtn:hover{ border-color:#4ADE80; }
+.card .allbtn.on{ background:#22C55E; border-color:#22C55E; color:#06210f; }
+/* nombre del personaje */
+.card .cname{ font-family:'Inter',sans-serif; font-weight:700; color:#f2f3f5; font-size:17px; padding:0 16px 8px; line-height:1.15; }
+/* chips: rol + timecode */
+.card .cchips{ display:flex; gap:6px; padding:0 16px 10px; flex-wrap:wrap; }
+.card .cchips .cc-chip{ font-family:'Inter',sans-serif; font-size:11px; font-weight:600; padding:4px 9px; border-radius:6px;
+  background:#1c1e22; color:#9CA3AF; border:1px solid #23262b; }
+.card.done .cchips .cc-chip{ background:rgba(34,197,94,.14); color:#4ADE80; border-color:rgba(34,197,94,.3); }
+/* divisor */
+.card .cdiv{ height:1px; background:#23262b; margin:2px 16px 0; }
+/* estado de talento */
+.card .tal{ display:flex; align-items:center; gap:8px; background:transparent !important; margin:0 !important;
+  padding:12px 16px 8px; color:#4ADE80; font-family:'Inter',sans-serif; font-size:13.5px; font-weight:600; }
+.card .tal b{ color:var(--cc); font-weight:700; }
+.card .tal .ng{ color:#4ADE80; font-style:normal; }
+.card .tal .tc{ margin-left:auto; color:#8b8f97; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:400; }
 .card .tal .meta{ display:none; }
+/* subrayado de color */
+.card .cline{ height:2px; background:var(--cc); margin:0 16px; border-radius:2px; opacity:.85; }
+/* botón de acción (Asignar / Editar) */
+.card .cbtn{ display:block; width:calc(100% - 32px); margin:12px 16px 14px; background:transparent; border:none;
+  color:var(--cc); font-family:'Inter',sans-serif; font-weight:700; font-size:13.5px; text-align:center; cursor:pointer; padding:4px; }
+.card .cbtn:hover{ filter:brightness(1.15); }
 .card .bar, .card .pgs{ display:none !important; }
+.card{ cursor:pointer; }
 </style>
 <style>
 /* ===== Selector de dispositivo (imagen 3) ===== */
@@ -719,9 +745,11 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
   background:linear-gradient(180deg,#141a16,#0f1211);
   border:1px solid #23312a; border-radius:16px; padding:10px 16px; margin:6px 0 22px; min-height:60px; }
 #topbar .tb-left{ display:flex; align-items:center; gap:16px; background:transparent; border:none; padding:0; z-index:2; }
-/* marca compacta (cuadro "D") */
-#topbar .tb-mk{ width:34px; height:34px; border-radius:9px; display:grid; place-items:center; flex:none;
-  background:#0f1512; border:1px solid #2b4636; color:#4ADE80; font-family:'Inter',sans-serif; font-weight:800; font-size:14px; }
+/* marca compacta (logo Dubbipt) */
+#topbar .tb-mk{ width:36px; height:36px; border-radius:9px; display:grid; place-items:center; flex:none;
+  background:transparent; border:none; }
+.ddl-logo-ico{ display:block; height:26px; width:auto; object-fit:contain; }
+#topbar .tb-mk .ddl-logo-ico{ height:28px; }
 /* pestaña de sección con subrayado verde */
 #topbar .tb-tab{ position:relative; background:transparent; border:none; color:#f2f3f5;
   font-family:'Inter',sans-serif; font-weight:700; font-size:15px; padding:6px 2px 12px; cursor:pointer; }
@@ -798,6 +826,92 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .acct-save:disabled{ opacity:.6; cursor:default; }
 .acct-msg{ font-size:12.5px; align-self:center; margin-right:auto; min-height:16px; }
 .acct-msg.ok{ color:#4ADE80; } .acct-msg.err{ color:#F472B6; }
+/* ===== Módulo 10B · Página de episodios (tabla) ===== */
+.eps-head{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin:2px 0 16px; }
+.eps-head .eh-title h2{ font-family:'Inter',sans-serif; font-weight:700; color:#f2f3f5; font-size:22px; }
+.eps-head .eh-title .eh-sub{ font-family:'Inter',sans-serif; color:#9CA3AF; font-size:13px; margin-top:3px; }
+.eps-head .eh-new{ margin-left:auto; background:#22C55E; border:none; color:#06210f; font-family:'Inter',sans-serif;
+  font-weight:700; font-size:13px; padding:10px 16px; border-radius:10px; cursor:pointer; white-space:nowrap; }
+.eps-head .eh-new:hover{ filter:brightness(1.08); }
+#libGrid.epstable{ display:block; border:none; padding:0; background:transparent; }
+.eps-opt{ display:inline-block; margin-bottom:12px; background:transparent; border:1px solid #1d4a30; color:#4ADE80;
+  font-family:'Inter',sans-serif; font-weight:600; font-size:12.5px; padding:8px 14px; border-radius:9px; cursor:pointer; }
+.eps-opt:hover{ background:#123b23; }
+.et-table{ border:1px solid #23262b; border-radius:14px; overflow:hidden; background:#111316; }
+.et-row{ display:grid; grid-template-columns:52px 1fr 168px 128px 116px; align-items:center; gap:12px; padding:14px 18px;
+  border-bottom:1px solid #1c1e22; }
+.et-row:last-child{ border-bottom:none; }
+.et-head{ padding:11px 18px; }
+.et-head span{ font-family:'Inter',sans-serif; font-size:11px; font-weight:600; letter-spacing:.4px; text-transform:uppercase; color:#6b7280; }
+.et-row:not(.et-head){ cursor:pointer; transition:background .12s; }
+.et-row:not(.et-head):hover{ background:#161a1e; }
+.et-row.cur{ background:rgba(34,197,94,.06); }
+.et-row.ok{ box-shadow:inset 3px 0 0 #22C55E; }
+.et-num{ font-family:'JetBrains Mono',monospace; color:#8b8f97; font-size:13px; }
+.et-row.ok .et-num{ color:#4ADE80; }
+.et-title{ font-family:'Inter',sans-serif; font-weight:600; color:#f2f3f5; font-size:14px; display:flex; align-items:center; gap:8px; min-width:0; }
+.et-title > :first-child{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.et-rowacts{ display:inline-flex; gap:2px; opacity:0; transition:opacity .12s; flex:none; }
+.et-row:hover .et-rowacts{ opacity:1; }
+.et-mini{ background:transparent; border:none; cursor:pointer; font-size:12px; padding:3px 5px; border-radius:6px; opacity:.75; }
+.et-mini:hover{ background:#23262b; opacity:1; }
+.et-chars{ font-family:'Inter',sans-serif; color:#9CA3AF; font-size:12.5px; }
+.et-badge{ display:inline-block; font-family:'Inter',sans-serif; font-weight:600; font-size:11.5px; padding:4px 11px; border-radius:99px; }
+.et-badge.done{ background:rgba(34,197,94,.14); color:#4ADE80; }
+.et-badge.prog{ background:rgba(245,158,11,.14); color:#FBBF24; }
+.et-badge.sin{ background:#1c1e22; color:#8b8f97; }
+.et-act{ text-align:right; }
+.et-go{ background:transparent; border:1px solid #2c3036; color:#c7c9cd; font-family:'Inter',sans-serif; font-weight:600;
+  font-size:12.5px; padding:7px 14px; border-radius:8px; cursor:pointer; }
+.et-go:hover{ border-color:#4ADE80; color:#fff; }
+.et-go.pri{ background:#22C55E; border-color:#22C55E; color:#06210f; }
+.et-go.pri:hover{ filter:brightness(1.08); color:#06210f; }
+@media(max-width:640px){
+  .et-row{ grid-template-columns:34px 1fr 92px; }
+  .et-chars, .et-head .et-chars{ display:none; }
+  .et-status{ grid-column:2; } .et-act{ grid-column:3; }
+}
+/* ===== Módulos 4 / 4B · Modales Crear programa / Crear espacio ===== */
+.ddlm-ov{ position:fixed; inset:0; z-index:11700; background:rgba(8,9,11,.7); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  display:flex; align-items:center; justify-content:center; padding:20px; font-family:'Inter',sans-serif; overflow:auto; }
+.ddlm-card{ width:min(460px,96vw); background:#111316; border:1px solid #23262b; border-radius:16px; padding:24px; }
+.ddlm-card .ddlm-kicker{ font-family:'Inter',sans-serif; font-size:11px; color:#6b7280; text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
+.ddlm-card h2{ font-family:'Inter',sans-serif; font-weight:700; font-size:18px; color:#f2f3f5; margin-bottom:18px; }
+.ddlm-field{ margin-bottom:14px; }
+.ddlm-field label{ display:block; color:#c7c9cd; font-size:12.5px; font-weight:500; margin-bottom:6px; }
+.ddlm-field input, .ddlm-field select{ width:100%; background:#0f1215; border:1px solid #23262b; border-radius:10px; padding:11px 13px;
+  color:#f2f3f5; font-family:'Inter',sans-serif; font-size:14px; outline:none; transition:border-color .12s; }
+.ddlm-field input::placeholder{ color:#6b7280; }
+.ddlm-field input:focus, .ddlm-field select:focus{ border-color:#4ADE80; }
+.ddlm-field select{ appearance:none; -webkit-appearance:none; cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%238b8f97' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 12px center; padding-right:32px; }
+.ddlm-row{ display:flex; gap:12px; }
+.ddlm-row .ddlm-field{ flex:1; }
+/* portada del programa */
+.ddlm-cover{ display:flex; gap:14px; align-items:flex-start; margin-bottom:16px; }
+.ddlm-cover .ddlm-cov-box{ width:70px; height:88px; border-radius:10px; border:1px dashed #2c3036; background:#0f1215;
+  display:grid; place-items:center; cursor:pointer; flex:none; position:relative; overflow:hidden; }
+.ddlm-cover .ddlm-cov-box:hover{ border-color:#4ADE80; }
+.ddlm-cover .ddlm-cov-box .pl{ color:#4ADE80; font-size:22px; }
+.ddlm-cover .ddlm-cov-box img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none; }
+.ddlm-cover .ddlm-cov-box input{ display:none; }
+.ddlm-cover .ddlm-cov-meta{ flex:1; }
+/* toggle de tipo (Estudio de doblaje / Uso personal) */
+.ddlm-toggle{ display:flex; gap:10px; }
+.ddlm-toggle button{ flex:1; background:#0f1215; border:1px solid #23262b; border-radius:10px; padding:11px; cursor:pointer;
+  font-family:'Inter',sans-serif; font-weight:600; font-size:13px; color:#c7c9cd; transition:all .12s; }
+.ddlm-toggle button.on{ background:rgba(34,197,94,.12); border-color:#22C55E; color:#4ADE80; }
+.ddlm-toggle button:hover{ border-color:#3a3f46; }
+.ddlm-toggle button.on:hover{ border-color:#22C55E; }
+.ddlm-err{ color:#F472B6; font-size:12.5px; min-height:16px; margin-top:2px; }
+.ddlm-btns{ display:flex; justify-content:flex-end; gap:10px; margin-top:14px; }
+.ddlm-cancel{ background:transparent; border:1px solid #3a3f46; color:#c7c9cd; font-family:'Inter',sans-serif; font-weight:600;
+  font-size:13.5px; padding:10px 18px; border-radius:9px; cursor:pointer; }
+.ddlm-go{ background:#22C55E; border:none; color:#06210f; font-family:'Inter',sans-serif; font-weight:700; font-size:13.5px;
+  padding:10px 18px; border-radius:9px; cursor:pointer; }
+.ddlm-go:hover{ filter:brightness(1.06); }
+.ddlm-go:disabled{ opacity:.6; cursor:default; }
 </style>
 <style>
 /* ===== Crear Programa / modales · ajuste al mockup (imagen 7) ===== */
@@ -1031,7 +1145,7 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
 <div class="gate" id="gate">
   <form class="gcard" id="gform" autocomplete="off">
     <div class="gbrand">
-      <div class="gmk">🎬</div>
+      <div class="gmk"><img class="ddl-logo-ico" src="data:image/png;base64,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" alt="Dubbipt"></div>
       <div class="gnm">Dubbipt</div>
     </div>
     <div class="dl-tabs">
@@ -1072,7 +1186,7 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
   </div>
   <div id="topbar">
     <div class="tb-left">
-      <div class="tb-mk" aria-hidden="true">D</div>
+      <div class="tb-mk" aria-hidden="true"><img class="ddl-logo-ico" src="data:image/png;base64,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" alt="Dubbipt"></div>
       <button class="tb-tab" id="tabPrograms" onclick="goPrograms()" title="Ir a Programas">Programas</button>
     </div>
     <div class="tb-right">
@@ -1337,10 +1451,54 @@ async function libFetchWorkspaces(){
   }catch(e){ libWorkspaces = []; }
   return libWorkspaces;
 }
-async function createWorkspace(name){
-  const { data, error } = await sb.from('workspaces').insert({ name:name.trim() }).select().single();
-  if(error){ libMsg('No se pudo crear el espacio: '+error.message+(/workspaces|relation/i.test(error.message||'')?' — corre esquema-original-v11.sql':'')); return null; }
-  libWorkspaces.push(data); return data;
+async function createWorkspace(name, kind){
+  const base = { name:name.trim() };
+  let r = await sb.from('workspaces').insert(kind ? Object.assign({}, base, { kind }) : base).select().single();
+  if(r.error && /column|kind|schema/i.test(r.error.message||'')){
+    r = await sb.from('workspaces').insert(base).select().single();   // reintento sin columna kind
+  }
+  if(r.error){ if(typeof DDL_UI!=='undefined') DDL_UI.toast(DDL_UI.friendlyError(r.error), {kind:'err'}); else libMsg('No se pudo crear el espacio: '+r.error.message+(/workspaces|relation/i.test(r.error.message||'')?' — corre esquema-original-v11.sql':'')); return null; }
+  libWorkspaces.push(r.data); return r.data;
+}
+// ===== Módulo 4B · Nuevo espacio de trabajo =====
+function newWorkspaceModal(onCreated){
+  const old = document.getElementById('ddlmWsOv'); if(old) old.remove();
+  const ov = document.createElement('div'); ov.id='ddlmWsOv'; ov.className='ddlm-ov';
+  ov.innerHTML =
+    '<div class="ddlm-card" role="dialog" aria-modal="true" aria-label="Crear espacio de trabajo">'
+    +'<div class="ddlm-kicker">Modal · Crear espacio de trabajo</div>'
+    +'<h2>Nuevo espacio de trabajo</h2>'
+    +'<div class="ddlm-field"><label for="wsName">Nombre del espacio</label><input id="wsName" placeholder="Ej. Estudio Andino"></div>'
+    +'<div class="ddlm-field"><label>Tipo</label>'
+      +'<div class="ddlm-toggle" id="wsType">'
+        +'<button type="button" class="on" data-k="studio">Estudio de doblaje</button>'
+        +'<button type="button" data-k="personal">Uso personal</button>'
+      +'</div>'
+    +'</div>'
+    +'<div class="ddlm-err" id="wsErr"></div>'
+    +'<div class="ddlm-btns"><button class="ddlm-cancel" id="wsCancel">Cancelar</button><button class="ddlm-go" id="wsGo">Crear espacio</button></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  const q=(id)=> ov.querySelector('#'+id);
+  const close=()=> ov.remove();
+  ov.addEventListener('mousedown', e=>{ if(e.target===ov) close(); });
+  ov.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
+  q('wsCancel').onclick = close;
+  let kind = 'studio';
+  ov.querySelectorAll('#wsType button').forEach(b=> b.onclick=()=>{ kind=b.dataset.k; ov.querySelectorAll('#wsType button').forEach(x=>x.classList.toggle('on', x===b)); });
+  const go = async ()=>{
+    const nm=(q('wsName').value||'').trim();
+    if(!nm){ q('wsErr').textContent='Escribe el nombre del espacio'; q('wsName').focus(); return; }
+    const btn=q('wsGo'); btn.disabled=true; btn.textContent='Creando…';
+    const w = await createWorkspace(nm, kind);
+    if(!w){ btn.disabled=false; btn.textContent='Crear espacio'; return; }
+    close();
+    if(typeof onCreated==='function') onCreated(w); else setWorkspace(w);
+    if(typeof DDL_UI!=='undefined') DDL_UI.toast('Espacio «'+nm+'» creado');
+  };
+  q('wsGo').onclick = go;
+  q('wsName').addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
+  setTimeout(()=>{ const n=q('wsName'); if(n) n.focus(); }, 60);
 }
 function setWorkspace(ws){
   WORKSPACE = ws ? { id:ws.id, name:ws.name } : null;
@@ -1389,10 +1547,7 @@ function showWorkspacePicker(force){
     if(WORKSPACE&&WORKSPACE.id===w.id){ WORKSPACE=null; try{localStorage.removeItem('ddl_ws');}catch(_){}}
     showWorkspacePicker(true);
   });
-  const nb=q('#wsNew'); if(nb) nb.onclick=()=>{ q('#wsCreate').style.display=''; nb.style.display='none'; const i=q('#wsNewName'); if(i) i.focus(); };
-  const doCreate=async()=>{ const nm=(q('#wsNewName').value||'').trim(); if(!nm) return; const w=await createWorkspace(nm); if(w){ ov.remove(); setWorkspace(w); } };
-  const gob=q('#wsNewGo'); if(gob) gob.onclick=doCreate;
-  const ni=q('#wsNewName'); if(ni) ni.addEventListener('keydown', e=>{ if(e.key==='Enter') doCreate(); });
+  const nb=q('#wsNew'); if(nb) nb.onclick=()=>{ ov.remove(); newWorkspaceModal((w)=> setWorkspace(w)); };
   const cl=q('#wsClose'); if(cl) cl.onclick=()=> ov.remove();
 }
 function applyWorkspace(){
@@ -3135,18 +3290,25 @@ function renderCards(){
       ? (c.noRec ? `<span class="ng">${esc(c.talent)} · no se graba</span>` : `<b>${esc(c.talent)}</b>`)
       : '<span class="ng">Sin asignar</span>';
     const tc0 = (typeof firstTCOf==='function' ? firstTCOf(c.key) : '') || '';
+    // rol aproximado por volumen de intervenciones (Protagonista / Secundario)
+    const rol = c.totalInts >= 60 ? 'Protagonista' : (c.totalInts >= 15 ? 'Secundario' : 'Reparto');
+    const chips = `<span class="cc-chip">${rol}</span>` + (tc0 ? `<span class="cc-chip">${esc(tc0)}</span>` : '');
     card.innerHTML =
-      `<div class="top"><h3>${esc(c.display)}</h3><span class="n">${c.totalInts}</span><button class="allbtn ${done?'on':''}" title="${done?'Desmarcar todas las páginas':'Marcar TODAS las páginas como grabadas'}">${done?'✓':''}</button></div>`+
+      `<div class="top"><span class="ints-lab">${c.totalInts} intervenciones</span>`+
+        `<button class="allbtn ${done?'on':''}" title="${done?'Desmarcar: personaje sin terminar':'Marcar personaje como terminado (todas las páginas grabadas)'}" aria-label="${done?'Marcar sin terminar':'Marcar terminado'} ${esc(c.display)}">${done?'✓':''}</button></div>`+
+      `<div class="cname">${esc(c.display)}</div>`+
+      `<div class="cchips">${chips}</div>`+
+      `<div class="cdiv"></div>`+
       `<div class="tal">${tal}<span class="tc">${tc0||''}</span></div>`+
-      `<div class="bar"><i style="width:${pct}%"></i></div>`+
-      `<div class="pgs">${pgHtml}</div>`;
+      `<div class="cline"></div>`+
+      `<button class="cbtn">${c.talent ? 'Editar' : 'Asignar'}</button>`+
+      `<div class="bar" hidden><i style="width:${pct}%"></i></div>`;
     card.addEventListener('click', ()=> openPopup(c.key));
     card.addEventListener('keydown', e=>{ if(e.key==='Enter') openPopup(c.key); });
     const ab = card.querySelector('.allbtn');
     if(ab) ab.addEventListener('click', ev=>{ ev.stopPropagation(); markAllPages(c.key); });
-    card.querySelectorAll('.pg[data-p]').forEach(el=>{
-      el.addEventListener('click', ev=>{ ev.stopPropagation(); openPopup(c.key, +el.dataset.p); });
-    });
+    const cb = card.querySelector('.cbtn');
+    if(cb) cb.addEventListener('click', ev=>{ ev.stopPropagation(); openPopup(c.key); });
     box.appendChild(card);
   }
   $('empty').classList.toggle('show', shown===0);
@@ -3604,7 +3766,8 @@ async function renderLibrary(silent){
       { const dt=$('dashTitle'); if(dt) dt.style.display='none'; }
       { const lh=document.querySelector('.lib-head'); if(lh) lh.style.display='none'; }
       { const ph=$('progHeader'); if(ph) ph.style.display='none'; }
-      grid.classList.remove('epsgrid');
+      { const eh=document.getElementById('epsHead'); if(eh) eh.style.display='none'; }
+      grid.classList.remove('epsgrid'); grid.classList.remove('epstable');
       // filtro de búsqueda del dashboard
       const dq = norm(window._dashQuery||'');
       const shownShows = dq ? shows.filter(s=> norm(s.name).includes(dq)) : shows;
@@ -3711,90 +3874,102 @@ async function renderLibrary(silent){
     { const dt=$('dashTitle'); if(dt) dt.style.display='none'; }
     { const dh=document.getElementById('dashHead'); if(dh) dh.style.display='none'; }
     { const lh=document.querySelector('.lib-head'); if(lh) lh.style.display='none'; }
-    grid.classList.add('dashgrid'); grid.classList.add('epsgrid');
-    renderProgHeader(sh);
+    { const ph=$('progHeader'); if(ph) ph.style.display='none'; }
+    grid.classList.remove('dashgrid'); grid.classList.remove('epsgrid'); grid.classList.add('epstable');
     act.style.display='none';
     const eps = sbEps(LDB.showId);
-    grid.innerHTML = eps.length ? '' : '<div class="lib-empty2">Sin capítulos todavía — usa la tarjeta ＋ Nuevo Episodio.</div>';
-    const back = document.createElement('button');
-    back.className = 'libback';
-    back.textContent = '← Volver a programas'; back.style.display='none';
-    back.addEventListener('click', ()=>{ LDB.browse=true; libView='shows'; LDB.showId=null; renderLibrary(true); });
-    grid.prepend(back);
-    // ⚡ Optimizar programa: procesa todos los capítulos 🐢 (sin libreto rápido) de una vez
+    const doneCount = eps.filter(e=> LDB.dataEps && LDB.dataEps.has(e.id)).length;
+    crumb.className='dashcrumb';
+    crumb.innerHTML = '<span class="dseg ws" id="cbHome" title="Volver a Programas">Programas</span>'
+      + '<span class="dseg on">'+esc(sh?sh.name:'')+'</span>';
+
+    // cabecera del programa (nombre · N episodios · X completados · + Nuevo episodio)
+    let ehead = document.getElementById('epsHead');
+    if(!ehead){ ehead=document.createElement('div'); ehead.id='epsHead'; ehead.className='eps-head'; grid.parentNode.insertBefore(ehead, grid); }
+    ehead.style.display='';
+    ehead.innerHTML =
+      '<div class="eh-title"><h2>'+esc(sh?sh.name:'')+'</h2>'
+        +'<div class="eh-sub">'+eps.length+' episodio'+(eps.length===1?'':'s')+' · '+doneCount+' completado'+(doneCount===1?'':'s')+'</div></div>'
+      +'<button class="eh-new" id="epsNew">＋ Nuevo episodio</button>';
+    { const en=ehead.querySelector('#epsNew'); if(en) en.onclick=newEpisodeModal; }
+
+    // ⚡ Optimizar programa (si hay capítulos lentos)
+    let optBtn = '';
     if(LDB.dataEps && eps.some(e=> !LDB.dataEps.has(e.id))){
       const slow = eps.filter(e=> !LDB.dataEps.has(e.id)).length;
-      const opt = document.createElement('button');
-      opt.className = 'libback';
-      opt.style.cssText = 'border-color:#10B981;color:#4ADE80';
-      opt.textContent = '⚡ Optimizar programa ('+slow+' lento'+(slow===1?'':'s')+')';
-      opt.title = 'Procesa los capítulos sin libreto rápido para que abran al instante en todos los equipos';
-      opt.addEventListener('click', ()=> optimizeProgram(LDB.showId));
-      grid.prepend(opt);
+      optBtn = '<button class="eps-opt" id="epsOpt" title="Procesa los capítulos sin libreto rápido para que abran al instante">⚡ Optimizar programa ('+slow+' lento'+(slow===1?'':'s')+')</button>';
     }
-    for(const ep of eps){
-      const c=document.createElement('div');
-      c.className='fcard etile'+(currentEp && currentEp.id===ep.id?' act':'');
-      c.innerHTML='<div class="ecover">'
-        +'<button class="ldel" title="Eliminar capítulo">🗑</button>'
-        +'<button class="lren" title="Renombrar capítulo">✏️</button>'
-        +'<button class="lupd" title="Actualizar desde la nube">🔄</button>'
-        +'<span class="enum">'+(eps.indexOf(ep)+1)+'</span>'
-        +'</div>'
-        +'<div class="ename">'+esc(ep.name)+'</div>';
-      c.addEventListener('click', async ev=>{
-        const dl = ev.target.closest('.dlb');
-        if(dl){ ev.stopPropagation(); downloadEpFile(ep, dl.dataset.k); return; }
-        if(ev.target.closest('.lren')){   // renombrar capítulo
+
+    if(!eps.length){
+      grid.innerHTML = optBtn + '<div class="lib-empty2">Sin capítulos todavía — usa «＋ Nuevo episodio».</div>';
+    } else {
+      const head = '<div class="et-row et-head"><span class="et-num">#</span><span class="et-title">Título</span>'
+        +'<span class="et-chars">Personajes</span><span class="et-status">Estado</span><span class="et-act"></span></div>';
+      const rows = eps.map((ep,i)=>{
+        const hasData = LDB.dataEps && LDB.dataEps.has(ep.id);
+        const meta = (typeof epCastMeta==='function') ? epCastMeta(ep.id) : null; // {done,total} si existe
+        let charsTxt = '—', badge, badgeCls, actLabel;
+        if(!hasData){
+          charsTxt = '—'; badge='Sin guion'; badgeCls='sin'; actLabel='Subir guion';
+        } else if(meta && meta.total && meta.done>=meta.total){
+          charsTxt = meta.done+'/'+meta.total+' asignados'; badge='Completado'; badgeCls='done'; actLabel='Abrir';
+        } else if(meta && meta.total){
+          charsTxt = meta.done+'/'+meta.total+' asignados'; badge='En desglose'; badgeCls='prog'; actLabel='Continuar';
+        } else {
+          charsTxt = 'Con desglose'; badge='En desglose'; badgeCls='prog'; actLabel='Abrir';
+        }
+        const cur = currentEp && currentEp.id===ep.id;
+        return '<div class="et-row'+(cur?' cur':'')+(badgeCls==='done'?' ok':'')+'" data-ep="'+esc(ep.id)+'" tabindex="0">'
+          +'<span class="et-num">'+(i+1)+'</span>'
+          +'<span class="et-title">'+esc(ep.name)
+            +'<span class="et-rowacts">'
+              +'<button class="et-mini lren" title="Renombrar" aria-label="Renombrar '+esc(ep.name)+'">✏️</button>'
+              +'<button class="et-mini lupd" title="Actualizar desde la nube" aria-label="Actualizar '+esc(ep.name)+'">🔄</button>'
+              +'<button class="et-mini ldel" title="Eliminar" aria-label="Eliminar '+esc(ep.name)+'">🗑</button>'
+            +'</span>'
+          +'</span>'
+          +'<span class="et-chars">'+charsTxt+'</span>'
+          +'<span class="et-status"><span class="et-badge '+badgeCls+'">'+badge+'</span></span>'
+          +'<span class="et-act"><button class="et-go '+(badgeCls==='done'?'':'pri')+'">'+actLabel+'</button></span>'
+          +'</div>';
+      }).join('');
+      grid.innerHTML = optBtn + '<div class="et-table">' + head + rows + '</div>';
+    }
+    { const eo=document.getElementById('epsOpt'); if(eo) eo.addEventListener('click', ()=> optimizeProgram(LDB.showId)); }
+
+    // handlers de fila (delegación)
+    grid.querySelectorAll('.et-row[data-ep]').forEach(row=>{
+      const ep = eps.find(e=> String(e.id)===row.dataset.ep); if(!ep) return;
+      const go = async (target)=>{
+        if(target && target.closest('.lren')){
           const nn = prompt('Nuevo nombre del capítulo:', ep.name);
           if(nn && nn.trim() && nn.trim()!==ep.name){
-            await sb.from('episodes').update({ name: nn.trim() }).eq('id', ep.id);
-            if(currentEp && currentEp.id===ep.id) currentEp.name = nn.trim();
+            await sb.from('episodes').update({ name:nn.trim() }).eq('id', ep.id);
+            if(currentEp && currentEp.id===ep.id) currentEp.name=nn.trim();
             await libFetchAll(); renderLibrary(true);
             if(typeof libPing==='function') libPing('ep', ep.id, ep.show_id);
-            libMsg('✏️ Capítulo renombrado a «'+nn.trim()+'»');
-          }
-          return;
+            if(typeof DDL_UI!=='undefined') DDL_UI.toast('Capítulo renombrado a «'+nn.trim()+'»');
+          } return;
         }
-        if(ev.target.closest('.lmov')){   // mover a otro programa
-          const otros = sbShows().filter(x=>x.id!==ep.show_id);
-          if(!otros.length){ libMsg('No hay otro programa al que moverlo'); return; }
-          const lista = otros.map((x,i)=> (i+1)+') '+x.name).join('\n');
-          const pick = prompt('¿A qué programa mover «'+ep.name+'»?\n'+lista+'\n\nEscribe el número:');
-          const idx = parseInt(pick||'',10)-1;
-          if(idx>=0 && otros[idx]){
-            await sb.from('episodes').update({ show_id: otros[idx].id }).eq('id', ep.id);
-            try{ await sb.from('episode_data').update({ show_id: otros[idx].id }).eq('ep_id', ep.id); }catch(e){}
-            await libFetchAll(); renderLibrary(true);
-            if(typeof libPing==='function') libPing('ep', ep.id, otros[idx].id);
-            libMsg('📦 «'+ep.name+'» movido a «'+otros[idx].name+'»');
-          }
-          return;
-        }
-        if(ev.target.closest('.lupd')){   // 🔄 actualizar este capítulo desde la tarjeta
-          forceRefreshEpisode(ep);
-          return;
-        }
-        if(ev.target.closest('.ldel')){
-          if(confirm('¿Eliminar el capítulo "'+ep.name+'"?')){
+        if(target && target.closest('.lupd')){ forceRefreshEpisode(ep); return; }
+        if(target && target.closest('.ldel')){
+          const ok = (typeof DDL_UI!=='undefined')
+            ? await DDL_UI.confirmModal({ title:'Eliminar capítulo', body:'Se eliminará «'+ep.name+'» y su libreto. No se puede deshacer.', confirmLabel:'Eliminar', cancelLabel:'Cancelar', danger:true })
+            : confirm('¿Eliminar el capítulo "'+ep.name+'"?');
+          if(ok){
             if(currentEp && currentEp.id===ep.id) currentEp=null;
             await sb.from('episodes').delete().eq('id', ep.id);
             await libFetchAll(); renderLibrary(true);
             if(typeof libPing==='function') libPing('ep', ep.id, ep.show_id);
-          }
-          return;
+          } return;
         }
         openEpisode(ep.id);
-      });
-      grid.appendChild(c);
-    }
-    const add=document.createElement('div'); add.className='fcard etile eadd';
-    add.innerHTML='<div class="ecover"><span class="eplus">＋</span></div><div class="ename">Nuevo Episodio</div>';
-    add.addEventListener('click', newEpisodeModal); grid.appendChild(add);
-    const home=document.getElementById('cbHome');
-    if(home) home.addEventListener('click', ()=>{ LDB.browse=true; libView='shows'; LDB.showId=null; renderLibrary(true); });
-    const cbs = document.getElementById('cbShow');
-    if(cbs) cbs.addEventListener('click', ()=>{ LDB.browse=true; libView='eps'; renderLibrary(true); });
+      };
+      row.addEventListener('click', ev=> go(ev.target));
+      row.addEventListener('keydown', ev=>{ if(ev.key==='Enter') go(null); });
+    });
+    { const home=document.getElementById('cbHome');
+      if(home) home.addEventListener('click', ()=>{ LDB.browse=true; libView='shows'; LDB.showId=null; renderLibrary(true); }); }
     updateBackBtn();
   }catch(err){
     console.error(err);
@@ -4221,39 +4396,63 @@ function toggleUserMenu(e){ if(e) e.stopPropagation(); const m=document.getEleme
 function closeUserMenu(){ const m=document.getElementById('userMenu'); if(m) m.classList.remove('open'); }
 document.addEventListener('click', ()=> closeUserMenu());
 async function newShow(){
-  if(!WORKSPACE || !WORKSPACE.id){ libMsg('Elige o crea primero un espacio de trabajo'); showWorkspacePicker(true); return; }
-  const { card, close } = dlgOpen(
-    '<h2 class="dlgtitle">Crear Programa</h2>'
-    +'<div class="dlgfield"><input id="npName" placeholder="Nombre"></div>'
-    +'<div class="dlglabel">Subir car\u00e1tula</div>'
-    +'<label class="dlgdrop" id="npCarD"><span class="pl">\uFF0B</span><img id="npCarImg" alt=""><input type="file" id="npCar" accept="image/*"></label>'
-    +'<div class="dlglabel">Subir portada</div>'
-    +'<label class="dlgdrop wide" id="npPorD"><span class="pl">\uFF0B</span><img id="npPorImg" alt=""><input type="file" id="npPor" accept="image/*"></label>'
-    +'<div class="dlgerr" id="npErr"></div>'
-    +'<button class="dlgbtn" id="npGo">Crear</button>'
-  );
-  const $q=(id)=>card.querySelector('#'+id);
-  function prev(inp,img){ inp.addEventListener('change',()=>{ const f=inp.files[0]; if(f){ img.src=URL.createObjectURL(f); img.style.display='block'; const pl=inp.parentNode.querySelector('.pl'); if(pl) pl.style.display='none'; } }); }
-  prev($q('npCar'),$q('npCarImg')); prev($q('npPor'),$q('npPorImg'));
+  if(!WORKSPACE || !WORKSPACE.id){ if(typeof DDL_UI!=='undefined') DDL_UI.toast('Elige o crea primero un espacio de trabajo', {kind:'err'}); showWorkspacePicker(true); return; }
+  const IDIOMAS = ['Coreano','Japonés','Chino (mandarín)','Inglés','Español','Portugués','Francés','Alemán','Italiano','Tailandés','Turco','Otro'];
+  const optHtml = (sel)=> IDIOMAS.map(l=>'<option'+(l===sel?' selected':'')+'>'+l+'</option>').join('');
+  const old = document.getElementById('ddlmOv'); if(old) old.remove();
+  const ov = document.createElement('div'); ov.id='ddlmOv'; ov.className='ddlm-ov';
+  ov.innerHTML =
+    '<div class="ddlm-card" role="dialog" aria-modal="true" aria-label="Crear programa">'
+    +'<div class="ddlm-kicker">Modal · Crear programa</div>'
+    +'<h2>Nuevo programa</h2>'
+    +'<div class="ddlm-cover">'
+      +'<label class="ddlm-cov-box" id="npCovBox" title="Portada (opcional)"><span class="pl">＋</span><img id="npCovImg" alt=""><input type="file" id="npCov" accept="image/*"></label>'
+      +'<div class="ddlm-cov-meta">'
+        +'<div class="ddlm-field" style="margin:0"><label for="npName">Nombre del programa</label><input id="npName" placeholder="Ej. La Vida en Seúl"></div>'
+      +'</div>'
+    +'</div>'
+    +'<div class="ddlm-field"><label for="npEps">N.º de episodios <span style="color:#6b7280">(opcional)</span></label><input id="npEps" type="number" min="0" placeholder="24"></div>'
+    +'<div class="ddlm-row">'
+      +'<div class="ddlm-field"><label for="npLangSrc">Idioma original</label><select id="npLangSrc">'+optHtml('Coreano')+'</select></div>'
+      +'<div class="ddlm-field"><label for="npLangDub">Idioma de doblaje</label><select id="npLangDub">'+optHtml('Español')+'</select></div>'
+    +'</div>'
+    +'<div class="ddlm-err" id="npErr"></div>'
+    +'<div class="ddlm-btns"><button class="ddlm-cancel" id="npCancel">Cancelar</button><button class="ddlm-go" id="npGo">Crear programa</button></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  const $q=(id)=>ov.querySelector('#'+id);
+  const close=()=> ov.remove();
+  ov.addEventListener('mousedown', e=>{ if(e.target===ov) close(); });
+  ov.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
+  $q('npCancel').onclick = close;
+  // preview de portada
+  $q('npCov').addEventListener('change', ()=>{ const f=$q('npCov').files[0]; if(f){ const img=$q('npCovImg'); img.src=URL.createObjectURL(f); img.style.display='block'; const pl=$q('npCovBox').querySelector('.pl'); if(pl) pl.style.display='none'; } });
   $q('npGo').addEventListener('click', async ()=>{
     const name=($q('npName').value||'').trim();
-    if(!name){ $q('npErr').textContent='Escribe el nombre del programa'; return; }
-    const btn=$q('npGo'); btn.disabled=true; btn.textContent='Creando\u2026';
-    let r = await sb.from('shows').insert({ name, workspace_id:WORKSPACE.id }).select().single();
-    if(r.error){ btn.disabled=false; btn.textContent='Crear';
-      $q('npErr').textContent = /workspace_id|column|schema/i.test(r.error.message||'') ? 'Falta correr esquema-original-v11.sql' : r.error.message; return; }
+    if(!name){ $q('npErr').textContent='Escribe el nombre del programa'; $q('npName').focus(); return; }
+    const btn=$q('npGo'); btn.disabled=true; btn.textContent='Creando…';
+    // guarda metadata extra si las columnas existen; si no, cae limpio a solo {name, workspace_id}
+    const payload = { name, workspace_id:WORKSPACE.id };
+    const epsN = parseInt($q('npEps').value||'',10);
+    const meta = { episodes: isFinite(epsN)?epsN:null, lang_src: $q('npLangSrc').value, lang_dub: $q('npLangDub').value };
+    let r = await sb.from('shows').insert(Object.assign({}, payload, meta)).select().single();
+    if(r.error && /column|schema|meta|lang_|episodes/i.test(r.error.message||'')){
+      // reintento sin columnas extra (proyectos con esquema base)
+      r = await sb.from('shows').insert(payload).select().single();
+    }
+    if(r.error){ btn.disabled=false; btn.textContent='Crear programa';
+      $q('npErr').textContent = /workspace_id|column|schema/i.test(r.error.message||'') ? 'Falta correr esquema-original-v11.sql' : (typeof DDL_UI!=='undefined'?DDL_UI.friendlyError(r.error):r.error.message); return; }
     const show=r.data;
-    const up=async(inp,kind,col)=>{ const f=inp.files[0]; if(!f) return;
-      const ext=((f.name.split('.').pop())||'jpg').toLowerCase();
-      const path='covers/'+show.id+'/'+kind+'.'+ext;
-      const u=await sb.storage.from('portadas').upload(path,f,{upsert:true,contentType:f.type||undefined});
-      if(!u.error){ await sb.from('shows').update({[col]:path}).eq('id',show.id); }
-      else console.warn('cover '+kind, u.error);
-    };
-    try{ await up($q('npCar'),'caratula','cover_path'); await up($q('npPor'),'portada','banner_path'); }catch(e){ console.warn('cover',e); }
+    // portada opcional
+    try{ const f=$q('npCov').files[0];
+      if(f){ const ext=((f.name.split('.').pop())||'jpg').toLowerCase(); const path='covers/'+show.id+'/portada.'+ext;
+        const u=await sb.storage.from('portadas').upload(path,f,{upsert:true,contentType:f.type||undefined});
+        if(!u.error){ await sb.from('shows').update({cover_path:path}).eq('id',show.id); } }
+    }catch(e){ console.warn('cover', e); }
     close();
     LDB.showId=show.id; libView='eps'; await libFetchAll(); renderLibrary(true);
     if(typeof libPing==='function') libPing('show', show.id);
+    if(typeof DDL_UI!=='undefined') DDL_UI.toast('Programa «'+name+'» creado');
   });
   setTimeout(()=>{ const n=$q('npName'); if(n) n.focus(); }, 60);
 }
@@ -5070,57 +5269,62 @@ const pop2 = { win:null, doc:null, key:null, type:null, els:null, blockEls:[],
                blockMap:[], theme:'dark', boxw:'760' };
 
 const LIB_OVERRIDE = `
-/* ===== Rediseño del libreto (imagen 1) ===== */
-body.dark{ background:var(--libbg,#201c50) !important; }
-.lh{ background:#5FC85A !important; border:none !important; border-radius:34px !important; margin:10px !important; padding:8px 12px !important; box-shadow:none !important; gap:10px !important; }
-.lh h2{ color:#123317 !important; font-family:'Inter',sans-serif !important; }
-.lh .lbk{ width:44px; height:44px; border-radius:50% !important; background:#3aa03a !important; color:#123317 !important; border:none !important; font-size:0 !important; position:relative; padding:0 !important; }
-.lh .lbk::after{ content:'‹'; font-size:24px; }
+/* ===== Módulo 3B · Panel del libreto (rediseño) ===== */
+body.dark{ background:var(--libbg,#0b0c0e) !important; }
+/* barra verde superior */
+.lh{ background:#22C55E !important; border:none !important; border-radius:14px !important; margin:10px !important; padding:8px 12px !important; box-shadow:none !important; gap:9px !important; }
+.lh h2{ color:#06210f !important; font-family:'Inter',sans-serif !important; font-weight:700 !important; }
+.lh .lbk{ width:38px; height:38px; border-radius:50% !important; background:rgba(6,33,15,.18) !important; color:#06210f !important; border:none !important; font-size:0 !important; position:relative; padding:0 !important; }
+.lh .lbk::after{ content:'‹'; font-size:22px; }
+.lh .lbk:hover{ background:rgba(6,33,15,.30) !important; }
 .lh .dot{ display:none !important; }
-#lConn{ background:#3aa03a !important; color:#eafff0 !important; border-radius:16px !important; padding:8px 14px !important; border:none !important; }
-.lh .goto{ background:#3aa03a !important; border-radius:16px !important; padding:8px 14px !important; }
-.lh .goto span{ color:#eafff0 !important; }
-.lh .goto input{ width:44px !important; background:transparent !important; border:none !important; color:#eafff0 !important; }
-#lScope{ background:#123317 !important; color:#8CF08C !important; border:none !important; border-radius:12px !important; }
-#lCharSel{ background:#140f30 !important; color:#8CF08C !important; border:none !important; border-radius:16px !important; padding:8px 14px !important; }
+#lConn{ background:rgba(6,33,15,.18) !important; color:#06210f !important; border-radius:10px !important; padding:7px 12px !important; border:none !important; font-weight:600 !important; }
+.lh .goto{ background:rgba(6,33,15,.18) !important; border-radius:10px !important; padding:7px 12px !important; }
+.lh .goto span{ color:#06210f !important; font-weight:600 !important; }
+.lh .goto input{ width:44px !important; background:transparent !important; border:none !important; color:#06210f !important; font-weight:600 !important; }
+.lh .goto input::placeholder{ color:rgba(6,33,15,.5) !important; }
+#lScope{ background:rgba(6,33,15,.18) !important; color:#06210f !important; border:none !important; border-radius:10px !important; }
+/* selector de personaje: pastilla oscura con la miga ámbar */
+#lCharSel{ background:#0b1710 !important; color:#4ADE80 !important; border:none !important; border-radius:10px !important; padding:8px 14px !important; font-weight:600 !important; }
 #lVid,#lTpad,#lConn2,#lLive{ display:none !important; }
-.lh > button:not(.lbk){ background:#123317 !important; color:#8CF08C !important; border:none !important; border-radius:14px !important; padding:8px 11px !important; font-size:13px !important; }
-.lh > button:not(.lbk):hover{ background:#1c4a24 !important; }
-#lColor{ color:#fff !important; }
-/* Página N centrada con divisores */
+/* botones de icono circulares */
+.lh > button:not(.lbk){ width:36px; height:36px; display:inline-grid; place-items:center; background:rgba(6,33,15,.18) !important; color:#06210f !important; border:none !important; border-radius:50% !important; padding:0 !important; font-size:15px !important; }
+.lh > button:not(.lbk):hover{ background:rgba(6,33,15,.32) !important; }
+#lColor{ color:#06210f !important; }
+/* subheader "episodio N · intervenciones" */
 .pgsep{ display:flex !important; align-items:center; gap:14px; max-width:var(--boxw,900px); margin:20px auto !important; }
-.pgsep::before,.pgsep::after{ content:''; flex:1; height:2px; background:rgba(255,255,255,.14); }
-.pgsep span{ background:#140f30; color:#fff; padding:10px 26px; border-radius:22px; font-family:'Inter',sans-serif; font-size:16px; }
-/* Cajas de diálogo */
-.blk{ position:relative; background:#140f30 !important; border:2px solid transparent !important; border-radius:16px !important; padding:16px 20px !important; }
+.pgsep::before,.pgsep::after{ content:''; flex:1; height:1px; background:rgba(255,255,255,.08); }
+.pgsep span{ background:#15171a; color:#9CA3AF; padding:8px 22px; border-radius:99px; font-family:'Inter',sans-serif; font-size:13.5px; border:1px solid #23262b; }
+/* cajas de diálogo */
+.blk{ position:relative; background:#111316 !important; border:1px solid #1c1e22 !important; border-radius:12px !important; padding:14px 18px !important; }
 .blk .bhead{ display:flex !important; justify-content:space-between !important; align-items:flex-start !important; gap:14px !important; margin-bottom:6px !important; }
-.blk .tc{ color:#8b84b0 !important; font-size:15px !important; font-weight:700 !important; flex:0 0 auto; }
-.blk .who{ position:static !important; transform:none !important; color:#6E678F !important; font-size:18px !important; font-family:'Inter',sans-serif !important; text-align:right; max-width:52%; line-height:1.18; word-break:break-word; }
-.blk .tx{ color:#e8e4f5 !important; font-size:17px !important; clear:both; }
-.blk.mine{ border-color:var(--hl,#5FC85A) !important; background:#140f30 !important; }
-.blk.mine .tc{ color:var(--hl,#5FC85A) !important; font-size:var(--minefs,19px) !important; font-weight:800 !important; text-shadow:none !important; }
-.blk.mine .who{ color:#fff !important; }
-.blk.mine .tx{ color:#fff !important; font-weight:700 !important; font-size:var(--minefs,19px) !important; }
+.blk .tc{ color:#6b7280 !important; font-family:'JetBrains Mono',monospace !important; font-size:13px !important; font-weight:500 !important; flex:0 0 auto; }
+.blk .who{ position:static !important; transform:none !important; color:#8b8f97 !important; font-size:15px !important; font-weight:600 !important; font-family:'Inter',sans-serif !important; text-align:right; max-width:52%; line-height:1.18; word-break:break-word; }
+.blk .tx{ color:#c7c9cd !important; font-size:16px !important; clear:both; line-height:1.5; }
+/* bloque del personaje resaltado: acento ámbar como en la maqueta */
+.blk.mine{ border-color:#8a6a1e !important; background:linear-gradient(180deg,rgba(251,191,36,.06),transparent),#161310 !important; }
+.blk.mine .tc{ color:#FBBF24 !important; font-family:'JetBrains Mono',monospace !important; font-size:var(--minefs,14px) !important; font-weight:700 !important; text-shadow:none !important; }
+.blk.mine .who{ color:#FBBF24 !important; }
+.blk.mine .tx{ color:#fff !important; font-weight:600 !important; font-size:var(--minefs,17px) !important; }
 .blk.narr .who{ display:none !important; }
-/* chips de página: se conserva el comportamiento original (evita romper el modo tablet) */
-.lchips > *{ border-radius:16px !important; }
-/* ===== Cajón de herramientas al estilo del libreto ===== */
-.ltools{ background:#171232 !important; border-left:2px solid #5FC85A !important; }
-.ltools .tt{ color:#8CF08C !important; }
-.ltools button{ background:#123317 !important; color:#dff5df !important; border:1px solid #2f6b34 !important; border-radius:12px !important; font-family:'Inter',sans-serif !important; }
-.ltools button:hover{ border-color:#5FC85A !important; background:#1c4a24 !important; }
-.ltools button.on{ background:var(--hl,#5FC85A) !important; color:#123317 !important; border:none !important; }
-.ltools button.grn{ background:var(--hl,#5FC85A) !important; color:#123317 !important; border:none !important; }
-.ltools input{ background:#241f52 !important; color:#fff !important; border:1px solid #2f6b34 !important; border-radius:10px !important; }
-.ltools #tHide{ background:transparent !important; border:none !important; color:#8CF08C !important; text-align:center !important; }
-.dtab{ background:#171232 !important; border:1px solid #5FC85A !important; color:#8CF08C !important; }
+.lchips > *{ border-radius:8px !important; }
+/* cajón de herramientas */
+.ltools{ background:#111316 !important; border-left:1px solid #23262b !important; }
+.ltools .tt{ color:#4ADE80 !important; }
+.ltools button{ background:#0f1215 !important; color:#c7c9cd !important; border:1px solid #23262b !important; border-radius:10px !important; font-family:'Inter',sans-serif !important; }
+.ltools button:hover{ border-color:#4ADE80 !important; background:#161a1e !important; }
+.ltools button.on{ background:#22C55E !important; color:#06210f !important; border:none !important; }
+.ltools button.grn{ background:#22C55E !important; color:#06210f !important; border:none !important; }
+.ltools input{ background:#0f1215 !important; color:#f2f3f5 !important; border:1px solid #23262b !important; border-radius:10px !important; }
+.ltools #tHide{ background:transparent !important; border:none !important; color:#4ADE80 !important; text-align:center !important; }
+.dtab{ background:#111316 !important; border:1px solid #22C55E !important; color:#4ADE80 !important; }
 `;
 const LIB_CSS = `
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',system-ui,sans-serif;overflow:hidden;height:100vh}
 /* ---- tema oscuro (por defecto) ---- */
-body.dark{--bg:#0d0a1e;--head:#171232;--card:#181334;--card-b:#2a2350;--ink:#ECE9FB;
-  --dim:#8B84B0;--tcc:#A9E6A9;--sep:#3a3168}
+body.dark{--bg:#0b0c0e;--head:#111316;--card:#15171a;--card-b:#23262b;--ink:#f2f3f5;
+  --dim:#8b8f97;--tcc:#4ADE80;--sep:#23262b}
 /* ---- tema claro ---- */
 body.light{--bg:#f4f2fb;--head:#ffffff;--card:#ffffff;--card-b:#e2ddf2;--ink:#1e1a35;
   --dim:#736d94;--tcc:#6d4ee0;--sep:#d8d2ee}
