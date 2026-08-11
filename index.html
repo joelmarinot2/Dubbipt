@@ -26,9 +26,11 @@
 html,body{height:100%}
 body{
   font-family:var(--body);color:var(--ink);background:
-  radial-gradient(1100px 560px at 80% -10%, rgba(74,222,128,.10), transparent 60%),
-  radial-gradient(900px 520px at -5% 105%, rgba(63,208,238,.06), transparent 55%),
+  radial-gradient(1200px 640px at 50% -8%, rgba(34,197,94,.16), transparent 58%),
+  radial-gradient(900px 520px at 100% 108%, rgba(34,197,94,.08), transparent 55%),
+  radial-gradient(760px 460px at -6% 40%, rgba(16,185,129,.05), transparent 60%),
   var(--bg);
+  background-attachment:fixed;
   min-height:100dvh;
 }
 .wrap{max-width:1100px;margin:0 auto;padding:26px 20px 60px}
@@ -138,7 +140,7 @@ header p{font-size:13px;color:var(--ink-dim);margin-top:2px}
 .fcard.act{border-color:var(--violet);box-shadow:0 0 0 1px var(--violet), 0 8px 22px rgba(0,0,0,.3)}
 .fcard .bopen{margin-top:8px;font-size:10px;letter-spacing:.6px;text-transform:uppercase;
   color:var(--violet-2);font-weight:700}
-.lib-empty2{grid-column:1/-1;color:var(--ink-faint);font-size:12.5px;text-align:center;padding:18px}
+.lib-empty2{grid-column:1/-1;color:#8b8f97;font-size:13px;text-align:center;padding:28px;font-family:'Inter',sans-serif}
 .btnv{border:1px solid var(--line);background:var(--inset);color:var(--violet-2);border-radius:10px;
   padding:10px 14px;font-size:13px;cursor:pointer;font-family:var(--disp);font-weight:600;white-space:nowrap}
 .btnv:hover{border-color:var(--violet);color:var(--ink)}
@@ -193,9 +195,17 @@ header p{font-size:13px;color:var(--ink-dim);margin-top:2px}
 .pla tr.done .ptot b{color:var(--ok)}
 .pla .ptot small{color:var(--ink-faint);font-size:10px}
 
-.empty{display:none;text-align:center;padding:60px 20px;color:var(--ink-faint)}
+.empty{display:none;text-align:center;padding:56px 20px;color:var(--ink-faint)}
 .empty.show{display:block}
-.empty .ic{font-size:34px;margin-bottom:12px}
+.empty .ic{width:64px;height:64px;margin:0 auto 16px;border-radius:16px;display:grid;place-items:center;
+  background:radial-gradient(120px 120px at 50% 30%,rgba(34,197,94,.14),transparent 70%),#15171a;
+  border:1px solid #23312a;font-size:30px}
+.empty h4{font-family:'Inter',sans-serif;font-weight:700;color:#f2f3f5;font-size:16px;margin-bottom:6px}
+.empty p{font-family:'Inter',sans-serif;color:#8b8f97;font-size:13.5px;line-height:1.5;max-width:380px;margin:0 auto}
+.empty .cta{display:inline-block;margin-top:18px;background:#22C55E;border:none;color:#06210f;
+  font-family:'Inter',sans-serif;font-weight:700;font-size:13.5px;padding:11px 20px;border-radius:10px;cursor:pointer}
+.empty .cta:hover{filter:brightness(1.08)}
+.empty.err .ic{background:radial-gradient(120px 120px at 50% 30%,rgba(244,114,182,.14),transparent 70%),#15171a;border-color:#3a2733}
 .loading{display:none;text-align:center;padding:40px;color:var(--violet-2);font-family:var(--disp)}
 .loading.show{display:block}
 .spin{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--violet);
@@ -543,9 +553,11 @@ body:not(.locked) #verBox{ display:block; left:12px; bottom:12px; z-index:9990;
 :root{ --disp:'Inter',sans-serif; }
 body{
   background:
-    radial-gradient(1200px 780px at 50% -8%, rgba(74,222,128,.10), transparent 55%),
-    radial-gradient(1000px 640px at 100% 112%, rgba(74,222,128,.06), transparent 55%),
+    radial-gradient(1200px 700px at 50% -8%, rgba(34,197,94,.16), transparent 58%),
+    radial-gradient(1000px 560px at 100% 110%, rgba(34,197,94,.08), transparent 55%),
+    radial-gradient(820px 500px at -6% 42%, rgba(16,185,129,.05), transparent 60%),
     #0b0c0e !important;
+  background-attachment:fixed !important;
 }
 /* barras verdes arriba y abajo (como el login); ocultas mientras el login está activo */
 .appbar{ position:fixed; left:0; right:0; height:3px; background:#22C55E; z-index:55; pointer-events:none; }
@@ -963,28 +975,35 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .dlghint{ color:#e6e2ff !important; }
 </style>
 <style>
-/* ===== Pantalla de revisión del desglose (imagen 10) ===== */
-#drvOv{ position:fixed; inset:0; z-index:9700; background:rgba(10,7,26,.92); display:flex; align-items:center; justify-content:center; padding:20px; }
-.drv-card{ width:min(960px,96vw); max-height:88vh; background:#1e1a40; border:4px solid #5FC85A; border-radius:30px; padding:22px 26px 24px; display:flex; flex-direction:column; }
-.drv-top{ position:relative; display:flex; align-items:center; justify-content:center; gap:14px; margin-bottom:6px; }
-.drv-back{ position:absolute; left:0; top:0; width:46px; height:46px; border-radius:50%; background:#5FC85A; border:none; color:#123317; font-size:22px; cursor:pointer; }
-.drv-title{ font-family:'Open Serif',monospace; color:#fff; font-size:30px; }
-.drv-epname{ background:#5FC85A; color:#123317; font-family:'Open Serif',monospace; font-size:15px; padding:10px 20px; border-radius:20px; }
-.drv-heads{ display:grid; grid-template-columns:1fr 1.2fr 92px 60px; gap:14px; margin:16px 0 8px; }
-.drv-heads span{ text-align:center; color:#fff; font-family:'Open Serif',monospace; font-size:15px; }
-.drv-list{ flex:1; overflow-y:auto; padding-right:6px; display:flex; flex-direction:column; gap:14px; }
-.drv-list::-webkit-scrollbar{ width:8px; } .drv-list::-webkit-scrollbar-thumb{ background:#5FC85A; border-radius:8px; }
-.drv-row{ display:grid; grid-template-columns:1fr 1.2fr 92px 60px; gap:14px; align-items:center; }
-.drv-name{ background:#140f30; color:#fff; font-family:'Open Serif',monospace; font-size:14px; text-align:center; padding:16px 10px; border-radius:24px; }
-.drv-tal{ background:#5FC85A; color:#123317; font-family:'Open Serif',monospace; font-size:14px; text-align:center; padding:15px 10px; border:none; border-radius:24px; outline:none; }
-.drv-tal::placeholder{ color:#1c4a24; }
-.drv-tal:focus{ box-shadow:0 0 0 3px rgba(18,51,23,.35) inset; }
-.drv-ints{ border:2px solid #5FC85A; color:#cfe9cf; font-family:'Open Serif',monospace; font-size:14px; text-align:center; padding:12px 6px; border-radius:20px; }
-.drv-del{ background:#ff3b3b; border:none; border-radius:16px; padding:12px 8px; cursor:pointer; display:grid; place-items:center; }
-.drv-del:hover{ filter:brightness(1.08); }
-.drv-save{ margin-top:16px; width:100%; background:#5FC85A; color:#123317; border:none; border-radius:26px; padding:16px; font-family:'Open Serif',monospace; font-size:17px; cursor:pointer; box-shadow:0 5px 0 #3f9e3c; }
-.drv-save:active{ transform:translateY(3px); box-shadow:0 2px 0 #3f9e3c; }
-@media(max-width:640px){ .drv-heads,.drv-row{ grid-template-columns:1fr 1fr 62px 48px; gap:8px; } .drv-title{ font-size:22px; } }
+/* ===== Módulo 11 · Confirmación de desglose (rediseño) ===== */
+#drvOv{ position:fixed; inset:0; z-index:9700; background:rgba(8,9,11,.72); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; padding:20px; }
+.drv-card{ width:min(720px,96vw); max-height:88vh; background:#111316; border:1px solid #23262b; border-radius:16px; padding:22px 24px 20px; display:flex; flex-direction:column; font-family:'Inter',sans-serif; }
+.drv-top{ position:relative; display:flex; align-items:center; gap:12px; margin-bottom:4px; }
+.drv-back{ width:34px; height:34px; border-radius:9px; background:#0f1215; border:1px solid #23262b; color:#c7c9cd; font-size:18px; cursor:pointer; display:grid; place-items:center; }
+.drv-back:hover{ border-color:#4ADE80; color:#fff; }
+.drv-title{ font-family:'Inter',sans-serif; font-weight:700; color:#f2f3f5; font-size:18px; }
+.drv-epname{ background:rgba(34,197,94,.14); color:#4ADE80; font-family:'Inter',sans-serif; font-weight:600; font-size:12px; padding:5px 12px; border-radius:99px; }
+.drv-heads{ display:grid; grid-template-columns:1fr 1.3fr 96px 44px; gap:12px; margin:16px 0 8px; padding:0 4px; }
+.drv-heads span{ color:#6b7280; font-family:'Inter',sans-serif; font-size:11px; font-weight:600; letter-spacing:.4px; text-transform:uppercase; }
+.drv-heads span:nth-child(3),.drv-heads span:nth-child(4){ text-align:center; }
+.drv-list{ flex:1; overflow-y:auto; padding-right:4px; display:flex; flex-direction:column; gap:8px; }
+.drv-list::-webkit-scrollbar{ width:8px; } .drv-list::-webkit-scrollbar-thumb{ background:#2c3036; border-radius:8px; }
+.drv-row{ display:grid; grid-template-columns:1fr 1.3fr 96px 44px; gap:12px; align-items:center; background:#0f1215; border:1px solid #1c1e22; border-radius:10px; padding:8px 10px; }
+.drv-name{ background:transparent; color:#f2f3f5; font-family:'Inter',sans-serif; font-weight:600; font-size:14px; padding:6px 8px; }
+.drv-tal{ background:#15171a; color:#f2f3f5; font-family:'Inter',sans-serif; font-size:13.5px; padding:10px 12px; border:1px solid #23262b; border-radius:8px; outline:none; transition:border-color .12s; }
+.drv-tal::placeholder{ color:#6b7280; }
+.drv-tal:focus{ border-color:#4ADE80; }
+.drv-ints{ color:#4ADE80; font-family:'JetBrains Mono',monospace; font-weight:700; font-size:13.5px; text-align:center; }
+.drv-del{ background:transparent; border:1px solid #2c3036; border-radius:8px; padding:8px; cursor:pointer; display:grid; place-items:center; color:#8b8f97; }
+.drv-del:hover{ border-color:#F472B6; color:#F472B6; }
+.drv-foot{ display:flex; gap:10px; margin-top:16px; align-items:center; }
+.drv-upload{ background:transparent; border:1px solid #2c3036; color:#c7c9cd; font-family:'Inter',sans-serif; font-weight:600; font-size:13px; padding:12px 18px; border-radius:10px; cursor:pointer; white-space:nowrap; }
+.drv-upload:hover{ border-color:#4ADE80; color:#fff; }
+.drv-save{ flex:1; background:#22C55E; color:#06210f; border:none; border-radius:10px; padding:13px; font-family:'Inter',sans-serif; font-weight:700; font-size:14px; cursor:pointer; }
+.drv-save:hover{ filter:brightness(1.06); }
+.drv-save:disabled{ opacity:.6; cursor:default; }
+.drv-msg{ font-size:12.5px; margin-top:10px; min-height:14px; }
+@media(max-width:640px){ .drv-heads,.drv-row{ grid-template-columns:1fr 1fr 62px 40px; gap:8px; } .drv-title{ font-size:16px; } }
 </style>
 <style>
 /* ===== Vista de episodio / casting (imagen 10) ===== */
@@ -1283,8 +1302,10 @@ body{ background:var(--bgimg) center/cover fixed no-repeat !important; }
   <div class="cards" id="cards"></div>
   <div id="planilla"></div>
   <div class="empty show" id="empty">
-    <div class="ic">🎙️</div>
-    <p>Sube el desglose (.xlsm) para generar el mapa de personajes.</p>
+    <div class="ic">📄</div>
+    <h4>Este episodio todavía no tiene desglose</h4>
+    <p>Sube el guion en PDF o DOCX y Dubbipt detectará automáticamente los personajes y sus intervenciones.</p>
+    <button class="cta" id="emptyCta" onclick="var e=document.getElementById('inPdf'); if(e) e.click();">Subir guion (PDF/DOCX)</button>
   </div>
 </div>
 
@@ -4226,19 +4247,24 @@ async function loadFileForEp(file){
 }
 function showDesgloseReview(epName, onSave){
   const old=document.getElementById('drvOv'); if(old) old.remove();
-  const TRASH='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>';
+  const TRASH='<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>';
   let rows = chars.slice().sort((a,b)=> b.totalInts-a.totalInts || a.display.localeCompare(b.display,'es'))
     .map(c=>({ key:c.key, display:c.display, talent:c.talent||'', ints:c.totalInts, del:false }));
   const ov=document.createElement('div'); ov.id='drvOv';
   ov.innerHTML='<div class="drv-card">'
     +'<div class="drv-top"><button class="drv-back" id="drvBack" title="Cancelar">\u2039</button>'
-    +'<span class="drv-title">Desglose</span><span class="drv-epname">'+esc(epName||'')+'</span></div>'
-    +'<div class="drv-heads"><span>Personajes</span><span>Talento</span><span>Intervenciones</span><span></span></div>'
+    +'<span class="drv-title">Desglose</span><span class="drv-epname">Revisado · '+esc(epName||'')+'</span></div>'
+    +'<div class="drv-heads"><span>Personaje</span><span>Fuente / Talento</span><span>Intervenc.</span><span></span></div>'
     +'<div class="drv-list" id="drvList"></div>'
-    +'<button class="drv-save" id="drvSave">Guardar desglose</button>'
+    +'<div class="drv-msg" id="drvMsg"></div>'
+    +'<div class="drv-foot">'
+      +'<button class="drv-upload" id="drvUpload" title="Asignar casting desde un Excel">Subir casting</button>'
+      +'<button class="drv-save" id="drvSave">Guardar desglose</button>'
+    +'</div>'
     +'</div>';
   document.body.appendChild(ov);
   const list=ov.querySelector('#drvList');
+  { const up=ov.querySelector('#drvUpload'); if(up) up.onclick=()=>{ const f=document.getElementById('castingFile'); if(f) f.click(); }; }
   function draw(){
     list.innerHTML = rows.filter(r=>!r.del).map(r=>{
       const i = rows.indexOf(r);
@@ -4248,7 +4274,7 @@ function showDesgloseReview(epName, onSave){
         +'<div class="drv-ints">'+r.ints+'</div>'
         +'<button class="drv-del" data-i="'+i+'" title="Eliminar personaje" aria-label="Quitar a '+esc(r.display)+'">'+TRASH+'</button>'
         +'</div>';
-    }).join('') || '<div style="color:#8B84B0;text-align:center;padding:24px;font-family:\'RetroPix\',monospace">No se detectaron personajes.</div>';
+    }).join('') || '<div style="color:#8b8f97;text-align:center;padding:24px;font-family:\'Inter\',sans-serif">No se detectaron personajes.</div>';
   }
   draw();
   list.addEventListener('input', e=>{ const t=e.target; if(t.classList.contains('drv-tal')) rows[+t.dataset.i].talent=t.value; });
