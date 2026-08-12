@@ -544,9 +544,9 @@ body.locked #verBox{ position:fixed; left:16px; bottom:26px; z-index:9001; backg
 /* La versión permanece VISIBLE en toda la app (no solo en el login): badge
    discreto y consistente, fijo abajo-izquierda, presente en cada pantalla. */
 body:not(.locked) #verBox{ display:block; left:12px; bottom:12px; z-index:9990;
-  background:rgba(20,15,48,.82); color:#8fe08f; border:1px solid #2f6b34;
-  font-family:'Silkscreen','Space Grotesk',monospace; font-size:10.5px; letter-spacing:.3px;
-  padding:5px 11px; border-radius:12px; opacity:.85; backdrop-filter:blur(4px); }
+  background:#15171a; color:#8b8f97; border:1px solid #23262b;
+  font-family:'Inter',sans-serif; font-size:11px; font-weight:500;
+  padding:5px 11px; border-radius:10px; opacity:.90; backdrop-filter:blur(4px); }
 </style>
 <style>
 /* ================= TEMA DUBBIPT (toda la interfaz) ================= */
@@ -1430,7 +1430,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.5.1-nube · 30-jul-2026';
+const APP_VERSION = 'v10.6.0-nube · 12-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -1636,7 +1636,12 @@ function ensureStudio(){ ensureWorkspace(); }
 function applyStudio(){ applyWorkspace(); }
 function updateStudioChip(){ updateWorkspaceChip(); }
 // Al iniciar sesión: preguntar SIEMPRE el rol del dispositivo, ajustar y seguir.
-function postLogin(){ askRoleAtLogin(()=> ensureWorkspace()); }
+function postLogin(){
+  // Cambio 1: borrar el último episodio guardado para que siempre se aterrice
+  // en la pestaña de Programas, sin reabrir automáticamente el libreto.
+  try{ localStorage.removeItem('ddl_last_ep'); localStorage.removeItem('ddl_last_key'); localStorage.removeItem('ddl_last_top'); }catch(e){}
+  askRoleAtLogin(()=> ensureWorkspace());
+}
 function askRoleAtLogin(done){
   const old=document.getElementById('rolePick'); if(old) old.remove();
   const ov=document.createElement('div'); ov.id='rolePick';
@@ -5237,16 +5242,8 @@ async function libBoot(){
   if(!window.OFFLINE){ libRealtimeStart(); storageProbe(); }
   try{
     await libEnsure();
-    // Reabrir el último capítulo que estaba abierto: con el libreto rápido en la
-    // nube (episode_data) es instantáneo y limpio; si ya no existe o falla, la
-    // biblioteca queda como respaldo. Antes se BORRABA el marcador al arrancar y
-    // el capítulo abierto «se perdía» en cada recarga o reinicio de la app.
-    try{
-      const last = localStorage.getItem('ddl_last_ep');
-      if(last && (typeof currentEp==='undefined' || !currentEp || currentEp.id!==last)){
-        await openEpisode(last);
-      }
-    }catch(e){}
+    // NO se reabre el último capítulo al iniciar sesión.
+    // El usuario elige desde la pestaña de Programas.
   }catch(e){}
 }
 renderLibrary();
