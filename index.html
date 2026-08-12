@@ -673,45 +673,46 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 /* ===== Carátula en las tarjetas del Dashboard ===== */
 .dtile .dcover .dcov{ width:100%; height:100%; object-fit:cover; }
 
-/* ===== Módulo 10 · Tarjetas de personaje (rediseño) ===== */
-.card{ border:1.5px solid var(--cc) !important; border-radius:14px !important; padding:0 !important; overflow:hidden;
-  position:relative; background:#15171a !important; transition:transform .12s, box-shadow .12s; }
-.card:hover{ transform:translateY(-3px); box-shadow:0 10px 30px rgba(0,0,0,.4); }
-.card.done{ opacity:1 !important; border-color:#22C55E !important; background:linear-gradient(180deg,rgba(34,197,94,.10),transparent),#141a16 !important; }
-/* fila superior: "N intervenciones" + checkbox */
-.card .top{ display:flex; align-items:flex-start; gap:10px; padding:14px 16px 6px; }
-.card .top .ints-lab{ font-family:'Inter',sans-serif; font-size:11px; color:#8b8f97; font-weight:500; }
-.card .top h3{ display:none; }  /* el nombre se reubica debajo */
+/* ===== Módulo 10 · Tarjetas de personaje (rediseño exacto captura) ===== */
+.card{ border:1px solid #23262b !important; border-radius:14px !important; padding:16px 18px 0 !important;
+  overflow:hidden; position:relative; background:#111316 !important;
+  transition:border-color .12s, box-shadow .12s; cursor:pointer; }
+.card:hover{ border-color:#3a3f46 !important; box-shadow:0 8px 24px rgba(0,0,0,.35); }
+.card.done{ background:linear-gradient(160deg,#0d2115,#0a1910) !important; border-color:#22C55E !important; opacity:1 !important; }
+.card.done:hover{ border-color:#4ADE80 !important; }
+.card .top{ display:flex; align-items:center; justify-content:space-between; padding:0; margin-bottom:12px; }
+.card .top .ints-lab{ font-family:'Inter',sans-serif; font-size:11.5px; color:#8b8f97; font-weight:500; }
+.card .top h3{ display:none; }
 .card .top .n{ display:none; }
-.card .allbtn{ position:absolute; top:12px; right:12px; width:26px; height:26px; border-radius:7px;
-  border:1px solid #3a3f46; background:transparent; color:transparent; display:grid; place-items:center;
-  font-size:13px; cursor:pointer; padding:0; transition:all .12s; }
+.card .allbtn{ width:28px; height:28px; border-radius:8px; border:1.5px solid #3a3f46;
+  background:transparent; color:transparent; display:grid; place-items:center;
+  font-size:15px; cursor:pointer; padding:0; transition:all .12s; flex:none; position:static; }
 .card .allbtn:hover{ border-color:#4ADE80; }
-.card .allbtn.on{ background:#22C55E; border-color:#22C55E; color:#06210f; }
-/* nombre del personaje */
-.card .cname{ font-family:'Inter',sans-serif; font-weight:700; color:#f2f3f5; font-size:17px; padding:0 16px 8px; line-height:1.15; }
-/* chips: rol + timecode */
-.card .cchips{ display:flex; gap:6px; padding:0 16px 10px; flex-wrap:wrap; }
-.card .cchips .cc-chip{ font-family:'Inter',sans-serif; font-size:11px; font-weight:600; padding:4px 9px; border-radius:6px;
-  background:#1c1e22; color:#9CA3AF; border:1px solid #23262b; }
-.card.done .cchips .cc-chip{ background:rgba(34,197,94,.14); color:#4ADE80; border-color:rgba(34,197,94,.3); }
-/* divisor */
-.card .cdiv{ height:1px; background:#23262b; margin:2px 16px 0; }
-/* estado de talento */
-.card .tal{ display:flex; align-items:center; gap:8px; background:transparent !important; margin:0 !important;
-  padding:12px 16px 8px; color:#4ADE80; font-family:'Inter',sans-serif; font-size:13.5px; font-weight:600; }
-.card .tal b{ color:var(--cc); font-weight:700; }
-.card .tal .ng{ color:#4ADE80; font-style:normal; }
-.card .tal .tc{ margin-left:auto; color:#8b8f97; font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:400; }
+.card .allbtn.on{ background:#22C55E; border-color:#22C55E; color:#06210f; font-size:14px; }
+.card .cname{ font-family:'Inter',sans-serif; font-weight:700; color:#f2f3f5; font-size:18px;
+  padding:0; margin-bottom:10px; line-height:1.15; }
+.card .cchips{ display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; padding:0; }
+.card .cchips .cc-chip{ font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; padding:4px 11px;
+  border-radius:7px; background:#1c1e22; color:#9CA3AF; border:1px solid #2c3036; }
+.card.done .cchips .cc-chip{ background:rgba(34,197,94,.10); color:#4ADE80; border-color:rgba(34,197,94,.25); }
+.card .cdiv{ height:1px; background:#23262b; margin:0 0 14px; }
+.card.done .cdiv{ background:rgba(34,197,94,.20); }
+.card .tal{ display:flex; align-items:center; background:transparent !important; margin:0 !important; padding:0; min-height:22px; }
+.card .tal .ng{ color:#4ADE80; font-style:normal; font-family:'Inter',sans-serif; font-weight:600; font-size:14px; }
+.card .tal b{ color:#f2f3f5; font-weight:600; font-family:'Inter',sans-serif; font-size:14px; }
+.card .tal .tc{ display:none; }
 .card .tal .meta{ display:none; }
-/* subrayado de color */
-.card .cline{ height:2px; background:var(--cc); margin:0 16px; border-radius:2px; opacity:.85; }
-/* botón de acción (Asignar / Editar) */
-.card .cbtn{ display:block; width:calc(100% - 32px); margin:12px 16px 14px; background:transparent; border:none;
-  color:var(--cc); font-family:'Inter',sans-serif; font-weight:700; font-size:13.5px; text-align:center; cursor:pointer; padding:4px; }
-.card .cbtn:hover{ filter:brightness(1.15); }
+.card .ctal-input{ width:100%; background:#0f1215; border:1px solid #22C55E; border-radius:9px;
+  padding:9px 12px; color:#f2f3f5; font-family:'Inter',sans-serif; font-size:14px; outline:none; }
+.card .ctal-input::placeholder{ color:#6b7280; }
+.card .cline{ display:none; }
+.card .cbtn{ display:block; width:calc(100% + 36px); margin:14px -18px 0; padding:12px 18px;
+  background:transparent; border:none; border-top:1px solid #1c1e22;
+  color:#4ADE80; font-family:'Inter',sans-serif; font-weight:700; font-size:14px;
+  text-align:center; cursor:pointer; letter-spacing:.2px; }
+.card.done .cbtn{ border-top-color:rgba(34,197,94,.15); }
+.card .cbtn:hover{ background:rgba(34,197,94,.07); }
 .card .bar, .card .pgs{ display:none !important; }
-.card{ cursor:pointer; }
 </style>
 <style>
 /* ===== Selector de dispositivo (imagen 3) ===== */
@@ -3355,29 +3356,68 @@ function renderCards(){
     const pgHtml = c.pages.slice(0,MAXPG).map(pg=>
       `<span class="pg ${rec.has(pg.p)?'rec':''}" data-p="${pg.p}" title="Abrir pág. ${pg.p}">${pg.p}·${pg.ints}</span>`).join('')
       + (c.pages.length>MAXPG?`<span class="pg more">+${c.pages.length-MAXPG}</span>`:'');
-    const tal = c.talent
-      ? (c.noRec ? `<span class="ng">${esc(c.talent)} · no se graba</span>` : `<b>${esc(c.talent)}</b>`)
+    const talDisplay = c.talent
+      ? `<b>${esc(c.talent)}</b>`
       : '<span class="ng">Sin asignar</span>';
     const tc0 = (typeof firstTCOf==='function' ? firstTCOf(c.key) : '') || '';
-    // rol aproximado por volumen de intervenciones (Protagonista / Secundario)
     const rol = c.totalInts >= 60 ? 'Protagonista' : (c.totalInts >= 15 ? 'Secundario' : 'Reparto');
-    const chips = `<span class="cc-chip">${rol}</span>` + (tc0 ? `<span class="cc-chip">${esc(tc0)}</span>` : '');
+    const chips = `<span class="cc-chip">${rol}</span>`;
     card.innerHTML =
       `<div class="top"><span class="ints-lab">${c.totalInts} intervenciones</span>`+
-        `<button class="allbtn ${done?'on':''}" title="${done?'Desmarcar: personaje sin terminar':'Marcar personaje como terminado (todas las páginas grabadas)'}" aria-label="${done?'Marcar sin terminar':'Marcar terminado'} ${esc(c.display)}">${done?'✓':''}</button></div>`+
+        `<button class="allbtn ${done?'on':''}" title="${done?'Desmarcar':'Marcar terminado'}" aria-label="${done?'Marcar sin terminar':'Marcar terminado'} ${esc(c.display)}">${done?'✓':''}</button></div>`+
       `<div class="cname">${esc(c.display)}</div>`+
       `<div class="cchips">${chips}</div>`+
       `<div class="cdiv"></div>`+
-      `<div class="tal">${tal}<span class="tc">${tc0||''}</span></div>`+
-      `<div class="cline"></div>`+
-      `<button class="cbtn">${c.talent ? 'Editar' : 'Asignar'}</button>`+
-      `<div class="bar" hidden><i style="width:${pct}%"></i></div>`;
-    card.addEventListener('click', ()=> openPopup(c.key));
-    card.addEventListener('keydown', e=>{ if(e.key==='Enter') openPopup(c.key); });
+      `<div class="tal" id="tal_${esc(c.key)}">${talDisplay}</div>`+
+      `<div class="cline" hidden></div>`+
+      `<button class="cbtn" aria-label="${c.talent?'Editar talento':'Asignar talento'} de ${esc(c.display)}">${c.talent ? 'Editar' : 'Asignar'}</button>`;
+
+    // clic en la tarjeta (no en botones) → abre libreto
+    card.addEventListener('click', ev=>{
+      if(ev.target.closest('.allbtn,.cbtn,.ctal-input')) return;
+      openPopup(c.key);
+    });
+    card.addEventListener('keydown', e=>{ if(e.key==='Enter' && e.target===card) openPopup(c.key); });
+
+    // checkbox: marcar/desmarcar todas las páginas
     const ab = card.querySelector('.allbtn');
     if(ab) ab.addEventListener('click', ev=>{ ev.stopPropagation(); markAllPages(c.key); });
+
+    // Asignar / Editar → input inline sobre la zona de talento
     const cb = card.querySelector('.cbtn');
-    if(cb) cb.addEventListener('click', ev=>{ ev.stopPropagation(); openPopup(c.key); });
+    if(cb) cb.addEventListener('click', ev=>{
+      ev.stopPropagation();
+      const talDiv = card.querySelector('.tal');
+      if(!talDiv) return;
+      // si ya hay un input abierto, no abrir otro
+      if(card.querySelector('.ctal-input')) return;
+      talDiv.innerHTML = '';
+      const inp = document.createElement('input');
+      inp.className = 'ctal-input';
+      inp.type = 'text';
+      inp.value = c.talent || '';
+      inp.placeholder = 'Nombre del talento…';
+      inp.setAttribute('aria-label', 'Talento para '+c.display);
+      talDiv.appendChild(inp);
+      inp.focus(); inp.select();
+      cb.textContent = 'Guardar';
+
+      const save = async ()=>{
+        const val = inp.value.trim();
+        c.talent = val;
+        c.noRec = (typeof NO_REC!=='undefined') ? NO_REC.has((typeof norm==='function'?norm(val):val)) : false;
+        // persistir en Supabase si hay episodio abierto
+        try{
+          if(typeof currentEp!=='undefined' && currentEp && currentEp.id && typeof epDataUpsert==='function')
+            await epDataUpsert(currentEp.id, currentEp.showId);
+        }catch(e){ console.warn('save talent', e); }
+        renderCards();
+        if(typeof DDL_UI!=='undefined') DDL_UI.toast(val ? 'Talento asignado: '+val : 'Talento borrado');
+      };
+      inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); save(); } if(e.key==='Escape'){ renderCards(); } });
+      inp.addEventListener('blur', ()=>{ setTimeout(()=>{ if(card.contains(document.activeElement)) return; save(); }, 120); });
+    });
+
     box.appendChild(card);
   }
   $('empty').classList.toggle('show', shown===0);
