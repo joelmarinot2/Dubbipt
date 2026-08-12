@@ -716,7 +716,7 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 <style>
 /* ===== Selector de dispositivo (imagen 3) ===== */
 /* ===== Selector de dispositivo · mismo fondo que el login ===== */
-#rolePick{ position:fixed; inset:0; z-index:9600; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px;
+#rolePick{ position:fixed; inset:0; z-index:9600; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0;
   background:
     radial-gradient(1100px 700px at 10% 0%, rgba(34,197,94,.30), transparent 52%),
     radial-gradient(800px 600px at 8% 8%, rgba(22,163,74,.18), transparent 60%),
@@ -724,24 +724,33 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
   background-attachment:fixed; font-family:'Inter',sans-serif; padding:24px; }
 #rolePick .rp-bar{ display:none; }
 #rolePick .rp-logo{ display:none; }
-/* logo (img inyectada por JS) */
-#rolePick .rp-logoimg{ height:90px; width:auto; display:block; }
-/* tarjeta */
-#rolePick .rp-card{ width:min(660px,96vw); background:#111316; border:1px solid #23262b; border-radius:16px; padding:24px 24px 22px; }
-#rolePick .rp-title{ text-align:center; color:#f2f3f5; font-family:'Inter',sans-serif; font-weight:700; font-size:17px; margin-bottom:4px; }
-#rolePick .rp-sub{ text-align:center; color:#8b8f97; font-family:'Inter',sans-serif; font-size:13.5px; margin:4px 0 20px; }
-#rolePick .rp-opts{ display:flex; gap:14px; }
-#rolePick .rp-opt{ flex:1; background:#0f1215; border:1.5px solid #23262b; border-radius:14px; padding:22px 16px 18px; cursor:pointer;
-  display:flex; flex-direction:column; align-items:center; gap:14px; transition:transform .12s,border-color .12s; }
-#rolePick .rp-opt:hover{ transform:translateY(-3px); border-color:#22C55E; }
-#rolePick .rp-opt svg{ width:100px; height:100px; }
-#rolePick .rp-opt .lab{ font-size:14px; font-weight:600; color:#f2f3f5; font-family:'Inter',sans-serif; text-align:center; line-height:1.5; }
-#rolePick .rp-opt .lab small{ display:block; color:#8b8f97; font-weight:400; font-size:12px; margin-top:3px; }
-/* botón Cerrar sesión */
-#rolePick .rp-logout{ width:min(660px,96vw); background:transparent; border:1px solid #2c3036; border-radius:11px;
-  padding:13px; color:#8b8f97; font-family:'Inter',sans-serif; font-weight:600; font-size:14px; cursor:pointer; }
-#rolePick .rp-logout:hover{ border-color:#3a3f46; color:#f2f3f5; }
-@media(max-width:560px){ #rolePick .rp-opts{ flex-direction:column } #rolePick .rp-opt svg{ width:72px; height:72px } }
+/* logo */
+#rolePick .rp-logoimg{ height:72px; width:auto; display:block; margin-bottom:28px; }
+/* title and subtitle — above the buttons, no wrapper card */
+#rolePick .rp-card{ width:min(660px,96vw); background:transparent; border:none; border-radius:0; padding:0; }
+#rolePick .rp-title{ text-align:center; color:#f2f3f5; font-family:'Inter',sans-serif; font-weight:700; font-size:20px; margin-bottom:8px; }
+#rolePick .rp-sub{ text-align:center; color:#9CA3AF; font-family:'Inter',sans-serif; font-size:13.5px; margin:0 0 24px; }
+/* option buttons grid */
+#rolePick .rp-opts{ display:flex; gap:16px; }
+#rolePick .rp-opt{ flex:1; background:#111316; border:1.5px solid #23262b; border-radius:14px;
+  padding:28px 20px 22px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:12px;
+  transition:border-color .14s, background .14s; }
+#rolePick .rp-opt:hover{ border-color:#22C55E; }
+/* active / selected state — green border + subtle tint */
+#rolePick .rp-opt.active{ border-color:#22C55E; background:rgba(34,197,94,.07); }
+#rolePick .rp-opt svg{ width:52px; height:52px; }
+#rolePick .rp-opt .lab{ font-size:15px; font-weight:700; color:#f2f3f5; font-family:'Inter',sans-serif; text-align:center; }
+#rolePick .rp-opt .lab small{ display:block; color:#9CA3AF; font-weight:400; font-size:12.5px; margin-top:6px; line-height:1.45; text-align:center; }
+/* bottom status pill */
+#rolePick .rp-status{ display:flex; align-items:center; gap:8px; margin-top:22px;
+  background:#1a1d21; border:1px solid #2c3036; border-radius:99px; padding:10px 18px;
+  color:#c7c9cd; font-family:'Inter',sans-serif; font-size:13px; font-weight:500; }
+#rolePick .rp-status .dot{ width:8px; height:8px; border-radius:50%; background:#FBBF24;
+  box-shadow:0 0 7px rgba(251,191,36,.6); flex:none; animation:rp-pulse 1.5s ease-in-out infinite; }
+@keyframes rp-pulse{ 0%,100%{opacity:1} 50%{opacity:.45} }
+/* hide old logout button */
+#rolePick .rp-logout{ display:none; }
+@media(max-width:560px){ #rolePick .rp-opts{ flex-direction:column } #rolePick .rp-opt svg{ width:42px; height:42px } }
 </style>
 <style>
 /* ===== Modal Espacios de trabajo (imagen 6) ===== */
@@ -1631,32 +1640,58 @@ function postLogin(){ askRoleAtLogin(()=> ensureWorkspace()); }
 function askRoleAtLogin(done){
   const old=document.getElementById('rolePick'); if(old) old.remove();
   const ov=document.createElement('div'); ov.id='rolePick';
-  // SVGs con colores del nuevo tema (verde sobre fondo oscuro)
-  const tabletSVG='<svg viewBox="0 0 100 132" fill="none" stroke="#22C55E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><rect x="12" y="8" width="76" height="116" rx="11"/><rect x="24" y="27" width="52" height="78" rx="4"/><circle cx="42" cy="17.5" r="1.8" fill="#22C55E" stroke="none"/><circle cx="50" cy="17.5" r="1.8" fill="#22C55E" stroke="none"/><line x1="44" y1="114" x2="56" y2="114"/></svg>';
-  const deskSVG='<svg viewBox="0 0 150 132" fill="none" stroke="#22C55E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><rect x="12" y="14" width="126" height="84" rx="9"/><rect x="24" y="27" width="102" height="58" rx="3"/><line x1="75" y1="98" x2="75" y2="114"/><rect x="52" y="114" width="46" height="8" rx="4"/></svg>';
+  // SVGs del tamaño nuevo (52px en CSS)
+  const deskSVG='<svg viewBox="0 0 64 56" fill="none" stroke="#22C55E" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="56" height="38" rx="5"/><rect x="12" y="12" width="40" height="22" rx="2"/><line x1="32" y1="42" x2="32" y2="50"/><rect x="20" y="50" width="24" height="3" rx="1.5"/></svg>';
+  const tabletSVG='<svg viewBox="0 0 44 62" fill="none" stroke="#6b7280" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="36" height="54" rx="5"/><rect x="10" y="13" width="24" height="34" rx="2"/><circle cx="22" cy="52.5" r="1.5" fill="#6b7280" stroke="none"/></svg>';
   // logo real de Dubbipt (mismo que el login)
   const logoSrc = (document.querySelector('#gate .gbrand img') || {}).src || '';
   ov.innerHTML =
     (logoSrc ? '<img class="rp-logoimg" src="'+logoSrc+'" alt="Dubbipt">' : '')
     +'<div class="rp-card">'
     +  '<div class="rp-title">¿Este dispositivo es…?</div>'
-    +  '<div class="rp-sub">Para adaptar la vista y la sincronía</div>'
+    +  '<div class="rp-sub">Para adaptar la vista y la sincronía con el otro dispositivo</div>'
     +  '<div class="rp-opts">'
-    +    '<button class="rp-opt" id="rTab">'+tabletSVG+'<span class="lab">Tablet<small>Control</small></span></button>'
-    +    '<button class="rp-opt" id="rPc">'+deskSVG+'<span class="lab">Escritorio<small>Muestra Libreto</small></span></button>'
+    +    '<button class="rp-opt active" id="rPc">'+deskSVG
+    +      '<span class="lab">Escritorio<small>Muestra el libreto para lectura<br>durante la grabación</small></span>'
+    +    '</button>'
+    +    '<button class="rp-opt" id="rTab">'+tabletSVG
+    +      '<span class="lab">Tablet<small>Control del desglose y avance de<br>página a distancia</small></span>'
+    +    '</button>'
     +  '</div>'
     +'</div>'
-    +'<button class="rp-logout" id="rpOut">Cerrar sesión</button>';
+    +'<div class="rp-status"><span class="dot"></span>Buscando el otro dispositivo en tu misma sesión…</div>'
+    +'<button class="rp-logout" id="rpOut" style="display:none">Cerrar sesión</button>';
   document.body.appendChild(ov);
-  const choose=(role)=>{ try{localStorage.setItem('ddl_role',role);}catch(e){} DEVROLE=role; try{sync.role=role;}catch(e){} ov.remove(); try{ applyDeviceRole(); }catch(e){} if(typeof done==='function') done(); };
-  ov.querySelector('#rTab').onclick=()=>choose('tablet');
-  ov.querySelector('#rPc').onclick=()=>choose('pc');
-  ov.querySelector('#rpOut').onclick=async ()=>{
-    try{ if(sb) await sb.auth.signOut(); }catch(e){}
-    try{ ['ddl_last_ep','ddl_last_key','ddl_last_top'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
-    try{ if(typeof idbClearAll==='function') await idbClearAll(); }catch(e){}
-    location.reload();
+
+  // toggle active state visually
+  const optPc  = ov.querySelector('#rPc');
+  const optTab = ov.querySelector('#rTab');
+  const setActive=(el)=>{
+    [optPc, optTab].forEach(b=>{ b.classList.remove('active');
+      b.querySelector('svg').setAttribute('stroke', '#6b7280'); });
+    el.classList.add('active');
+    el.querySelector('svg').setAttribute('stroke', '#22C55E');
   };
+  optPc.addEventListener('mouseenter', ()=> setActive(optPc));
+  optTab.addEventListener('mouseenter', ()=> setActive(optTab));
+  ov.querySelector('.rp-opts').addEventListener('mouseleave', ()=> setActive(optPc));
+
+  const choose=(role)=>{ try{localStorage.setItem('ddl_role',role);}catch(e){} DEVROLE=role; try{sync.role=role;}catch(e){} ov.remove(); try{ applyDeviceRole(); }catch(e){} if(typeof done==='function') done(); };
+  optPc.onclick  = ()=> choose('pc');
+  optTab.onclick = ()=> choose('tablet');
+
+  // Cerrar sesión: triple-tap the status pill as a hidden escape hatch
+  let _logoutTaps=0, _logoutTimer=null;
+  ov.querySelector('.rp-status').addEventListener('click', ()=>{
+    _logoutTaps++;
+    clearTimeout(_logoutTimer);
+    _logoutTimer = setTimeout(()=>_logoutTaps=0, 700);
+    if(_logoutTaps>=3){
+      _logoutTaps=0;
+      if(!confirm('¿Cerrar sesión?')) return;
+      (async()=>{ try{ if(sb) await sb.auth.signOut(); }catch(e){} try{['ddl_last_ep','ddl_last_key','ddl_last_top'].forEach(k=>localStorage.removeItem(k));}catch(e){} location.reload(); })();
+    }
+  });
 }
 function applyDeviceRole(){
   try{ document.body.classList.toggle('is-tablet', DEVROLE==='tablet'); }catch(e){}
