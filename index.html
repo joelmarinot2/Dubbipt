@@ -694,7 +694,9 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .card .cchips{ display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; padding:0; }
 .card .cchips .cc-chip{ font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; padding:4px 11px;
   border-radius:7px; background:#1c1e22; color:#9CA3AF; border:1px solid #2c3036; }
+.card .cchips .cc-tc{ font-family:'JetBrains Mono',ui-monospace,monospace; font-size:11px; color:#8b8f97; background:#101215; }
 .card.done .cchips .cc-chip{ background:rgba(34,197,94,.10); color:#4ADE80; border-color:rgba(34,197,94,.25); }
+.card.done .cchips .cc-tc{ color:#4ADE80; }
 .card .cdiv{ height:1px; background:#23262b; margin:0 0 14px; }
 .card.done .cdiv{ background:rgba(34,197,94,.20); }
 .card .tal{ display:flex; align-items:center; background:transparent !important; margin:0 !important; padding:0; min-height:22px; }
@@ -1041,10 +1043,27 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .find input{ color:#f2f3f5 !important; font-family:'Inter',sans-serif !important; }
 .find input::placeholder{ color:#8b8f97 !important; }
 .find .fi{ color:#4ADE80; }
-/* filtros rápidos: Todos / Sin asignar / Asignado */
-.filtrow{ display:flex; gap:8px; margin:2px 0 14px; flex-wrap:wrap; }
-.filtrow .fchip{ background:transparent; border:1px solid #2c3036; color:#9CA3AF; font-family:'Inter',sans-serif; font-weight:600; font-size:12.5px; padding:7px 14px; border-radius:8px; cursor:pointer; }
-.filtrow .fchip.on{ background:#123b23; border-color:#1d4a30; color:#4ADE80; }
+/* ===== Organizar dropdown ===== */
+.actrow .ac-sort{ position:relative; }
+.actrow .ac-sort .sort-menu{ display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:200;
+  background:#15171a; border:1px solid #23262b; border-radius:10px; overflow:hidden; min-width:180px;
+  box-shadow:0 10px 30px rgba(0,0,0,.45); }
+.actrow .ac-sort .sort-menu.open{ display:block; }
+.actrow .ac-sort .sort-menu button{ display:block; width:100%; text-align:left; background:transparent;
+  border:none; color:#c7c9cd; font-family:'Inter',sans-serif; font-weight:600; font-size:13px;
+  padding:11px 14px; cursor:pointer; border-bottom:1px solid #1c1e22; }
+.actrow .ac-sort .sort-menu button:last-child{ border-bottom:none; }
+.actrow .ac-sort .sort-menu button:hover{ background:#1c1e22; color:#f2f3f5; }
+.actrow .ac-sort .sort-menu button.on{ color:#4ADE80; background:#0d1f13; }
+/* nav buttons (Episodios / Programas) acima da tabla de episodios */
+.eps-nav{ display:flex; gap:10px; align-items:center; margin-bottom:14px; }
+.eps-nav .enav-btn{ background:transparent; border:1px solid #23262b; color:#8b8f97;
+  font-family:'Inter',sans-serif; font-weight:600; font-size:13px; padding:8px 14px;
+  border-radius:8px; cursor:pointer; display:flex; align-items:center; gap:6px; }
+.eps-nav .enav-btn:hover{ border-color:#3a3f46; color:#f2f3f5; }
+.eps-nav .enav-sep{ width:1px; height:20px; background:#23262b; }
+/* search SVG icon */
+.find .fi svg{ display:block; }
 /* stats: Personajes + Completados */
 .stats .stat:nth-child(n+3){ display:none !important; }
 .stats .stat.ok b{ color:#4ADE80 !important; }
@@ -1252,39 +1271,43 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
   <div class="stats" id="stats"></div>
   <div class="toolbar" id="toolbar">
     <div class="findrow">
-      <label class="find"><span class="fi">🔍</span><input type="text" id="search" placeholder="Busca personaje o talento"><button type="button" id="searchClear" title="Borrar búsqueda" style="display:none;border:none;background:none;color:var(--ink-faint);cursor:pointer;font-size:15px;padding:0 6px;line-height:1">✕</button></label>
+      <label class="find">
+        <span class="fi"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+        <input type="text" id="search" placeholder="Busca personaje o talento">
+        <button type="button" id="searchClear" title="Borrar búsqueda" style="display:none;border:none;background:none;color:var(--ink-faint);cursor:pointer;font-size:15px;padding:0 6px;line-height:1">✕</button>
+      </label>
       <div class="dens" id="dens" role="group" aria-label="Densidad de la vista">
         <button type="button" data-d="comoda" class="on">Cómoda</button><button type="button" data-d="compacta">Compacta</button>
       </div>
     </div>
     <div class="actrow">
-      <div class="ac-cluster ac-nav">
-        <button class="btnv sm act-nav" id="btnEpsBack" onclick="appBack()" title="Volver a los episodios">‹ Episodios</button>
-        <button class="btnv sm act-nav" id="btnToPrograms" onclick="goPrograms()" title="Ir a Programas">📚 Programas</button>
-      </div>
-      <div class="ac-div" aria-hidden="true"></div>
       <div class="ac-cluster ac-edit">
-        <button class="btnv sm act-g" id="btnEditEp" onclick="editEpisode()" title="Editar el desglose del episodio (talentos / quitar personajes)">Editar Episodio</button>
-        <button class="btnv sm act-g" id="btnMerge" title="Unir dos personajes en uno (p. ej. MARCUS (VO) + MARCUS)">Fusionar Personajes</button>
-        <button class="btnv sm act-g" id="btnSortAbc" onclick="setSort('abc')" title="Ordenar alfabéticamente (A–Z)">A–Z</button>
+        <button class="btnv sm act-g" id="btnEditEp" onclick="editEpisode()" title="Editar el desglose del episodio">Editar Episodio</button>
+        <button class="btnv sm act-g" id="btnMerge" title="Unir dos personajes en uno">Fusionar Personajes</button>
+        <button class="btnv sm act-g" id="btnFull" title="Abrir el libreto completo">Libreto Completo</button>
+        <button class="btnv sm act-g" id="btnModoEst" title="Modo estudio: video/audio + onda + marcado de pausas">Video Estudio</button>
+        <div class="ac-sort" id="sortDropWrap">
+          <button class="btnv sm act-g" id="btnOrganizar" title="Ordenar personajes" aria-haspopup="true" aria-expanded="false">
+            Organizar <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="margin-left:3px"><path d="M2 4l4 4 4-4"/></svg>
+          </button>
+          <div class="sort-menu" id="sortMenu" role="menu">
+            <button type="button" id="btnSortAbc" onclick="setSort('abc')" role="menuitem">A–Z</button>
+            <button type="button" id="btnSortInts" onclick="setSort('ints')" class="on" role="menuitem">Por intervenciones</button>
+          </div>
+        </div>
       </div>
       <div class="ac-div" aria-hidden="true"></div>
-      <div class="ac-cluster ac-prod">
-        <button class="btnv sm act-g" id="btnFull" title="Abrir el libreto completo, sin filtrar por personaje">Libreto Completo</button>
-        <button class="btnv sm act-g" id="btnModoEst" title="Modo estudio: video/audio + onda + marcado de pausas">Video Estudio</button>
-        <button class="btnv sm act-g on" id="btnSortInts" onclick="setSort('ints')" title="Ordenar por número de intervenciones">Por intervenciones</button>
-        <button class="btnv sm act-primary" id="btnCasting" onclick="document.getElementById('castingFile').click()" title="Asignar casting desde un Excel (personaje → talento)">Asignar casting</button>
-      </div>
+      <button class="btnv sm act-primary" id="btnCasting" onclick="document.getElementById('castingFile').click()" title="Asignar casting desde un Excel">Asignar casting</button>
       <input type="file" id="castingFile" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="if(this.files[0]) assignCastingFromExcel(this.files[0]); this.value=''">
+      <button class="btnv sm" id="btnEpsBack" onclick="appBack()" style="display:none" title="Volver a los episodios">‹ Episodios</button>
+      <button class="btnv sm" id="btnToPrograms" onclick="goPrograms()" style="display:none" title="Ir a Programas">📚 Programas</button>
       <button class="btnv sm" id="btnExport" style="display:none" title="Avance">⬇ Avance</button>
       <button class="btnv sm" id="btnRefresh" style="display:none" title="Actualizar">🔄 Actualizar</button>
+      <button class="btnv sm act-g" id="btnSortAbc2" style="display:none">A–Z</button>
+      <button class="btnv sm act-g on" id="btnSortInts2" style="display:none">Por intervenciones</button>
       <span class="hint" style="display:none">Clic en un personaje abre su libreto</span>
     </div>
-    <div class="filtrow" id="filtrow" role="group" aria-label="Filtrar por estado de asignación">
-      <button type="button" class="fchip on" data-f="all">Todos</button>
-      <button type="button" class="fchip" data-f="unassigned">Sin asignar</button>
-      <button type="button" class="fchip" data-f="assigned">Asignado</button>
-    </div>
+    <div id="filtrow" style="display:none"></div>
   </div>
   <div class="cards" id="cards"></div>
   <div id="planilla"></div>
@@ -3332,8 +3355,8 @@ function renderCards(){
       ? `<b>${esc(c.talent)}</b>`
       : '<span class="ng">Sin asignar</span>';
     const tc0 = (typeof firstTCOf==='function' ? firstTCOf(c.key) : '') || '';
-    const rol = c.totalInts >= 60 ? 'Protagonista' : (c.totalInts >= 15 ? 'Secundario' : 'Reparto');
-    const chips = `<span class="cc-chip">${rol}</span>`;
+    // chip: timecode inicial del personaje (en vez del rol estimado)
+    const chips = tc0 ? `<span class="cc-chip cc-tc">${esc(tc0)}</span>` : '';
     card.innerHTML =
       `<div class="top"><span class="ints-lab">${c.totalInts} intervenciones</span>`+
         `<button class="allbtn ${done?'on':''}" title="${done?'Desmarcar':'Marcar terminado'}" aria-label="${done?'Marcar sin terminar':'Marcar terminado'} ${esc(c.display)}">${done?'✓':''}</button></div>`+
@@ -3423,6 +3446,19 @@ $('btnFull').addEventListener('click', ()=>{
   if(!pdfDoc && !(script && script.length)){ alert('Sube primero el libreto PDF para ver el libreto completo.'); return; }
   openPopup(null);
 });
+// Organizar dropdown
+(function(){
+  const btn = document.getElementById('btnOrganizar');
+  const menu = document.getElementById('sortMenu');
+  if(!btn || !menu) return;
+  btn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    const open = menu.classList.toggle('open');
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  document.addEventListener('click', ()=>{ menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); });
+  menu.addEventListener('click', ()=>{ setTimeout(()=>{ menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); }, 80); });
+})();
 
 /* ================= ventana emergente (PiP siempre-arriba o popup) ================= */
 
@@ -3969,7 +4005,16 @@ async function renderLibrary(silent){
     if(!ehead){ ehead=document.createElement('div'); ehead.id='epsHead'; ehead.className='eps-head'; grid.parentNode.insertBefore(ehead, grid); }
     ehead.style.display='';
     ehead.innerHTML =
-      '<div class="eh-title"><h2>'+esc(sh?sh.name:'')+'</h2>'
+      '<div class="eps-nav">'
+        +'<button class="enav-btn" onclick="appBack()" title="Volver a los episodios">'
+          +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>'
+          +'Episodios</button>'
+        +'<span class="enav-sep"></span>'
+        +'<button class="enav-btn" onclick="goPrograms()" title="Ir a Programas">'
+          +'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>'
+          +'Programas</button>'
+      +'</div>'
+      +'<div class="eh-title"><h2>'+esc(sh?sh.name:'')+'</h2>'
         +'<div class="eh-sub">'+eps.length+' episodio'+(eps.length===1?'':'s')+' · '+doneCount+' completado'+(doneCount===1?'':'s')+'</div></div>'
       +'<button class="eh-new" id="epsNew">＋ Nuevo episodio</button>';
     { const en=ehead.querySelector('#epsNew'); if(en) en.onclick=newEpisodeModal; }
@@ -4128,9 +4173,17 @@ function sortedChars(){
 }
 function setSort(mode){
   window._sortMode = (mode==='abc') ? 'abc' : 'ints';
+  // update dropdown menu items
   const bi=document.getElementById('btnSortInts'), ba=document.getElementById('btnSortAbc');
   if(bi) bi.classList.toggle('on', window._sortMode==='ints');
   if(ba) ba.classList.toggle('on', window._sortMode==='abc');
+  // update Organizar button label to show current sort
+  const ob = document.getElementById('btnOrganizar');
+  if(ob){
+    const svg = ob.querySelector('svg');
+    ob.textContent = window._sortMode==='abc' ? 'Organizar: A–Z ' : 'Organizar ';
+    if(svg) ob.appendChild(svg);
+  }
   try{ renderCards(); }catch(e){}
   try{ if(typeof renderPlanilla==='function') renderPlanilla(); }catch(e){}
 }
