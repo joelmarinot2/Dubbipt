@@ -5429,160 +5429,215 @@ const pop2 = { win:null, doc:null, key:null, type:null, els:null, blockEls:[],
                blockMap:[], theme:'dark', boxw:'760' };
 
 const LIB_OVERRIDE = `
-/* ===== Módulo 3B · Panel del libreto — interfaz rediseñada ===== */
-/* ── Fuentes ── */
+/* ===== Módulo 3B · Panel del libreto — rediseño captura ===== */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-/* ── Fondo ── */
 body.dark{ background:var(--libbg,#0b0c0e) !important; }
 
-/* ── Barra superior verde ── */
+/* ─── Barra superior: verde, ancho completo, sin radio ni margen ─── */
 .lh{
   background:#22C55E !important;
-  border:none !important; border-radius:14px !important;
-  margin:10px 10px 0 !important; padding:8px 10px !important;
-  gap:6px !important; flex-wrap:wrap !important;
-  box-shadow:none !important; position:sticky !important; top:10px;
+  border:none !important; border-radius:0 !important;
+  margin:0 !important; padding:8px 14px !important;
+  gap:7px !important; flex-wrap:nowrap !important;
+  box-shadow:none !important; position:sticky !important; top:0;
+  overflow-x:auto; overflow-y:visible;
+  align-items:center !important;
 }
-.lh h2{ color:#06210f !important; font-family:'Inter',sans-serif !important; font-weight:700 !important; font-size:14px !important; }
+.lh h2{ display:none !important; }
 .lh .dot{ display:none !important; }
-.lh .sp{ flex:1 !important; min-width:8px; }
+.lh .sp{ flex:1 !important; min-width:4px; }
 
-/* Botón ← Atrás */
+/* Botón ← Atrás: píldora oscura */
 .lh .lbk{
-  height:34px; border-radius:9px !important; padding:0 13px !important;
+  height:34px; border-radius:99px !important; padding:0 13px !important;
   background:rgba(6,33,15,.22) !important; color:#06210f !important;
   border:none !important; font-family:'Inter',sans-serif !important;
   font-weight:700 !important; font-size:13px !important; white-space:nowrap;
+  flex:none;
 }
-.lh .lbk::after{ content:none !important; }
 .lh .lbk:hover{ background:rgba(6,33,15,.36) !important; }
 
-/* Estado de conexión */
-#lConn{
-  background:rgba(6,33,15,.22) !important; color:#06210f !important;
-  border-radius:8px !important; padding:5px 10px !important;
-  border:none !important; font-weight:600 !important; font-size:12px !important;
-  white-space:nowrap;
+/* pág. N — píldora oscura */
+.lh .goto{
+  display:flex !important; align-items:center !important; gap:4px !important;
+  background:rgba(6,33,15,.22) !important; border-radius:99px !important;
+  padding:6px 11px !important; flex:none !important;
 }
-
-/* Campo ir a página */
-.lh .goto{ background:rgba(6,33,15,.22) !important; border-radius:8px !important; padding:5px 9px !important; }
 .lh .goto span{ color:#06210f !important; font-weight:600 !important; font-size:12px !important; }
-.lh .goto input{ width:40px !important; background:transparent !important; border:none !important; color:#06210f !important; font-weight:700 !important; }
-.lh .goto input::placeholder{ color:rgba(6,33,15,.45) !important; }
+.lh .goto input{
+  width:36px !important; background:transparent !important; border:none !important;
+  color:#06210f !important; font-weight:700 !important; font-size:12px !important;
+  font-family:'JetBrains Mono',monospace !important; text-align:center !important;
+}
 
-/* Selector de personaje */
-#lScope{ background:rgba(6,33,15,.22) !important; color:#06210f !important; border:none !important; border-radius:8px !important; padding:5px 9px !important; font-size:14px !important; }
+/* Botón scope 👤 — círculo */
+#lScope{
+  width:34px !important; height:34px !important; border-radius:50% !important;
+  background:rgba(6,33,15,.22) !important; color:#06210f !important;
+  border:none !important; font-size:15px !important; flex:none !important;
+  display:inline-grid !important; place-items:center !important; cursor:pointer !important;
+}
+
+/* Selector de personaje: pastilla negra con punto de color */
 #lCharSel{
-  background:#0b1710 !important; color:#4ADE80 !important; border:none !important;
-  border-radius:8px !important; padding:6px 10px !important;
-  font-weight:600 !important; font-size:12px !important; max-width:140px !important;
-  font-family:'Inter',sans-serif !important;
+  background:#0b1a0f !important; color:#4ADE80 !important; border:none !important;
+  border-radius:99px !important; padding:7px 13px !important;
+  font-weight:700 !important; font-size:13px !important; flex:none !important;
+  font-family:'Inter',sans-serif !important; max-width:200px !important;
+  cursor:pointer !important;
 }
 
-/* Botones de icono — círculos compactos */
-.lh > button:not(.lbk):not(#lVid){
-  width:32px !important; height:32px !important; display:inline-grid !important;
-  place-items:center !important; background:rgba(6,33,15,.22) !important;
-  color:#06210f !important; border:none !important; border-radius:50% !important;
-  padding:0 !important; font-size:14px !important; cursor:pointer !important;
+/* Botones de icono: círculos semitransparentes */
+.lh > button:not(.lbk):not(#lVid):not(#lScope){
+  width:34px !important; height:34px !important;
+  display:inline-grid !important; place-items:center !important;
+  background:rgba(6,33,15,.22) !important; color:#06210f !important;
+  border:none !important; border-radius:50% !important;
+  padding:0 !important; font-size:15px !important; cursor:pointer !important; flex:none !important;
 }
-.lh > button:not(.lbk):not(#lVid):hover{ background:rgba(6,33,15,.36) !important; }
+.lh > button:not(.lbk):not(#lVid):not(#lScope):hover{ background:rgba(6,33,15,.36) !important; }
 
-/* ── Botón Video (antes lVid, ahora visible) ── */
+/* Botón Video: píldora oscura con icono */
 #lVid{
   display:inline-flex !important; align-items:center !important; gap:5px !important;
-  height:32px !important; padding:0 11px !important; border-radius:9px !important;
+  height:34px !important; padding:0 13px !important; border-radius:99px !important;
   background:rgba(6,33,15,.22) !important; color:#06210f !important;
   border:none !important; font-family:'Inter',sans-serif !important;
-  font-weight:700 !important; font-size:12px !important; cursor:pointer !important;
-  white-space:nowrap !important;
+  font-weight:700 !important; font-size:12.5px !important; cursor:pointer !important;
+  white-space:nowrap !important; flex:none !important;
 }
-#lVid::before{ content:'🎬'; font-size:13px; }
 #lVid:hover{ background:rgba(6,33,15,.36) !important; }
 #lTpad,#lConn2,#lLive{ display:none !important; }
 
-/* ── Subheader de página ── */
-.pgsep{
-  display:flex !important; align-items:center; gap:12px;
-  max-width:var(--boxw,900px); margin:16px auto !important;
-}
-.pgsep::before,.pgsep::after{ content:''; flex:1; height:1px; background:rgba(255,255,255,.08); }
-.pgsep span{
-  background:#15171a; color:#9CA3AF; padding:6px 18px; border-radius:99px;
-  font-family:'Inter',sans-serif !important; font-size:12px; border:1px solid #23262b;
-  white-space:nowrap; letter-spacing:.3px;
+/* Estado conexión */
+#lConn{
+  background:rgba(6,33,15,.22) !important; color:#06210f !important;
+  border-radius:99px !important; padding:5px 10px !important;
+  border:none !important; font-weight:600 !important; font-size:11px !important;
+  white-space:nowrap; flex:none;
 }
 
-/* ── Bloques de intervención ── */
+/* ─── Separador de escena/página ─── */
+.pgsep{
+  display:flex !important; align-items:center; gap:10px;
+  max-width:var(--boxw,960px); margin:18px auto !important; padding:0 4px;
+}
+.pgsep::before,.pgsep::after{ content:''; flex:1; height:1px; background:rgba(255,255,255,.07); }
+.pgsep span{
+  background:#111316; color:#6b7280; padding:5px 16px; border-radius:99px;
+  font-family:'Inter',sans-serif !important; font-size:11.5px;
+  border:1px solid #1c1e22; white-space:nowrap; letter-spacing:.5px; text-transform:uppercase;
+}
+
+/* ─── Bloques de intervención — layout de la captura ─── */
+/* Fondo de página: sin card individual, fondo plano oscuro, bloques apilados */
 .blk{
-  background:#111316 !important; border:1px solid #1c1e22 !important;
-  border-radius:12px !important; padding:13px 16px !important;
-  margin:0 auto 10px !important;
+  background:transparent !important;
+  border:none !important; border-radius:0 !important;
+  padding:10px 18px !important;
+  margin:0 auto !important;
+  max-width:var(--boxw,960px);
+  display:grid !important;
+  grid-template-columns:72px 1fr !important;
+  grid-template-rows:auto auto !important;
+  gap:0 14px !important;
+  align-items:start !important;
+  border-bottom:1px solid #17191c !important;
 }
-.blk .bhead{
-  display:flex !important; justify-content:space-between !important;
-  align-items:baseline !important; gap:10px !important; margin-bottom:5px !important;
-  flex-wrap:nowrap !important;
-}
-/* timecode: compacto, no gigante */
+.blk:last-child{ border-bottom:none !important; }
+
+/* Timecode: columna izquierda, ambas filas */
+.blk .bhead{ display:contents !important; }
 .blk .tc{
+  grid-column:1 !important; grid-row:1 !important;
   color:#6b7280 !important; font-family:'JetBrains Mono',monospace !important;
-  font-size:12px !important; font-weight:500 !important; flex:0 0 auto !important;
-  text-shadow:none !important; letter-spacing:.3px;
+  font-size:12px !important; font-weight:500 !important;
+  letter-spacing:.3px !important; padding-top:2px !important;
+  white-space:nowrap !important; text-shadow:none !important;
 }
+
+/* Nombre del personaje: columna derecha fila 1 */
 .blk .who{
-  color:#8b8f97 !important; font-family:'Inter',sans-serif !important;
-  font-size:13px !important; font-weight:600 !important; text-align:right !important;
-  position:static !important; transform:none !important;
-  max-width:55% !important; line-height:1.2 !important;
-  word-break:break-word !important; text-transform:uppercase !important;
-  letter-spacing:.5px !important;
+  grid-column:2 !important; grid-row:1 !important;
+  color:#4ADE80 !important; font-family:'Inter',sans-serif !important;
+  font-size:13px !important; font-weight:700 !important;
+  text-align:left !important; position:static !important; transform:none !important;
+  letter-spacing:.3px !important; line-height:1.3 !important;
+  text-transform:uppercase !important; max-width:100% !important; word-break:break-word !important;
 }
+
+/* Texto del diálogo: columna derecha fila 2 */
 .blk .tx{
-  color:#c7c9cd !important; font-size:16px !important;
-  line-height:1.6 !important; clear:both !important;
-  font-family:'Inter',sans-serif !important;
+  grid-column:2 !important; grid-row:2 !important;
+  color:#d1d5db !important; font-size:16px !important;
+  line-height:1.55 !important; font-family:'Inter',sans-serif !important;
   overflow-wrap:break-word !important; word-break:break-word !important;
+  padding-bottom:2px !important;
 }
-/* bloque del personaje resaltado (ámbar) */
-.blk.mine{
-  border-color:#7a5f18 !important;
-  background:linear-gradient(160deg,rgba(251,191,36,.08),rgba(251,191,36,.02)),#141108 !important;
-}
-.blk.mine .tc{
-  color:#FBBF24 !important; font-size:12px !important;
-  font-weight:700 !important; text-shadow:none !important;
-}
-.blk.mine .who{ color:#FBBF24 !important; }
-.blk.mine .tx{
-  color:#fff !important; font-weight:600 !important;
-  font-size:var(--minefs,17px) !important; line-height:1.6 !important;
+
+/* Acotaciones (narración): sin columnas, centrado */
+.blk.narr{
+  display:block !important; padding:7px 18px !important; opacity:.6 !important;
 }
 .blk.narr .who{ display:none !important; }
+.blk.narr .tc{ color:#4b5563 !important; font-size:11px !important; }
+.blk.narr .tx{ font-style:italic !important; font-size:14px !important; color:#6b7280 !important; }
 
-/* ── Barra inferior (anchos de columna) ── */
-.lbar{
-  background:#111316 !important; border-top:1px solid #23262b !important;
-  padding:8px 12px !important; gap:6px !important; flex-wrap:wrap !important;
+/* ─── Resaltado del personaje activo: VERDE (no ámbar) ─── */
+.blk.mine{
+  background:#0d1f13 !important;
+  border-left:3px solid #22C55E !important;
+  border-bottom:1px solid #1a2d1e !important;
+  padding-left:15px !important;   /* compensar el border-left de 3px */
 }
-.lbar span{ color:#8b8f97 !important; font-family:'Inter',sans-serif !important; font-size:12px !important; }
+.blk.mine .tc{
+  color:#22C55E !important; font-size:12px !important;
+  font-weight:700 !important; text-shadow:none !important;
+}
+.blk.mine .who{ color:#4ADE80 !important; }
+.blk.mine .tx{
+  color:#f2f3f5 !important; font-weight:600 !important;
+  font-size:var(--minefs,17px) !important; line-height:1.55 !important;
+}
+
+/* herramientas de marcación (tablet) inline */
+.blk .mtools{ grid-column:2; grid-row:3; display:none; gap:5px; margin-top:6px; flex-wrap:wrap; }
+.blk.active .mtools, body.tablet .blk .mtools{ display:flex; }
+
+/* ─── Barra inferior de anchos ─── */
+.lbar{
+  background:#111316 !important; border-top:1px solid #1c1e22 !important;
+  padding:8px 14px !important; gap:6px !important; flex-wrap:wrap !important;
+  justify-content:center !important;
+}
+.lbar span{ color:#6b7280 !important; font-family:'Inter',sans-serif !important; font-size:11.5px !important; }
 .lbar button{
   border:1px solid #23262b !important; background:transparent !important;
-  color:#c7c9cd !important; border-radius:8px !important;
-  padding:6px 12px !important; font-size:12.5px !important;
+  color:#9CA3AF !important; border-radius:99px !important;
+  padding:5px 14px !important; font-size:12px !important;
   font-family:'Inter',sans-serif !important; font-weight:600 !important; cursor:pointer !important;
 }
 .lbar button:hover{ border-color:#4ADE80 !important; color:#f2f3f5 !important; }
 .lbar button.act{ background:#22C55E !important; color:#06210f !important; border-color:#22C55E !important; font-weight:700 !important; }
 
-/* ── Riel de páginas ── */
-.lchips > *{ border-radius:8px !important; }
+/* ─── Riel de páginas (derecha en escritorio) ─── */
+.lchips > *{ border-radius:6px !important; }
+.lchips .pgchip{
+  font-family:'Inter',sans-serif !important; font-size:12px !important;
+  font-weight:600 !important; padding:7px 4px !important; text-align:center !important;
+  border:none !important; background:transparent !important; color:#6b7280 !important;
+}
+.lchips .pgchip:hover{ color:#f2f3f5 !important; background:rgba(255,255,255,.06) !important; }
+.lchips .pgchip.cur{
+  background:#22C55E !important; color:#06210f !important;
+  border-radius:8px !important; font-weight:700 !important;
+}
+.lchips .pgchip.rec{ text-decoration:line-through !important; color:#4ADE80 !important; background:transparent !important; }
 
-/* ── Cajón de herramientas (tablet) ── */
+/* ─── Cajón de herramientas (tablet) ─── */
 .ltools{ background:#111316 !important; border-left:1px solid #23262b !important; }
-.ltools .tt{ color:#4ADE80 !important; font-family:'Inter',sans-serif !important; font-size:10px !important; letter-spacing:.8px !important; }
+.ltools .tt{ color:#4ADE80 !important; font-size:10px !important; letter-spacing:.8px !important; font-family:'Inter',sans-serif !important; }
 .ltools button{ background:#0f1215 !important; color:#c7c9cd !important; border:1px solid #23262b !important; border-radius:9px !important; font-family:'Inter',sans-serif !important; }
 .ltools button:hover{ border-color:#4ADE80 !important; background:#161a1e !important; }
 .ltools button.on{ background:#22C55E !important; color:#06210f !important; border:none !important; }
@@ -5591,19 +5646,17 @@ body.dark{ background:var(--libbg,#0b0c0e) !important; }
 .ltools #tHide{ background:transparent !important; border:none !important; color:#4ADE80 !important; text-align:center !important; }
 .dtab{ background:#111316 !important; border:1px solid #22C55E !important; color:#4ADE80 !important; }
 
-/* ── Responsivo: móvil y tablet estrecha ── */
+/* ─── Responsivo ─── */
 @media(max-width:680px){
-  .lh{ margin:6px !important; padding:6px 8px !important; gap:4px !important; top:6px !important; border-radius:10px !important; }
-  .lh h2{ font-size:13px !important; }
-  #lCharSel{ max-width:100px !important; font-size:11px !important; }
+  .lh{ flex-wrap:wrap !important; }
+  .blk{ grid-template-columns:60px 1fr !important; padding:8px 12px !important; }
   .blk .tx{ font-size:15px !important; }
-  .blk.mine .tx{ font-size:var(--minefs,16px) !important; }
-  .lbar{ padding:6px 8px !important; }
-  .lbar button{ padding:5px 9px !important; font-size:11.5px !important; }
+  #lCharSel{ max-width:130px !important; font-size:12px !important; }
   #lScope,#lTheme,#lClean,#lPron,#lColor{ display:none !important; }
 }
 @media(max-width:420px){
-  #lFontDn,#lFontUp{ display:none !important; }
+  .blk{ grid-template-columns:52px 1fr !important; gap:0 8px !important; }
+  #lFontDn,#lFontUp,#lVid{ display:none !important; }
   .lh .goto{ display:none !important; }
 }
 `;
@@ -5657,11 +5710,9 @@ body.light .blk.mine .tc{color:#B45309;text-shadow:none}
   color:var(--dim);text-transform:uppercase;line-height:1}
 .blk .tx{font-size:17px;line-height:1.55;color:var(--ink);white-space:normal;
   overflow-wrap:break-word;word-break:break-word}
-/* intervención del personaje activo: caja resaltada en pastel + texto negrita */
-body.dark .blk.mine{background:linear-gradient(135deg,rgba(95,200,90,.34),rgba(95,200,90,.18));
-  border:1px solid var(--pc,#A9E6A9);box-shadow:0 2px 12px rgba(95,200,90,.22)}
-body.light .blk.mine{background:linear-gradient(135deg,rgba(140,105,255,.24),rgba(140,105,255,.12));
-  border:1px solid var(--pc,#8C69FF);box-shadow:0 2px 12px rgba(140,105,255,.18)}
+/* intervención del personaje activo: verde */
+body.dark .blk.mine{background:rgba(34,197,94,.08);border-left:3px solid #22C55E}
+body.light .blk.mine{background:rgba(34,197,94,.10);border-left:3px solid #22C55E}
 .blk.mine .who{color:var(--pc,#5FC85A)}
 .blk.mine .tx{font-weight:700;font-size:var(--minefs,18px);line-height:1.6}
 body.light .blk.mine .tx{color:#1a1530}
