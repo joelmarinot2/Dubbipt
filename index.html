@@ -1430,7 +1430,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.6.0-nube · 12-ago-2026';
+const APP_VERSION = 'v10.7.0-nube · 13-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -5530,72 +5530,71 @@ body.dark{ background:var(--libbg,#0b0c0e) !important; }
   border:1px solid #1c1e22; white-space:nowrap; letter-spacing:.5px; text-transform:uppercase;
 }
 
-/* ─── Bloques de intervención — layout de la captura ─── */
-/* Fondo de página: sin card individual, fondo plano oscuro, bloques apilados */
+/* ─── Bloques de intervención — timecode IZQUIERDA · nombre DERECHA · líneas CENTRO ─── */
 .blk{
   background:transparent !important;
   border:none !important; border-radius:0 !important;
-  padding:10px 18px !important;
-  margin:0 auto !important;
+  padding:11px 20px !important;
+  margin:0 auto 2px !important;
   max-width:var(--boxw,960px);
-  display:grid !important;
-  grid-template-columns:72px 1fr !important;
-  grid-template-rows:auto auto !important;
-  gap:0 14px !important;
-  align-items:start !important;
+  display:block !important;
   border-bottom:1px solid #17191c !important;
 }
 .blk:last-child{ border-bottom:none !important; }
 
-/* Timecode: columna izquierda, ambas filas */
-.blk .bhead{ display:contents !important; }
+/* Cabecera: una fila con el timecode a la izquierda y el nombre a la derecha */
+.blk .bhead{
+  display:flex !important; align-items:center !important;
+  justify-content:space-between !important; gap:14px !important;
+  margin-bottom:6px !important;
+}
 .blk .tc{
-  grid-column:1 !important; grid-row:1 !important;
-  color:#6b7280 !important; font-family:'JetBrains Mono',monospace !important;
+  order:0 !important;
+  color:#8b8f97 !important; font-family:'JetBrains Mono',monospace !important;
   font-size:12px !important; font-weight:500 !important;
-  letter-spacing:.3px !important; padding-top:2px !important;
-  white-space:nowrap !important; text-shadow:none !important;
+  letter-spacing:.3px !important; white-space:nowrap !important; text-shadow:none !important;
+  background:rgba(255,255,255,.045) !important; padding:3px 8px !important; border-radius:6px !important;
 }
-
-/* Nombre del personaje: columna derecha fila 1 */
+/* Nombre del personaje: a la DERECHA, con el color propio del personaje */
 .blk .who{
-  grid-column:2 !important; grid-row:1 !important;
-  color:#4ADE80 !important; font-family:'Inter',sans-serif !important;
+  order:2 !important; margin-left:auto !important;
+  color:var(--pc,#4ADE80) !important; font-family:'Inter',sans-serif !important;
   font-size:13px !important; font-weight:700 !important;
-  text-align:left !important; position:static !important; transform:none !important;
-  letter-spacing:.3px !important; line-height:1.3 !important;
-  text-transform:uppercase !important; max-width:100% !important; word-break:break-word !important;
+  text-align:right !important; position:static !important; transform:none !important;
+  letter-spacing:.4px !important; line-height:1.3 !important;
+  text-transform:uppercase !important; max-width:60% !important; word-break:break-word !important;
 }
-
-/* Texto del diálogo: columna derecha fila 2 */
+/* Líneas del diálogo: CENTRADAS */
 .blk .tx{
-  grid-column:2 !important; grid-row:2 !important;
   color:#d1d5db !important; font-size:16px !important;
   line-height:1.55 !important; font-family:'Inter',sans-serif !important;
   overflow-wrap:break-word !important; word-break:break-word !important;
-  padding-bottom:2px !important;
+  text-align:center !important; padding:0 4px 2px !important;
 }
+.blk .mtools{ justify-content:center !important; }
 
-/* Acotaciones (narración): sin columnas, centrado */
-.blk.narr{
-  display:block !important; padding:7px 18px !important; opacity:.6 !important;
-}
+/* Acotaciones (narración): centrado y tenue */
+.blk.narr{ padding:7px 20px !important; opacity:.6 !important; }
 .blk.narr .who{ display:none !important; }
-.blk.narr .tc{ color:#4b5563 !important; font-size:11px !important; }
+.blk.narr .bhead{ justify-content:center !important; }
+.blk.narr .tc{ color:#4b5563 !important; font-size:11px !important; background:transparent !important; padding:0 !important; }
 .blk.narr .tx{ font-style:italic !important; font-size:14px !important; color:#6b7280 !important; }
 
-/* ─── Resaltado del personaje activo: VERDE (no ámbar) ─── */
+/* ─── Resaltado del personaje seleccionado: borde y timecode DEL COLOR DEL PERSONAJE ─── */
 .blk.mine{
-  background:#0d1f13 !important;
-  border-left:3px solid #22C55E !important;
-  border-bottom:1px solid #1a2d1e !important;
-  padding-left:15px !important;   /* compensar el border-left de 3px */
+  border:1px solid var(--pc,#22C55E) !important;
+  border-radius:12px !important;
+  background:color-mix(in srgb, var(--pc,#22C55E) 11%, #0c0e11) !important;
+  margin:8px auto !important;
+  padding:12px 18px !important;
+  box-shadow:0 0 0 1px color-mix(in srgb, var(--pc,#22C55E) 22%, transparent) inset !important;
 }
 .blk.mine .tc{
-  color:#22C55E !important; font-size:12px !important;
+  color:var(--pc,#22C55E) !important; font-size:12px !important;
   font-weight:700 !important; text-shadow:none !important;
+  background:color-mix(in srgb, var(--pc,#22C55E) 16%, #0c0e11) !important;
 }
-.blk.mine .who{ color:#4ADE80 !important; }
+.blk.mine .who{ color:var(--pc,#4ADE80) !important; }
 .blk.mine .tx{
   color:#f2f3f5 !important; font-weight:600 !important;
   font-size:var(--minefs,17px) !important; line-height:1.55 !important;
@@ -5621,19 +5620,33 @@ body.dark{ background:var(--libbg,#0b0c0e) !important; }
 .lbar button:hover{ border-color:#4ADE80 !important; color:#f2f3f5 !important; }
 .lbar button.act{ background:#22C55E !important; color:#06210f !important; border-color:#22C55E !important; font-weight:700 !important; }
 
-/* ─── Riel de páginas (derecha en escritorio) ─── */
-.lchips > *{ border-radius:6px !important; }
+/* ─── Riel de páginas — mejor integrado con la barra y el fondo ─── */
+.lchips{
+  background:linear-gradient(180deg, rgba(34,197,94,.05), transparent 120px), #0e1013 !important;
+  border-left:1px solid #1b1e22 !important;
+  padding:10px 8px !important; gap:3px !important;
+}
+.lchips .pglabel{
+  font-family:'Inter',sans-serif !important; font-size:10px !important; font-weight:700 !important;
+  letter-spacing:1.2px !important; color:#22C55E !important; text-align:center !important;
+  padding:2px 0 8px !important; text-transform:uppercase !important; flex:none !important;
+  position:sticky !important; top:0 !important; background:#0e1013 !important; z-index:2 !important;
+}
+.lchips > *{ border-radius:8px !important; }
 .lchips .pgchip{
-  font-family:'Inter',sans-serif !important; font-size:12px !important;
-  font-weight:600 !important; padding:7px 4px !important; text-align:center !important;
-  border:none !important; background:transparent !important; color:#6b7280 !important;
+  font-family:'JetBrains Mono',monospace !important; font-size:12px !important;
+  font-weight:600 !important; padding:8px 4px !important; text-align:center !important;
+  border:none !important; background:transparent !important; color:#7b7f87 !important;
+  transition:background .12s, color .12s !important;
 }
 .lchips .pgchip:hover{ color:#f2f3f5 !important; background:rgba(255,255,255,.06) !important; }
 .lchips .pgchip.cur{
   background:#22C55E !important; color:#06210f !important;
-  border-radius:8px !important; font-weight:700 !important;
+  border-radius:9px !important; font-weight:700 !important;
+  box-shadow:0 3px 10px rgba(34,197,94,.28) !important;
 }
-.lchips .pgchip.rec{ text-decoration:line-through !important; color:#4ADE80 !important; background:transparent !important; }
+.lchips .pgchip.rec{ text-decoration:line-through !important; color:#4ADE80 !important; background:rgba(74,222,128,.08) !important; }
+.lchips .pgchip.rec.cur{ color:#06210f !important; background:#22C55E !important; }
 
 /* ─── Cajón de herramientas (tablet) ─── */
 .ltools{ background:#111316 !important; border-left:1px solid #23262b !important; }
@@ -5645,6 +5658,40 @@ body.dark{ background:var(--libbg,#0b0c0e) !important; }
 .ltools input{ background:#0f1215 !important; color:#f2f3f5 !important; border:1px solid #23262b !important; border-radius:9px !important; font-family:'JetBrains Mono',monospace !important; }
 .ltools #tHide{ background:transparent !important; border:none !important; color:#4ADE80 !important; text-align:center !important; }
 .dtab{ background:#111316 !important; border:1px solid #22C55E !important; color:#4ADE80 !important; }
+
+/* ─── Modo claro: colores legibles para el nuevo layout de cajas ─── */
+body.light .blk{ border-bottom:1px solid #e6e2f2 !important; }
+body.light .blk .tc{ color:#6b7280 !important; background:rgba(0,0,0,.05) !important; }
+body.light .blk .tx{ color:#2a2540 !important; }
+body.light .blk.mine{
+  background:color-mix(in srgb, var(--pc,#22C55E) 12%, #ffffff) !important;
+  border:1px solid var(--pc,#22C55E) !important;
+  box-shadow:0 0 0 1px color-mix(in srgb, var(--pc,#22C55E) 25%, transparent) inset !important;
+}
+body.light .blk.mine .tc{ color:var(--pc,#B45309) !important; background:color-mix(in srgb, var(--pc,#22C55E) 18%, #ffffff) !important; }
+body.light .blk.mine .tx{ color:#1a1530 !important; }
+body.light .lchips{ background:#f7f5fd !important; border-left:1px solid #e6e2f2 !important; }
+body.light .lchips .pglabel{ background:#f7f5fd !important; }
+body.light .lchips .pgchip{ color:#6b6786 !important; }
+body.light .ltoolhide{ background:#ffffff; color:#16a34a; border-color:#e2ddf2; }
+
+/* ─── Flecha para ocultar/mostrar la barra (reemplaza «expandir») ─── */
+.ltoolhide{
+  position:fixed !important; top:var(--lhH,54px); left:50%; transform:translateX(-50%);
+  z-index:17; width:48px; height:21px; display:grid !important; place-items:center;
+  background:#111316; color:#4ADE80; border:1px solid #1c1e22; border-top:none;
+  border-radius:0 0 12px 12px; padding:0 !important; cursor:pointer; transition:top .15s, background .12s;
+  box-shadow:0 6px 14px rgba(0,0,0,.28);
+}
+.ltoolhide:hover{ background:#161a1e; color:#22C55E; }
+.ltoolhide svg{ width:16px; height:16px; }
+body.toolhidden .lh{ display:none !important; }
+body.toolhidden .ltoolhide{ top:0; border-top:1px solid #1c1e22; }
+
+/* Barra de herramientas: SVG bien centrados; botón Video con icono + texto */
+.lh button svg{ display:block; }
+#lVid svg{ width:16px; height:16px; margin-right:1px; }
+#lVid span{ line-height:1; }
 
 /* ─── Responsivo ─── */
 @media(max-width:680px){
@@ -5662,7 +5709,9 @@ body.dark{ background:var(--libbg,#0b0c0e) !important; }
 `;
 const LIB_CSS = `
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',system-ui,sans-serif;overflow:hidden;height:100vh}
+:root{--lhH:54px}
+body{font-family:'Inter',system-ui,sans-serif;overflow:hidden;height:100vh;height:100dvh;
+  display:flex;flex-direction:column}
 /* ---- tema oscuro (por defecto) ---- */
 body.dark{--bg:#0b0c0e;--head:#111316;--card:#15171a;--card-b:#23262b;--ink:#f2f3f5;
   --dim:#8b8f97;--tcc:#4ADE80;--sep:#23262b}
@@ -5672,7 +5721,7 @@ body.light{--bg:#f4f2fb;--head:#ffffff;--card:#ffffff;--card-b:#e2ddf2;--ink:#1e
 body{background:var(--bg);color:var(--ink)}
 .lh{display:flex;align-items:center;gap:9px;padding:9px 13px;background:var(--head);
   border-bottom:1px solid var(--card-b);position:sticky;top:0;z-index:10;flex-wrap:wrap;
-  font-family:'Inter',sans-serif}
+  flex:0 0 auto;font-family:'Inter',sans-serif}
 .lh .dot{width:12px;height:12px;border-radius:4px;background:var(--pc,#5FC85A);box-shadow:0 0 10px var(--pc)}
 .lh h2{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;white-space:nowrap}
 .lh .sp{flex:1}
@@ -5686,7 +5735,7 @@ body{background:var(--bg);color:var(--ink)}
 .lh .goto input{width:52px;background:var(--bg);border:1px solid var(--card-b);color:var(--ink);
   border-radius:7px;padding:5px 7px;font-size:12px;font-family:ui-monospace,monospace;text-align:center}
 .lh .live{font-family:ui-monospace,monospace;font-size:13px;color:var(--tcc);min-width:80px;text-align:right;font-weight:600}
-.lwrap{height:calc(100vh - 100px);overflow-y:auto;overflow-x:hidden;padding:20px 18px;scroll-behavior:auto}
+.lwrap{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:20px 18px 60px;scroll-behavior:auto}
 .lwrap.tp{scroll-behavior:smooth}
 .lspacer{height:40vh}
 /* separador de página */
@@ -5743,7 +5792,7 @@ body.light .blk.centerhi{box-shadow:0 0 0 3px var(--pc,#4CB84C)}
 @keyframes tapselA{0%{box-shadow:0 0 0 5px var(--pc,#5FC85A)}100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}}
 .conn{font-size:11px;font-weight:700;letter-spacing:.4px;padding:4px 10px;border-radius:99px;border:1px solid;white-space:nowrap}
 .lfind{display:none;align-items:center;gap:8px;padding:9px 13px;background:var(--head);
-  border-bottom:1px solid var(--card-b);position:sticky;top:52px;z-index:15}
+  border-bottom:1px solid var(--card-b);position:sticky;top:var(--lhH,54px);z-index:15}
 body.finding .lfind{display:flex}
 .lfind input{flex:1;min-width:0;background:var(--card);border:1px solid var(--card-b);color:var(--ink);
   border-radius:9px;padding:9px 12px;font-size:15px;outline:none}
@@ -5798,7 +5847,7 @@ body.haschips .lchips .ctabs{display:flex;gap:4px;position:sticky;top:0;backgrou
   color:#08240f;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;cursor:pointer;
   box-shadow:0 8px 24px rgba(74,222,128,.35)}
 /* ---- escritorio: páginas a la DERECHA en la misma ventana ---- */
-body.deskchips .lchips{position:fixed;right:0;top:52px;bottom:0;width:88px;display:flex;
+body.deskchips .lchips{position:fixed;right:0;top:var(--lhH,54px);bottom:0;width:88px;display:flex;
   flex-direction:column;align-items:stretch;overflow-y:auto;overflow-x:hidden;
   border-left:1px solid var(--card-b);border-bottom:none;z-index:15}
 body.deskchips .lchips .pgchip{text-align:center}
@@ -5820,12 +5869,12 @@ body.haschips .lh .goto, body.haschips .lh #lScope, body.haschips .lh #lTheme,
 body.haschips .lh #lTablet, body.haschips .lh #lTp, body.haschips .lh #lEye,
 body.haschips .lh #lFontDn, body.haschips .lh #lFontUp, body.haschips .lh #lPron, body.haschips .lh #lClean, body.haschips .lh #lFind, body.haschips .lh #lPip{display:none}
 body.haschips .lfind{position:fixed;left:0;right:0;top:0;z-index:40}
-body.haschips .lchips{position:fixed;left:0;top:52px;bottom:0;width:88px;display:flex;
+body.haschips .lchips{position:fixed;left:0;top:var(--lhH,54px);bottom:0;width:88px;display:flex;
   flex-direction:column;align-items:stretch;overflow-y:auto;overflow-x:hidden;
   border-right:1px solid var(--card-b);border-bottom:none;z-index:15;transition:transform .2s}
 body.haschips.lclosed .lchips{transform:translateX(-100%)}
 body.haschips .lchips .pgchip{text-align:center}
-.ltools{display:none;position:fixed;right:0;top:52px;bottom:0;width:158px;background:var(--head);
+.ltools{display:none;position:fixed;right:0;top:var(--lhH,54px);bottom:0;width:158px;background:var(--head);
   border-left:1px solid var(--card-b);z-index:15;padding:12px 10px;flex-direction:column;gap:7px;
   overflow-y:auto;transition:transform .2s}
 body.haschips .ltools{display:flex}
@@ -6071,6 +6120,23 @@ async function libEmptyAction(what, silent){
   }
 }
 
+/* ── Iconos del libreto: trazos limpios (sin emojis) ──
+   18px, stroke=currentColor, heredan el color del botón. */
+const LIB_SVG = (p, sw)=> '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="'+(sw||2)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+p+'</svg>';
+const LIB_ICON = {
+  scopeOne : LIB_SVG('<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.5-6 8-6s8 2 8 6"/>'),                 // 👤 solo este personaje
+  scopeAll : LIB_SVG('<path d="M12 5.5C10 4 7 4 4 5v13c3-1 6-1 8 .5 2-1.5 5-1.5 8-.5V5c-3-1-6-1-8 .5z"/><path d="M12 6v13"/>'), // 📖 todo el libreto
+  sun      : LIB_SVG('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+  moon     : LIB_SVG('<path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/>'),
+  edit     : LIB_SVG('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/>'),                     // ✏️
+  sliders  : LIB_SVG('<path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h8M16 18h4"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="14" cy="18" r="2"/>'), // 🎛️
+  search   : LIB_SVG('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>'),                                   // 🔍
+  speak    : LIB_SVG('<path d="M4 5h11a2 2 0 012 2v6a2 2 0 01-2 2H9l-4 3v-3H4a2 2 0 01-2-2V7a2 2 0 012-2z"/><path d="M19 8c1.2 1 1.2 5 0 6"/>'), // 🗣
+  palette  : LIB_SVG('<path d="M12 3a9 9 0 100 18h1.5a2 2 0 001.6-3.2 2 2 0 011.6-3.2H19a3 3 0 003-3A9 9 0 0012 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="14.5" cy="7" r="1"/><circle cx="17" cy="11" r="1"/>'), // 🎨
+  video    : LIB_SVG('<rect x="2.5" y="5.5" width="13" height="13" rx="2"/><path d="M15.5 9.5l6-3v11l-6-3z"/>'),      // Video
+  chevUp   : LIB_SVG('<path d="M6 15l6-6 6 6"/>', 2.4),
+  chevDown : LIB_SVG('<path d="M6 9l6 6 6-6"/>', 2.4)
+};
 function buildLibretoDoc(pc){
   const d = pop2.win.document;
   if(!script || !script.length){
@@ -6131,20 +6197,21 @@ function buildLibretoDoc(pc){
       <span class="conn no" id="lConn" role="status" aria-live="polite">● sin conexión</span>
       <span class="sp"></span>
       <span class="goto"><span>pág.</span><input id="lGoto" type="number" min="1" placeholder="#" aria-label="Ir a página"></span>
-      <button id="lScope" title="Alcance: solo este personaje o todo el libreto" aria-label="Cambiar alcance: personaje o libreto completo">${pop2.scopeAll?'📖':'👤'}</button>
+      <button id="lScope" title="Alcance: solo este personaje o todo el libreto" aria-label="Cambiar alcance: personaje o libreto completo">${pop2.scopeAll?LIB_ICON.scopeAll:LIB_ICON.scopeOne}</button>
       <select id="lCharSel" title="Resaltar un personaje" aria-label="Resaltar un personaje" style="background:#191238;color:#ECE9FB;border:1px solid #2a2350;border-radius:8px;padding:5px 6px;font-size:12px;max-width:160px"></select>
-      <button id="lTheme" title="Modo claro / oscuro" aria-label="Cambiar modo claro u oscuro">${pop2.theme==='dark'?'☀️':'🌙'}</button>
+      <button id="lTheme" title="Modo claro / oscuro" aria-label="Cambiar modo claro u oscuro">${pop2.theme==='dark'?LIB_ICON.sun:LIB_ICON.moon}</button>
       <button id="lFontDn" title="Letra del personaje más pequeña" aria-label="Reducir tamaño de letra">A−</button>
       <button id="lFontUp" title="Letra del personaje más grande" aria-label="Aumentar tamaño de letra">A+</button>
-      <button id="lClean" title="Vista limpia: solo el libreto" aria-label="Vista limpia, ocultar herramientas">⛶</button>
-      <button id="lVid" title="Video Estudio: video/audio del capítulo" aria-label="Abrir Video Estudio">Video</button>
-      <button id="lTablet" title="Modo tablet: herramientas de marcación" aria-label="Activar modo tablet con herramientas de marcación">✏️</button>
-      ${(DEVROLE==='tablet') ? '<button id="lTpad" title="Pasar al trackpad: controlar el libreto del escritorio" aria-label="Pasar al modo trackpad">🎛️</button>' : ''}
-      <button id="lFind" title="Buscar en el libreto" aria-label="Buscar en el libreto">🔍</button>
-      <button id="lPron" title="Pronunciaciones del libreto" aria-label="Ver pronunciaciones del libreto">🗣</button>\n      <button id="lColor" title="Colores del libreto (resaltado y fondo)" aria-label="Cambiar colores del libreto">🎨</button>
+      <button id="lVid" title="Video Estudio: video/audio del capítulo" aria-label="Abrir Video Estudio">${LIB_ICON.video}<span>Video</span></button>
+      <button id="lTablet" title="Modo tablet: herramientas de marcación" aria-label="Activar modo tablet con herramientas de marcación">${LIB_ICON.edit}</button>
+      ${(DEVROLE==='tablet') ? '<button id="lTpad" title="Pasar al trackpad: controlar el libreto del escritorio" aria-label="Pasar al modo trackpad">'+LIB_ICON.sliders+'</button>' : ''}
+      <button id="lFind" title="Buscar en el libreto" aria-label="Buscar en el libreto">${LIB_ICON.search}</button>
+      <button id="lPron" title="Pronunciaciones del libreto" aria-label="Ver pronunciaciones del libreto">${LIB_ICON.speak}</button>
+      <button id="lColor" title="Colores del libreto (resaltado y fondo)" aria-label="Cambiar colores del libreto">${LIB_ICON.palette}</button>
       <span class="conn no" id="lConn2" style="display:none" role="status" aria-live="polite"></span>
       <span class="live" id="lLive" role="status" aria-live="polite"></span>
     </div>
+    <button class="ltoolhide" id="lHide" title="Ocultar / mostrar la barra de herramientas" aria-label="Ocultar o mostrar la barra">${LIB_ICON.chevUp}</button>
     <div class="lfind" id="lFindBar">
       <input id="lFindInput" type="text" placeholder="Buscar palabra…" autocomplete="off">
       <span class="lfcount" id="lFindCount"></span>
@@ -6154,23 +6221,23 @@ function buildLibretoDoc(pc){
     </div>
     <div class="lchips" id="lChips"></div>
     <div class="ltools" id="lTools">
-      <button id="tHide" style="text-align:center">⟩ Ocultar herramientas</button>
+      <button id="tHide" style="text-align:center">${LIB_ICON.chevUp} Ocultar herramientas</button>
       <div class="tt">Vista</div>
-      <div class="trow"><button id="tScope">👤</button><button id="tTheme">🌙</button></div>
+      <div class="trow"><button id="tScope">${pop2.scopeAll?LIB_ICON.scopeAll:LIB_ICON.scopeOne}</button><button id="tTheme">${pop2.theme==='dark'?LIB_ICON.sun:LIB_ICON.moon}</button></div>
       <div class="tt">Página</div>
       <div class="trow"><input id="tPg" placeholder="#" inputmode="numeric" style="flex:1;min-width:0;padding:8px 6px"><button id="tPgGo" style="flex:0 0 auto">Ir</button></div>
       <div class="tt">Letra</div>
       <div class="trow"><button id="tFontDn">A−</button><button id="tFontUp">A+</button></div>
       <div class="tt">Tiempo</div>
       <input id="tTC" placeholder="00:01:15:00" inputmode="numeric">
-      <button id="tGo">⏱ Ir al tiempo</button>
+      <button id="tGo">Ir al tiempo</button>
       <div class="tt">Marcar</div>
-      <button id="tEdit">✏️ Editar</button>
+      <button id="tEdit">${LIB_ICON.edit} Editar</button>
       <button id="tPause">/ Pausa</button>
       <button id="tAccent">á Acento</button>
-      <button id="tClear">↺ Limpiar</button>
-      <button id="tPron">🗣 Pronunc.</button>
-      <button id="tFind">🔍 Buscar</button>
+      <button id="tClear">Limpiar</button>
+      <button id="tPron">${LIB_ICON.speak} Pronunc.</button>
+      <button id="tFind">${LIB_ICON.search} Buscar</button>
       <div class="tt">Grabación</div>
       <button id="tRec" class="grn">✓ Grabada</button>
     </div>
@@ -6255,7 +6322,7 @@ function buildLibretoDoc(pc){
   if(tEdit) tEdit.addEventListener('click', ()=>{
     if(pop2.editMode){
       saveEditBox(); pop2.editMode = false;
-      tEdit.classList.remove('on'); tEdit.textContent = '✏️ Editar';
+      tEdit.classList.remove('on'); tEdit.innerHTML = LIB_ICON.edit + ' Editar';
       pop2.els.live.textContent = '';
     } else {
       setMarkMode(null); if(tP) tP.classList.remove('on'); if(tA) tA.classList.remove('on');
@@ -6306,7 +6373,8 @@ function buildLibretoDoc(pc){
     if(d.body.classList.contains('deskchips')) keep.push('deskchips');
     if(d.body.classList.contains('nochips')) keep.push('nochips');
     d.body.className = pop2.theme + (keep.length? ' '+keep.join(' ') : '');
-    ev.target.textContent = pop2.theme==='dark' ? '☀️' : '🌙';
+    const _lt = d.getElementById('lTheme'); if(_lt) _lt.innerHTML = pop2.theme==='dark' ? LIB_ICON.sun : LIB_ICON.moon;
+    try{ libSyncHeadH(); }catch(e){}
     if(typeof syncSendTool==='function') syncSendTool('theme', pop2.theme);
   });
   { const _sel = d.getElementById('lCharSel');
@@ -6327,18 +6395,27 @@ function buildLibretoDoc(pc){
     }catch(e){}
     try{ window.focus(); }catch(e){}
   });
-  d.getElementById('lClean').addEventListener('click', (ev)=>{
-    const on = d.body.classList.toggle('clean');
-    ev.target.textContent = on ? '🗔' : '⛶';
-    ev.target.title = on ? 'Salir de la vista limpia' : 'Vista limpia: solo el libreto';
-    // la vista limpia también esconde las herramientas del video (barra y ajustes),
-    // dejando el video, la onda y el transporte para poder seguir trabajando
+  // ── Ajusta --lhH a la altura REAL de la barra para que el riel de páginas y
+  //    el buscador se peguen justo debajo (mejor integración, sin números mágicos).
+  function libSyncHeadH(){
     try{
-      const left = document.getElementById('stLeft');
-      if(left) left.classList.toggle('stclean', on);
-      if(typeof stDrawWave==='function') stDrawWave();
+      const lh = d.querySelector('.lh');
+      const h = (d.body.classList.contains('toolhidden') || !lh) ? 0 : Math.round(lh.getBoundingClientRect().height);
+      d.documentElement.style.setProperty('--lhH', h+'px');
     }catch(e){}
-  });
+  }
+  libSyncHeadH();
+  try{ pop2.win.addEventListener('resize', libSyncHeadH); }catch(e){}
+  setTimeout(libSyncHeadH, 60); setTimeout(libSyncHeadH, 300);
+  // ── Flecha: oculta/muestra la barra de herramientas (reemplaza «expandir») ──
+  { const hb = d.getElementById('lHide');
+    if(hb) hb.addEventListener('click', ()=>{
+      const hidden = d.body.classList.toggle('toolhidden');
+      hb.innerHTML = hidden ? LIB_ICON.chevDown : LIB_ICON.chevUp;
+      hb.title = hidden ? 'Mostrar la barra de herramientas' : 'Ocultar la barra de herramientas';
+      libSyncHeadH();
+    });
+  }
   d.getElementById('lVid').addEventListener('click', ()=>{ try{ studioToggleStrip(); }catch(e){} });
   // ✏️ herramientas: efecto visible SIEMPRE. En rol tablet el libreto trae el
   // cajón de herramientas (haschips) y las .mtools de las cajas están ocultas
@@ -6372,7 +6449,7 @@ function buildLibretoDoc(pc){
   d.getElementById('lFontDn').addEventListener('click', ()=>{ pop2.mineFs=Math.max(13,pop2.mineFs-2); setMineFs(); });
   d.getElementById('lScope').addEventListener('click', ()=>{
     pop2.scopeAll = !pop2.scopeAll;
-    pop2.els.scope.textContent = pop2.scopeAll ? '📖' : '👤';
+    pop2.els.scope.innerHTML = pop2.scopeAll ? LIB_ICON.scopeAll : LIB_ICON.scopeOne;
     pop2.els.scope.title = pop2.scopeAll ? 'Mostrando TODO el libreto' : 'Mostrando solo este personaje';
     renderLibretoBlocks();
     if(typeof syncSendTool==='function') syncSendTool('scope', pop2.scopeAll);
@@ -6438,9 +6515,9 @@ function buildLibretoDoc(pc){
       if(x&&y) x.classList.toggle('on', y.classList.contains('on'));
     });
     const ts=pop2.doc.getElementById('tScope'), ls=pop2.doc.getElementById('lScope');
-    if(ts&&ls) ts.textContent = ls.textContent;
+    if(ts&&ls) ts.innerHTML = ls.innerHTML;
     const tt=pop2.doc.getElementById('tTheme'), lt=pop2.doc.getElementById('lTheme');
-    if(tt&&lt) tt.textContent = lt.textContent;
+    if(tt&&lt) tt.innerHTML = lt.innerHTML;
   }, 900);
   pop2.els.wrap.addEventListener('wheel', ()=>{ pop2._navAt = performance.now(); }, {passive:true});
   /* RENDER PROTEGIDO AL FINAL: primero se cablean TODOS los botones (atrás,
@@ -6551,14 +6628,18 @@ function renderLibretoBlocks(){
     const cls = mine ? 'blk mine' : (b.key ? 'blk' : 'blk narr');
     const vi = pop2.blockMap.length;
     pop2.blockMap.push(i);
-    html.push('<div class="'+cls+'" data-vi="'+vi+'" data-si="'+i+'" data-pg="'+b.page+'" style="--pc:'+pc+'">'
+    // color propio de CADA personaje: el nombre y (si es el seleccionado) el
+    // borde + timecode toman ese color. Fallback al color del abierto.
+    const bChar = b.key ? charIdx[b.key] : null;
+    const bcolor = (bChar && bChar.color) ? bChar.color : pc;
+    html.push('<div class="'+cls+'" data-vi="'+vi+'" data-si="'+i+'" data-pg="'+b.page+'" style="--pc:'+bcolor+'">'
       + ((tc||who) ? '<div class="bhead">'+(tc?'<span class="tc" title="Clic: saltar el video aquí">'+tc+'</span>':'')+(who?'<span class="who">'+esc(who)+'</span>':'')+(window._stCps?stCpsBadge(i):'')+'</div>' : '')
       + (txt ? '<div class="tx">'+applyMarks(i, txt)+'</div>' : '')
       + '<div class="mtools">'
-        + '<button class="edit" data-si="'+i+'">✏️ Editar</button>'
+        + '<button class="edit" data-si="'+i+'">'+LIB_ICON.edit+' Editar</button>'
         + '<button data-act="pause" data-si="'+i+'">/ Pausa</button>'
         + '<button data-act="accent" data-si="'+i+'">á Acento</button>'
-        + '<button data-act="clear" data-si="'+i+'">↺</button>'
+        + '<button data-act="clear" data-si="'+i+'">Limpiar</button>'
       + '</div>'
       + '</div>');
   });
@@ -6607,7 +6688,7 @@ function renderLibretoBlocks(){
       const editing = txEl.getAttribute('contenteditable')==='true';
       if(editing){
         txEl.setAttribute('contenteditable','false');
-        btn.classList.remove('on'); btn.textContent='✏️ Editar';
+        btn.classList.remove('on'); btn.innerHTML=LIB_ICON.edit+' Editar';
         syncSendMark(si, { text: txEl.innerText.trim() });
       } else {
         setMarkMode(null);
@@ -7040,6 +7121,7 @@ function renderLibretoChips(){
   }
   if(!isTab || pop2.chipView==='pg'){
     const rec = recSet(pop2.key);
+    if(!isTab) html += '<div class="pglabel">Pág.</div>';
     html += c.pages.map(pg=>
       '<span class="pgchip'+(rec.has(pg.p)?' rec':'')+'" data-pg="'+pg.p+'">'+pg.p+'</span>'
     ).join('');
