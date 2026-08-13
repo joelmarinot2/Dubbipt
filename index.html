@@ -4680,17 +4680,21 @@ async function ddlResetCache(){
 // reconstruir todo el estado desde la caché (sin descargar ni re-procesar)
 function _epOpen(v){ try{ document.body.classList.toggle('ep-open', !!v); }catch(e){} try{ refreshTopbar(); }catch(e){} }
 function hydrateEpisode(d){ _epOpen(true);
-  chars = d.chars || [];
+  // Normalizar claves al cargar: datos viejos podían tener "O'BRIEN" (con apóstrofo)
+  // mientras el motor nuevo genera "OBRIEN". Se unifican aquí para que la comparación
+  // b.key === highlight siempre funcione, independientemente de cuándo se guardó el capítulo.
+  const normalizeKey = (k) => (typeof norm==='function' && k) ? norm(k) : k;
+  chars = (d.chars || []).map(c=> ({ ...c, key: normalizeKey(c.key) }));
   charIdx = {}; chars.forEach(c=> charIdx[c.key] = c);
   numPages = d.numPages || 0;
   pdfDoc = null; pdfName = d.pdfName || 'libreto.pdf';
   xlsFileName = d.xlsName || 'desglose.xlsm';
   occByChar = {}; pageData = {}; charMarks = {};
   tcIndex = d.tcIndex || [];
-  script = d.script || [];
+  script = (d.script || []).map(b=> b.key ? { ...b, key: normalizeKey(b.key) } : b);
   scriptByKey = {};
   script.forEach(b=>{ if(b.key) (scriptByKey[b.key] = scriptByKey[b.key] || []).push(b.idx); });
-  window._charsRaw = d.charsRaw || chars.map(c=> ({...c, pages:(c.pages||[]).map(p=>({...p}))}));
+  window._charsRaw = (d.charsRaw || chars.map(c=> ({...c, pages:(c.pages||[]).map(p=>({...p}))}))).map(c=>({...c, key:normalizeKey(c.key)}));
   if(typeof buildPronIndex==='function') buildPronIndex();
   window._script = script;
 }
