@@ -692,14 +692,18 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .card .cname{ font-family:'Inter',sans-serif; font-weight:700; color:#f2f3f5; font-size:18px;
   padding:0; margin-bottom:10px; line-height:1.15; }
 .card .cchips{ display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; padding:0; }
-.card .cchips .cc-chip{ font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; padding:4px 11px;
-  border-radius:7px; background:#1c1e22; color:#9CA3AF; border:1px solid #2c3036; }
-.card .cchips .cc-tc{ font-family:'JetBrains Mono',ui-monospace,monospace; font-size:11px; color:#8b8f97; background:#101215; }
-.card.done .cchips .cc-chip{ background:rgba(34,197,94,.10); color:#4ADE80; border-color:rgba(34,197,94,.25); }
-.card.done .cchips .cc-tc{ color:#4ADE80; }
+/* timecode box encima del nombre */
+.card .ctc{ display:inline-block; font-family:'JetBrains Mono',ui-monospace,monospace; font-size:11px;
+  font-weight:600; color:#8b8f97; background:#101215; border:1px solid #23262b; border-radius:6px;
+  padding:3px 8px; margin-bottom:8px; letter-spacing:.3px; }
+.card .ctc.ctc-empty{ visibility:hidden; height:0; margin:0; padding:0; border:none; }
+.card.done .ctc{ color:#4ADE80; border-color:rgba(34,197,94,.25); background:rgba(34,197,94,.06); }
+/* ocultar la fila de chips — ya no se usa */
+.card .cchips{ display:none !important; }
 .card .cdiv{ height:1px; background:#23262b; margin:0 0 14px; }
 .card.done .cdiv{ background:rgba(34,197,94,.20); }
-.card .tal{ display:flex; align-items:center; background:transparent !important; margin:0 !important; padding:0; min-height:22px; }
+.card .tal{ display:flex; align-items:center; background:transparent !important; margin:0 !important;
+  padding:12px 0 0; min-height:24px; }
 .card .tal .ng{ color:#4ADE80; font-style:normal; font-family:'Inter',sans-serif; font-weight:600; font-size:14px; }
 .card .tal b{ color:#f2f3f5; font-weight:600; font-family:'Inter',sans-serif; font-size:14px; }
 .card .tal .tc{ display:none; }
@@ -1934,8 +1938,18 @@ const NON_CHAR = new Set(['INT','EXT','INTEXT','EST','ESC','ESCENA','SCENE','SEQ
 
 const $ = id => document.getElementById(id);
 function norm(s){
-  return String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-    .replace(/\s+/g,' ').replace(/[:：]\s*$/,'').trim();
+  // Normalizar para generar claves de personaje robustas:
+  // - elimina tildes
+  // - elimina apóstrofos, puntos, guiones y comillas (para que O'BRIEN y OBRIEN coincidan,
+  //   DR. KIM y DR KIM, etc.)
+  // - colapsa espacios extra
+  return String(s||'').toUpperCase().normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')           // tildes
+    .replace(/['\u2018\u2019\u201A\u201B`]/g,'') // apóstrofos y comillas simples
+    .replace(/\./g,' ')                        // punto → espacio (DR.KIM → DR KIM)
+    .replace(/\s+/g,' ')
+    .replace(/[:：]\s*$/,'')
+    .trim();
 }
 function esc(s){ return String(s).replace(/[&<>"'\/]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#47;'}[m])); }
 
@@ -2402,12 +2416,17 @@ function separaNombreDialogo(line){
   let ni=0; const nameW=[];
   for(; ni<words.length; ni++){
     const w=words[ni]; if(!w) continue;
-    if(/^[\(\[¡¿"“‘'\u2014\-]/.test(w)) break;              // empieza acotación/diálogo
-    const wp = w.replace(/[\(\[][^)\]]*[\)\]]/g,'');
-    if(/[a-záéíóúüñ]/.test(wp)) break;                          // palabra con minúscula → diálogo
+    // Solo romper si empieza con comilla/acotación de APERTURA, no mid-word apostrophe (O'BRIEN) ni punto abreviativo (DR.)
+    if(/^[\(\[¡¿\u201C\u2014]/.test(w)) break;            // acotación / diálogo
+    if(/^[\u2018\u201A]/.test(w)) break;                    // comilla curva de apertura
+    if(w === "'" || w === '"') break;                       // comilla recta sola
+    const wp = w.replace(/[\(\[][^)\]]*[\)\]]/g,'').replace(/^'+|'+$/g,'').replace(/\./g,'');
+    if(wp.length>0 && /[a-záéíóúüñ]/.test(wp)) break;        // minúscula real (no artefacto de abreviatura)
     nameW.push(w);
   }
-  return { name: nameW.join(' ').trim(), dial: words.slice(ni).join(' ').trim() };
+  // quitar dos puntos al final del nombre si el formato es "NOMBRE: diálogo"
+  const name = nameW.join(' ').trim().replace(/:+\s*$/, '');
+  return { name, dial: words.slice(ni).join(' ').trim() };
 }
 // Genera el desglose recorriendo los bloques  timecode → NOMBRE → diálogo.
 function desgloseByRules(){
@@ -2433,7 +2452,10 @@ function desgloseByRules(){
       if(seq[k].text) dial += (dial?' ':'') + seq[k].text;
       k++;
     }
-    const esNombre = name && name.length>=1 && name===name.toUpperCase() && /[A-ZÁÉÍÓÚÜÑ0-9]/.test(name);
+    // Un nombre válido va en MAYÚSCULAS (o es una abreviatura como DR. que sí pasa toUpperCase)
+    // y contiene al menos una letra. Permitimos apóstrofos y puntos dentro del nombre.
+    const nameCore = name.replace(/[\.\'\u2019]/g,'').replace(/\s+/g,' ').trim();
+    const esNombre = nameCore && nameCore.length>=1 && name.toUpperCase()===name && /[A-ZÁÉÍÓÚÜÑ0-9]/.test(name);
     if(esNombre){
       const ints = contarIntervenciones(dial);
       if(ints>0){
@@ -2753,7 +2775,7 @@ function normChar(ch){
 }
 function normSameLen(s){ let r=''; for(const ch of s) r += normChar(ch); return r; }
 const LETTER = /[A-Z0-9]/;
-const IGNORABLE = /['"“”‘’`]/;
+const IGNORABLE = /['"\u201C\u201D\u2018\u2019\u201A\u201B\`\.]/;  // incluye punto: DR. KIM → DRKIM
 function isIgnorable(ch){ return IGNORABLE.test(ch) || ch===' '; }
 
 async function scanPdf(){
@@ -2826,7 +2848,7 @@ async function scanPdf(){
         if(hs.length < 2) return;
         let chosen=null;
         for(const key of wanted){
-          const ks = key.replace(/[^A-Z0-9]/g,'');
+          const ks = key.replace(/[^A-Z0-9]/g,'');  // strip apostrophes, dots, spaces → OBRIEN, DRKIM
           if(ks.length < 2) continue;
           if(hs.startsWith(ks)){
             const a0 = hmap[0], a1 = hmap[ks.length-1];
@@ -3355,16 +3377,19 @@ function renderCards(){
       ? `<b>${esc(c.talent)}</b>`
       : '<span class="ng">Sin asignar</span>';
     const tc0 = (typeof firstTCOf==='function' ? firstTCOf(c.key) : '') || '';
-    // chip: timecode inicial del personaje (en vez del rol estimado)
-    const chips = tc0 ? `<span class="cc-chip cc-tc">${esc(tc0)}</span>` : '';
     card.innerHTML =
+      // fila superior: N intervenciones + checkbox
       `<div class="top"><span class="ints-lab">${c.totalInts} intervenciones</span>`+
         `<button class="allbtn ${done?'on':''}" title="${done?'Desmarcar':'Marcar terminado'}" aria-label="${done?'Marcar sin terminar':'Marcar terminado'} ${esc(c.display)}">${done?'✓':''}</button></div>`+
+      // timecode en cajita encima del nombre
+      (tc0 ? `<div class="ctc">${esc(tc0)}</div>` : `<div class="ctc ctc-empty"></div>`)+
+      // nombre grande
       `<div class="cname">${esc(c.display)}</div>`+
-      `<div class="cchips">${chips}</div>`+
+      // divisor
       `<div class="cdiv"></div>`+
+      // talento (o "Sin asignar") — donde antes estaban los chips
       `<div class="tal" id="tal_${esc(c.key)}">${talDisplay}</div>`+
-      `<div class="cline" hidden></div>`+
+      // botón al pie
       `<button class="cbtn" aria-label="${c.talent?'Editar talento':'Asignar talento'} de ${esc(c.display)}">${c.talent ? 'Editar' : 'Asignar'}</button>`;
 
     // clic en la tarjeta (no en botones) → abre libreto
@@ -5400,55 +5425,183 @@ const pop2 = { win:null, doc:null, key:null, type:null, els:null, blockEls:[],
                blockMap:[], theme:'dark', boxw:'760' };
 
 const LIB_OVERRIDE = `
-/* ===== Módulo 3B · Panel del libreto (rediseño) ===== */
+/* ===== Módulo 3B · Panel del libreto — interfaz rediseñada ===== */
+/* ── Fuentes ── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+/* ── Fondo ── */
 body.dark{ background:var(--libbg,#0b0c0e) !important; }
-/* barra verde superior */
-.lh{ background:#22C55E !important; border:none !important; border-radius:14px !important; margin:10px !important; padding:8px 12px !important; box-shadow:none !important; gap:9px !important; }
-.lh h2{ color:#06210f !important; font-family:'Inter',sans-serif !important; font-weight:700 !important; }
-.lh .lbk{ width:38px; height:38px; border-radius:50% !important; background:rgba(6,33,15,.18) !important; color:#06210f !important; border:none !important; font-size:0 !important; position:relative; padding:0 !important; }
-.lh .lbk::after{ content:'‹'; font-size:22px; }
-.lh .lbk:hover{ background:rgba(6,33,15,.30) !important; }
+
+/* ── Barra superior verde ── */
+.lh{
+  background:#22C55E !important;
+  border:none !important; border-radius:14px !important;
+  margin:10px 10px 0 !important; padding:8px 10px !important;
+  gap:6px !important; flex-wrap:wrap !important;
+  box-shadow:none !important; position:sticky !important; top:10px;
+}
+.lh h2{ color:#06210f !important; font-family:'Inter',sans-serif !important; font-weight:700 !important; font-size:14px !important; }
 .lh .dot{ display:none !important; }
-#lConn{ background:rgba(6,33,15,.18) !important; color:#06210f !important; border-radius:10px !important; padding:7px 12px !important; border:none !important; font-weight:600 !important; }
-.lh .goto{ background:rgba(6,33,15,.18) !important; border-radius:10px !important; padding:7px 12px !important; }
-.lh .goto span{ color:#06210f !important; font-weight:600 !important; }
-.lh .goto input{ width:44px !important; background:transparent !important; border:none !important; color:#06210f !important; font-weight:600 !important; }
-.lh .goto input::placeholder{ color:rgba(6,33,15,.5) !important; }
-#lScope{ background:rgba(6,33,15,.18) !important; color:#06210f !important; border:none !important; border-radius:10px !important; }
-/* selector de personaje: pastilla oscura con la miga ámbar */
-#lCharSel{ background:#0b1710 !important; color:#4ADE80 !important; border:none !important; border-radius:10px !important; padding:8px 14px !important; font-weight:600 !important; }
-#lVid,#lTpad,#lConn2,#lLive{ display:none !important; }
-/* botones de icono circulares */
-.lh > button:not(.lbk){ width:36px; height:36px; display:inline-grid; place-items:center; background:rgba(6,33,15,.18) !important; color:#06210f !important; border:none !important; border-radius:50% !important; padding:0 !important; font-size:15px !important; }
-.lh > button:not(.lbk):hover{ background:rgba(6,33,15,.32) !important; }
-#lColor{ color:#06210f !important; }
-/* subheader "episodio N · intervenciones" */
-.pgsep{ display:flex !important; align-items:center; gap:14px; max-width:var(--boxw,900px); margin:20px auto !important; }
+.lh .sp{ flex:1 !important; min-width:8px; }
+
+/* Botón ← Atrás */
+.lh .lbk{
+  height:34px; border-radius:9px !important; padding:0 13px !important;
+  background:rgba(6,33,15,.22) !important; color:#06210f !important;
+  border:none !important; font-family:'Inter',sans-serif !important;
+  font-weight:700 !important; font-size:13px !important; white-space:nowrap;
+}
+.lh .lbk::after{ content:none !important; }
+.lh .lbk:hover{ background:rgba(6,33,15,.36) !important; }
+
+/* Estado de conexión */
+#lConn{
+  background:rgba(6,33,15,.22) !important; color:#06210f !important;
+  border-radius:8px !important; padding:5px 10px !important;
+  border:none !important; font-weight:600 !important; font-size:12px !important;
+  white-space:nowrap;
+}
+
+/* Campo ir a página */
+.lh .goto{ background:rgba(6,33,15,.22) !important; border-radius:8px !important; padding:5px 9px !important; }
+.lh .goto span{ color:#06210f !important; font-weight:600 !important; font-size:12px !important; }
+.lh .goto input{ width:40px !important; background:transparent !important; border:none !important; color:#06210f !important; font-weight:700 !important; }
+.lh .goto input::placeholder{ color:rgba(6,33,15,.45) !important; }
+
+/* Selector de personaje */
+#lScope{ background:rgba(6,33,15,.22) !important; color:#06210f !important; border:none !important; border-radius:8px !important; padding:5px 9px !important; font-size:14px !important; }
+#lCharSel{
+  background:#0b1710 !important; color:#4ADE80 !important; border:none !important;
+  border-radius:8px !important; padding:6px 10px !important;
+  font-weight:600 !important; font-size:12px !important; max-width:140px !important;
+  font-family:'Inter',sans-serif !important;
+}
+
+/* Botones de icono — círculos compactos */
+.lh > button:not(.lbk):not(#lVid){
+  width:32px !important; height:32px !important; display:inline-grid !important;
+  place-items:center !important; background:rgba(6,33,15,.22) !important;
+  color:#06210f !important; border:none !important; border-radius:50% !important;
+  padding:0 !important; font-size:14px !important; cursor:pointer !important;
+}
+.lh > button:not(.lbk):not(#lVid):hover{ background:rgba(6,33,15,.36) !important; }
+
+/* ── Botón Video (antes lVid, ahora visible) ── */
+#lVid{
+  display:inline-flex !important; align-items:center !important; gap:5px !important;
+  height:32px !important; padding:0 11px !important; border-radius:9px !important;
+  background:rgba(6,33,15,.22) !important; color:#06210f !important;
+  border:none !important; font-family:'Inter',sans-serif !important;
+  font-weight:700 !important; font-size:12px !important; cursor:pointer !important;
+  white-space:nowrap !important;
+}
+#lVid::before{ content:'🎬'; font-size:13px; }
+#lVid:hover{ background:rgba(6,33,15,.36) !important; }
+#lTpad,#lConn2,#lLive{ display:none !important; }
+
+/* ── Subheader de página ── */
+.pgsep{
+  display:flex !important; align-items:center; gap:12px;
+  max-width:var(--boxw,900px); margin:16px auto !important;
+}
 .pgsep::before,.pgsep::after{ content:''; flex:1; height:1px; background:rgba(255,255,255,.08); }
-.pgsep span{ background:#15171a; color:#9CA3AF; padding:8px 22px; border-radius:99px; font-family:'Inter',sans-serif; font-size:13.5px; border:1px solid #23262b; }
-/* cajas de diálogo */
-.blk{ position:relative; background:#111316 !important; border:1px solid #1c1e22 !important; border-radius:12px !important; padding:14px 18px !important; }
-.blk .bhead{ display:flex !important; justify-content:space-between !important; align-items:flex-start !important; gap:14px !important; margin-bottom:6px !important; }
-.blk .tc{ color:#6b7280 !important; font-family:'JetBrains Mono',monospace !important; font-size:13px !important; font-weight:500 !important; flex:0 0 auto; }
-.blk .who{ position:static !important; transform:none !important; color:#8b8f97 !important; font-size:15px !important; font-weight:600 !important; font-family:'Inter',sans-serif !important; text-align:right; max-width:52%; line-height:1.18; word-break:break-word; }
-.blk .tx{ color:#c7c9cd !important; font-size:16px !important; clear:both; line-height:1.5; }
-/* bloque del personaje resaltado: acento ámbar como en la maqueta */
-.blk.mine{ border-color:#8a6a1e !important; background:linear-gradient(180deg,rgba(251,191,36,.06),transparent),#161310 !important; }
-.blk.mine .tc{ color:#FBBF24 !important; font-family:'JetBrains Mono',monospace !important; font-size:var(--minefs,14px) !important; font-weight:700 !important; text-shadow:none !important; }
+.pgsep span{
+  background:#15171a; color:#9CA3AF; padding:6px 18px; border-radius:99px;
+  font-family:'Inter',sans-serif !important; font-size:12px; border:1px solid #23262b;
+  white-space:nowrap; letter-spacing:.3px;
+}
+
+/* ── Bloques de intervención ── */
+.blk{
+  background:#111316 !important; border:1px solid #1c1e22 !important;
+  border-radius:12px !important; padding:13px 16px !important;
+  margin:0 auto 10px !important;
+}
+.blk .bhead{
+  display:flex !important; justify-content:space-between !important;
+  align-items:baseline !important; gap:10px !important; margin-bottom:5px !important;
+  flex-wrap:nowrap !important;
+}
+/* timecode: compacto, no gigante */
+.blk .tc{
+  color:#6b7280 !important; font-family:'JetBrains Mono',monospace !important;
+  font-size:12px !important; font-weight:500 !important; flex:0 0 auto !important;
+  text-shadow:none !important; letter-spacing:.3px;
+}
+.blk .who{
+  color:#8b8f97 !important; font-family:'Inter',sans-serif !important;
+  font-size:13px !important; font-weight:600 !important; text-align:right !important;
+  position:static !important; transform:none !important;
+  max-width:55% !important; line-height:1.2 !important;
+  word-break:break-word !important; text-transform:uppercase !important;
+  letter-spacing:.5px !important;
+}
+.blk .tx{
+  color:#c7c9cd !important; font-size:16px !important;
+  line-height:1.6 !important; clear:both !important;
+  font-family:'Inter',sans-serif !important;
+  overflow-wrap:break-word !important; word-break:break-word !important;
+}
+/* bloque del personaje resaltado (ámbar) */
+.blk.mine{
+  border-color:#7a5f18 !important;
+  background:linear-gradient(160deg,rgba(251,191,36,.08),rgba(251,191,36,.02)),#141108 !important;
+}
+.blk.mine .tc{
+  color:#FBBF24 !important; font-size:12px !important;
+  font-weight:700 !important; text-shadow:none !important;
+}
 .blk.mine .who{ color:#FBBF24 !important; }
-.blk.mine .tx{ color:#fff !important; font-weight:600 !important; font-size:var(--minefs,17px) !important; }
+.blk.mine .tx{
+  color:#fff !important; font-weight:600 !important;
+  font-size:var(--minefs,17px) !important; line-height:1.6 !important;
+}
 .blk.narr .who{ display:none !important; }
+
+/* ── Barra inferior (anchos de columna) ── */
+.lbar{
+  background:#111316 !important; border-top:1px solid #23262b !important;
+  padding:8px 12px !important; gap:6px !important; flex-wrap:wrap !important;
+}
+.lbar span{ color:#8b8f97 !important; font-family:'Inter',sans-serif !important; font-size:12px !important; }
+.lbar button{
+  border:1px solid #23262b !important; background:transparent !important;
+  color:#c7c9cd !important; border-radius:8px !important;
+  padding:6px 12px !important; font-size:12.5px !important;
+  font-family:'Inter',sans-serif !important; font-weight:600 !important; cursor:pointer !important;
+}
+.lbar button:hover{ border-color:#4ADE80 !important; color:#f2f3f5 !important; }
+.lbar button.act{ background:#22C55E !important; color:#06210f !important; border-color:#22C55E !important; font-weight:700 !important; }
+
+/* ── Riel de páginas ── */
 .lchips > *{ border-radius:8px !important; }
-/* cajón de herramientas */
+
+/* ── Cajón de herramientas (tablet) ── */
 .ltools{ background:#111316 !important; border-left:1px solid #23262b !important; }
-.ltools .tt{ color:#4ADE80 !important; }
-.ltools button{ background:#0f1215 !important; color:#c7c9cd !important; border:1px solid #23262b !important; border-radius:10px !important; font-family:'Inter',sans-serif !important; }
+.ltools .tt{ color:#4ADE80 !important; font-family:'Inter',sans-serif !important; font-size:10px !important; letter-spacing:.8px !important; }
+.ltools button{ background:#0f1215 !important; color:#c7c9cd !important; border:1px solid #23262b !important; border-radius:9px !important; font-family:'Inter',sans-serif !important; }
 .ltools button:hover{ border-color:#4ADE80 !important; background:#161a1e !important; }
 .ltools button.on{ background:#22C55E !important; color:#06210f !important; border:none !important; }
 .ltools button.grn{ background:#22C55E !important; color:#06210f !important; border:none !important; }
-.ltools input{ background:#0f1215 !important; color:#f2f3f5 !important; border:1px solid #23262b !important; border-radius:10px !important; }
+.ltools input{ background:#0f1215 !important; color:#f2f3f5 !important; border:1px solid #23262b !important; border-radius:9px !important; font-family:'JetBrains Mono',monospace !important; }
 .ltools #tHide{ background:transparent !important; border:none !important; color:#4ADE80 !important; text-align:center !important; }
 .dtab{ background:#111316 !important; border:1px solid #22C55E !important; color:#4ADE80 !important; }
+
+/* ── Responsivo: móvil y tablet estrecha ── */
+@media(max-width:680px){
+  .lh{ margin:6px !important; padding:6px 8px !important; gap:4px !important; top:6px !important; border-radius:10px !important; }
+  .lh h2{ font-size:13px !important; }
+  #lCharSel{ max-width:100px !important; font-size:11px !important; }
+  .blk .tx{ font-size:15px !important; }
+  .blk.mine .tx{ font-size:var(--minefs,16px) !important; }
+  .lbar{ padding:6px 8px !important; }
+  .lbar button{ padding:5px 9px !important; font-size:11.5px !important; }
+  #lScope,#lTheme,#lClean,#lPron,#lColor{ display:none !important; }
+}
+@media(max-width:420px){
+  #lFontDn,#lFontUp{ display:none !important; }
+  .lh .goto{ display:none !important; }
+}
 `;
 const LIB_CSS = `
 *{margin:0;padding:0;box-sizing:border-box}
@@ -5461,7 +5614,8 @@ body.light{--bg:#f4f2fb;--head:#ffffff;--card:#ffffff;--card-b:#e2ddf2;--ink:#1e
   --dim:#736d94;--tcc:#6d4ee0;--sep:#d8d2ee}
 body{background:var(--bg);color:var(--ink)}
 .lh{display:flex;align-items:center;gap:9px;padding:9px 13px;background:var(--head);
-  border-bottom:1px solid var(--card-b);position:sticky;top:0;z-index:10;flex-wrap:wrap}
+  border-bottom:1px solid var(--card-b);position:sticky;top:0;z-index:10;flex-wrap:wrap;
+  font-family:'Inter',sans-serif}
 .lh .dot{width:12px;height:12px;border-radius:4px;background:var(--pc,#5FC85A);box-shadow:0 0 10px var(--pc)}
 .lh h2{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;white-space:nowrap}
 .lh .sp{flex:1}
@@ -5491,10 +5645,9 @@ body{background:var(--bg);color:var(--ink)}
   overflow-wrap:break-word;word-break:break-word;hyphens:auto}
 .blk .bhead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:7px}
 /* cabecera: TIMECODE grande arriba, luego nombre */
-.blk .tc{font-family:ui-monospace,'SF Mono',monospace;font-size:13px;font-weight:700;
-  color:var(--dim);letter-spacing:.5px;line-height:1;display:inline-block;text-shadow:none}
-.blk.mine .tc{font-size:28px;font-weight:800;color:#FFB020;
-  text-shadow:0 0 16px rgba(255,176,32,.28)}
+.blk .tc{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:600;
+  color:var(--dim);letter-spacing:.4px;line-height:1;display:inline-block;text-shadow:none;flex:0 0 auto}
+.blk.mine .tc{font-size:13px;font-weight:700;color:#FBBF24;text-shadow:none}
 body.light .blk.mine .tc{color:#B45309;text-shadow:none}
 .blk .who{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;letter-spacing:.4px;
   color:var(--dim);text-transform:uppercase;line-height:1}
@@ -5506,7 +5659,7 @@ body.dark .blk.mine{background:linear-gradient(135deg,rgba(95,200,90,.34),rgba(9
 body.light .blk.mine{background:linear-gradient(135deg,rgba(140,105,255,.24),rgba(140,105,255,.12));
   border:1px solid var(--pc,#8C69FF);box-shadow:0 2px 12px rgba(140,105,255,.18)}
 .blk.mine .who{color:var(--pc,#5FC85A)}
-.blk.mine .tx{font-weight:800;font-size:var(--minefs,19px)}
+.blk.mine .tx{font-weight:700;font-size:var(--minefs,18px);line-height:1.6}
 body.light .blk.mine .tx{color:#1a1530}
 body.dark .blk.mine .tx{color:#FFFFFF}
 /* acotaciones */
@@ -5929,7 +6082,7 @@ function buildLibretoDoc(pc){
       <button id="lFontDn" title="Letra del personaje más pequeña" aria-label="Reducir tamaño de letra">A−</button>
       <button id="lFontUp" title="Letra del personaje más grande" aria-label="Aumentar tamaño de letra">A+</button>
       <button id="lClean" title="Vista limpia: solo el libreto" aria-label="Vista limpia, ocultar herramientas">⛶</button>
-      <button id="lVid" title="Video/audio del capítulo: mostrar u ocultar" aria-label="Mostrar u ocultar video del capítulo">🎬</button>
+      <button id="lVid" title="Video Estudio: video/audio del capítulo" aria-label="Abrir Video Estudio">Video</button>
       <button id="lTablet" title="Modo tablet: herramientas de marcación" aria-label="Activar modo tablet con herramientas de marcación">✏️</button>
       ${(DEVROLE==='tablet') ? '<button id="lTpad" title="Pasar al trackpad: controlar el libreto del escritorio" aria-label="Pasar al modo trackpad">🎛️</button>' : ''}
       <button id="lFind" title="Buscar en el libreto" aria-label="Buscar en el libreto">🔍</button>
@@ -6324,14 +6477,15 @@ function renderLibretoBlocks(){
   pop2.blockMap = [];
   let lastPage = 0;
   script.forEach((b, i)=>{
-    const mine = b.key === highlight;
+    const keyFlat = (k)=> (k||'').replace(/[^A-Z0-9]/g,'');
+    const mine = b.key === highlight || (highlight && b.key && keyFlat(b.key)===keyFlat(highlight) && keyFlat(highlight).length>=2);
     if(!pop2.scopeAll){
-      const near = mine || (script[i-1] && script[i-1].key===key) || (script[i+1] && script[i+1].key===key);
+      const near = mine || (script[i-1] && (script[i-1].key===key || keyFlat(script[i-1].key)===keyFlat(key))) || (script[i+1] && (script[i+1].key===key || keyFlat(script[i+1].key)===keyFlat(key)));
       if(!near) return;
     }
     const txt = b.lines.join(' ');
     const who = b.adShot ? ('TOMA '+b.adShot)
-                : (b.key ? (charIdx[b.key]?charIdx[b.key].display:b.key) : '');
+                : (b.key ? (charIdx[b.key] ? charIdx[b.key].display : (chars.find(c=>keyFlat(c.key)===keyFlat(b.key))?.display || b.key)) : '');
     if(!txt && !who) return;
     // separador de página
     if(b.page !== lastPage){
