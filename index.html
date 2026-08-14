@@ -1457,7 +1457,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.9.2-nube · 14-ago-2026';
+const APP_VERSION = 'v10.9.3-nube · 14-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -3214,9 +3214,9 @@ function buildPronIndex(){
 // positivos con cifras dentro de los diálogos o números de escena)
 function strictTC(text){
   const t = String(text||'').trim();
-  let m = t.match(/^(\d{1,2}):(\d{2}):(\d{2})(?:[:;.](\d{2}))?$/);
+  let m = t.match(/^(\d{1,2})\s*:\s*(\d{2})\s*:\s*(\d{2})(?:\s*[:;.]\s*(\d{2}))?$/);
   if(m) return (+m[1])*3600 + (+m[2])*60 + (+m[3]) + (m[4]? (+m[4])/25 : 0);
-  m = t.match(/^(\d{1,2}):(\d{2})$/);
+  m = t.match(/^(\d{1,2})\s*:\s*(\d{2})$/);
   if(m) return (+m[1])*60 + (+m[2]);
   return null;
 }
@@ -3225,7 +3225,7 @@ function strictTC(text){
 // no confundir cifras sueltas del diálogo.
 function leadTC(text){
   const t = String(text||'').trim();
-  const m = t.match(/^(\d{1,2}):(\d{2}):(\d{2})(?:[:;.](\d{2}))?(?:\s+|$)(.*)$/);
+  const m = t.match(/^(\d{1,2})\s*:\s*(\d{2})\s*:\s*(\d{2})(?:\s*[:;.]\s*(\d{2}))?(?:\s+|$)(.*)$/);
   if(!m) return null;
   const sec = (+m[1])*3600 + (+m[2])*60 + (+m[3]) + (m[4]? (+m[4])/25 : 0);
   return { sec, rest:(m[5]||'').trim() };
@@ -6722,6 +6722,20 @@ function markWidthBtn(){
   pop2.doc.querySelectorAll('.lbar button').forEach(b=> b.classList.toggle('act', b.dataset.w===pop2.boxw));
 }
 
+// ¿la línea es SÓLO un timecode? (tolera espacios: "00: 00: 15: 15")
+function isTCLineLoose(l){
+  return /^\s*\d{1,2}\s*:\s*\d{2}\s*:\s*\d{2}(?:\s*[:;.]\s*\d{2})?\s*$/.test(String(l||''));
+}
+// texto de diálogo del bloque, sin timecodes colados (red de seguridad para
+// capítulos ya cargados antes de corregir el parser).
+function blockText(b){
+  const lines = (b && b.lines ? b.lines : []).filter(l=> !isTCLineLoose(l));
+  let s = lines.join(' ');
+  // por si un TC quedó pegado al final de una línea de diálogo
+  s = s.replace(/(^|\s)\d{1,2}\s*:\s*\d{2}\s*:\s*\d{2}(?:\s*[:;.]\s*\d{2})?(?=\s|$)/g, '$1')
+       .replace(/\s{2,}/g,' ').trim();
+  return s;
+}
 function renderLibretoBlocks(){
   if(!pop2.els) return;
   // el personaje abierto no existe en ESTE capítulo (se cambió de programa):
@@ -6741,7 +6755,7 @@ function renderLibretoBlocks(){
       const near = mine || (script[i-1] && (script[i-1].key===key || keyFlat(script[i-1].key)===keyFlat(key))) || (script[i+1] && (script[i+1].key===key || keyFlat(script[i+1].key)===keyFlat(key)));
       if(!near) return;
     }
-    const txt = b.lines.join(' ');
+    const txt = blockText(b);
     const who = b.adShot ? ('TOMA '+b.adShot)
                 : (b.key ? (charIdx[b.key] ? charIdx[b.key].display : (chars.find(c=>keyFlat(c.key)===keyFlat(b.key))?.display || b.key)) : '');
     if(!txt && !who) return;
@@ -8440,7 +8454,7 @@ function pipDlgAt(si){
 }
 function pipLineHtml(b){
   const tc = (b.tcEff!=null && typeof fmtTC4==='function') ? fmtTC4(b.tcEff) : '';
-  const tx = (typeof applyMarks==='function') ? applyMarks(b.idx, b.lines.join(' ')) : esc(b.lines.join(' '));
+  const tx = (typeof applyMarks==='function') ? applyMarks(b.idx, blockText(b)) : esc(blockText(b));
   return '<div class="ln" data-si="'+b.idx+'">'
     + '<div class="meta">'+(tc?'<span class="tc">'+tc+'</span>':'')+(b.display?'<span class="who">'+esc(b.display)+'</span>':'')+'</div>'
     + (b.display?'<span class="w">'+esc(b.display)+'</span>':'')
