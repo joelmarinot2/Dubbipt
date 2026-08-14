@@ -105,6 +105,14 @@ header p{font-size:13px;color:var(--ink-dim);margin-top:2px}
 .lib.slim{padding:10px 16px}
 .lib.slim .lib-head{margin-bottom:0}
 .lib.slim .uploads,.lib.slim .sec-title{display:none}
+/* El desglose del episodio SOLO se ve estando dentro del episodio.
+   Fuera (Programas, lista de capítulos u otra pestaña) queda oculto. */
+body:not(.ep-open) #stats,
+body:not(.ep-open) #toolbar,
+body:not(.ep-open) #cards,
+body:not(.ep-open) #planilla,
+body:not(.ep-open) #empty,
+body:not(.ep-open) #epLine{display:none !important}
 .sec-title{font-weight:700;font-size:15px;margin:12px 2px 8px}
 .sec-hint{font-weight:400;font-size:12.5px;opacity:.6}
 .up-actions{grid-column:1/-1;display:flex;justify-content:flex-end}
@@ -1430,7 +1438,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.7.0-nube · 13-ago-2026';
+const APP_VERSION = 'v10.8.0-nube · 13-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -3589,6 +3597,7 @@ function markPageGlobal(page){
 function libretoReflectRecordedGlobal(page, recorded){
   if(!pop2.doc) return;
   pop2.doc.querySelectorAll('.blk[data-pg="'+page+'"]').forEach(el=> el.classList.toggle('rec', !!recorded));
+  if(typeof libSyncDoneBtns==='function') libSyncDoneBtns(page);
 }
 
 function renderPopupPage(){ return; }   // el visor PDF del popup legacy ya no existe (quedó reemplazado por el libreto digital)
@@ -3886,6 +3895,8 @@ async function renderLibrary(silent){
     const shows = sbShows();
     if(LDB.showId && !shows.some(x=>x.id===LDB.showId)){ LDB.showId=null; libView='shows'; }
     lib.classList.toggle('slim', !!currentEp && !LDB.browse);
+    // fuente de verdad: el episodio solo se visualiza estando DENTRO de él
+    try{ document.body.classList.toggle('ep-open', !!currentEp && !LDB.browse); }catch(e){}
     // botón para abrir/cerrar la lista sin cerrar el capítulo actual
     const tg = $('libToggle');
     if(tg){
@@ -5602,6 +5613,32 @@ body.dark{ background:var(--libbg,#0b0c0e) !important; }
   font-size:var(--minefs,17px) !important; line-height:1.55 !important;
 }
 
+/* ─── COMPLETADO (grabado): marca inequívoca, incluso sobre el resaltado ─── */
+.blk.rec{ position:relative !important; }
+.blk.rec::after{
+  content:'✓ Completado' !important; position:absolute !important; top:8px; right:12px;
+  font-family:'Inter',sans-serif !important; font-size:10.5px !important; font-weight:800 !important;
+  letter-spacing:.4px !important; color:#08240f !important;
+  background:linear-gradient(135deg,#4ADE80,#22C55E) !important; border:none !important;
+  border-radius:99px !important; padding:3px 9px !important; box-shadow:0 3px 10px rgba(34,197,94,.35) !important;
+}
+.blk.rec .bhead{ padding-right:118px !important; }   /* deja hueco para la insignia */
+.blk.rec .tx{ opacity:.72 !important; }
+.blk.mine.rec, body.dark .blk.mine.rec{
+  background:linear-gradient(135deg, rgba(74,222,128,.22), rgba(34,197,94,.10)) !important;
+  border:1px solid #22C55E !important;
+  box-shadow:0 0 0 1px rgba(74,222,128,.45) inset, 0 4px 16px rgba(34,197,94,.20) !important;
+}
+.blk.rec:not(.mine){ border-left:3px solid #22C55E !important; background:rgba(34,197,94,.05) !important; }
+.blk.mine.rec .tc, .blk.rec .tc{ color:#22C55E !important; background:rgba(34,197,94,.16) !important; border-color:rgba(34,197,94,.4) !important; }
+body.light .blk.rec .tx{ opacity:.8 !important; }
+body.light .blk.mine.rec{ background:linear-gradient(135deg,rgba(74,222,128,.24),rgba(34,197,94,.12)) !important; border:1px solid #22C55E !important; }
+body.light .blk.rec::after{ color:#06210f !important; }
+
+/* Botón «Completar / Quitar» en las herramientas de la caja */
+.mtools .done{ font-weight:700 !important; }
+.mtools .done.on{ background:linear-gradient(135deg,#4ADE80,#22C55E) !important; color:#08240f !important; border-color:transparent !important; }
+
 /* herramientas de marcación (tablet) inline */
 .blk .mtools{ grid-column:2; grid-row:3; display:none; gap:5px; margin-top:6px; flex-wrap:wrap; }
 .blk.active .mtools, body.tablet .blk .mtools{ display:flex; }
@@ -6634,10 +6671,15 @@ function renderLibretoBlocks(){
     // borde + timecode toman ese color. Fallback al color del abierto.
     const bChar = b.key ? charIdx[b.key] : null;
     const bcolor = (bChar && bChar.color) ? bChar.color : pc;
-    html.push('<div class="'+cls+'" data-vi="'+vi+'" data-si="'+i+'" data-pg="'+b.page+'" style="--pc:'+bcolor+'">'
+    // estado de completado inicial (para pintar la marca y la etiqueta del botón)
+    const recKey = (pop2.key && charIdx[pop2.key]) ? pop2.key : '_pages';
+    const recDone = recSet(recKey).has(b.page);
+    const cls2 = cls + (recDone ? ' rec' : '');
+    html.push('<div class="'+cls2+'" data-vi="'+vi+'" data-si="'+i+'" data-pg="'+b.page+'" style="--pc:'+bcolor+'">'
       + ((tc||who) ? '<div class="bhead">'+(tc?'<span class="tc" title="Clic: saltar el video aquí">'+tc+'</span>':'')+(who?'<span class="who">'+esc(who)+'</span>':'')+(window._stCps?stCpsBadge(i):'')+'</div>' : '')
       + (txt ? '<div class="tx">'+applyMarks(i, txt)+'</div>' : '')
       + '<div class="mtools">'
+        + '<button class="done'+(recDone?' on':'')+'" data-act="done" data-si="'+i+'">'+(recDone?'↩ Quitar':'✓ Completar')+'</button>'
         + '<button class="edit" data-si="'+i+'">'+LIB_ICON.edit+' Editar</button>'
         + '<button data-act="pause" data-si="'+i+'">/ Pausa</button>'
         + '<button data-act="accent" data-si="'+i+'">á Acento</button>'
@@ -6700,6 +6742,10 @@ function renderLibretoBlocks(){
         txEl.setAttribute('contenteditable','true'); txEl.focus();
         btn.classList.add('on'); btn.textContent='✓ Guardar';
       }
+      return;
+    }
+    if(act==='done'){   // marcar/desmarcar ESTE parlamento como completado (funciona sin conexión)
+      libToggleDone(si);
       return;
     }
     if(act==='pause' || act==='accent'){
@@ -6813,9 +6859,30 @@ function centerBlock(vi, smooth){
   if(!isFinite(target)) return;
   wrap.scrollTo({ top: target, behavior: smooth?'smooth':'auto' });
 }
+// desplazamiento ANIMADO (rápido pero visible): en vez de saltar seco a la
+// página, recorre el trayecto para dar sensación de "scroll" hasta el destino.
+function libAnimScroll(top){
+  const wrap = pop2.els && pop2.els.wrap; if(!wrap) return;
+  top = Math.max(0, Math.min(libMaxTop(), top));
+  const start = wrap.scrollTop, dist = top - start;
+  if(Math.abs(dist) < 4){ wrap.scrollTop = top; return; }
+  // duración proporcional a la distancia, acotada → rápido en saltos cortos,
+  // y aun así visible (no instantáneo) en saltos largos
+  const dur = Math.max(240, Math.min(900, Math.abs(dist) * 0.32));
+  const raf = (pop2.win && pop2.win.requestAnimationFrame) ? pop2.win.requestAnimationFrame.bind(pop2.win) : requestAnimationFrame;
+  if(pop2._pageAnim){ try{ (pop2.win||window).cancelAnimationFrame(pop2._pageAnim); }catch(e){} }
+  const t0 = performance.now();
+  const ease = t=> t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;   // easeInOutCubic
+  pop2._pageAnimating = true;
+  const step = (now)=>{
+    const p = Math.min(1, (now - t0)/dur);
+    wrap.scrollTop = start + dist * ease(p);
+    if(p < 1){ pop2._pageAnim = raf(step); }
+    else { pop2._pageAnim = 0; pop2._pageAnimating = false; wrap.scrollTop = top; }
+  };
+  pop2._pageAnim = raf(step);
+}
 function gotoLibretoPage(pg, fromRemote){
-  pop2._progAt = performance.now();
-  pg = +pg;
   if(!pop2.doc || !pg || !isFinite(pg)) return;
   if(fromRemote && sync._lastNavAt && (performance.now()-sync._lastNavAt) < 8000) return;   // el trackpad manda
   pop2._navAt = performance.now();
@@ -6834,7 +6901,7 @@ function gotoLibretoPage(pg, fromRemote){
   const wrap = pop2.els.wrap;
   const top = Math.max(0, Math.min(libMaxTop(), el.offsetTop - wrap.clientHeight*0.25));
   if(!isFinite(top)) return;
-  wrap.scrollTo({ top, behavior:'smooth' });
+  libAnimScroll(top);
   if(!fromRemote){
     if(typeof syncSendPos==='function') syncSendPos({ page:pg });
     // emitir la posición varias veces mientras el smooth-scroll asienta
@@ -6923,12 +6990,21 @@ function caretCharOffset(el, sel){
   }catch(e){ return null; }
 }
 // marcar/desmarcar visualmente una página como grabada en el libreto digital
+function libSyncDoneBtns(page){
+  if(!pop2 || !pop2.doc) return;
+  pop2.doc.querySelectorAll('.blk[data-pg="'+page+'"] .mtools .done').forEach(bt=>{
+    const on = bt.closest('.blk').classList.contains('rec');
+    bt.textContent = on ? '↩ Quitar' : '✓ Completar';
+    bt.classList.toggle('on', on);
+  });
+}
 function libretoReflectRecorded(key, page, recorded){
   if(!pop2 || !pop2.doc) return;
   if(pop2.key !== key) return;
   pop2.doc.querySelectorAll('.blk[data-pg="'+page+'"]').forEach(el=>{
     if(el.classList.contains('mine')) el.classList.toggle('rec', !!recorded);
   });
+  libSyncDoneBtns(page);
   if(typeof refreshLibretoChips==='function') refreshLibretoChips();
 }
 // aplicar el estado de grabadas al (re)renderizar
@@ -6964,6 +7040,30 @@ function saveEditBox(){
   if(!tx) return;
   tx.setAttribute('contenteditable','false');
   syncSendMark(si, { text: tx.innerText.trim() });
+}
+// marcar/desmarcar UN parlamento como completado desde el libreto — funciona
+// también en el ESCRITORIO sin estar conectado a la tablet (solo local + nube).
+function libToggleDone(si){
+  const b = script[si]; if(!b || b.page==null) return;
+  const page = b.page;
+  const key = (pop2.key && charIdx[pop2.key]) ? pop2.key : null;
+  let done;
+  if(key){
+    const rec = recSet(key);
+    done = !rec.has(page);
+    if(done) rec.add(page); else rec.delete(page);
+    progTouched(key); saveProgress();
+    if(typeof syncSendSave==='function') syncSendSave(key, page, done);           // si hay conexión, se sincroniza
+    if(typeof libretoReflectRecorded==='function') libretoReflectRecorded(key, page, done);
+  } else {
+    done = markPageGlobal(page);   // libreto completo: página global
+  }
+  try{ if(typeof renderPlanilla==='function') renderPlanilla(); }catch(e){}
+  try{ if(typeof renderStats==='function') renderStats(); }catch(e){}
+  if(typeof refreshLibretoChips==='function') refreshLibretoChips();
+  if(typeof libReportPage==='function') libReportPage(true);
+  libSyncDoneBtns(page);
+  if(typeof DDL_UI!=='undefined' && DDL_UI.toast) DDL_UI.toast(done ? 'Parlamento marcado como completado' : 'Marca de completado quitada', {kind: done?'ok':'info'});
 }
 // marcar la página del bloque activo como grabada (tablet)
 function libretoMarkRecorded(){
@@ -8039,7 +8139,7 @@ function ensureMirrorLoop(){
     if(!pop2.win || pop2.win.closed || pop2._mirrorWin !== pop2.win || !pop2.els){ pop2._mirrorRaf = 0; return; }
     const dt = Math.min(64, pop2._mirrorLast ? (ts - pop2._mirrorLast) : 16.7);
     pop2._mirrorLast = ts;
-    if(sync.isOn && pop2._rTargetPx!=null){
+    if(sync.isOn && pop2._rTargetPx!=null && !pop2._pageAnimating){
       const wr = pop2.els.wrap;
       const maxTop = Math.max(0, wr.scrollHeight - wr.clientHeight);
       const age = performance.now() - (pop2._rSeenAt || 0);
