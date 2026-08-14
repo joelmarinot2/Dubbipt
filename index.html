@@ -1457,7 +1457,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.9.0-nube · 13-ago-2026';
+const APP_VERSION = 'v10.9.1-nube · 14-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -1975,6 +1975,17 @@ const NO_REC = new Set(['ORIGINAL','TODOS','X','N/A','NA']);
 const TC_RE = /^\d{1,2}\s*[:;.]\s*\d{2}/;
 const SCENE_RE = /^\s*(?:\d+[\s.\-]*)?(INT\.?\/EXT\.?|INT\.?|EXT\.?|EST\.?|ESC\.?|ESCENA|SCENE|SEQ|SEQUENCE)\b/i;
 const NON_CHAR = new Set(['INT','EXT','INTEXT','EST','ESC','ESCENA','SCENE','SEQ','SEQUENCE','FADE','FADEIN','FADEOUT','CUT','CUTTO','SMASHCUT','MATCHCUT','DISSOLVE','DISSOLVETO','CONTINUED','CONTD','THEEND','FIN','INSERT','SUPER','TITLE','TITLES','SUBTITLE','SUBTITLES','OMITTED','FLASHBACK','FLASHFORWARD','MONTAGE','INTERCUT','ANGLE','CLOSEUP','WIDESHOT','CREDITS','ACTO','ACT','MUSICA','MUSIC','SFX','AMBIENTE']);
+// Honoríficos/títulos: cuando el guion parte el nombre en dos renglones, el
+// título (REV., DR., SR.…) queda solo en una línea y el nombre real en la
+// siguiente. Un renglón que es SOLO título no es un personaje completo.
+const HONOR = new Set(['REV','DR','DRA','SR','SRA','SRTA','STA','STO','MR','MRS','MS','FR','PADRE','MADRE','PROF','PROFE','LIC','ING','ARQ','GRAL','GEN','CNEL','CORONEL','MAY','CMDTE','CAP','CAPITAN','TTE','LT','SGTO','SGT','SARGENTO','OFICIAL','AGENTE','DON','DONA','SAN','SANTA','SANTO','MISS','SIR','LORD','LADY','MADAME','MME']);
+function isHonorificOnly(name){
+  const raw = String(name||'').trim();
+  if(!/\.\s*$/.test(raw)) return false;          // debe ser abreviatura con punto: REV., DR., SR.
+  const toks = raw.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\./g,' ').replace(/\s+/g,' ').trim().split(' ').filter(Boolean);
+  return toks.length>0 && toks.every(t=> HONOR.has(t));
+}
 
 const $ = id => document.getElementById(id);
 function norm(s){
@@ -2470,7 +2481,6 @@ function separaNombreDialogo(line){
 }
 // Genera el desglose recorriendo los bloques  timecode → NOMBRE → diálogo.
 function desgloseByRules(){
-  const TC = /^\s*\d{1,2}:\d{2}:\d{2}(?::\d{2})?\s*$/;
   const seq=[];
   for(let p=1;p<=numPages;p++){
     const pd=pageData[p]; if(!pd||!pd.lines) continue;
@@ -2480,20 +2490,32 @@ function desgloseByRules(){
   const order=[]; const byName={};
   let i=0;
   while(i<seq.length){
-    if(!TC.test(seq[i].text)){ i++; continue; }
-    const tc = seq[i].text.trim();
-    let j=i+1; while(j<seq.length && !seq[j].text) j++;
-    if(j>=seq.length) break;
-    if(TC.test(seq[j].text)){ i=j; continue; }          // dos timecodes seguidos: sin nombre
-    const sp = separaNombreDialogo(seq[j].text);
-    const name = sp.name; const page = seq[j].p;
-    let k=j+1; let dial=sp.dial;
-    while(k<seq.length && !TC.test(seq[k].text)){
-      if(seq[k].text) dial += (dial?' ':'') + seq[k].text;
-      k++;
+    const lt = leadTC(seq[i].text);
+    if(!lt){ i++; continue; }
+    const tc = lt.rest ? fmtTC(lt.sec) : seq[i].text.trim();
+    let name, page, dial, k;
+    if(lt.rest){
+      // "01:23:45 REV. HENRY HARDY [diálogo]" — nombre y TC en la misma línea
+      const sp = separaNombreDialogo(lt.rest);
+      name = sp.name; page = seq[i].p; dial = sp.dial; k = i+1;
+      while(k<seq.length && !leadTC(seq[k].text)){ if(seq[k].text) dial += (dial?' ':'') + seq[k].text; k++; }
+    } else {
+      // TC en su propia línea → NOMBRE en la siguiente línea no vacía
+      let j=i+1; while(j<seq.length && !seq[j].text) j++;
+      if(j>=seq.length) break;
+      if(leadTC(seq[j].text)){ i=j; continue; }          // dos timecodes seguidos: sin nombre
+      const sp = separaNombreDialogo(seq[j].text);
+      name = sp.name; page = seq[j].p; dial = sp.dial; k = j+1;
+      while(k<seq.length && !leadTC(seq[k].text)){ if(seq[k].text) dial += (dial?' ':'') + seq[k].text; k++; }
     }
-    // Un nombre válido va en MAYÚSCULAS (o es una abreviatura como DR. que sí pasa toUpperCase)
-    // y contiene al menos una letra. Permitimos apóstrofos y puntos dentro del nombre.
+    // Nombre partido en dos renglones: "REV." arriba y "HENRY HARDY" abajo.
+    // Si el nombre es SOLO un título, absórbe las palabras-nombre que lo siguen.
+    if(isHonorificOnly(name) && dial){
+      const sp2 = separaNombreDialogo(name + ' ' + dial);
+      if(sp2.name && !isHonorificOnly(sp2.name)){ name = sp2.name; dial = sp2.dial; }
+    }
+    // Un nombre válido va en MAYÚSCULAS (incluidas abreviaturas como REV./DR.) y
+    // contiene al menos una letra o dígito.
     const nameCore = name.replace(/[\.\'\u2019]/g,'').replace(/\s+/g,' ').trim();
     const esNombre = nameCore && nameCore.length>=1 && name.toUpperCase()===name && /[A-ZÁÉÍÓÚÜÑ0-9]/.test(name);
     if(esNombre){
@@ -2551,9 +2573,10 @@ function docxCue(text){
   if(!/[A-ZÁÉÍÓÚÜÑ]/.test(head)) return null;
   if(head !== head.toUpperCase()) return null;                  // el nombre va en MAYÚSCULAS
   if(colon < 0){
-    const w = head.split(/\s+/).filter(Boolean);
+    const hc = head.replace(/\./g,' ').replace(/\s+/g,' ').trim();   // permite REV./DR./SR.
+    const w = hc.split(/\s+/).filter(Boolean);
     if(w.length > 6) return null;
-    if(/[.!?¡¿]/.test(head)) return null;
+    if(/[!?¡¿]/.test(hc)) return null;
   }
   return { name:head.trim(), rest };
 }
@@ -2925,10 +2948,13 @@ async function scanPdf(){
       // RENGLÓN, descartando encabezados de escena, timecodes, números de página,
       // acotaciones y palabras de formato (INT/EXT/CUT TO/MÚSICA/…) → menos falsos.
       lines.forEach((line,li)=>{
-        const raw = (line.text||'').trim();
+        let raw = (line.text||'').trim();
         if(raw.length < 2) return;
         if(SCENE_RE.test(raw)) return;
-        if(/^\d/.test(raw) && TC_RE.test(raw)) return;
+        // si la línea empieza con un timecode, lo separamos: "01:23:45 REV. HENRY HARDY"
+        // → el TC se registra aparte (abajo) y aquí analizamos el NOMBRE restante.
+        const _lt = leadTC(raw);
+        if(_lt){ if(!_lt.rest) return; raw = _lt.rest; }
         let colonAt = -1;
         for(let i=0;i<raw.length;i++){ const ch=raw[i]; if(ch===':'||ch==='：'){ colonAt=i; break; } }
         let head = colonAt>=0 ? raw.slice(0,colonAt) : raw;
@@ -2942,9 +2968,11 @@ async function scanPdf(){
         if(NON_CHAR.has(flat)) return;
         if(/^\d+$/.test(flat)) return;
         if(colonAt < 0){
-          const words = headClean.split(/\s+/).filter(Boolean);
+          // el punto de una abreviatura (REV., DR., SR.) NO descarta el nombre
+          const hcCheck = headClean.replace(/\./g,' ').replace(/\s+/g,' ').trim();
+          const words = hcCheck.split(/\s+/).filter(Boolean);
           if(words.length > 5) return;
-          if(/[.!?¡¿,;]/.test(headClean)) return;
+          if(/[!?¡¿,;]/.test(hcCheck)) return;
         } else {
           const after = raw.slice(colonAt+1).trim();
           if(after && !/[A-Za-zÁÉÍÓÚÜÑ0-9¡¿"“(\[]/.test(after) && !TC_RE.test(after)) return;
@@ -2959,7 +2987,8 @@ async function scanPdf(){
     // asignar a cada intervención el último timecode visto en el flujo de líneas
     let lastTC = null;
     lines.forEach((line,li)=>{
-      const tc = strictTC(line.text);
+      let tc = strictTC(line.text);
+      if(tc==null){ const _l = leadTC(line.text); if(_l) tc = _l.sec; }   // TC al inicio de la línea aunque le siga texto
       if(tc!=null){ lastTC = tc; tcIndex.push({sec:tc, page:p, lineIdx:li}); }
       for(const m of marks) if(m.lineIdx===li && m.tcSec===undefined) m.tcSec = lastTC;
     });
@@ -3190,6 +3219,16 @@ function strictTC(text){
   m = t.match(/^(\d{1,2}):(\d{2})$/);
   if(m) return (+m[1])*60 + (+m[2]);
   return null;
+}
+// timecode al INICIO de la línea (HH:MM:SS[:FF]) aunque le siga texto (nombre o
+// diálogo). Devuelve {sec, rest} o null. Exige el formato completo HH:MM:SS para
+// no confundir cifras sueltas del diálogo.
+function leadTC(text){
+  const t = String(text||'').trim();
+  const m = t.match(/^(\d{1,2}):(\d{2}):(\d{2})(?:[:;.](\d{2}))?(?:\s+|$)(.*)$/);
+  if(!m) return null;
+  const sec = (+m[1])*3600 + (+m[2])*60 + (+m[3]) + (m[4]? (+m[4])/25 : 0);
+  return { sec, rest:(m[5]||'').trim() };
 }
 function parseTC(s){
   const m = String(s||'').match(/(\d{1,2})\s*:\s*(\d{2})(?:\s*:\s*(\d{2}))?(?:\s*[:;.]\s*(\d{2}))?/);
