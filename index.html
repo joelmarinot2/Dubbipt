@@ -1457,7 +1457,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.9.1-nube · 14-ago-2026';
+const APP_VERSION = 'v10.9.2-nube · 14-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -6511,7 +6511,7 @@ function buildLibretoDoc(pc){
       try{ if(typeof pop2.doc.querySelector('.lh h2')!=='undefined'){ const h=pop2.doc.querySelector('.lh h2'); if(h) h.textContent = (pop2.key&&charIdx[pop2.key])?charIdx[pop2.key].display:'Libreto'; } }catch(e){}
       try{ renderLibretoBlocks(); }catch(e){}
       try{ renderLibretoChips(); }catch(e){}
-      try{ const f = pop2.doc.querySelector('.blk.mine'); if(f) f.scrollIntoView({block:'center', behavior:'smooth'}); }catch(e){}
+      try{ pop2._interact = performance.now(); const f = pop2.doc.querySelector('.blk.mine'); if(f) libCenterTo(f); }catch(e){}
     });
   }
   d.getElementById('lBack').addEventListener('click', ()=>{
@@ -6944,18 +6944,25 @@ function centerBlock(vi, smooth){
   if(comoda && smooth) return;
   const target = Math.max(0, Math.min(libMaxTop(), el.offsetTop - wrap.clientHeight*0.42 + el.offsetHeight/2));
   if(!isFinite(target)) return;
-  wrap.scrollTo({ top: target, behavior: smooth?'smooth':'auto' });
+  if(smooth) libAnimScroll(target);
+  else wrap.scrollTo({ top: target, behavior:'auto' });
 }
 // desplazamiento ANIMADO (rápido pero visible): en vez de saltar seco a la
 // página, recorre el trayecto para dar sensación de "scroll" hasta el destino.
+// En libretos grandes NO recorre miles de px (se demoraba mucho): teletransporta
+// cerca del destino y desliza solo el último tramo → siempre llega en <½ s.
 function libAnimScroll(top){
   const wrap = pop2.els && pop2.els.wrap; if(!wrap) return;
   top = Math.max(0, Math.min(libMaxTop(), top));
-  const start = wrap.scrollTop, dist = top - start;
+  let start = wrap.scrollTop, dist = top - start;
   if(Math.abs(dist) < 4){ wrap.scrollTop = top; return; }
-  // duración proporcional a la distancia, acotada → rápido en saltos cortos,
-  // y aun así visible (no instantáneo) en saltos largos
-  const dur = Math.max(240, Math.min(900, Math.abs(dist) * 0.32));
+  const vh = wrap.clientHeight || 600;
+  const maxTravel = vh * 2.2;                       // tope de recorrido visible
+  if(Math.abs(dist) > maxTravel){
+    start = top - Math.sign(dist) * maxTravel;      // salto instantáneo hasta cerca
+    wrap.scrollTop = start; dist = top - start;
+  }
+  const dur = Math.max(200, Math.min(520, Math.abs(dist) * 0.42));   // snappy
   const raf = (pop2.win && pop2.win.requestAnimationFrame) ? pop2.win.requestAnimationFrame.bind(pop2.win) : requestAnimationFrame;
   if(pop2._pageAnim){ try{ (pop2.win||window).cancelAnimationFrame(pop2._pageAnim); }catch(e){} }
   const t0 = performance.now();
@@ -6968,6 +6975,13 @@ function libAnimScroll(top){
     else { pop2._pageAnim = 0; pop2._pageAnimating = false; wrap.scrollTop = top; }
   };
   pop2._pageAnim = raf(step);
+}
+// centra un bloque en el área de lectura con el mismo scroll animado y acotado
+function libCenterTo(el){
+  if(!el || !pop2.els) return;
+  const wrap = pop2.els.wrap;
+  const target = Math.max(0, Math.min(libMaxTop(), el.offsetTop - wrap.clientHeight*0.42 + el.offsetHeight/2));
+  if(isFinite(target)) libAnimScroll(target);
 }
 function gotoLibretoPage(pg, fromRemote){
   if(!pop2.doc || !pg || !isFinite(pg)) return;
@@ -7239,7 +7253,7 @@ function libFindGo(idx){
   try{ w.CSS.highlights.delete('libsearchcur'); w.CSS.highlights.set('libsearchcur', new w.Highlight(libSearch.ranges[idx])); }catch(e){}
   const r = libSearch.ranges[idx];
   const el = r.startContainer.parentElement;
-  if(el && el.scrollIntoView){ pop2._interact = performance.now(); el.scrollIntoView({block:'center', behavior:'smooth'}); }
+  if(el){ pop2._interact = performance.now(); const blk = (el.closest && el.closest('.blk')) || el; if(blk===el && el.scrollIntoView){ el.scrollIntoView({block:'center', behavior:'auto'}); } else { libCenterTo(blk); } }
 }
 // panel de PRONUNCIACIONES: todos los "Nombre (fonética)" del libreto
 function openPronPanel(){
