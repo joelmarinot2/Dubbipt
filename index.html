@@ -114,6 +114,7 @@ body:not(.ep-open) #planilla,
 body:not(.ep-open) #empty,
 body:not(.ep-open) #epLine{display:none !important}
 .sec-title{font-weight:700;font-size:15px;margin:12px 2px 8px}
+.sec-title .sti{vertical-align:-2px;margin-right:5px;color:#5FC85A}
 .sec-hint{font-weight:400;font-size:12.5px;opacity:.6}
 .up-actions{grid-column:1/-1;display:flex;justify-content:flex-end}
 .fcard{position:relative;background:var(--inset);border:1px solid var(--line-soft);border-radius:14px;
@@ -898,8 +899,15 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .et-title > :first-child{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .et-rowacts{ display:inline-flex; gap:2px; opacity:0; transition:opacity .12s; flex:none; }
 .et-row:hover .et-rowacts{ opacity:1; }
-.et-mini{ background:transparent; border:none; cursor:pointer; font-size:12px; padding:3px 5px; border-radius:6px; opacity:.75; }
+.et-mini{ background:transparent; border:none; cursor:pointer; font-size:12px; padding:0; border-radius:7px; opacity:.7;
+  color:#9CA3AF; width:28px; height:28px; display:inline-grid; place-items:center; vertical-align:middle; transition:background .12s,color .12s,opacity .12s; }
+.et-mini svg{ display:block; width:15px; height:15px; }
 .et-mini:hover{ background:#23262b; opacity:1; }
+.et-mini.lren:hover{ color:#5FC85A; }
+.et-mini.lupd:hover{ color:#4ADE80; }
+.et-mini.ldel:hover{ color:#FB7185; }
+.fcard .ldel, .fcard .lren, .fcard .lmov, .fcard .lupd{ display:grid; place-items:center; width:26px; height:26px; padding:0; }
+.fcard .ldel svg, .fcard .lren svg, .fcard .lmov svg, .fcard .lupd svg{ display:block; width:15px; height:15px; }
 .et-chars{ font-family:'Inter',sans-serif; color:#9CA3AF; font-size:12.5px; }
 .et-badge{ display:inline-block; font-family:'Inter',sans-serif; font-weight:600; font-size:11.5px; padding:4px 11px; border-radius:99px; }
 .et-badge.done{ background:rgba(34,197,94,.14); color:#4ADE80; }
@@ -957,6 +965,17 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
   padding:10px 18px; border-radius:9px; cursor:pointer; }
 .ddlm-go:hover{ filter:brightness(1.06); }
 .ddlm-go:disabled{ opacity:.6; cursor:default; }
+/* zona de carga del guion (nuevo episodio) — estilo moderno */
+.ddlm-field label.ddlm-drop{ position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  border:1px dashed #2c3036; border-radius:12px; background:#0f1215; padding:22px 14px; cursor:pointer; text-align:center; margin-bottom:0;
+  transition:border-color .12s, background .12s; }
+.ddlm-field label.ddlm-drop:hover{ border-color:#4ADE80; background:#0d1512; }
+.ddlm-field label.ddlm-drop.has{ border-style:solid; border-color:#22C55E; background:rgba(34,197,94,.07); }
+.ddlm-drop .ddlm-drop-ic{ color:#4ADE80; line-height:0; }
+.ddlm-drop .ddlm-drop-ic svg{ width:24px; height:24px; }
+.ddlm-drop .ddlm-drop-t{ color:#e6e7ea; font-family:'Inter',sans-serif; font-size:13.5px; font-weight:600; word-break:break-word; max-width:100%; }
+.ddlm-drop .ddlm-drop-h{ color:#6b7280; font-family:'Inter',sans-serif; font-size:11.5px; }
+.ddlm-drop input{ display:none; }
 </style>
 <style>
 /* ===== Crear Programa / modales · ajuste al mockup (imagen 7) ===== */
@@ -1260,13 +1279,13 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
       <button class="btnv sm" id="libToggle" style="display:none">📂 Cambiar capítulo</button>
       <button class="btnv sm" id="libAction" style="display:none"></button>
     </div>
-    <div class="sec-title" id="ttlOpen" style="display:none">📂 Abrir un capítulo</div>
+    <div class="sec-title" id="ttlOpen" style="display:none"><svg class="sti" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg> Abrir un capítulo</div>
     <div class="lib-grid" id="libGrid"></div>
-    <div class="sec-title" id="ttlLoad" style="display:none">⬆️ Cargar un capítulo <span class="sec-hint">sube el guion (PDF o Word) — el desglose de personajes se genera automáticamente — y pulsa «💾 Guardar capítulo»</span></div>
+    <div class="sec-title" id="ttlLoad" style="display:none"><svg class="sti" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5"/><path d="M8 9l4-4 4 4"/><path d="M5 16v2a2 2 0 002 2h10a2 2 0 002-2v-2"/></svg> Cargar un capítulo <span class="sec-hint">sube el guion (PDF o Word) — el desglose de personajes se genera automáticamente — y pulsa «💾 Guardar capítulo»</span></div>
     <div class="uploads" id="uploadsBox" style="display:none">
     <span id="dropXls" style="display:none"><span id="xlsName"></span><input type="file" id="inXls"></span>
     <label class="drop" id="dropPdf">
-      <div class="ic">📄</div>
+      <div class="ic"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v6h6"/></svg></div>
       <b>Guion (PDF o Word)</b>
       <small>El desglose de personajes se genera automáticamente al cargarlo · el archivo nunca se modifica</small>
       <div class="file-ok" id="pdfName"></div>
@@ -1324,7 +1343,7 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
   <div class="cards" id="cards"></div>
   <div id="planilla"></div>
   <div class="empty show" id="empty">
-    <div class="ic">📄</div>
+    <div class="ic"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v6h6"/></svg></div>
     <h4>Este episodio todavía no tiene desglose</h4>
     <p>Sube el guion en PDF o DOCX y Dubbipt detectará automáticamente los personajes y sus intervenciones.</p>
     <button class="cta" id="emptyCta" onclick="var e=document.getElementById('inPdf'); if(e) e.click();">Subir guion (PDF/DOCX)</button>
@@ -1438,12 +1457,25 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.8.0-nube · 13-ago-2026';
+const APP_VERSION = 'v10.9.0-nube · 13-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
 });
 console.log('%cDesglose Digital de Libreto '+APP_VERSION, 'color:#5FC85A;font-weight:bold');
+
+/* ── Iconos de la app (trazos limpios, sin emojis) — heredan color del botón ── */
+const _svgI = (p, sw, sz)=> '<svg viewBox="0 0 24 24" width="'+(sz||15)+'" height="'+(sz||15)+'" fill="none" stroke="currentColor" stroke-width="'+(sw||2)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+p+'</svg>';
+const ICO = {
+  edit    : _svgI('<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4z"/>'),
+  trash   : _svgI('<path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/>'),
+  refresh : _svgI('<path d="M21 12a9 9 0 11-2.64-6.36"/><path d="M21 3.5V8h-4.5"/>'),
+  folder  : _svgI('<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>'),
+  upload  : _svgI('<path d="M12 16V5"/><path d="M8 9l4-4 4 4"/><path d="M5 16v2a2 2 0 002 2h10a2 2 0 002-2v-2"/>'),
+  doc     : _svgI('<path d="M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v6h6"/>'),
+  plus    : _svgI('<path d="M12 5v14M5 12h14"/>', 2.2),
+  move    : _svgI('<path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/>', 1.7)
+};
 
 /* ================= acceso (Supabase) ================= */
 let sb = null, sbUser = null;
@@ -3228,7 +3260,7 @@ function renderPlanilla(){
         +'<td class="pnm"><div class="nrow"><span class="cdot"></span>'
         +'<span class="nm2">'+esc(c.display)+'</span>'
         +(done?'<span class="bdg">✓</span>':'')
-        +'<button class="delChar" data-k="'+esc(c.key)+'" title="Eliminar personaje del desglose" style="margin-left:auto;border:none;background:none;color:#7d76a8;cursor:pointer;font-size:14px;padding:0 4px">🗑</button>'
+        +'<button class="delChar" data-k="'+esc(c.key)+'" title="Eliminar personaje del desglose" style="margin-left:auto;display:inline-grid;place-items:center;border:none;background:none;color:#7d76a8;cursor:pointer;padding:2px 4px">'+ICO.trash+'</button>'
         +'</div></td>'
         +'<td class="ploc'+(c.talent?'':' ng')+'"><input class="talIn" data-k="'+esc(c.key)+'" value="'+esc(c.talent||'')+'" placeholder="Asignar talento…" style="width:100%;min-width:90px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;color:inherit;font:inherit;outline:none">'+((c.noRec&&c.talent)?'<small>no se graba</small>':'')+'</td>'
         +'<td class="ptime">'+(tc||'—')+'</td>'
@@ -3733,7 +3765,8 @@ function taskPanelEl(){
     + 'min-width:330px;max-width:92vw;box-shadow:0 14px 44px rgba(0,0,0,.5);display:none}'
     + '#taskPanel.on{display:block}'
     + '#taskPanel .tp-t{font-family:Space Grotesk,sans-serif;font-weight:700;font-size:14.5px}'
-    + '#taskPanel .tp-k{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A90BC;font-family:ui-monospace,monospace}'
+    + '#taskPanel .tp-k{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A90BC;font-family:ui-monospace,monospace;display:flex;align-items:center;gap:6px}'
+    + '#taskPanel .tp-k svg{width:14px;height:14px}'
     + '#taskPanel .tp-s{font-family:ui-monospace,monospace;font-size:12px;color:#A9E6A9;min-height:1.2em;margin-top:4px}'
     + '#taskPanel .tp-b{height:6px;background:#2A2150;border-radius:4px;margin-top:9px;overflow:hidden}'
     + '#taskPanel .tp-f{height:100%;width:0;background:linear-gradient(90deg,#4CB84C,#5FC85A);transition:width .25s}'
@@ -3746,7 +3779,7 @@ function taskPanelEl(){
 function taskShow(kind, title){
   const p = taskPanelEl();
   p.className = 'on ' + kind;
-  p.innerHTML = '<div class="tp-k">'+(kind==='load'?'⬆️ Tablero de carga':'📂 Tablero de apertura')+'</div>'
+  p.innerHTML = '<div class="tp-k">'+(kind==='load'?ICO.upload+' Cargando capítulo':ICO.folder+' Abriendo capítulo')+'</div>'
     + '<div class="tp-t">'+esc(title)+'</div>'
     + '<div class="tp-s" id="tpStep">…</div>'
     + '<div class="tp-b"><div class="tp-f" id="tpFill"></div></div>';
@@ -3967,8 +4000,8 @@ async function renderLibrary(silent){
         const cov = progCover(sh.name);
         const c = document.createElement('div'); c.className='fcard dtile';
         c.innerHTML = '<div class="dcover" style="--cov1:'+cov[0]+';--cov2:'+cov[1]+'">'
-          +'<button class="ldel" title="Eliminar programa" aria-label="Eliminar programa '+esc(sh.name)+'">🗑</button>'
-          +'<button class="lren" title="Renombrar programa" aria-label="Renombrar programa '+esc(sh.name)+'">✏️</button>'
+          +'<button class="ldel" title="Eliminar programa" aria-label="Eliminar programa '+esc(sh.name)+'">'+ICO.trash+'</button>'
+          +'<button class="lren" title="Renombrar programa" aria-label="Renombrar programa '+esc(sh.name)+'">'+ICO.edit+'</button>'
           + (sh.cover_path ? '<img class="dcov" src="'+pubUrl(sh.cover_path)+'" alt="">' : '<span class="dinit">'+esc(progInitials(sh.name))+'</span>')
           +'</div>'
           +'<div class="dbody">'
@@ -4085,9 +4118,9 @@ async function renderLibrary(silent){
           +'<span class="et-num">'+(i+1)+'</span>'
           +'<span class="et-title">'+esc(ep.name)
             +'<span class="et-rowacts">'
-              +'<button class="et-mini lren" title="Renombrar" aria-label="Renombrar '+esc(ep.name)+'">✏️</button>'
-              +'<button class="et-mini lupd" title="Actualizar desde la nube" aria-label="Actualizar '+esc(ep.name)+'">🔄</button>'
-              +'<button class="et-mini ldel" title="Eliminar" aria-label="Eliminar '+esc(ep.name)+'">🗑</button>'
+              +'<button class="et-mini lren" title="Renombrar" aria-label="Renombrar '+esc(ep.name)+'">'+ICO.edit+'</button>'
+              +'<button class="et-mini lupd" title="Actualizar desde la nube" aria-label="Actualizar '+esc(ep.name)+'">'+ICO.refresh+'</button>'
+              +'<button class="et-mini ldel" title="Eliminar" aria-label="Eliminar '+esc(ep.name)+'">'+ICO.trash+'</button>'
             +'</span>'
           +'</span>'
           +'<span class="et-chars">'+charsTxt+'</span>'
@@ -4468,29 +4501,41 @@ function showDesgloseReview(epName, onSave){
 }
 function newEpisodeModal(){
   if(!LDB.showId){ libMsg('Entra en un programa primero'); return; }
-  const { card, close } = dlgOpen(
-    '<h2 class="dlgtitle">Nuevo episodio</h2>'
-    +'<div class="dlgfield nef"><span class="nepfx">Nombre:</span><input id="neName" placeholder="" spellcheck="false"></div>'
-    +'<div class="dlglabel">Subir libreto</div>'
-    +'<label class="dlgdrop tall" id="neD"><span class="pl" id="nePl">\uFF0B</span><span class="nefile" id="neFile"></span><input type="file" id="neFile2" accept="application/pdf,.pdf,.docx,.xlsx,.xlsm,.xls"></label>'
-    +'<div class="dlghint">Word, PDF, Excel</div>'
-    +'<div class="dlgerr" id="neErr"></div>'
-    +'<button class="dlgbtn" id="neGo">Crear Episodio</button>'
-  );
-  const q=(id)=>card.querySelector('#'+id);
-  q('neFile2').addEventListener('change', ()=>{ const f=q('neFile2').files[0]; if(f){ const pl=q('nePl'); if(pl) pl.style.display='none'; q('neFile').textContent='\uD83D\uDCC4 '+f.name; } });
+  const old=document.getElementById('ddlmOv'); if(old) old.remove();
+  const ov=document.createElement('div'); ov.id='ddlmOv'; ov.className='ddlm-ov';
+  ov.innerHTML =
+    '<div class="ddlm-card" role="dialog" aria-modal="true" aria-label="Crear episodio">'
+    +'<div class="ddlm-kicker">Modal · Nuevo episodio</div>'
+    +'<h2>Nuevo episodio</h2>'
+    +'<div class="ddlm-field"><label for="neName">Nombre del episodio</label><input id="neName" placeholder="Ej. Episodio 1" spellcheck="false"></div>'
+    +'<div class="ddlm-field" style="margin-bottom:8px"><label>Guion del episodio</label>'
+      +'<label class="ddlm-drop" id="neDrop"><span class="ddlm-drop-ic">'+ICO.upload+'</span>'
+        +'<span class="ddlm-drop-t" id="neDropT">Arrastra o elige el guion</span>'
+        +'<span class="ddlm-drop-h">PDF · Word · Excel — el desglose se genera solo</span>'
+        +'<input type="file" id="neFile2" accept="application/pdf,.pdf,.docx,.xlsx,.xlsm,.xls"></label>'
+    +'</div>'
+    +'<div class="ddlm-err" id="neErr"></div>'
+    +'<div class="ddlm-btns"><button class="ddlm-cancel" id="neCancel">Cancelar</button><button class="ddlm-go" id="neGo">Crear episodio</button></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  const q=(id)=>ov.querySelector('#'+id);
+  const close=()=>ov.remove();
+  ov.addEventListener('mousedown', e=>{ if(e.target===ov) close(); });
+  ov.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
+  q('neCancel').onclick=close;
+  q('neFile2').addEventListener('change', ()=>{ const f=q('neFile2').files[0]; if(f){ q('neDropT').textContent=f.name; q('neDrop').classList.add('has'); } });
   q('neGo').addEventListener('click', async ()=>{
     const name=(q('neName').value||'').trim();
-    if(!name){ q('neErr').textContent='Escribe el nombre del episodio'; return; }
+    if(!name){ q('neErr').textContent='Escribe el nombre del episodio'; q('neName').focus(); return; }
     const file=q('neFile2').files[0];
-    if(!file){ q('neErr').textContent='Sube el libreto (PDF, Word o Excel)'; return; }
-    const btn=q('neGo'); btn.disabled=true; btn.textContent='Creando\u2026';
+    if(!file){ q('neErr').textContent='Sube el guion (PDF, Word o Excel)'; return; }
+    const btn=q('neGo'); btn.disabled=true; btn.textContent='Creando…';
     try{
       currentEp=null;
       await loadFileForEp(file);
       close();
       showDesgloseReview(name, async ()=>{ window._epNameOverride = name; await saveEpHere(); try{ _epOpen(true); }catch(e){} });
-    }catch(e){ btn.disabled=false; btn.textContent='Crear Episodio'; q('neErr').textContent=DDL_UI.friendlyError(e); }
+    }catch(e){ btn.disabled=false; btn.textContent='Crear episodio'; q('neErr').textContent=(typeof DDL_UI!=='undefined'?DDL_UI.friendlyError(e):(e&&e.message||'Error')); }
   });
   setTimeout(()=>{ const n=q('neName'); if(n) n.focus(); },60);
 }
@@ -5358,6 +5403,9 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', async () => {
     try {
       const reg = await navigator.serviceWorker.register('./sw.js');
+      try{ reg.update(); }catch(e){}
+      // vuelve a comprobar si hay versión nueva al volver a la pestaña
+      document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ try{ reg.update(); }catch(e){} } });
       reg.addEventListener('updatefound', () => {
         const nw = reg.installing;
         nw && nw.addEventListener('statechange', () => {
