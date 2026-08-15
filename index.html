@@ -1475,7 +1475,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.12.0-nube · 15-ago-2026';
+const APP_VERSION = 'v10.12.1-nube · 15-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -4147,18 +4147,10 @@ async function renderLibrary(silent){
             return;
           }
           LDB.showId = sh.id; libView='eps'; renderLibrary();
-          // precarga los libretos rápidos y, la primera vez, carga en segundo plano
-          // los capítulos que nunca se abrieron (aunque no se hayan tocado)
-          (async ()=>{
-            try{ await precacheShowData(sh.id); }catch(e){}
-            try{
-              window._autoLoaded = window._autoLoaded || new Set();
-              if(!window._autoLoaded.has(sh.id) && LDB.showId===sh.id){
-                window._autoLoaded.add(sh.id);
-                await optimizeProgram(sh.id, true);
-              }
-            }catch(e){}
-          })();
+          // precarga SILENCIOSA de los libretos ya procesados (abren al instante).
+          // No abrimos capítulos sin procesar automáticamente: eso navegaba a la
+          // pantalla de «preparando». Los sin procesar se cargan con «Optimizar programa».
+          precacheShowData(sh.id);
         });
         grid.appendChild(c);
       }
