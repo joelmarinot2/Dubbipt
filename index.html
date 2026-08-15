@@ -115,6 +115,8 @@ body:not(.ep-open) #empty,
 body:not(.ep-open) #epLine{display:none !important}
 .sec-title{font-weight:700;font-size:15px;margin:12px 2px 8px}
 .sec-title .sti{vertical-align:-2px;margin-right:5px;color:#5FC85A}
+.fmt-open-btn{ margin-left:8px; vertical-align:1px; background:rgba(95,200,90,.10); color:#5FC85A; border:1px solid rgba(95,200,90,.4); border-radius:8px; padding:4px 10px; font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600; cursor:pointer; }
+.fmt-open-btn:hover{ background:rgba(95,200,90,.18); border-color:#5FC85A; }
 .sec-hint{font-weight:400;font-size:12.5px;opacity:.6}
 .up-actions{grid-column:1/-1;display:flex;justify-content:flex-end}
 .fcard{position:relative;background:var(--inset);border:1px solid var(--line-soft);border-radius:14px;
@@ -965,6 +967,22 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
   padding:10px 18px; border-radius:9px; cursor:pointer; }
 .ddlm-go:hover{ filter:brightness(1.06); }
 .ddlm-go:disabled{ opacity:.6; cursor:default; }
+.ddlm-fmt{ margin-right:auto; background:transparent; color:#8ab6ff; border:1px solid #2a3550; border-radius:9px; padding:9px 12px; font-family:'Inter',sans-serif; font-weight:600; font-size:13px; cursor:pointer; }
+.ddlm-fmt:hover{ border-color:#4d7cff; color:#a9c8ff; }
+/* Perfil de formato */
+.fmt-card{ max-width:600px; }
+.fmt-lead{ color:#9aa0ab; font-family:'Inter',sans-serif; font-size:12.5px; line-height:1.5; margin:-4px 0 14px; }
+.fmt-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.fmt-f{ display:flex; flex-direction:column; gap:5px; margin-bottom:6px; }
+.fmt-f label{ color:#c7c9cd; font-family:'Inter',sans-serif; font-size:12px; font-weight:600; }
+.fmt-sel, .fmt-ta{ background:#0f1215; border:1px solid #2a2f36; color:#e6e7ea; border-radius:9px; padding:9px 10px; font-family:'Inter',sans-serif; font-size:13px; outline:none; }
+.fmt-sel:focus, .fmt-ta:focus{ border-color:#4ADE80; }
+.fmt-ta{ width:100%; min-height:78px; resize:vertical; font-family:ui-monospace,monospace; font-size:12.5px; }
+.fmt-sec{ margin:14px 0 8px; color:#e6e7ea; font-family:'Inter',sans-serif; font-weight:700; font-size:13px; border-top:1px solid #1e2228; padding-top:12px; }
+.fmt-checks{ display:grid; grid-template-columns:1fr 1fr; gap:8px 14px; margin-bottom:12px; }
+.fmt-chk{ display:flex; align-items:center; gap:8px; color:#cdd0d6; font-family:'Inter',sans-serif; font-size:12.5px; cursor:pointer; }
+.fmt-chk input{ width:16px; height:16px; accent-color:#22C55E; flex:none; }
+@media(max-width:560px){ .fmt-grid, .fmt-checks{ grid-template-columns:1fr; } .ddlm-fmt{ margin-right:0; } }
 /* zona de carga del guion (nuevo episodio) — estilo moderno */
 .ddlm-field label.ddlm-drop{ position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
   border:1px dashed #2c3036; border-radius:12px; background:#0f1215; padding:22px 14px; cursor:pointer; text-align:center; margin-bottom:0;
@@ -1281,7 +1299,7 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
     </div>
     <div class="sec-title" id="ttlOpen" style="display:none"><svg class="sti" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg> Abrir un capítulo</div>
     <div class="lib-grid" id="libGrid"></div>
-    <div class="sec-title" id="ttlLoad" style="display:none"><svg class="sti" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5"/><path d="M8 9l4-4 4 4"/><path d="M5 16v2a2 2 0 002 2h10a2 2 0 002-2v-2"/></svg> Cargar un capítulo <span class="sec-hint">sube el guion (PDF o Word) — el desglose de personajes se genera automáticamente — y pulsa «💾 Guardar capítulo»</span></div>
+    <div class="sec-title" id="ttlLoad" style="display:none"><svg class="sti" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5"/><path d="M8 9l4-4 4 4"/><path d="M5 16v2a2 2 0 002 2h10a2 2 0 002-2v-2"/></svg> Cargar un capítulo <span class="sec-hint">sube el guion (PDF o Word) — el desglose de personajes se genera automáticamente — y pulsa «💾 Guardar capítulo»</span> <button type="button" class="fmt-open-btn" onclick="openFormatProfile()" title="Configurar cómo se detecta este tipo de libreto">Perfil de formato</button></div>
     <div class="uploads" id="uploadsBox" style="display:none">
     <span id="dropXls" style="display:none"><span id="xlsName"></span><input type="file" id="inXls"></span>
     <label class="drop" id="dropPdf">
@@ -1457,12 +1475,54 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.9.3-nube · 14-ago-2026';
+const APP_VERSION = 'v10.11.0-nube · 15-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
 });
 console.log('%cDesglose Digital de Libreto '+APP_VERSION, 'color:#5FC85A;font-weight:bold');
+
+/* ================= Perfil de formato del libreto =================
+   Permite configurar MANUALMENTE cómo es cada tipo de libreto para detectarlo
+   bien: timecodes, cómo se ven los nombres/líneas, qué excluir y la paginación.
+   Con los valores por defecto ('auto'/off) el comportamiento es EXACTAMENTE el
+   de siempre; el usuario activa reglas según su guion. */
+const FMT_DEFAULT = {
+  hasTC:'auto',        // 'auto' | 'yes' | 'no'  → ¿el guion trae timecodes?
+  nameStyle:'auto',    // 'auto' | 'allcaps' | 'colon'  → cómo se ven los nombres
+  nameSep:'auto',      // 'auto' | ':' | 'tab' | '-'     → separador nombre/diálogo
+  honorifics:true,     // fusionar REV./DR./SR. con el nombre de la línea siguiente
+  exclParen:false,     // excluir acotaciones (líneas entre paréntesis)
+  exclScene:false,     // excluir encabezados de escena (INT./EXT./ESC.)
+  exclPageNums:false,  // excluir números de página sueltos
+  pageMode:'auto',     // 'auto' | 'pdfpage' | 'marker'
+  pageMarker:'PÁG',    // marcador de página si pageMode='marker'
+  custom:[]            // patrones (regex) de líneas a excluir del libreto
+};
+let FMT = Object.assign({}, FMT_DEFAULT);
+FMT._customRx = [];
+function fmtCompile(){
+  FMT._customRx = [];
+  for(const p of (FMT.custom||[])){
+    const s = String(p||'').trim(); if(!s) continue;
+    try{ FMT._customRx.push(new RegExp(s, 'i')); }catch(e){ /* patrón inválido: se ignora */ }
+  }
+}
+function loadFMT(){
+  try{ const r = localStorage.getItem('ddl_fmt'); if(r) FMT = Object.assign({}, FMT_DEFAULT, JSON.parse(r)); }catch(e){}
+  fmtCompile(); return FMT;
+}
+function saveFMT(){ try{ localStorage.setItem('ddl_fmt', JSON.stringify(FMT)); }catch(e){} fmtCompile(); }
+try{ loadFMT(); }catch(e){}
+// ¿esta línea debe EXCLUIRSE del libreto según el perfil de formato?
+function lineExcluded(text){
+  const t = String(text||'').trim(); if(!t) return false;
+  if(FMT.exclScene && typeof SCENE_RE!=='undefined' && SCENE_RE.test(t)) return true;
+  if(FMT.exclPageNums && /^\s*(?:p[áa]g\.?\s*|pg\.?\s*)?\d{1,4}\s*$/i.test(t)) return true;
+  if(FMT.exclParen && /^\s*[\(\[][^)\]]*[\)\]]\s*$/.test(t)) return true;   // línea completa entre ( ) o [ ]
+  for(const rx of (FMT._customRx||[])){ try{ if(rx.test(t)) return true; }catch(e){} }
+  return false;
+}
 
 /* ── Iconos de la app (trazos limpios, sin emojis) — heredan color del botón ── */
 const _svgI = (p, sw, sz)=> '<svg viewBox="0 0 24 24" width="'+(sz||15)+'" height="'+(sz||15)+'" fill="none" stroke="currentColor" stroke-width="'+(sw||2)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+p+'</svg>';
@@ -2481,10 +2541,11 @@ function separaNombreDialogo(line){
 }
 // Genera el desglose recorriendo los bloques  timecode → NOMBRE → diálogo.
 function desgloseByRules(){
+  if(typeof FMT!=='undefined' && FMT.hasTC==='no') return false;   // el perfil dice que NO hay timecodes
   const seq=[];
   for(let p=1;p<=numPages;p++){
     const pd=pageData[p]; if(!pd||!pd.lines) continue;
-    pd.lines.forEach(l=> seq.push({p, text:(l.text||'').trim()}));
+    pd.lines.forEach(l=>{ const t=(l.text||'').trim(); if(typeof lineExcluded==='function' && lineExcluded(t)) return; seq.push({p, text:t}); });
   }
   if(!seq.length) return false;
   const order=[]; const byName={};
@@ -2510,7 +2571,7 @@ function desgloseByRules(){
     }
     // Nombre partido en dos renglones: "REV." arriba y "HENRY HARDY" abajo.
     // Si el nombre es SOLO un título, absórbe las palabras-nombre que lo siguen.
-    if(isHonorificOnly(name) && dial){
+    if((typeof FMT==='undefined' || FMT.honorifics!==false) && isHonorificOnly(name) && dial){
       const sp2 = separaNombreDialogo(name + ' ' + dial);
       if(sp2.name && !isHonorificOnly(sp2.name)){ name = sp2.name; dial = sp2.dial; }
     }
@@ -4538,6 +4599,49 @@ function showDesgloseReview(epName, onSave){
     catch(e){ btn.disabled=false; btn.textContent='Guardar desglose'; DDL_UI.toast(DDL_UI.friendlyError(e), {kind:'err'}); }
   };
 }
+function openFormatProfile(){
+  loadFMT();
+  const old=document.getElementById('ddlmOv'); if(old) old.remove();
+  const ov=document.createElement('div'); ov.id='ddlmOv'; ov.className='ddlm-ov';
+  const sel=(id,val,opts)=> '<select id="'+id+'" class="fmt-sel">'+opts.map(o=>'<option value="'+o[0]+'"'+(o[0]===val?' selected':'')+'>'+o[1]+'</option>').join('')+'</select>';
+  const chk=(id,on,lbl)=> '<label class="fmt-chk"><input type="checkbox" id="'+id+'"'+(on?' checked':'')+'><span>'+lbl+'</span></label>';
+  ov.innerHTML='<div class="ddlm-card fmt-card" role="dialog" aria-modal="true" aria-label="Perfil de formato del libreto">'
+   +'<div class="ddlm-kicker">Detección de libreto</div><h2>Perfil de formato</h2>'
+   +'<p class="fmt-lead">Configura cómo es tu libreto para detectarlo bien. Con «Automático» / desactivado funciona como siempre; activa reglas según tu guion.</p>'
+   +'<div class="fmt-grid">'
+     +'<div class="fmt-f"><label>¿Tiene timecodes?</label>'+sel('fmtTC',FMT.hasTC,[['auto','Automático'],['yes','Sí, trae timecodes'],['no','No trae timecodes']])+'</div>'
+     +'<div class="fmt-f"><label>¿Cómo se ven los nombres?</label>'+sel('fmtName',FMT.nameStyle,[['auto','Automático'],['allcaps','MAYÚSCULAS'],['colon','NOMBRE: diálogo']])+'</div>'
+     +'<div class="fmt-f"><label>Separador nombre / línea</label>'+sel('fmtSep',FMT.nameSep,[['auto','Automático'],[':','Dos puntos ( : )'],['tab','Tabulación'],['-','Guion ( - )']])+'</div>'
+     +'<div class="fmt-f"><label>Paginación</label>'+sel('fmtPage',FMT.pageMode,[['auto','Automática'],['pdfpage','Por página del PDF'],['marker','Por marcador «PÁG N»']])+'</div>'
+   +'</div>'
+   +'<div class="fmt-sec">Excepciones — qué NO es parte del libreto</div>'
+   +'<div class="fmt-checks">'
+     +chk('fmtParen',FMT.exclParen,'Excluir acotaciones (líneas entre paréntesis)')
+     +chk('fmtScene',FMT.exclScene,'Excluir encabezados de escena (INT./EXT./ESC.)')
+     +chk('fmtPg',FMT.exclPageNums,'Excluir números de página sueltos')
+     +chk('fmtHon',FMT.honorifics,'Unir títulos con el nombre (REV., DR., SR.)')
+   +'</div>'
+   +'<div class="fmt-f"><label>Patrones a excluir (uno por línea · admite regex)</label>'
+     +'<textarea id="fmtCustom" class="fmt-ta" spellcheck="false" placeholder="Ej.:&#10;^NARRADOR&#10;\\(RISAS\\)&#10;^CORTE A">'+esc((FMT.custom||[]).join('\n'))+'</textarea></div>'
+   +'<div class="ddlm-btns"><button class="ddlm-cancel" id="fmtCancel">Cancelar</button><button class="ddlm-go" id="fmtSave">Guardar perfil</button></div>'
+   +'</div>';
+  document.body.appendChild(ov);
+  const q=id=>ov.querySelector('#'+id); const close=()=>ov.remove();
+  ov.addEventListener('mousedown',e=>{ if(e.target===ov) close(); });
+  ov.addEventListener('keydown',e=>{ if(e.key==='Escape') close(); });
+  q('fmtCancel').onclick=close;
+  q('fmtSave').onclick=()=>{
+    FMT.hasTC=q('fmtTC').value; FMT.nameStyle=q('fmtName').value; FMT.nameSep=q('fmtSep').value; FMT.pageMode=q('fmtPage').value;
+    FMT.exclParen=q('fmtParen').checked; FMT.exclScene=q('fmtScene').checked; FMT.exclPageNums=q('fmtPg').checked; FMT.honorifics=q('fmtHon').checked;
+    FMT.custom=(q('fmtCustom').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+    saveFMT();
+    if(typeof DDL_UI!=='undefined'&&DDL_UI.toast) DDL_UI.toast('Perfil de formato guardado. Recarga el capítulo para re-desglosar.',{kind:'ok'});
+    try{ if(typeof pop2!=='undefined'&&pop2.doc) renderLibretoBlocks(); }catch(e){}
+    close();
+  };
+  setTimeout(()=>{ const t=q('fmtTC'); if(t) t.focus(); },60);
+}
+window.openFormatProfile = openFormatProfile;
 function newEpisodeModal(){
   if(!LDB.showId){ libMsg('Entra en un programa primero'); return; }
   const old=document.getElementById('ddlmOv'); if(old) old.remove();
@@ -4554,7 +4658,7 @@ function newEpisodeModal(){
         +'<input type="file" id="neFile2" accept="application/pdf,.pdf,.docx,.xlsx,.xlsm,.xls"></label>'
     +'</div>'
     +'<div class="ddlm-err" id="neErr"></div>'
-    +'<div class="ddlm-btns"><button class="ddlm-cancel" id="neCancel">Cancelar</button><button class="ddlm-go" id="neGo">Crear episodio</button></div>'
+    +'<div class="ddlm-btns"><button class="ddlm-cancel" id="neCancel">Cancelar</button><button class="ddlm-fmt" id="neFmt" type="button">Perfil de formato…</button><button class="ddlm-go" id="neGo">Crear episodio</button></div>'
     +'</div>';
   document.body.appendChild(ov);
   const q=(id)=>ov.querySelector('#'+id);
@@ -4562,6 +4666,7 @@ function newEpisodeModal(){
   ov.addEventListener('mousedown', e=>{ if(e.target===ov) close(); });
   ov.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
   q('neCancel').onclick=close;
+  { const fb=q('neFmt'); if(fb) fb.onclick=()=>{ close(); openFormatProfile(); }; }
   q('neFile2').addEventListener('change', ()=>{ const f=q('neFile2').files[0]; if(f){ q('neDropT').textContent=f.name; q('neDrop').classList.add('has'); } });
   q('neGo').addEventListener('click', async ()=>{
     const name=(q('neName').value||'').trim();
@@ -5726,6 +5831,35 @@ body.light .blk.rec::after{ color:#06210f !important; }
 .mtools .done{ font-weight:700 !important; }
 .mtools .done.on{ background:linear-gradient(135deg,#4ADE80,#22C55E) !important; color:#08240f !important; border-color:transparent !important; }
 
+/* ─── Etiqueta «Editado» + historial de cambios ─── */
+.blk .bhead .edited-tag{
+  order:1 !important; margin:0 0 0 4px !important;
+  background:rgba(96,165,250,.15) !important; color:#93c5fd !important;
+  border:1px solid rgba(96,165,250,.42) !important; border-radius:99px !important;
+  padding:2px 9px !important; font-family:'Inter',sans-serif !important;
+  font-size:10.5px !important; font-weight:700 !important; letter-spacing:.3px !important;
+  line-height:1.5 !important; cursor:pointer !important; white-space:nowrap !important;
+}
+.blk .bhead .edited-tag:hover{ background:rgba(96,165,250,.28) !important; }
+body.light .blk .bhead .edited-tag{ color:#1d4ed8 !important; background:rgba(37,99,235,.12) !important; border-color:rgba(37,99,235,.4) !important; }
+.edithist{
+  position:fixed; z-index:60; min-width:230px; max-width:min(380px,88vw);
+  background:#0f1320; border:1px solid #2a3550; border-radius:12px;
+  box-shadow:0 18px 46px rgba(0,0,0,.55); padding:8px; font-family:'Inter',sans-serif;
+}
+.edithist .eh-h{ font-size:10.5px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:#93c5fd; padding:4px 6px 8px; }
+.edithist .eh-row{ font-size:12.5px; color:#dfe3ea; padding:7px 6px; border-top:1px solid #1b2133; display:flex; justify-content:space-between; gap:12px; align-items:baseline; }
+.edithist .eh-c{ min-width:0; word-break:break-word; }
+.edithist .eh-row b{ color:#fff; font-weight:700; }
+.edithist .eh-old{ color:#fca5a5; text-decoration:line-through; }
+.edithist .eh-new{ color:#86efac; font-weight:600; }
+.edithist .eh-t{ color:#7b8496; font-size:10px; white-space:nowrap; flex:none; }
+.edithist .eh-empty{ color:#8b93a5; border-top:none; }
+body.light .edithist{ background:#ffffff; border-color:#e2ddf2; box-shadow:0 18px 46px rgba(0,0,0,.18); }
+body.light .edithist .eh-row{ color:#2a2540; border-top-color:#eee; }
+body.light .edithist .eh-old{ color:#b91c1c; }
+body.light .edithist .eh-new{ color:#15803d; }
+
 /* herramientas de marcación (tablet) inline */
 .blk .mtools{ grid-column:2; grid-row:3; display:none; gap:5px; margin-top:6px; flex-wrap:wrap; }
 .blk.active .mtools, body.tablet .blk .mtools{ display:flex; }
@@ -5918,8 +6052,19 @@ body.light .blk.centerhi{box-shadow:0 0 0 3px var(--pc,#4CB84C)}
 @keyframes tapselA{0%{box-shadow:0 0 0 5px var(--pc,#5FC85A)}100%{box-shadow:0 0 0 0 rgba(0,0,0,0)}}
 .conn{font-size:11px;font-weight:700;letter-spacing:.4px;padding:4px 10px;border-radius:99px;border:1px solid;white-space:nowrap}
 .lfind{display:none;align-items:center;gap:8px;padding:9px 13px;background:var(--head);
-  border-bottom:1px solid var(--card-b);position:sticky;top:var(--lhH,54px);z-index:15}
+  border-bottom:1px solid var(--card-b);position:sticky;top:var(--lhH,54px);z-index:41}
 body.finding .lfind{display:flex}
+/* que la X y los botones no queden bajo el riel vertical de páginas */
+body.deskchips.finding .lfind{ padding-right:100px; }
+body.haschips.finding  .lfind{ padding-left:100px; }
+#lFindClose{ font-weight:800; }
+@media(max-width:560px){
+  .lfind{ gap:5px; }
+  .lfind button{ padding:8px 9px; }
+  .lfcount{ min-width:34px; }
+  body.deskchips.finding .lfind{ padding-right:96px; }
+  body.haschips.finding  .lfind{ padding-left:96px; }
+}
 .lfind input{flex:1;min-width:0;background:var(--card);border:1px solid var(--card-b);color:var(--ink);
   border-radius:9px;padding:9px 12px;font-size:15px;outline:none}
 .lfind input:focus{border-color:var(--pc,#5FC85A)}
@@ -6333,7 +6478,6 @@ function buildLibretoDoc(pc){
       ${(DEVROLE==='tablet') ? '<button id="lTpad" title="Pasar al trackpad: controlar el libreto del escritorio" aria-label="Pasar al modo trackpad">'+LIB_ICON.sliders+'</button>' : ''}
       <button id="lFind" title="Buscar en el libreto" aria-label="Buscar en el libreto">${LIB_ICON.search}</button>
       <button id="lPron" title="Pronunciaciones del libreto" aria-label="Ver pronunciaciones del libreto">${LIB_ICON.speak}</button>
-      <button id="lColor" title="Colores del libreto (resaltado y fondo)" aria-label="Cambiar colores del libreto">${LIB_ICON.palette}</button>
       <span class="conn no" id="lConn2" style="display:none" role="status" aria-live="polite"></span>
       <span class="live" id="lLive" role="status" aria-live="polite"></span>
     </div>
@@ -6614,8 +6758,12 @@ function buildLibretoDoc(pc){
     }
   });
   d.getElementById('lPron').addEventListener('click', ()=> openPronPanel());
+  // clic en la etiqueta «Editado» → historial de cambios del parlamento
+  d.addEventListener('click', (e)=>{
+    const t = e.target && e.target.closest && e.target.closest('.edited-tag');
+    if(t){ e.preventDefault(); e.stopPropagation(); showEditHistory(+t.dataset.si, t); }
+  }, true);
   d.getElementById('lFind').addEventListener('click', ()=> openLibFind());
-  try{ const _lc=d.getElementById('lColor'); if(_lc) _lc.addEventListener('click', ()=> toggleLibColorPanel(d)); }catch(e){}
   d.getElementById('lFindClose').addEventListener('click', ()=> closeLibFind());
   d.getElementById('lFindNext').addEventListener('click', ()=> libFindGo(libSearch.cur+1));
   d.getElementById('lFindPrev').addEventListener('click', ()=> libFindGo(libSearch.cur-1));
@@ -6729,12 +6877,81 @@ function isTCLineLoose(l){
 // texto de diálogo del bloque, sin timecodes colados (red de seguridad para
 // capítulos ya cargados antes de corregir el parser).
 function blockText(b){
-  const lines = (b && b.lines ? b.lines : []).filter(l=> !isTCLineLoose(l));
+  let lines = (b && b.lines ? b.lines : []).filter(l=> !isTCLineLoose(l));
+  if(typeof lineExcluded==='function') lines = lines.filter(l=> !lineExcluded(l));
   let s = lines.join(' ');
   // por si un TC quedó pegado al final de una línea de diálogo
   s = s.replace(/(^|\s)\d{1,2}\s*:\s*\d{2}\s*:\s*\d{2}(?:\s*[:;.]\s*\d{2})?(?=\s|$)/g, '$1')
        .replace(/\s{2,}/g,' ').trim();
   return s;
+}
+// ── Indicador "Editado" + historial de cambios por parlamento ──
+function origText(si){ try{ return (script[si] && script[si].lines) ? script[si].lines.join(' ') : ''; }catch(e){ return ''; } }
+function isEdited(si){
+  const m = (typeof sync!=='undefined' && sync.marks) ? sync.marks[si] : null; if(!m) return false;
+  const textChanged = (m.text!=null) && (String(m.text).trim() !== String(origText(si)).trim());
+  return !!(textChanged || (m.pauses && m.pauses.length) || (m.accents && m.accents.length));
+}
+// registra en el historial qué se cambió (texto de→a, pausa/acento +/−, reset)
+function recordEdit(si, prev, mark){
+  const cur = sync.marks[si]; if(!cur) return;
+  const log = cur.log = (cur.log || []);
+  const push = (e)=>{ e.t = Date.now(); log.push(e); if(log.length>30) log.splice(0, log.length-30); };
+  if(mark.text !== undefined){
+    if(mark.text === null){
+      if((prev.text!=null) || (prev.pauses&&prev.pauses.length) || (prev.accents&&prev.accents.length)) push({k:'reset'});
+    } else {
+      const from = (prev.text!=null) ? prev.text : origText(si);
+      const to = mark.text;
+      if(String(from).trim() !== String(to).trim()) push({k:'text', from:String(from), to:String(to)});
+    }
+  }
+  if(mark.pauses !== undefined){
+    const a=(prev.pauses||[]).length, b=(mark.pauses||[]).length;
+    if(b>a) push({k:'pause+'}); else if(b<a) push({k:'pause-'});
+  }
+  if(mark.accents !== undefined){
+    const a=(prev.accents||[]).length, b=(mark.accents||[]).length;
+    if(b>a) push({k:'accent+'}); else if(b<a) push({k:'accent-'});
+  }
+}
+function ehTime(t){
+  if(!t) return '';
+  const s=Math.floor((Date.now()-t)/1000);
+  if(s<60) return 'hace '+s+' s'; const mn=Math.floor(s/60);
+  if(mn<60) return 'hace '+mn+' min'; const h=Math.floor(mn/60);
+  if(h<24) return 'hace '+h+' h'; try{ return new Date(t).toLocaleDateString(); }catch(e){ return ''; }
+}
+function showEditHistory(si, anchor){
+  const d = pop2.doc; if(!d) return;
+  const prev = d.getElementById('editHist');
+  if(prev){ const was = prev._forSi; prev.remove(); if(was===si) return; }
+  const m = (sync.marks && sync.marks[si]) || {};
+  const log = (m.log||[]).slice().reverse();
+  const pop = d.createElement('div'); pop.id='editHist'; pop._forSi=si; pop.className='edithist';
+  let rows;
+  if(!log.length){ rows = '<div class="eh-row eh-empty">Sin detalle de cambios registrado.</div>'; }
+  else rows = log.map(e=>{
+    let txt;
+    if(e.k==='text') txt = '<b>Texto:</b> <span class="eh-old">'+esc(e.from||'—')+'</span> → <span class="eh-new">'+esc(e.to||'—')+'</span>';
+    else if(e.k==='pause+') txt = 'Pausa añadida';
+    else if(e.k==='pause-') txt = 'Pausa quitada';
+    else if(e.k==='accent+') txt = 'Acento añadido';
+    else if(e.k==='accent-') txt = 'Acento quitado';
+    else if(e.k==='reset') txt = 'Restablecido al original';
+    else txt = 'Editado';
+    return '<div class="eh-row"><span class="eh-c">'+txt+'</span><span class="eh-t">'+ehTime(e.t)+'</span></div>';
+  }).join('');
+  pop.innerHTML = '<div class="eh-h">Historial de edición</div>' + rows;
+  d.body.appendChild(pop);
+  try{
+    const r = anchor.getBoundingClientRect();
+    const vw = d.documentElement.clientWidth, pw = pop.offsetWidth;
+    pop.style.left = Math.max(8, Math.min(vw - pw - 8, r.left)) + 'px';
+    pop.style.top  = (r.bottom + 6) + 'px';
+  }catch(e){}
+  const close = (ev)=>{ if(pop.contains(ev.target) || ev.target===anchor) return; pop.remove(); d.removeEventListener('mousedown', close, true); };
+  setTimeout(()=> d.addEventListener('mousedown', close, true), 0);
 }
 function renderLibretoBlocks(){
   if(!pop2.els) return;
@@ -6777,7 +6994,7 @@ function renderLibretoBlocks(){
     const recDone = recSet(recKey).has(b.page);
     const cls2 = cls + (recDone ? ' rec' : '');
     html.push('<div class="'+cls2+'" data-vi="'+vi+'" data-si="'+i+'" data-pg="'+b.page+'" style="--pc:'+bcolor+'">'
-      + ((tc||who) ? '<div class="bhead">'+(tc?'<span class="tc" title="Clic: saltar el video aquí">'+tc+'</span>':'')+(who?'<span class="who">'+esc(who)+'</span>':'')+(window._stCps?stCpsBadge(i):'')+'</div>' : '')
+      + ((tc||who) ? '<div class="bhead">'+(tc?'<span class="tc" title="Clic: saltar el video aquí">'+tc+'</span>':'')+(isEdited(i)?'<button class="edited-tag" data-si="'+i+'" title="Ver historial de cambios">✎ Editado</button>':'')+(who?'<span class="who">'+esc(who)+'</span>':'')+(window._stCps?stCpsBadge(i):'')+'</div>' : '')
       + (txt ? '<div class="tx">'+applyMarks(i, txt)+'</div>' : '')
       + '<div class="mtools">'
         + '<button class="done'+(recDone?' on':'')+'" data-act="done" data-si="'+i+'">'+(recDone?'↩ Quitar':'✓ Completar')+'</button>'
@@ -6971,16 +7188,16 @@ function libAnimScroll(top){
   let start = wrap.scrollTop, dist = top - start;
   if(Math.abs(dist) < 4){ wrap.scrollTop = top; return; }
   const vh = wrap.clientHeight || 600;
-  const maxTravel = vh * 2.2;                       // tope de recorrido visible
+  const maxTravel = vh * 1.5;                       // tope de recorrido visible (más corto = llega antes)
   if(Math.abs(dist) > maxTravel){
     start = top - Math.sign(dist) * maxTravel;      // salto instantáneo hasta cerca
     wrap.scrollTop = start; dist = top - start;
   }
-  const dur = Math.max(200, Math.min(520, Math.abs(dist) * 0.42));   // snappy
+  const dur = Math.max(150, Math.min(360, Math.abs(dist) * 0.30));   // rápido
   const raf = (pop2.win && pop2.win.requestAnimationFrame) ? pop2.win.requestAnimationFrame.bind(pop2.win) : requestAnimationFrame;
   if(pop2._pageAnim){ try{ (pop2.win||window).cancelAnimationFrame(pop2._pageAnim); }catch(e){} }
   const t0 = performance.now();
-  const ease = t=> t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;   // easeInOutCubic
+  const ease = t=> 1 - Math.pow(1-t, 3);            // easeOutCubic: arranca rápido, frena suave
   pop2._pageAnimating = true;
   const step = (now)=>{
     const p = Math.min(1, (now - t0)/dur);
@@ -8589,7 +8806,9 @@ function onRemoteSave(p){
 const _marksDirty = new Set();
 let _rpcMarks = true;
 function syncSendMark(si, mark){
+  const prev = Object.assign({}, sync.marks[si]);   // estado ANTES del cambio (para el historial)
   sync.marks[si] = Object.assign(sync.marks[si]||{}, mark);
+  try{ if(typeof recordEdit==='function') recordEdit(si, prev, mark); }catch(e){}
   _marksDirty.add(si);
   if(sync.channel){
     syncEmit('mark', { si, mark:sync.marks[si] });
@@ -8631,8 +8850,21 @@ async function loadCloudMarks(){
   }catch(e){ sync.marks = {}; }
 }
 function refreshBlock(si){
-  const el = pop2.doc.querySelector('.blk[data-si="'+si+'"] .tx');
-  if(el){ const b=script[si]; el.innerHTML = applyMarks(si, b.lines.join(' ')); }
+  const blk = pop2.doc.querySelector('.blk[data-si="'+si+'"]'); if(!blk) return;
+  const b = script[si];
+  const el = blk.querySelector('.tx'); if(el) el.innerHTML = applyMarks(si, blockText(b));
+  const head = blk.querySelector('.bhead');
+  if(head){
+    let tag = head.querySelector('.edited-tag');
+    if(isEdited(si)){
+      if(!tag){
+        tag = pop2.doc.createElement('button'); tag.className='edited-tag'; tag.dataset.si=si;
+        tag.title='Ver historial de cambios'; tag.textContent='✎ Editado';
+        const tc = head.querySelector('.tc');
+        if(tc) head.insertBefore(tag, tc.nextSibling); else head.insertBefore(tag, head.firstChild);
+      }
+    } else if(tag){ tag.remove(); }
+  }
 }
 window._sync = sync;
 
