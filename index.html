@@ -1475,7 +1475,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.12.3-nube · 17-ago-2026';
+const APP_VERSION = 'v10.12.4-nube · 17-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -6256,6 +6256,14 @@ function ensureLibFrame(){
 }
 function openLibretoInline(key){
   const host = ensureLibFrame();
+  // Video Estudio: cada apertura de libreto empieza a ANCHO COMPLETO. Si venías
+  // del estudio y saliste a las tarjetas, el panel de video ya no debe angostarlo.
+  try{
+    const left = document.getElementById('stLeft'); if(left) left.style.display='none';
+    const sp = document.getElementById('stSplit'); if(sp) sp.style.display='none';
+    if(typeof studio!=='undefined' && studio.on){ studio.on=false; try{ const el=(typeof studioEl==='function')?studioEl():null; if(el) el.pause(); }catch(e){} }
+    host.style.flexDirection='';
+  }catch(e){}
   host.style.display = 'block';
   try{ window.scrollTo(0,0); }catch(e){}
   try{ updateBackBtn(); }catch(e){}
@@ -6689,6 +6697,7 @@ function buildLibretoDoc(pc){
       try{ if(typeof pop2.doc.querySelector('.lh h2')!=='undefined'){ const h=pop2.doc.querySelector('.lh h2'); if(h) h.textContent = (pop2.key&&charIdx[pop2.key])?charIdx[pop2.key].display:'Libreto'; } }catch(e){}
       try{ renderLibretoBlocks(); }catch(e){}
       try{ renderLibretoChips(); }catch(e){}
+      try{ if(typeof syncSendHl==='function') syncSendHl(pop2.key); }catch(e){}   // avisar al otro dispositivo
       try{ pop2._interact = performance.now(); const f = pop2.doc.querySelector('.blk.mine'); if(f) libCenterTo(f); }catch(e){}
     });
   }
@@ -7809,6 +7818,7 @@ async function syncConnect(role){
   ch
     .on('broadcast', { event:'ep'     }, ({payload})=> onRemoteEp(payload))
     .on('broadcast', { event:'open'   }, ({payload})=> onRemoteOpen(payload))
+    .on('broadcast', { event:'hl'     }, ({payload})=> onRemoteHl(payload))
     .on('broadcast', { event:'pos'    }, ({payload})=> onRemotePos(payload))
     .on('broadcast', { event:'scroll' }, ({payload})=> onRemoteScroll(payload))
     .on('broadcast', { event:'tool'   }, ({payload})=> onRemoteTool(payload))
@@ -8047,6 +8057,23 @@ function syncSendOpen(key){
   if(sync._applyingEp) return;
   const epId = (typeof currentEp!=='undefined' && currentEp) ? currentEp.id : null;
   syncEmit('open', { key, epId }, true);   // nunca en cola
+}
+// cambio de personaje RESALTADO (ligero): el otro dispositivo actualiza el
+// resaltado sin reconstruir el libreto → no pierde la posición de lectura.
+function syncSendHl(key){
+  if(!sync.isOn || !sync.channel) return;
+  syncEmit('hl', { key }, true);
+}
+function onRemoteHl(p){
+  if(!p || p.from===sync.meId) return;
+  if(typeof pop2==='undefined' || !pop2 || !pop2.doc) return;   // sin libreto abierto: nada que resaltar
+  let key = p.key || null;
+  if(key && !charIdx[key]) key = null;                           // ese personaje no existe en este capítulo
+  pop2.key = key; pop2.hl = key; pop2.scopeAll = true;
+  try{ const sel = pop2.doc.getElementById('lCharSel'); if(sel) sel.value = key || ''; }catch(e){}
+  try{ const h = pop2.doc.querySelector('.lh h2'); if(h) h.textContent = (key && charIdx[key]) ? charIdx[key].display : 'Libreto'; }catch(e){}
+  try{ renderLibretoBlocks(); }catch(e){}
+  try{ renderLibretoChips(); }catch(e){}
 }
 function onRemoteOpen(p){
   if(!p || p.from===sync.meId) return;
@@ -9247,8 +9274,8 @@ function studioToggleStrip(){
     studio.pcm=null; studio.peaks=[]; studio.pauses=[]; studio.cur=-1;
     studio.env=null; studio.envAny=false; studio.pyr=null; studio.pcmMax=0; studio._waveT0=null;
   }
-  // el contenedor pasa a DOS COLUMNAS mientras el modo está activo
-  host.style.display = 'flex'; host.style.flexDirection = 'row';
+  // el contenedor pasa a DOS COLUMNAS solo mientras el modo está activo
+  if(show){ host.style.display = 'flex'; host.style.flexDirection = 'row'; }
   left.style.display = show ? 'flex' : 'none';
   { const sp = $('stSplit'); if(sp) sp.style.display = show ? 'block' : 'none'; }
   try{ localStorage.setItem('stStrip', show?'1':'0'); }catch(e){}
@@ -9261,8 +9288,8 @@ function studioToggleStrip(){
   }else{
     studio.on = false;
     try{ const el=studioEl(); if(el) el.pause(); }catch(e){}
-    // al cerrar, el libreto vuelve a ocupar todo el ancho
-    host.style.flexDirection = 'row';
+    // al cerrar, el libreto vuelve a ocupar TODO el ancho
+    host.style.display = 'block'; host.style.flexDirection = '';
   }
   try{ updateBackBtn(); }catch(e){}
 }
