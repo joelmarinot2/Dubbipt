@@ -1475,7 +1475,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.12.4-nube · 17-ago-2026';
+const APP_VERSION = 'v10.12.5-nube · 17-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -6887,7 +6887,7 @@ function libViewPos(){
   const w = pop2.els && pop2.els.wrap;
   const els = pop2.blockEls;
   if(!w || !els || !els.length || !pop2.blockMap) return null;
-  const refY = w.scrollTop;
+  const refY = w.scrollTop + w.clientHeight*0.42;   // referencia = LÍNEA DE LECTURA, no el borde superior
   let lo=0, hi=els.length-1, idx=0;
   while(lo<=hi){ const mid=(lo+hi)>>1; if(els[mid].offsetTop<=refY){ idx=mid; lo=mid+1; } else hi=mid-1; }
   const el = els[idx];
@@ -8487,6 +8487,10 @@ function syncSendScroll(pos){
 }
 function resolveTargetPx(p){
   if(!pop2 || !pop2.els || !pop2.blockEls || !pop2.blockMap) return null;
+  const w = pop2.els.wrap;
+  const readline = w.clientHeight * 0.42;   // misma referencia que el emisor
+  const maxTop = (typeof libMaxTop==='function') ? libMaxTop() : Math.max(0, w.scrollHeight - w.clientHeight);
+  const clamp = (t)=> Math.max(0, Math.min(maxTop, t));
   if(p.si!=null){
     let vi = pop2.blockMap.indexOf(p.si);
     if(vi < 0){
@@ -8496,11 +8500,11 @@ function resolveTargetPx(p){
       vi = best;
     }
     const el = vi>=0 ? pop2.blockEls[vi] : null;
-    if(el) return el.offsetTop + (p.f||0) * el.offsetHeight;
+    if(el) return clamp(el.offsetTop + (p.f||0) * el.offsetHeight - readline);
     return null;
   }
-  if(p.b!=null && pop2.blockEls[p.b]) return pop2.blockEls[p.b].offsetTop + (p.f||0) * pop2.blockEls[p.b].offsetHeight;
-  if(p.r!=null){ const w = pop2.els.wrap; return p.r * Math.max(1, w.scrollHeight - w.clientHeight); }
+  if(p.b!=null && pop2.blockEls[p.b]) return clamp(pop2.blockEls[p.b].offsetTop + (p.f||0) * pop2.blockEls[p.b].offsetHeight - readline);
+  if(p.r!=null){ return p.r * Math.max(1, w.scrollHeight - w.clientHeight); }
   return null;
 }
 function onRemoteScroll(p){
