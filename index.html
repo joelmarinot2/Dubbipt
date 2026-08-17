@@ -1475,7 +1475,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.12.1-nube · 15-ago-2026';
+const APP_VERSION = 'v10.12.2-nube · 15-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -6421,19 +6421,41 @@ function buildLibretoDoc(pc){
     // el archivo manualmente, y reintento repetido mientras haya fuente.
     const row = (typeof currentEp!=='undefined' && currentEp) ? ((LDB.epsAll||[]).find(e=> e.id===currentEp.id)||null) : null;
     const sinFuente = row && !row.pdf_path && !row.json_path;
-    const btn = 'style="border:1px solid #4c1d95;background:#2e1065;color:#f5f3ff;border-radius:10px;padding:9px 16px;font-size:14px;font-weight:600;cursor:pointer"';
-    d.documentElement.innerHTML = '<head><meta charset="utf-8"><title>Libreto</title></head>'
-      +'<body style="margin:0;background:#0b0718;color:#e8e4f5;font-family:system-ui;min-height:100vh">'
-      +'<div style="padding:14px"><button id="ebk" '+btn+'>← Atrás</button></div>'
-      +'<div style="display:flex;align-items:center;justify-content:center;height:70vh"><div style="text-align:center;max-width:480px;padding:0 20px">'
-      +'<div style="font-size:40px">'+(sinFuente?'📄':'⏳')+'</div>'
+    const SI = (p,sw)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(sw||2)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+p+'</svg>';
+    const icArrow  = SI('<path d="M15 18l-6-6 6-6"/>', 2.3);
+    const icSpin   = '<svg class="eb-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/></svg>';
+    const icDoc    = SI('<path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v6h6"/>');
+    const icSearch = SI('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>');
+    const icFolder = SI('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>');
+    d.documentElement.innerHTML = '<head><meta charset="utf-8"><title>Libreto</title>'
+      +'<style>'
+      +'*{box-sizing:border-box} body{margin:0;background:#0b0c0e;color:#e8eaed;font-family:Inter,system-ui,sans-serif;min-height:100vh}'
+      +'.eb-back{position:fixed;top:14px;left:14px;display:inline-flex;align-items:center;gap:5px;background:#15181d;color:#c7c9cd;border:1px solid #23262b;border-radius:10px;padding:8px 13px 8px 10px;font-size:14px;font-weight:600;cursor:pointer}'
+      +'.eb-back:hover{border-color:#5FC85A;color:#5FC85A} .eb-back svg{width:16px;height:16px}'
+      +'.eb-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}'
+      +'.eb-card{max-width:460px;text-align:center}'
+      +'.eb-ic{width:66px;height:66px;margin:0 auto 18px;border-radius:18px;display:grid;place-items:center;background:rgba(95,200,90,.12);color:#5FC85A}'
+      +'.eb-ic svg{width:32px;height:32px}'
+      +'.eb-t{font-size:15px;line-height:1.55;color:#c7ccd3;margin:0 0 20px} .eb-t b{color:#fff}'
+      +'.eb-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}'
+      +'.eb-b{display:inline-flex;align-items:center;gap:8px;border-radius:11px;padding:11px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:Inter,sans-serif;border:1px solid transparent}'
+      +'.eb-b svg{width:17px;height:17px}'
+      +'.eb-b.pri{background:linear-gradient(135deg,#5FC85A,#22C55E);color:#08240f} .eb-b.pri:hover{filter:brightness(1.06)}'
+      +'.eb-b.sec{background:#15181d;color:#e8eaed;border-color:#2a2f36} .eb-b.sec:hover{border-color:#5FC85A}'
+      +'.eb-msg{margin-top:16px;font-size:13px;color:#8b93a5;min-height:18px}'
+      +'@keyframes ebspin{to{transform:rotate(360deg)}} .eb-spin{animation:ebspin 1.05s linear infinite;transform-origin:12px 12px}'
+      +'</style></head>'
+      +'<body>'
+      +'<button class="eb-back" id="ebk">'+icArrow+' Atrás</button>'
+      +'<div class="eb-wrap"><div class="eb-card">'
+      +'<div class="eb-ic">'+(sinFuente?icDoc:icSpin)+'</div>'
       +(sinFuente
-        ? '<p style="opacity:.92">Este equipo cree que el capítulo se guardó <b>sin libreto PDF</b>, pero puede ser un dato desactualizado: búscalo de verdad en la nube.</p>'
-        : '<p style="opacity:.92">Este capítulo aún no tiene libreto procesado.<br>Se está preparando en segundo plano — se abrirá solo en unos segundos…</p>')
-      +'<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px">'
-      +'<button id="ecld" '+btn+'>🔄 Buscar libreto en la nube</button>'
-      +'<button id="epick" '+btn+'>📂 Elegir archivo manualmente</button>'
-      +'</div><div id="emsg" style="margin-top:14px;font-size:13px;opacity:.75;min-height:18px"></div>'
+        ? '<p class="eb-t">Este equipo cree que el capítulo se guardó <b>sin libreto PDF</b>, pero puede ser un dato desactualizado. Búscalo de verdad en la nube.</p>'
+        : '<p class="eb-t">Este capítulo aún no tiene libreto procesado.<br>Se está preparando — se abrirá solo en unos segundos…</p>')
+      +'<div class="eb-btns">'
+      +'<button class="eb-b pri" id="ecld">'+icSearch+' Buscar en la nube</button>'
+      +'<button class="eb-b sec" id="epick">'+icFolder+' Elegir archivo</button>'
+      +'</div><div class="eb-msg" id="emsg"></div>'
       +'</div></div></body>';
     try{ d.getElementById('ebk').onclick = ()=>{ try{ if(pop2.type==='inline' && typeof hideLibretoInline==='function') hideLibretoInline(); else if(pop2.win && pop2.win!==window) window.close(); }catch(e){} }; }catch(e){}
     try{ d.getElementById('ecld').onclick = ()=>{ libEmptyAction('cloud'); }; }catch(e){}
@@ -7190,8 +7212,9 @@ function centerBlock(vi, smooth){
 function libAnimScroll(top){
   const wrap = pop2.els && pop2.els.wrap; if(!wrap) return;
   top = Math.max(0, Math.min(libMaxTop(), top));
+  if(!isFinite(top)){ return; }
   let start = wrap.scrollTop, dist = top - start;
-  if(Math.abs(dist) < 4){ wrap.scrollTop = top; return; }
+  if(Math.abs(dist) < 4){ wrap.scrollTop = top; pop2._pageAnimating=false; return; }
   const vh = wrap.clientHeight || 600;
   const maxTravel = vh * 1.5;                       // tope de recorrido visible (más corto = llega antes)
   if(Math.abs(dist) > maxTravel){
@@ -7201,11 +7224,12 @@ function libAnimScroll(top){
   const dur = Math.max(150, Math.min(360, Math.abs(dist) * 0.30));   // rápido
   const raf = (pop2.win && pop2.win.requestAnimationFrame) ? pop2.win.requestAnimationFrame.bind(pop2.win) : requestAnimationFrame;
   if(pop2._pageAnim){ try{ (pop2.win||window).cancelAnimationFrame(pop2._pageAnim); }catch(e){} }
-  const t0 = performance.now();
   const ease = t=> 1 - Math.pow(1-t, 3);            // easeOutCubic: arranca rápido, frena suave
   pop2._pageAnimating = true;
-  const step = (now)=>{
-    const p = Math.min(1, (now - t0)/dur);
+  let t0 = null;                                    // ⚠ el reloj del iframe ≠ el principal:
+  const step = (now)=>{                             //    fijamos t0 con el PRIMER frame (mismo reloj)
+    if(t0 === null) t0 = now;
+    const p = Math.min(1, Math.max(0, (now - t0)/dur));
     wrap.scrollTop = start + dist * ease(p);
     if(p < 1){ pop2._pageAnim = raf(step); }
     else { pop2._pageAnim = 0; pop2._pageAnimating = false; wrap.scrollTop = top; }
