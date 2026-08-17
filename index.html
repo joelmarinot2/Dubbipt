@@ -1475,7 +1475,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.12.2-nube · 15-ago-2026';
+const APP_VERSION = 'v10.12.3-nube · 17-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -3211,6 +3211,13 @@ function buildScript(){
         + (conDesglose ? ' — hay un desglose de doblaje cargado, ese manda' : ' — numeración no consecutiva'));
     }
   }catch(e){ console.warn('detección AD', e); }
+  // ⚠ Si el libreto viene de datos GUARDADOS (sin PDF cargado), no hay páginas en
+  // pageData. Reconstruir desde ahí BORRARÍA el libreto ya cargado (script→[]).
+  // En ese caso conservamos el script hidratado tal cual.
+  try{
+    const hasPages = pageData && Object.keys(pageData).length > 0;
+    if(!hasPages && Array.isArray(script) && script.length){ return; }
+  }catch(e){}
   script = []; scriptByKey = {};
   let cur = null;
   for(let p=1;p<=numPages;p++){
