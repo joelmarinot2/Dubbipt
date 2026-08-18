@@ -1475,7 +1475,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.12.5-nube · 17-ago-2026';
+const APP_VERSION = 'v10.12.6-nube · 18-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -4892,6 +4892,8 @@ async function ddlResetCache(){
 // reconstruir todo el estado desde la caché (sin descargar ni re-procesar)
 function _epOpen(v){ try{ document.body.classList.toggle('ep-open', !!v); }catch(e){} try{ refreshTopbar(); }catch(e){} }
 function hydrateEpisode(d){ _epOpen(true);
+  // al cambiar de capítulo, el modo estudio arranca apagado (no arrastrar video del anterior)
+  try{ if(typeof studio!=='undefined') studio.on=false; const _l=document.getElementById('stLeft'); if(_l) _l.style.display='none'; }catch(e){}
   // Normalizar claves al cargar: datos viejos podían tener "O'BRIEN" (con apóstrofo)
   // mientras el motor nuevo genera "OBRIEN". Se unifican aquí para que la comparación
   // b.key === highlight siempre funcione, independientemente de cuándo se guardó el capítulo.
@@ -6256,15 +6258,25 @@ function ensureLibFrame(){
 }
 function openLibretoInline(key){
   const host = ensureLibFrame();
-  // Video Estudio: cada apertura de libreto empieza a ANCHO COMPLETO. Si venías
-  // del estudio y saliste a las tarjetas, el panel de video ya no debe angostarlo.
+  // Video Estudio: si está ACTIVO, al cambiar de personaje se mantiene el video +
+  // libreto lado a lado (tamaños correctos). Si NO, el libreto va a ancho completo.
   try{
-    const left = document.getElementById('stLeft'); if(left) left.style.display='none';
-    const sp = document.getElementById('stSplit'); if(sp) sp.style.display='none';
-    if(typeof studio!=='undefined' && studio.on){ studio.on=false; try{ const el=(typeof studioEl==='function')?studioEl():null; if(el) el.pause(); }catch(e){} }
-    host.style.flexDirection='';
-  }catch(e){}
-  host.style.display = 'block';
+    const left = document.getElementById('stLeft');
+    const sp = document.getElementById('stSplit');
+    const f0 = document.getElementById('libFrame');
+    const keepStudio = (typeof studio!=='undefined' && studio.on && left);
+    if(keepStudio){
+      host.style.display='flex'; host.style.flexDirection='row';
+      left.style.display='flex'; if(sp) sp.style.display='';
+      if(f0){ f0.style.flex='1 1 auto'; f0.style.width='auto'; f0.style.minWidth='0'; }
+    } else {
+      if(left) left.style.display='none'; if(sp) sp.style.display='none';
+      if(typeof studio!=='undefined') studio.on=false;
+      host.style.flexDirection='';
+      if(f0){ f0.style.flex=''; f0.style.width='100%'; f0.style.minWidth=''; }   // iframe a 100% (no ~300px)
+      host.style.display='block';
+    }
+  }catch(e){ host.style.display='block'; }
   try{ window.scrollTo(0,0); }catch(e){}
   try{ updateBackBtn(); }catch(e){}
   try{ ddlOvSync(); }catch(e){}
@@ -9294,6 +9306,7 @@ function studioToggleStrip(){
     try{ const el=studioEl(); if(el) el.pause(); }catch(e){}
     // al cerrar, el libreto vuelve a ocupar TODO el ancho
     host.style.display = 'block'; host.style.flexDirection = '';
+    const f2 = $('libFrame'); if(f2){ f2.style.flex=''; f2.style.width='100%'; f2.style.minWidth=''; }
   }
   try{ updateBackBtn(); }catch(e){}
 }
