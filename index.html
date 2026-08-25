@@ -1475,7 +1475,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.12.7-nube · 18-ago-2026';
+const APP_VERSION = 'v10.12.8-nube · 18-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -8489,9 +8489,14 @@ function remoteGuard(ms){
 }
 function onRemotePos(p){
   if(!p || p.from===sync.meId) return;
-  if(p.page && pop2 && pop2.doc) markChipCur(p.page);      // solo resaltar el chip
-  // el índice de vista (vi) del otro dispositivo NO se aplica: cada render pagina distinto
-  // (aplicarlo marcaba cajas equivocadas al cambiar la paginación); el movimiento real lo trae onRemoteScroll
+  if(typeof TP!=='undefined' && TP.on){ if(p.page) markChipCur(p.page); return; }   // trackpad: solo el chip
+  if(p.page!=null && pop2 && pop2.doc){
+    // ESPEJO: un SALTO de página se replica exacto — el escritorio salta a la MISMA
+    // página con la misma lógica, en vez de depender del scroll aproximado (que dejaba
+    // p.ej. la tablet en 15 y el escritorio en 11).
+    try{ pop2._rTargetPx = null; pop2._rVel = 0; }catch(e){}   // cortar el seguimiento suave para no pelear con el salto
+    try{ gotoLibretoPage(p.page, true); }catch(e){ markChipCur(p.page); }
+  }
 }
 
 // ---- scroll manual espejado (deslizar la tablet mueve el computador) ----
