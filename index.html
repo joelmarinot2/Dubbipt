@@ -1475,7 +1475,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.12.8-nube · 18-ago-2026';
+const APP_VERSION = 'v10.12.9-nube · 25-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -5874,6 +5874,48 @@ body.light .edithist .eh-row{ color:#2a2540; border-top-color:#eee; }
 body.light .edithist .eh-old{ color:#b91c1c; }
 body.light .edithist .eh-new{ color:#15803d; }
 
+/* ─── Marcado libre (pincel) ─── */
+.blk-canvas{ position:absolute; inset:0; z-index:6; pointer-events:none; touch-action:none; border-radius:12px; }
+body.drawmode .blk-canvas{ pointer-events:auto; }
+body.drawmode .blk{ cursor:crosshair; }
+body.drawmode .mtools{ display:none !important; }
+.lpaint{ position:fixed; left:50%; bottom:64px; transform:translateX(-50%); z-index:55;
+  display:none; gap:12px; align-items:center; background:#0f1320; border:1px solid #2a3550;
+  border-radius:14px; padding:9px 14px; box-shadow:0 16px 44px rgba(0,0,0,.55); font-family:'Inter',sans-serif; max-width:94vw; }
+body.drawmode .lpaint{ display:flex; flex-wrap:wrap; justify-content:center; }
+.lpaint .lp-t{ font-size:11px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:#93c5fd; }
+.lpaint .lp-widths, .lpaint .lp-colors{ display:flex; gap:6px; align-items:center; }
+.lpaint .lp-w{ width:30px; height:30px; border-radius:8px; background:#161a22; border:1px solid #2a2f3a; display:grid; place-items:center; cursor:pointer; }
+.lpaint .lp-w i{ display:block; border-radius:50%; background:#cfd3da; }
+.lpaint .lp-w.on{ border-color:#4ADE80; background:#12241a; }
+.lpaint .lp-c{ width:24px; height:24px; border-radius:50%; border:2px solid transparent; cursor:pointer; box-shadow:0 0 0 1px rgba(255,255,255,.18) inset; padding:0; }
+.lpaint .lp-c.on{ border-color:#fff; transform:scale(1.12); }
+.lpaint .lp-btn{ background:#161a22; color:#e6e7ea; border:1px solid #2a2f3a; border-radius:9px; padding:8px 12px; font-size:12.5px; font-weight:600; cursor:pointer; }
+.lpaint .lp-btn:hover{ border-color:#4ADE80; }
+.lpaint #lpErase.on{ background:#3a1f1f; border-color:#EF4444; color:#fca5a5; }
+.lpaint .lp-done{ background:linear-gradient(135deg,#5FC85A,#22C55E); color:#08240f; border-color:transparent; font-weight:700; }
+body.light .lpaint{ background:#fff; border-color:#e2ddf2; box-shadow:0 16px 44px rgba(0,0,0,.18); }
+body.light .lpaint .lp-btn{ background:#f3f1fb; color:#2a2540; border-color:#e2ddf2; }
+
+/* ─── Compresión de textos (IA) ─── */
+.comp-ov{ position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.55); backdrop-filter:blur(3px); display:flex; align-items:center; justify-content:center; padding:18px; }
+.comp-card{ width:min(560px,94vw); max-height:88vh; overflow:auto; background:#0f1320; border:1px solid #2a3550; border-radius:16px; padding:18px; box-shadow:0 24px 60px rgba(0,0,0,.6); font-family:'Inter',sans-serif; }
+.comp-h{ font-size:12px; font-weight:800; letter-spacing:.5px; text-transform:uppercase; color:#93c5fd; margin-bottom:14px; }
+.comp-row{ margin-bottom:14px; }
+.comp-lbl{ font-size:11px; font-weight:700; color:#8b93a5; text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px; }
+.comp-orig{ background:#161a22; border:1px solid #2a2f3a; border-radius:10px; padding:10px 12px; color:#c7ccd3; font-size:14px; line-height:1.5; }
+.comp-out{ width:100%; min-height:80px; background:#0c1710; border:1px solid #22C55E; border-radius:10px; padding:10px 12px; color:#eafff0; font-size:15px; line-height:1.5; font-family:'Inter',sans-serif; resize:vertical; outline:none; }
+.comp-load{ display:flex; align-items:center; gap:10px; color:#c7ccd3; font-size:14px; padding:14px 0; }
+.comp-spin{ width:18px; height:18px; border:2.5px solid #2a3550; border-top-color:#4ADE80; border-radius:50%; animation:compspin .9s linear infinite; }
+@keyframes compspin{ to{ transform:rotate(360deg) } }
+.comp-err{ background:#2a1414; border:1px solid #7f1d1d; color:#fca5a5; border-radius:10px; padding:12px; font-size:13.5px; line-height:1.5; }
+.comp-btns{ display:flex; justify-content:flex-end; gap:10px; margin-top:6px; }
+.comp-btns button{ border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; font-family:'Inter',sans-serif; border:1px solid transparent; }
+.comp-cancel{ background:#161a22; color:#e6e7ea; border-color:#2a2f3a; }
+.comp-apply{ background:linear-gradient(135deg,#5FC85A,#22C55E); color:#08240f; }
+body.light .comp-card{ background:#fff; border-color:#e2ddf2; }
+body.light .comp-orig{ background:#f3f1fb; color:#2a2540; border-color:#e2ddf2; }
+
 /* herramientas de marcación (tablet) inline */
 .blk .mtools{ grid-column:2; grid-row:3; display:none; gap:5px; margin-top:6px; flex-wrap:wrap; }
 .blk.active .mtools, body.tablet .blk .mtools{ display:flex; }
@@ -6160,14 +6202,14 @@ body.haschips .lchips{position:fixed;left:0;top:var(--lhH,54px);bottom:0;width:8
 body.haschips.lclosed .lchips{transform:translateX(-100%)}
 body.haschips .lchips .pgchip{text-align:center}
 .ltools{display:none;position:fixed;right:0;top:var(--lhH,54px);bottom:0;width:158px;background:var(--head);
-  border-left:1px solid var(--card-b);z-index:15;padding:12px 10px;flex-direction:column;gap:7px;
-  overflow-y:auto;transition:transform .2s}
+  border-left:1px solid var(--card-b);z-index:15;padding:9px 9px 26px;flex-direction:column;gap:5px;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;transition:transform .2s}
 body.haschips .ltools{display:flex}
 body.haschips.rclosed .ltools{transform:translateX(100%)}
-.ltools .tt{font-size:10px;letter-spacing:1.1px;color:var(--dim);text-transform:uppercase;margin-top:8px;font-weight:700}
-.ltools .trow{display:flex;gap:6px}
+.ltools .tt{font-size:9.5px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;margin-top:5px;font-weight:700}
+.ltools .trow{display:flex;gap:5px}
 .ltools button{border:1px solid var(--card-b);background:var(--card);color:var(--ink);border-radius:9px;
-  padding:10px 9px;font-size:13px;cursor:pointer;font-family:inherit;text-align:left}
+  padding:8px 8px;font-size:12px;cursor:pointer;font-family:inherit;text-align:left}
 .ltools .trow button{flex:1;text-align:center}
 .ltools button:hover{border-color:#5FC85A}
 .ltools button.on{background:var(--pc,#5FC85A);color:#160f33;border-color:transparent;font-weight:700}
@@ -6438,7 +6480,8 @@ const LIB_ICON = {
   palette  : LIB_SVG('<path d="M12 3a9 9 0 100 18h1.5a2 2 0 001.6-3.2 2 2 0 011.6-3.2H19a3 3 0 003-3A9 9 0 0012 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="14.5" cy="7" r="1"/><circle cx="17" cy="11" r="1"/>'), // 🎨
   video    : LIB_SVG('<rect x="2.5" y="5.5" width="13" height="13" rx="2"/><path d="M15.5 9.5l6-3v11l-6-3z"/>'),      // Video
   chevUp   : LIB_SVG('<path d="M6 15l6-6 6 6"/>', 2.4),
-  chevDown : LIB_SVG('<path d="M6 9l6 6 6-6"/>', 2.4)
+  chevDown : LIB_SVG('<path d="M6 9l6 6 6-6"/>', 2.4),
+  brush    : LIB_SVG('<path d="M15.5 3.5a2.1 2.1 0 013 3l-8.4 8.4-3.6.9.9-3.6z"/><path d="M6 15c-1.5 0-3 1-3 3 0 1.2-.6 2-1.5 2.5 1 .7 2.3 1 3.5 1 2.2 0 4-1.6 4-3.8A2.7 2.7 0 006 15z"/>')
 };
 function buildLibretoDoc(pc){
   const d = pop2.win.document;
@@ -6532,6 +6575,7 @@ function buildLibretoDoc(pc){
       ${(DEVROLE==='tablet') ? '<button id="lTpad" title="Pasar al trackpad: controlar el libreto del escritorio" aria-label="Pasar al modo trackpad">'+LIB_ICON.sliders+'</button>' : ''}
       <button id="lFind" title="Buscar en el libreto" aria-label="Buscar en el libreto">${LIB_ICON.search}</button>
       <button id="lPron" title="Pronunciaciones del libreto" aria-label="Ver pronunciaciones del libreto">${LIB_ICON.speak}</button>
+      <button id="lDraw" title="Marcado libre (pincel)" aria-label="Marcado libre: dibujar sobre el libreto">${LIB_ICON.brush}</button>
       <span class="conn no" id="lConn2" style="display:none" role="status" aria-live="polite"></span>
       <span class="live" id="lLive" role="status" aria-live="polite"></span>
     </div>
@@ -6562,6 +6606,8 @@ function buildLibretoDoc(pc){
       <button id="tClear">Limpiar</button>
       <button id="tPron">${LIB_ICON.speak} Pronunc.</button>
       <button id="tFind">${LIB_ICON.search} Buscar</button>
+      <button id="tDraw">${LIB_ICON.brush} Pincel</button>
+      <button id="tComp">${LIB_ICON.sliders} Comprimir</button>
       <div class="tt">Grabación</div>
       <button id="tRec" class="grn">✓ Grabada</button>
     </div>
@@ -6580,6 +6626,25 @@ function buildLibretoDoc(pc){
       <button data-w="760">Medio</button>
       <button data-w="1040">Ancho</button>
       <button data-w="full">Completo</button>
+    </div>
+    <div class="lpaint" id="lPaint">
+      <span class="lp-t">Pincel</span>
+      <div class="lp-widths">
+        <button class="lp-w" data-w="2" title="Fino"><i style="width:4px;height:4px"></i></button>
+        <button class="lp-w on" data-w="4" title="Medio"><i style="width:8px;height:8px"></i></button>
+        <button class="lp-w" data-w="8" title="Grueso"><i style="width:13px;height:13px"></i></button>
+      </div>
+      <div class="lp-colors">
+        <button class="lp-c on" data-c="#22C55E" style="background:#22C55E"></button>
+        <button class="lp-c" data-c="#FBBF24" style="background:#FBBF24"></button>
+        <button class="lp-c" data-c="#EF4444" style="background:#EF4444"></button>
+        <button class="lp-c" data-c="#60A5FA" style="background:#60A5FA"></button>
+        <button class="lp-c" data-c="#F472B6" style="background:#F472B6"></button>
+        <button class="lp-c" data-c="#FFFFFF" style="background:#FFFFFF"></button>
+      </div>
+      <button class="lp-btn" id="lpErase" title="Borrador">Borrar</button>
+      <button class="lp-btn" id="lpClear" title="Limpiar todo el marcado del libreto">Limpiar</button>
+      <button class="lp-btn lp-done" id="lpDone" title="Salir del pincel">Listo</button>
     </div>`;
   pop2.doc = d;
   pop2._epId = (typeof currentEp!=='undefined' && currentEp) ? currentEp.id : null;   // a qué capítulo pertenece este libreto
@@ -6679,6 +6744,7 @@ function buildLibretoDoc(pc){
     const dr = $t('dtabR'); if(dr) dr.textContent = '⟨';
   });
   if($t('tPron')) $t('tPron').addEventListener('click', ()=> openPronPanel());
+  if($t('tComp')) $t('tComp').addEventListener('click', ()=>{ const si=libActiveSi(); if(si!=null) libCompress(si); else libMsg&&libMsg('Toca primero un parlamento'); });
   if($t('tFind')) $t('tFind').addEventListener('click', ()=> openLibFind());
   if($t('tRec')) $t('tRec').addEventListener('click', ()=> libretoMarkRecorded());
   const dl = $t('dtabL'), dr = $t('dtabR');
@@ -6813,6 +6879,7 @@ function buildLibretoDoc(pc){
     }
   });
   d.getElementById('lPron').addEventListener('click', ()=> openPronPanel());
+  try{ libDrawSetup(d); }catch(e){ console.warn('marcado libre', e); }
   // clic en la etiqueta «Editado» → historial de cambios del parlamento
   d.addEventListener('click', (e)=>{
     const t = e.target && e.target.closest && e.target.closest('.edited-tag');
@@ -6888,7 +6955,7 @@ function buildLibretoDoc(pc){
       pw.clearTimeout(pop2._endTx);
       pop2._endTx = pw.setTimeout(()=>{
         const p2 = libViewPos();
-        if(p2 && sync.isOn) syncSendScroll(p2);
+        if(p2 && sync.isOn){ p2.snap = true; syncSendScroll(p2); }   // posición final: encaje exacto
       }, 150);
     }catch(e){}
   }, {passive:true});
@@ -7009,8 +7076,157 @@ function showEditHistory(si, anchor){
   const close = (ev)=>{ if(pop.contains(ev.target) || ev.target===anchor) return; pop.remove(); d.removeEventListener('mousedown', close, true); };
   setTimeout(()=> d.addEventListener('mousedown', close, true), 0);
 }
+// ═══════════════ Marcado libre (pincel / pizarrón por caja) ═══════════════
+function libDrawState(){ if(!pop2._draw) pop2._draw = { on:false, color:'#22C55E', width:4, erase:false }; return pop2._draw; }
+function libDrawStrokes(si){ const m = (typeof sync!=='undefined' && sync.marks) ? sync.marks[si] : null; return (m && Array.isArray(m.draw) && m.draw.length) ? m.draw : null; }
+function libDrawEnsureCanvas(blk){
+  let cv = blk.querySelector('.blk-canvas');
+  if(!cv){ cv = pop2.doc.createElement('canvas'); cv.className='blk-canvas'; cv.dataset.si = blk.dataset.si; blk.appendChild(cv); }
+  const w = blk.clientWidth, h = blk.clientHeight, dpr = pop2.win.devicePixelRatio || 1;
+  if(cv._w!==w || cv._h!==h){ cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr); cv.style.width=w+'px'; cv.style.height=h+'px'; cv._w=w; cv._h=h; }
+  return cv;
+}
+function libDrawRenderBlock(blk){
+  const si = +blk.dataset.si; const strokes = libDrawStrokes(si);
+  const exist = blk.querySelector('.blk-canvas');
+  if(!strokes){ if(exist){ const x=exist.getContext('2d'); x.clearRect(0,0,exist.width,exist.height); } return; }
+  const cv = libDrawEnsureCanvas(blk); const ctx = cv.getContext('2d'); const dpr = pop2.win.devicePixelRatio || 1;
+  ctx.clearRect(0,0,cv.width,cv.height); ctx.lineCap='round'; ctx.lineJoin='round';
+  for(const s of strokes){
+    ctx.strokeStyle = s.c || '#22C55E'; ctx.lineWidth = (s.w||4)*dpr;
+    const p = s.p || []; ctx.beginPath();
+    for(let i=0;i<p.length;i++){ const x=p[i][0]*cv.width, y=p[i][1]*cv.height; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
+    if(p.length===1){ ctx.arc(p[0][0]*cv.width, p[0][1]*cv.height, ((s.w||4)*dpr)/2, 0, 7); ctx.fillStyle=s.c||'#22C55E'; ctx.fill(); }
+    else ctx.stroke();
+  }
+}
+function libDrawRenderAll(){
+  if(!pop2.doc || !pop2.els || !pop2.els.blocks) return;
+  pop2.els.blocks.querySelectorAll('.blk').forEach(blk=>{ if(libDrawStrokes(+blk.dataset.si)) libDrawRenderBlock(blk); });
+}
+function libDrawEraseAt(si, blk, pt){
+  const strokes = libDrawStrokes(si); if(!strokes) return;
+  const keep = strokes.filter(s=> !(s.p||[]).some(q=> Math.abs(q[0]-pt[0])<0.03 && Math.abs(q[1]-pt[1])<0.06 ));
+  if(keep.length !== strokes.length){ if(!sync.marks[si]) sync.marks[si]={}; sync.marks[si].draw = keep; libDrawRenderBlock(blk); blk._eraseDirty = si; }
+}
+function libDrawClearAll(){
+  if(typeof sync==='undefined' || !sync.marks) return;
+  Object.keys(sync.marks).forEach(k=>{ if(sync.marks[k] && Array.isArray(sync.marks[k].draw) && sync.marks[k].draw.length){ if(typeof syncSendMark==='function') syncSendMark(+k, { draw: [] }); } });
+  try{ pop2.els.blocks.querySelectorAll('.blk-canvas').forEach(c=>{ const x=c.getContext('2d'); x.clearRect(0,0,c.width,c.height); }); }catch(e){}
+}
+function libDrawSetup(d){
+  const st = libDrawState();
+  const setMode = (on)=>{ st.on=on; d.body.classList.toggle('drawmode', on); if(on) libDrawRenderAll(); };
+  const brush = d.getElementById('lDraw'); if(brush) brush.addEventListener('click', ()=> setMode(!st.on));
+  const tbrush = d.getElementById('tDraw'); if(tbrush) tbrush.addEventListener('click', ()=> setMode(!st.on));
+  const paint = d.getElementById('lPaint');
+  if(paint){
+    paint.querySelectorAll('.lp-w').forEach(b=> b.addEventListener('click', ()=>{ st.width=+b.dataset.w; st.erase=false; paint.querySelectorAll('.lp-w').forEach(x=>x.classList.toggle('on',x===b)); const er=d.getElementById('lpErase'); if(er) er.classList.remove('on'); }));
+    paint.querySelectorAll('.lp-c').forEach(b=> b.addEventListener('click', ()=>{ st.color=b.dataset.c; st.erase=false; paint.querySelectorAll('.lp-c').forEach(x=>x.classList.toggle('on',x===b)); const er=d.getElementById('lpErase'); if(er) er.classList.remove('on'); }));
+    const er=d.getElementById('lpErase'); if(er) er.addEventListener('click', ()=>{ st.erase=!st.erase; er.classList.toggle('on', st.erase); });
+    const cl=d.getElementById('lpClear'); if(cl) cl.addEventListener('click', ()=>{ try{ if(pop2.win.confirm && !pop2.win.confirm('¿Borrar TODO el marcado libre de este libreto?')) return; }catch(e){} libDrawClearAll(); });
+    const dn=d.getElementById('lpDone'); if(dn) dn.addEventListener('click', ()=> setMode(false));
+  }
+  const wrap = pop2.els.wrap;
+  let cur=null, curBlk=null, drawSi=null;
+  const norm=(cv,e)=>{ const r=cv.getBoundingClientRect(); return [ Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)), Math.max(0,Math.min(1,(e.clientY-r.top)/r.height)) ]; };
+  wrap.addEventListener('pointerdown', (e)=>{
+    if(!st.on) return;
+    const blk = e.target.closest && e.target.closest('.blk'); if(!blk) return;
+    e.preventDefault();
+    curBlk = blk; drawSi = +blk.dataset.si;
+    const cv = libDrawEnsureCanvas(blk); try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+    const pt = norm(cv,e);
+    if(st.erase){ cur=null; libDrawEraseAt(drawSi, blk, pt); return; }
+    cur = { c:st.color, w:st.width, p:[pt] };
+  });
+  wrap.addEventListener('pointermove', (e)=>{
+    if(!st.on || !curBlk) return;
+    const cv = curBlk.querySelector('.blk-canvas'); if(!cv) return;
+    const pt = norm(cv,e);
+    if(st.erase){ libDrawEraseAt(drawSi, curBlk, pt); return; }
+    if(!cur) return;
+    cur.p.push(pt);
+    const ctx=cv.getContext('2d'), dpr=pop2.win.devicePixelRatio||1, n=cur.p.length;
+    ctx.strokeStyle=cur.c; ctx.lineWidth=cur.w*dpr; ctx.lineCap='round'; ctx.lineJoin='round';
+    if(n>=2){ ctx.beginPath(); ctx.moveTo(cur.p[n-2][0]*cv.width, cur.p[n-2][1]*cv.height); ctx.lineTo(pt[0]*cv.width, pt[1]*cv.height); ctx.stroke(); }
+  });
+  const endStroke=()=>{
+    if(!curBlk){ return; }
+    if(cur && cur.p.length){
+      cur.p = cur.p.map(pt=>[ Math.round(pt[0]*1000)/1000, Math.round(pt[1]*1000)/1000 ]);
+      const m=(sync.marks&&sync.marks[drawSi])||{}; const arr=Array.isArray(m.draw)?m.draw.slice():[]; arr.push(cur);
+      if(typeof syncSendMark==='function') syncSendMark(drawSi, { draw: arr });
+    } else if(curBlk._eraseDirty!=null){
+      const si=curBlk._eraseDirty; curBlk._eraseDirty=null;
+      if(typeof syncSendMark==='function') syncSendMark(si, { draw: (sync.marks[si]&&sync.marks[si].draw)||[] });
+    }
+    cur=null; curBlk=null; drawSi=null;
+  };
+  wrap.addEventListener('pointerup', endStroke);
+  wrap.addEventListener('pointercancel', endStroke);
+}
+// ═══════════════ Compresión de textos (IA con contexto del libreto) ═══════════════
+function libActiveSi(){
+  try{
+    const a = pop2.doc.querySelector('.blk.active'); if(a) return +a.dataset.si;
+    if(pop2._hiVi!=null && pop2._hiVi>=0 && pop2.blockMap) return pop2.blockMap[pop2._hiVi];
+  }catch(e){}
+  return null;
+}
+function libCompressCtx(si){
+  const out = [];
+  for(let j=Math.max(0, si-6); j<=Math.min(script.length-1, si+3); j++){
+    const b = script[j]; if(!b) continue; const t = blockText(b); if(!t) continue;
+    const w = (b.key && charIdx[b.key]) ? charIdx[b.key].display : '';
+    out.push((j===si?'>> ':'')+(w?w+': ':'')+t);
+  }
+  return out.join('\n');
+}
+async function libCompress(si){
+  if(si==null || !script[si]){ return; }
+  const orig = (typeof sync!=='undefined' && sync.marks && sync.marks[si] && sync.marks[si].text!=null) ? sync.marks[si].text : blockText(script[si]);
+  if(!orig || !orig.trim()){ return; }
+  const who = (script[si].key && charIdx[script[si].key]) ? charIdx[script[si].key].display : '';
+  libCompressModal(si, orig, null, true, null);
+  try{
+    if(typeof sb==='undefined' || !sb || !sb.functions) throw new Error('No hay conexión con el servidor.');
+    const { data, error } = await sb.functions.invoke('comprimir', { body: { texto: orig, personaje: who, contexto: libCompressCtx(si) } });
+    if(error) throw error;
+    const out = data && (data.texto || data.result || data.output || data.text);
+    if(!out || !String(out).trim()) throw new Error('La IA no devolvió texto.');
+    libCompressModal(si, orig, String(out).trim(), false, null);
+  }catch(e){
+    libCompressModal(si, orig, null, false, ((e&&e.message)||'No se pudo comprimir') + ' — verifica que la función «comprimir» esté desplegada en Supabase.');
+  }
+}
+function libCompressModal(si, orig, out, loading, err){
+  const d = pop2.doc; if(!d) return;
+  let ov = d.getElementById('compOv');
+  if(!ov){ ov = d.createElement('div'); ov.id='compOv'; ov.className='comp-ov'; d.body.appendChild(ov); }
+  const body = loading
+    ? '<div class="comp-load"><span class="comp-spin"></span> Comprimiendo con IA…</div>'
+    : (err
+      ? '<div class="comp-err">'+esc(err)+'</div>'
+      : '<div class="comp-row"><div class="comp-lbl">Original</div><div class="comp-orig">'+esc(orig)+'</div></div>'
+        + '<div class="comp-row"><div class="comp-lbl">Comprimido (editable)</div><textarea class="comp-out" id="compOut" spellcheck="false">'+esc(out||'')+'</textarea></div>');
+  ov.innerHTML = '<div class="comp-card"><div class="comp-h">Comprimir texto</div>'+body
+    + '<div class="comp-btns"><button class="comp-cancel" id="compCancel">Cerrar</button>'
+    + ((!loading && !err && out) ? '<button class="comp-apply" id="compApply">Aplicar al parlamento</button>' : '')
+    + '</div></div>';
+  const close = ()=>{ try{ ov.remove(); }catch(e){} };
+  ov.onclick = (e)=>{ if(e.target===ov) close(); };
+  const c = d.getElementById('compCancel'); if(c) c.onclick = close;
+  const ap = d.getElementById('compApply');
+  if(ap) ap.onclick = ()=>{
+    const txt = (d.getElementById('compOut').value||'').trim(); if(!txt){ close(); return; }
+    try{ if(typeof syncSendMark==='function') syncSendMark(si, { text: txt }); }catch(e){}
+    close();
+  };
+}
 function renderLibretoBlocks(){
   if(!pop2.els) return;
+  // (marcado libre + compresión definidos arriba)
   // el personaje abierto no existe en ESTE capítulo (se cambió de programa):
   // caer al libreto completo — jamás un libreto vacío
   if(pop2.key && !charIdx[pop2.key]){ pop2.key = null; pop2.scopeAll = true; }
@@ -7058,6 +7274,7 @@ function renderLibretoBlocks(){
         + '<button data-act="pause" data-si="'+i+'">/ Pausa</button>'
         + '<button data-act="accent" data-si="'+i+'">á Acento</button>'
         + '<button data-act="clear" data-si="'+i+'">Limpiar</button>'
+        + '<button data-act="compress" data-si="'+i+'">'+LIB_ICON.sliders+' Comprimir</button>'
       + '</div>'
       + '</div>');
   });
@@ -7122,6 +7339,7 @@ function renderLibretoBlocks(){
       libToggleDone(si);
       return;
     }
+    if(act==='compress'){ libCompress(si); return; }   // comprimir texto con IA
     if(act==='pause' || act==='accent'){
       // activar/desactivar el modo; el modo aplica a TODAS las cajas
       const already = pop2.markMode===act && pop2.markSi===si;
@@ -7158,11 +7376,13 @@ function renderLibretoBlocks(){
     wireFresh();
     const next = from + CHUNK;
     if(next < html.length) idle(()=>step(next));
+    else { try{ if(typeof libDrawRenderAll==='function') libDrawRenderAll(); }catch(e){} }
   };
   if(html.length){
     pop2.els.blocks.insertAdjacentHTML('beforeend', html.slice(0, CHUNK).join(''));
     wireFresh();
     if(html.length > CHUNK) idle(()=>step(CHUNK));
+    else { try{ if(typeof libDrawRenderAll==='function') libDrawRenderAll(); }catch(e){} }
   }
   pop2.markMode = null;
   if(typeof studioHookLibreto==='function'){ try{ studioHookLibreto(); }catch(e){} }
@@ -8535,6 +8755,11 @@ function onRemoteScroll(p){
   const target = resolveTargetPx(p);
   if(target==null) return;
   const now = performance.now();
+  if(p.snap){
+    // posición FINAL del gesto: encajar de golpe (evita el desfase al devolverse brusco)
+    try{ pop2._rTargetPx = null; pop2._rVel = 0; const wr = pop2.els.wrap; wr.scrollTop = target; libHighlightCenter(); }catch(e){}
+    return;
+  }
   // velocidad del gesto (px/ms): permite seguir moviéndose ENTRE mensajes,
   // así el deslizar se ve continuo aunque los mensajes lleguen a ~20/s
   if(pop2._rTargetPx!=null && pop2._rSeenAt){
@@ -8957,6 +9182,7 @@ function refreshBlock(si){
       }
     } else if(tag){ tag.remove(); }
   }
+  try{ if(typeof libDrawRenderBlock==='function') libDrawRenderBlock(blk); }catch(e){}
 }
 window._sync = sync;
 
