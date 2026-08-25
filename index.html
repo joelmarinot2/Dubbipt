@@ -1475,7 +1475,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.12.6-nube · 18-ago-2026';
+const APP_VERSION = 'v10.12.7-nube · 18-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -6875,6 +6875,7 @@ function buildLibretoDoc(pc){
     if(pop2._applyRemote) return;                 // este movimiento vino del otro lado
     const now = performance.now();
     pop2._navAt = now;
+    try{ libHighlightCenter(); }catch(e){}          // mantener el chip de página al día con la lectura
     if(typeof sync==='undefined' || !sync.isOn) return;
     if(now < (pop2._suppressTx||0)) return;        // silencio breve tras abrir (evita floods de layout)
     const pos = libViewPos();
@@ -8431,6 +8432,7 @@ function libHighlightCenter(){
   if(pop2._hiVi!=null && pop2.blockEls[pop2._hiVi]) pop2.blockEls[pop2._hiVi].classList.remove('centerhi');
   if(pop2.blockEls[vi]) pop2.blockEls[vi].classList.add('centerhi');
   pop2._hiVi = vi;
+  try{ const b = script[pop2.blockMap[vi]]; if(b && b.page!=null && typeof markChipCur==='function') markChipCur(b.page); }catch(e){}   // sincroniza el chip de página con la lectura
   libReportPage();
 }
 // decirle a la TABLET (trackpad) en qué página está la caja del centro —
@@ -8572,6 +8574,7 @@ function ensureMirrorLoop(){
         const k = 1 - Math.exp(-dt / 110);        // suavizado por tiempo
         const boost = ad > 1600 ? 2.2 : 1;        // saltos grandes: alcanzar más rápido
         wr.scrollTop = cur + diff * Math.min(1, k * boost);
+        try{ libHighlightCenter(); }catch(e){}     // el que SIGUE también sincroniza su chip de página
         try{
           w.clearTimeout(pop2._appTmr);
           pop2._appTmr = w.setTimeout(()=>{ pop2._applyRemote = false; }, 130);
