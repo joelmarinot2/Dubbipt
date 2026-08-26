@@ -1475,7 +1475,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.12.9-nube · 25-ago-2026';
+const APP_VERSION = 'v10.12.10-nube · 25-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -5755,6 +5755,7 @@ body.dark{ background:var(--libbg,#0b0c0e) !important; }
   margin:0 auto 2px !important;
   max-width:var(--boxw,960px);
   display:block !important;
+  position:relative !important;   /* para que el canvas del pincel se superponga a la caja */
   border-bottom:1px solid #17191c !important;
 }
 .blk:last-child{ border-bottom:none !important; }
@@ -5877,7 +5878,7 @@ body.light .edithist .eh-new{ color:#15803d; }
 /* ─── Marcado libre (pincel) ─── */
 .blk-canvas{ position:absolute; inset:0; z-index:6; pointer-events:none; touch-action:none; border-radius:12px; }
 body.drawmode .blk-canvas{ pointer-events:auto; }
-body.drawmode .blk{ cursor:crosshair; }
+body.drawmode .blk{ cursor:crosshair; touch-action:none; }
 body.drawmode .mtools{ display:none !important; }
 .lpaint{ position:fixed; left:50%; bottom:64px; transform:translateX(-50%); z-index:55;
   display:none; gap:12px; align-items:center; background:#0f1320; border:1px solid #2a3550;
