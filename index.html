@@ -1475,7 +1475,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.12.10-nube · 25-ago-2026';
+const APP_VERSION = 'v10.13.0-nube · 26-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -5914,6 +5914,18 @@ body.light .lpaint .lp-btn{ background:#f3f1fb; color:#2a2540; border-color:#e2d
 .comp-btns button{ border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; font-family:'Inter',sans-serif; border:1px solid transparent; }
 .comp-cancel{ background:#161a22; color:#e6e7ea; border-color:#2a2f3a; }
 .comp-apply{ background:linear-gradient(135deg,#5FC85A,#22C55E); color:#08240f; }
+.comp-syl{ display:inline-block; margin-left:6px; background:rgba(96,165,250,.16); color:#93c5fd; border:1px solid rgba(96,165,250,.35); border-radius:99px; padding:1px 8px; font-size:11px; font-weight:800; letter-spacing:.2px; }
+.comp-delta{ display:inline-block; margin-left:4px; border-radius:99px; padding:1px 8px; font-size:11px; font-weight:800; }
+.comp-delta.neg{ background:rgba(74,222,128,.16); color:#86efac; border:1px solid rgba(74,222,128,.4); }
+.comp-delta.pos{ background:rgba(251,191,36,.16); color:#fcd34d; border:1px solid rgba(251,191,36,.4); }
+.comp-modes{ display:flex; gap:10px; margin:2px 0 14px; }
+.comp-modes .comp-mode{ flex:1; background:#161a22; color:#e6e7ea; border:1px solid #2a2f3a; border-radius:11px; padding:11px; font-size:14px; font-weight:700; cursor:pointer; font-family:'Inter',sans-serif; }
+.comp-modes .comp-mode:hover{ border-color:#4ADE80; }
+.comp-modes .comp-mode.on{ background:rgba(34,197,94,.14); border-color:#22C55E; color:#86efac; }
+.comp-lines{ display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
+.comp-lines span{ background:#12161e; border:1px solid #242a34; border-radius:7px; padding:2px 8px; font-size:11px; color:#9aa3b2; font-family:ui-monospace,monospace; }
+body.light .comp-syl{ background:rgba(37,99,235,.1); color:#1d4ed8; border-color:rgba(37,99,235,.3); }
+body.light .comp-modes .comp-mode{ background:#f3f1fb; color:#2a2540; border-color:#e2ddf2; }
 body.light .comp-card{ background:#fff; border-color:#e2ddf2; }
 body.light .comp-orig{ background:#f3f1fb; color:#2a2540; border-color:#e2ddf2; }
 
@@ -6608,7 +6620,7 @@ function buildLibretoDoc(pc){
       <button id="tPron">${LIB_ICON.speak} Pronunc.</button>
       <button id="tFind">${LIB_ICON.search} Buscar</button>
       <button id="tDraw">${LIB_ICON.brush} Pincel</button>
-      <button id="tComp">${LIB_ICON.sliders} Comprimir</button>
+      <button id="tComp">${LIB_ICON.sliders} Ajustar</button>
       <div class="tt">Grabación</div>
       <button id="tRec" class="grn">✓ Grabada</button>
     </div>
@@ -6745,7 +6757,7 @@ function buildLibretoDoc(pc){
     const dr = $t('dtabR'); if(dr) dr.textContent = '⟨';
   });
   if($t('tPron')) $t('tPron').addEventListener('click', ()=> openPronPanel());
-  if($t('tComp')) $t('tComp').addEventListener('click', ()=>{ const si=libActiveSi(); if(si!=null) libCompress(si); else libMsg&&libMsg('Toca primero un parlamento'); });
+  if($t('tComp')) $t('tComp').addEventListener('click', ()=>{ const si=libActiveSi(); if(si!=null) libTextTool(si); else libMsg&&libMsg('Toca primero un parlamento'); });
   if($t('tFind')) $t('tFind').addEventListener('click', ()=> openLibFind());
   if($t('tRec')) $t('tRec').addEventListener('click', ()=> libretoMarkRecorded());
   const dl = $t('dtabL'), dr = $t('dtabR');
@@ -7184,44 +7196,87 @@ function libCompressCtx(si){
   }
   return out.join('\n');
 }
-async function libCompress(si){
+// ── Conteo de sílabas (español, aproximado para doblaje) ──
+function _silWord(w){
+  const g = w.toLowerCase().match(/[aeiouáéíóúü]+/g);
+  if(!g) return 0;
+  let syl = 0; const strong='aeoáéó', accWeak='íú';
+  for(const grp of g){
+    let s = 1;
+    for(let i=1;i<grp.length;i++){
+      const a=grp[i-1], b=grp[i];
+      if((strong.includes(a)&&strong.includes(b)) || accWeak.includes(a) || accWeak.includes(b)) s++;
+    }
+    syl += s;
+  }
+  return syl;
+}
+function contarSilabas(t){
+  const words = (t||'').match(/[a-záéíóúüñ]+/gi) || [];
+  let n=0; for(const w of words) n += _silWord(w); return n;
+}
+function silabasPorLinea(t){
+  return String(t||'').split(/\n+/).map(l=>l.trim()).filter(Boolean).map(l=>({ t:l, s:contarSilabas(l) }));
+}
+function libTextTool(si){
   if(si==null || !script[si]){ return; }
   const orig = (typeof sync!=='undefined' && sync.marks && sync.marks[si] && sync.marks[si].text!=null) ? sync.marks[si].text : blockText(script[si]);
   if(!orig || !orig.trim()){ return; }
-  const who = (script[si].key && charIdx[script[si].key]) ? charIdx[script[si].key].display : '';
-  libCompressModal(si, orig, null, true, null);
+  pop2._txtTool = { si, orig, origSyl: contarSilabas(orig), out:null, outSyl:0, loading:false, err:null, modo:null };
+  libTextModal();
+}
+async function libRunAdjust(modo){
+  const st = pop2._txtTool; if(!st) return;
+  st.modo = modo; st.loading = true; st.err = null; st.out = null;
+  libTextModal();
   try{
     if(typeof sb==='undefined' || !sb || !sb.functions) throw new Error('No hay conexión con el servidor.');
-    const { data, error } = await sb.functions.invoke('comprimir', { body: { texto: orig, personaje: who, contexto: libCompressCtx(si) } });
+    const who = (script[st.si].key && charIdx[script[st.si].key]) ? charIdx[script[st.si].key].display : '';
+    const { data, error } = await sb.functions.invoke('comprimir', { body: { texto: st.orig, personaje: who, contexto: libCompressCtx(st.si), modo } });
     if(error) throw error;
     const out = data && (data.texto || data.result || data.output || data.text);
     if(!out || !String(out).trim()) throw new Error('La IA no devolvió texto.');
-    libCompressModal(si, orig, String(out).trim(), false, null);
+    st.out = String(out).trim(); st.outSyl = contarSilabas(st.out); st.loading = false;
+    libTextModal();
   }catch(e){
-    libCompressModal(si, orig, null, false, ((e&&e.message)||'No se pudo comprimir') + ' — verifica que la función «comprimir» esté desplegada en Supabase.');
+    st.loading = false; st.err = ((e&&e.message)||'No se pudo procesar') + ' — revisa la función/clave en Supabase.';
+    libTextModal();
   }
 }
-function libCompressModal(si, orig, out, loading, err){
-  const d = pop2.doc; if(!d) return;
+function _sylTag(n){ return '<span class="comp-syl">'+n+' síl.</span>'; }
+function _deltaTag(diff){ return '<span class="comp-delta '+(diff<0?'neg':diff>0?'pos':'')+'">'+(diff===0?'= igual':(diff>0?'+':'−')+Math.abs(diff)+' síl.')+'</span>'; }
+function _linesTag(t){ const ls=silabasPorLinea(t); return ls.length>1 ? '<div class="comp-lines">'+ls.map((l,i)=>'<span title="'+esc(l.t)+'">L'+(i+1)+': '+l.s+'</span>').join('')+'</div>' : ''; }
+function libTextModal(){
+  const d = pop2.doc, st = pop2._txtTool; if(!d || !st) return;
   let ov = d.getElementById('compOv');
   if(!ov){ ov = d.createElement('div'); ov.id='compOv'; ov.className='comp-ov'; d.body.appendChild(ov); }
-  const body = loading
-    ? '<div class="comp-load"><span class="comp-spin"></span> Comprimiendo con IA…</div>'
-    : (err
-      ? '<div class="comp-err">'+esc(err)+'</div>'
-      : '<div class="comp-row"><div class="comp-lbl">Original</div><div class="comp-orig">'+esc(orig)+'</div></div>'
-        + '<div class="comp-row"><div class="comp-lbl">Comprimido (editable)</div><textarea class="comp-out" id="compOut" spellcheck="false">'+esc(out||'')+'</textarea></div>');
-  ov.innerHTML = '<div class="comp-card"><div class="comp-h">Comprimir texto</div>'+body
+  let body = '<div class="comp-row"><div class="comp-lbl">Original '+_sylTag(st.origSyl)+'</div>'
+    + '<div class="comp-orig">'+esc(st.orig)+'</div>'+_linesTag(st.orig)+'</div>'
+    + '<div class="comp-modes"><button class="comp-mode'+(st.modo==='comprimir'?' on':'')+'" data-m="comprimir">▼ Comprimir</button>'
+    + '<button class="comp-mode'+(st.modo==='expandir'?' on':'')+'" data-m="expandir">▲ Expandir</button></div>';
+  if(st.loading) body += '<div class="comp-load"><span class="comp-spin"></span> '+(st.modo==='expandir'?'Expandiendo':'Comprimiendo')+' con IA…</div>';
+  else if(st.err) body += '<div class="comp-err">'+esc(st.err)+'</div>';
+  else if(st.out!=null) body += '<div class="comp-row"><div class="comp-lbl" id="compResLbl">Resultado '+_sylTag(st.outSyl)+' '+_deltaTag(st.outSyl-st.origSyl)+'</div>'
+    + '<textarea class="comp-out" id="compOut" spellcheck="false">'+esc(st.out)+'</textarea>'+_linesTag(st.out)+'</div>';
+  ov.innerHTML = '<div class="comp-card"><div class="comp-h">Ajustar texto · sílabas</div>'+body
     + '<div class="comp-btns"><button class="comp-cancel" id="compCancel">Cerrar</button>'
-    + ((!loading && !err && out) ? '<button class="comp-apply" id="compApply">Aplicar al parlamento</button>' : '')
+    + ((st.out!=null && !st.loading) ? '<button class="comp-apply" id="compApply">Aplicar al parlamento</button>' : '')
     + '</div></div>';
-  const close = ()=>{ try{ ov.remove(); }catch(e){} };
+  const close = ()=>{ try{ ov.remove(); }catch(e){} pop2._txtTool=null; };
   ov.onclick = (e)=>{ if(e.target===ov) close(); };
-  const c = d.getElementById('compCancel'); if(c) c.onclick = close;
+  d.getElementById('compCancel').onclick = close;
+  ov.querySelectorAll('.comp-mode').forEach(b=> b.onclick = ()=> libRunAdjust(b.dataset.m));
+  const outEl = d.getElementById('compOut');
+  if(outEl) outEl.addEventListener('input', ()=>{
+    st.out = outEl.value; st.outSyl = contarSilabas(outEl.value);
+    const lbl = d.getElementById('compResLbl'); if(lbl) lbl.innerHTML = 'Resultado '+_sylTag(st.outSyl)+' '+_deltaTag(st.outSyl-st.origSyl);
+  });
   const ap = d.getElementById('compApply');
   if(ap) ap.onclick = ()=>{
     const txt = (d.getElementById('compOut').value||'').trim(); if(!txt){ close(); return; }
-    try{ if(typeof syncSendMark==='function') syncSendMark(si, { text: txt }); }catch(e){}
+    const diff = contarSilabas(txt) - st.origSyl;
+    try{ if(typeof syncSendMark==='function') syncSendMark(st.si, { text: txt }); }catch(e){}
+    try{ if(typeof DDL_UI!=='undefined' && DDL_UI.toast) DDL_UI.toast(diff===0 ? 'Texto aplicado · mismas sílabas' : (diff>0 ? ('Texto aplicado · +'+diff+' sílabas') : ('Texto aplicado · −'+Math.abs(diff)+' sílabas')), { kind:'ok' }); }catch(e){}
     close();
   };
 }
@@ -7275,7 +7330,7 @@ function renderLibretoBlocks(){
         + '<button data-act="pause" data-si="'+i+'">/ Pausa</button>'
         + '<button data-act="accent" data-si="'+i+'">á Acento</button>'
         + '<button data-act="clear" data-si="'+i+'">Limpiar</button>'
-        + '<button data-act="compress" data-si="'+i+'">'+LIB_ICON.sliders+' Comprimir</button>'
+        + '<button data-act="compress" data-si="'+i+'">'+LIB_ICON.sliders+' Ajustar</button>'
       + '</div>'
       + '</div>');
   });
@@ -7340,7 +7395,7 @@ function renderLibretoBlocks(){
       libToggleDone(si);
       return;
     }
-    if(act==='compress'){ libCompress(si); return; }   // comprimir texto con IA
+    if(act==='compress'){ libTextTool(si); return; }   // ajustar texto (comprimir/expandir + sílabas)
     if(act==='pause' || act==='accent'){
       // activar/desactivar el modo; el modo aplica a TODAS las cajas
       const already = pop2.markMode===act && pop2.markSi===si;
