@@ -1475,7 +1475,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.13.3-nube · 27-ago-2026';
+const APP_VERSION = 'v10.14.0-nube · 28-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -1760,7 +1760,10 @@ function askRoleAtLogin(done){
     +      '<span class="lab">Escritorio<small>Muestra el libreto para lectura<br>durante la grabación</small></span>'
     +    '</button>'
     +    '<button class="rp-opt" id="rTab">'+tabletSVG
-    +      '<span class="lab">Tablet<small>Control del desglose y avance de<br>página a distancia</small></span>'
+    +      '<span class="lab">Tablet · Director<small>Control total del desglose<br>y todas las herramientas</small></span>'
+    +    '</button>'
+    +    '<button class="rp-opt" id="rTal">'+tabletSVG
+    +      '<span class="lab">Tablet · Actor<small>Solo marcar: pincel, pausas<br>y más rápido / más lento</small></span>'
     +    '</button>'
     +  '</div>'
     +'</div>'
@@ -1771,19 +1774,22 @@ function askRoleAtLogin(done){
   // toggle active state visually
   const optPc  = ov.querySelector('#rPc');
   const optTab = ov.querySelector('#rTab');
+  const optTal = ov.querySelector('#rTal');
   const setActive=(el)=>{
-    [optPc, optTab].forEach(b=>{ b.classList.remove('active');
+    [optPc, optTab, optTal].forEach(b=>{ if(!b) return; b.classList.remove('active');
       b.querySelector('svg').setAttribute('stroke', '#6b7280'); });
     el.classList.add('active');
     el.querySelector('svg').setAttribute('stroke', '#22C55E');
   };
   optPc.addEventListener('mouseenter', ()=> setActive(optPc));
   optTab.addEventListener('mouseenter', ()=> setActive(optTab));
+  if(optTal) optTal.addEventListener('mouseenter', ()=> setActive(optTal));
   ov.querySelector('.rp-opts').addEventListener('mouseleave', ()=> setActive(optPc));
 
   const choose=(role)=>{ try{localStorage.setItem('ddl_role',role);}catch(e){} DEVROLE=role; try{sync.role=role;}catch(e){} ov.remove(); try{ applyDeviceRole(); }catch(e){} if(typeof done==='function') done(); };
   optPc.onclick  = ()=> choose('pc');
   optTab.onclick = ()=> choose('tablet');
+  if(optTal) optTal.onclick = ()=> choose('talent');
 
   // Cerrar sesión: triple-tap the status pill as a hidden escape hatch
   let _logoutTaps=0, _logoutTimer=null;
@@ -1799,11 +1805,12 @@ function askRoleAtLogin(done){
   });
 }
 function applyDeviceRole(){
-  try{ document.body.classList.toggle('is-tablet', DEVROLE==='tablet'); }catch(e){}
-  try{ const d=document.getElementById('devStat'); if(d){ d.textContent = DEVROLE==='tablet' ? 'Tablet Lista' : (DEVROLE==='pc' ? 'Escritorio Listo' : 'Listo'); d.classList.toggle('off', !DEVROLE); } }catch(e){}
+  try{ document.body.classList.toggle('is-tablet', DEVROLE==='tablet' || DEVROLE==='talent'); }catch(e){}
+  try{ document.body.classList.toggle('is-talent', DEVROLE==='talent'); }catch(e){}
+  try{ const d=document.getElementById('devStat'); if(d){ d.textContent = DEVROLE==='talent' ? 'Tablet Actor' : (DEVROLE==='tablet' ? 'Tablet Director' : (DEVROLE==='pc' ? 'Escritorio Listo' : 'Listo')); d.classList.toggle('off', !DEVROLE); } }catch(e){}
   try{ updateWorkspaceChip(); }catch(e){}
   try{ refreshTopbar(); }catch(e){}
-  try{ if(typeof pop2!=='undefined' && pop2.doc){ renderLibretoBlocks(); renderLibretoChips(); } }catch(e){}
+  try{ if(typeof pop2!=='undefined' && pop2.doc){ pop2.doc.body.classList.toggle('is-talent', DEVROLE==='talent'); renderLibretoBlocks(); renderLibretoChips(); } }catch(e){}
 }
 /* ===== Módulo 0 · relleno dinámico de la barra superior ===== */
 function refreshTopbar(){
@@ -5932,6 +5939,21 @@ body.light .comp-modes .comp-mode{ background:#f3f1fb; color:#2a2540; border-col
 .dict-syns{ display:flex; flex-wrap:wrap; gap:7px; }
 .dict-syn{ background:rgba(96,165,250,.14); color:#bcd4ff; border:1px solid rgba(96,165,250,.35); border-radius:99px; padding:5px 12px; font-size:13px; font-weight:600; }
 body.light .dict-syn{ background:rgba(37,99,235,.1); color:#1d4ed8; border-color:rgba(37,99,235,.3); }
+.spl-tc{ width:180px; background:#0f1215; border:1px solid #2a2f36; color:#e6e7ea; border-radius:9px; padding:9px 12px; font-family:'JetBrains Mono',ui-monospace,monospace; font-size:14px; letter-spacing:1px; outline:none; }
+.spl-tc:focus{ border-color:#4ADE80; }
+
+/* ─── Tablet ACTOR: solo marcar (pincel, pausas, más rápido / más lento) ─── */
+body.is-talent #lVid, body.is-talent #lFind, body.is-talent #lPron, body.is-talent #lTpad,
+body.is-talent #lFontDn, body.is-talent #lFontUp, body.is-talent #lCharSel, body.is-talent #lScope,
+body.is-talent .lbar,
+body.is-talent #tComp, body.is-talent #tDict, body.is-talent #tFind, body.is-talent #tPron,
+body.is-talent .ltools .tt, body.is-talent #tPg, body.is-talent #tTime, body.is-talent #tGoTime,
+body.is-talent .mtools .edit,
+body.is-talent .mtools [data-act="compress"],
+body.is-talent .mtools [data-act="split"],
+body.is-talent .mtools [data-act="merge"],
+body.is-talent .mtools [data-act="done"]{ display:none !important; }
+/* del cajón de la tablet, el actor conserva: Pincel (tDraw) y Grabada */
 body.light .comp-card{ background:#fff; border-color:#e2ddf2; }
 body.light .comp-orig{ background:#f3f1fb; color:#2a2540; border-color:#e2ddf2; }
 
@@ -6627,6 +6649,7 @@ function buildLibretoDoc(pc){
       <button id="tFind">${LIB_ICON.search} Buscar</button>
       <button id="tDraw">${LIB_ICON.brush} Pincel</button>
       <button id="tComp">${LIB_ICON.sliders} Ajustar</button>
+      <button id="tDict">${LIB_ICON.speak} Significado</button>
       <div class="tt">Grabación</div>
       <button id="tRec" class="grn">✓ Grabada</button>
     </div>
@@ -6696,6 +6719,7 @@ function buildLibretoDoc(pc){
   const roleTab = (typeof isTablet==='function' && isTablet());
   d.body.classList.toggle('haschips', roleTab);        // tablet: páginas izq + herramientas der
   d.body.classList.toggle('deskchips', !roleTab);      // escritorio/espejo: páginas a la derecha
+  d.body.classList.toggle('is-talent', (typeof isTalent==='function' && isTalent()));   // tablet actor: herramientas limitadas
   if(typeof isMirror==='function' && isMirror()) d.body.classList.add('mirror');
   const recBtn = d.getElementById('lRec');
   if(recBtn) recBtn.addEventListener('click', ()=> libretoMarkRecorded());
@@ -6765,6 +6789,16 @@ function buildLibretoDoc(pc){
   });
   if($t('tPron')) $t('tPron').addEventListener('click', ()=> openPronPanel());
   if($t('tComp')) $t('tComp').addEventListener('click', ()=>{ const si=libActiveSi(); if(si!=null) libTextTool(si); else libMsg&&libMsg('Toca primero un parlamento'); });
+  if($t('tDict')){
+    $t('tDict').addEventListener('mousedown', e=> e.preventDefault());   // no perder la selección
+    $t('tDict').addEventListener('click', ()=>{
+      const sel = pop2.doc.getSelection ? pop2.doc.getSelection() : null;
+      const raw = sel ? String(sel.toString()||'').trim() : '';
+      const word = raw.replace(/[^a-záéíóúüñ'-]/gi,'');
+      if(word && word.length>=2 && !/\s/.test(raw)) libDefine(word);
+      else libMsg && libMsg('Selecciona primero una palabra');
+    });
+  }
   if($t('tFind')) $t('tFind').addEventListener('click', ()=> openLibFind());
   if($t('tRec')) $t('tRec').addEventListener('click', ()=> libretoMarkRecorded());
   const dl = $t('dtabL'), dr = $t('dtabR');
@@ -7118,18 +7152,14 @@ function _libArrow(ctx, x1,y1,x2,y2, head){
   ctx.stroke();
 }
 function libDrawSymbol(ctx, g, W, H, dpr){
-  const x=g.x*W, y=g.y*H, size=Math.min(H*0.42, 24*dpr);
-  ctx.save(); ctx.lineWidth=3.2*dpr; ctx.lineCap='round'; ctx.lineJoin='round';
-  ctx.font='800 '+(11*dpr)+'px Inter, sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const x=g.x*W, y=g.y*H, size=Math.min(H*0.5, 30*dpr);
+  ctx.save(); ctx.lineWidth=3.6*dpr; ctx.lineCap='round'; ctx.lineJoin='round';
   if(g.k==='pause'){
-    ctx.strokeStyle='#22C55E'; ctx.beginPath(); ctx.moveTo(x-size*0.32,y+size*0.55); ctx.lineTo(x+size*0.32,y-size*0.55); ctx.stroke();
-    ctx.fillStyle='#22C55E'; ctx.fillText('pausa', x, y+size*0.9);
+    ctx.strokeStyle='#F59E0B'; ctx.beginPath(); ctx.moveTo(x-size*0.34,y+size*0.6); ctx.lineTo(x+size*0.34,y-size*0.6); ctx.stroke();
   } else if(g.k==='fast'){
-    ctx.strokeStyle='#4ADE80'; _libArrow(ctx, x-size, y-size*0.3, x+size, y-size*0.3, 8*dpr);
-    ctx.fillStyle='#4ADE80'; ctx.fillText('más rápido', x, y+size*0.75);
+    ctx.strokeStyle='#4ADE80'; _libArrow(ctx, x-size, y, x+size, y, 9*dpr);
   } else if(g.k==='slow'){
-    ctx.strokeStyle='#FBBF24'; _libArrow(ctx, x+size, y-size*0.3, x-size, y-size*0.3, 8*dpr);
-    ctx.fillStyle='#FBBF24'; ctx.fillText('más lento', x, y+size*0.75);
+    ctx.strokeStyle='#FBBF24'; _libArrow(ctx, x+size, y, x-size, y, 9*dpr);
   }
   ctx.restore();
 }
@@ -7259,15 +7289,17 @@ function libSplitTool(si){
   if(!full || !full.trim()){ return; }
   let mid = Math.floor(full.length/2);
   let sp = full.lastIndexOf(' ', mid); if(sp<3) sp = full.indexOf(' ', mid); if(sp<0) sp = mid;
-  libSplitModal(si, full.slice(0,sp).trim(), full.slice(sp).trim());
+  libSplitModal(si, full.slice(0,sp).trim(), full.slice(sp).trim(), (script[si].tcSec!=null ? fmtTC4(script[si].tcSec) : (script[si].tcEff!=null ? fmtTC4(script[si].tcEff) : '')));
 }
-function libSplitModal(si, p1, p2){
+function libSplitModal(si, p1, p2, tc0){
+  tc0 = tc0 || '';
   const d = pop2.doc; if(!d) return;
   let ov = d.getElementById('compOv');
   if(!ov){ ov = d.createElement('div'); ov.id='compOv'; ov.className='comp-ov'; d.body.appendChild(ov); }
   ov.innerHTML = '<div class="comp-card"><div class="comp-h">Dividir parlamento en dos cajas</div>'
     + '<div class="comp-row"><div class="comp-lbl">Caja 1</div><textarea class="comp-out" id="splA" spellcheck="false">'+esc(p1)+'</textarea></div>'
     + '<div class="comp-row"><div class="comp-lbl">Caja 2 (nueva)</div><textarea class="comp-out" id="splB" spellcheck="false">'+esc(p2)+'</textarea></div>'
+    + '<div class="comp-row"><div class="comp-lbl">Timecode de la Caja 2</div><input type="text" class="spl-tc" id="splTC" spellcheck="false" placeholder="HH:MM:SS:FF" value="'+esc(tc0)+'"></div>'
     + '<div class="comp-btns"><button class="comp-cancel" id="splCancel">Cancelar</button><button class="comp-apply" id="splGo">Dividir</button></div></div>';
   const close=()=>{ try{ ov.remove(); }catch(e){} };
   ov.onclick=(e)=>{ if(e.target===ov) close(); };
@@ -7275,17 +7307,21 @@ function libSplitModal(si, p1, p2){
   d.getElementById('splGo').onclick=()=>{
     const a=(d.getElementById('splA').value||'').trim(), b=(d.getElementById('splB').value||'').trim();
     if(!a || !b){ try{ if(pop2.win.alert) pop2.win.alert('Ambas cajas deben tener texto.'); }catch(e){} return; }
-    close(); libDoSplit(si, a, b);
+    const tcStr=(d.getElementById('splTC').value||'').trim();
+    const tcSec = tcStr ? parseTC(tcStr) : undefined;   // undefined = mantener el mismo TC del original
+    close(); libDoSplit(si, a, b, tcSec);
   };
 }
-async function libDoSplit(si, t1, t2){
+async function libDoSplit(si, t1, t2, tcSec){
   if(!script[si]){ return; }
   const oldLen = script.length; const base = script[si];
-  const b2 = { key: base.key, display: base.display, tcSec: base.tcSec, tcEff: base.tcEff, page: base.page, lines: [t2] };
+  const newTc = (tcSec!==undefined && tcSec!==null) ? tcSec : base.tcSec;
+  const b2 = { key: base.key, display: base.display, tcSec: newTc, tcEff: (newTc!=null?newTc:base.tcEff), page: base.page, lines: [t2] };
   base.lines = [t1];
   try{ if(sync.marks[si] && sync.marks[si].text!=null) sync.marks[si].text = t1; }catch(e){}
   script.splice(si+1, 0, b2);
   for(let i=0;i<script.length;i++) script[i].idx = i;
+  { let lastTC=null; for(const b of script){ if(b.tcSec!=null) lastTC=b.tcSec; b.tcEff=(b.tcSec!=null?b.tcSec:lastTC); } }   // recalcular cascada de TC
   // re-indexar marcas de los bloques que se corrieron (descendente, para no pisar)
   if(typeof sync!=='undefined' && sync.marks){ for(let k=oldLen-1; k>si; k--){ if(sync.marks[k]!==undefined){ sync.marks[k+1]=sync.marks[k]; delete sync.marks[k]; } } }
   try{ scriptByKey = {}; for(let i=0;i<script.length;i++){ const k=script[i].key; if(k){ (scriptByKey[k]=scriptByKey[k]||[]).push(i); } } }catch(e){}
@@ -7310,6 +7346,46 @@ async function onRemoteReload(p){
     }
   }catch(e){ console.warn('reload', e); }
 }
+// ═══════════════ Unir parlamento con el siguiente ═══════════════
+function libMergeTool(si){
+  if(si==null || !script[si]) return;
+  if(si+1 >= script.length){ try{ if(pop2.win.alert) pop2.win.alert('No hay una caja siguiente para unir.'); }catch(e){} return; }
+  const txtOf = (k)=> (sync.marks && sync.marks[k] && sync.marks[k].text!=null) ? sync.marks[k].text : blockText(script[k]);
+  const merged = (txtOf(si).trim() + ' ' + txtOf(si+1).trim()).replace(/\s{2,}/g,' ').trim();
+  const d = pop2.doc; if(!d) return;
+  let ov = d.getElementById('compOv');
+  if(!ov){ ov = d.createElement('div'); ov.id='compOv'; ov.className='comp-ov'; d.body.appendChild(ov); }
+  const who1 = (script[si].key&&charIdx[script[si].key])?charIdx[script[si].key].display:'—';
+  const who2 = (script[si+1].key&&charIdx[script[si+1].key])?charIdx[script[si+1].key].display:'—';
+  ov.innerHTML = '<div class="comp-card"><div class="comp-h">Unir con la caja siguiente</div>'
+    + '<div class="comp-row"><div class="comp-lbl">Se unirán '+esc(who1)+' + '+esc(who2)+' — quedará como '+esc(who1)+'</div>'
+    + '<textarea class="comp-out" id="mrgT" spellcheck="false">'+esc(merged)+'</textarea></div>'
+    + '<div class="comp-btns"><button class="comp-cancel" id="mrgCancel">Cancelar</button><button class="comp-apply" id="mrgGo">Unir</button></div></div>';
+  const close=()=>{ try{ ov.remove(); }catch(e){} };
+  ov.onclick=(e)=>{ if(e.target===ov) close(); };
+  d.getElementById('mrgCancel').onclick=close;
+  d.getElementById('mrgGo').onclick=()=>{ const t=(d.getElementById('mrgT').value||'').trim(); if(!t){ close(); return; } close(); libDoMerge(si, t); };
+}
+async function libDoMerge(si, mergedText){
+  if(!script[si] || si+1>=script.length){ return; }
+  const oldLen = script.length;
+  script[si].lines = [mergedText];
+  try{ if(sync.marks[si]){ if(sync.marks[si].text!=null) sync.marks[si].text = mergedText; } }catch(e){}
+  script.splice(si+1, 1);   // quitar la caja siguiente
+  for(let i=0;i<script.length;i++) script[i].idx = i;
+  { let lastTC=null; for(const b of script){ if(b.tcSec!=null) lastTC=b.tcSec; b.tcEff=(b.tcSec!=null?b.tcSec:lastTC); } }
+  // re-indexar marcas: quitar las de la caja unida (si+1) y correr las siguientes una posición hacia abajo
+  if(typeof sync!=='undefined' && sync.marks){
+    delete sync.marks[si+1];
+    for(let k=si+2; k<oldLen; k++){ if(sync.marks[k]!==undefined){ sync.marks[k-1]=sync.marks[k]; delete sync.marks[k]; } }
+  }
+  try{ scriptByKey = {}; for(let i=0;i<script.length;i++){ const k=script[i].key; if(k){ (scriptByKey[k]=scriptByKey[k]||[]).push(i); } } }catch(e){}
+  try{ pop2._hiVi=null; renderLibretoBlocks(); renderLibretoChips(); }catch(e){}
+  try{ if(typeof epDataUpsert==='function') await epDataUpsert(currentEp.id, currentEp.show_id); }catch(e){}
+  try{ if(sb && currentEp) await sb.from('episodes').update({ marks: sync.marks }).eq('id', currentEp.id); }catch(e){}
+  try{ if(sync.isOn && sync.channel && typeof syncEmit==='function') syncEmit('reload', { epId: currentEp.id }, true); }catch(e){}
+  try{ if(typeof DDL_UI!=='undefined' && DDL_UI.toast) DDL_UI.toast('Cajas unidas', {kind:'ok'}); }catch(e){}
+}
 // ═══════════════ Diccionario: significado + sinónimos (IA) ═══════════════
 function libDictSetup(d){
   let chip = null;
@@ -7331,8 +7407,10 @@ function libDictSetup(d){
         d.body.appendChild(chip);
       }
       chip._w = word;
-      chip.style.left = Math.max(8, Math.min(d.documentElement.clientWidth - 140, r.left)) + 'px';
-      chip.style.top  = Math.max(8, r.top - 40) + 'px';
+      // debajo de la palabra: el menú nativo de copiar/pegar aparece ARRIBA, así no lo tapa
+      const vw = d.documentElement.clientWidth, vh = d.documentElement.clientHeight;
+      chip.style.left = Math.max(8, Math.min(vw - 150, r.left + r.width/2 - 60)) + 'px';
+      chip.style.top  = Math.min(vh - 46, r.bottom + 10) + 'px';
     }catch(e){ clear(); }
   };
   d.addEventListener('selectionchange', ()=> setTimeout(onSel, 10));
@@ -7523,6 +7601,7 @@ function renderLibretoBlocks(){
         + '<button data-act="clear" data-si="'+i+'">Limpiar</button>'
         + '<button data-act="compress" data-si="'+i+'">'+LIB_ICON.sliders+' Ajustar</button>'
         + '<button data-act="split" data-si="'+i+'">⊟ Dividir</button>'
+        + '<button data-act="merge" data-si="'+i+'">⊞ Unir</button>'
       + '</div>'
       + '</div>');
   });
@@ -7589,6 +7668,7 @@ function renderLibretoBlocks(){
     }
     if(act==='compress'){ libTextTool(si); return; }   // ajustar texto (comprimir/expandir + sílabas)
     if(act==='split'){ libSplitTool(si); return; }      // dividir el parlamento en dos cajas
+    if(act==='merge'){ libMergeTool(si); return; }       // unir con la caja siguiente
     if(act==='pause' || act==='accent'){
       // activar/desactivar el modo; el modo aplica a TODAS las cajas
       const already = pop2.markMode===act && pop2.markSi===si;
@@ -8453,7 +8533,8 @@ try{
     }
   });
 }catch(e){}
-function isTablet(){ return sync.isOn && sync.role==='tablet'; }
+function isTablet(){ return sync.isOn && (sync.role==='tablet' || sync.role==='talent'); }
+function isTalent(){ return DEVROLE==='talent'; }
 function isMirror(){ return sync.isOn && sync.role==='pc'; }
 
 function updateSyncUI(){
