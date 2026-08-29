@@ -1475,7 +1475,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.15.1-nube · 28-ago-2026';
+const APP_VERSION = 'v10.15.2-nube · 28-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -5515,13 +5515,15 @@ async function refreshOpenEpisodeFromCloud(){
 /* ===== 🧪 PRUEBA DE LA NUBE: avisa si Supabase bloquea el guardado ===== */
 async function storageProbe(){
   if(!sb || !sbUser) return null;
-  const path = '_diag/probe-'+Math.random().toString(36).slice(2)+'.txt';
+  // carpeta propia del usuario: las políticas del bucket solo permiten
+  // _diag/<user_id>/ y <show_id>/<ep_id>/ de sus workspaces (seguridad-03)
+  const path = '_diag/'+sbUser.id+'/probe-'+Math.random().toString(36).slice(2)+'.txt';
   try{
     const { error } = await sb.storage.from('libretos').upload(path, new Blob(['ok']), { upsert:true });
     if(error){
       const rls = /row-level security|violates|policy/i.test(error.message||'');
       showStorageWarn(rls
-        ? 'Faltan los permisos del bucket. Corre <b>storage_setup.sql</b> en Supabase → SQL Editor (1 minuto, una sola vez) o sigue INSTRUCCIONES_STORAGE.md. Mientras tanto, cada equipo solo ve sus archivos locales.'
+        ? 'Faltan los permisos del bucket. Corre <b>sql/seguridad-03-bucket-libretos.sql</b> en Supabase → SQL Editor (1 minuto, una sola vez). Mientras tanto, cada equipo solo ve sus archivos locales.'
         : 'No se pudo escribir en el almacenamiento: '+esc(error.message||''));
       return false;
     }
