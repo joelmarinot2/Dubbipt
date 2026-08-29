@@ -1,0 +1,19 @@
+# Solo se despliega lo que la app necesita en el navegador:
+#   index.html, config.js, sw.js, manifest.json, iconos.
+# Todo lo demás son esquemas, documentación, diseños y código no usado
+# (auditoría 28-ago-2026, hallazgo S11: los .sql se servían públicamente).
+.git
+sql/
+*.sql
+*.md
+*.pdf
+*.dc.html
+support.js
+doc-page.js
+auth.js
+desglose-auto.js
+settings.json
+settings.local.json
+manifest.webmanifest
+retropix.ttf
+Dubbipt-main/
