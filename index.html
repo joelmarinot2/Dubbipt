@@ -1475,7 +1475,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.15.0-nube · 28-ago-2026';
+const APP_VERSION = 'v10.15.1-nube · 28-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -4439,7 +4439,8 @@ async function showAccountProfile(){
   let hasProfiles = false;
   try{
     const { data, error } = await sb.from('profiles').select('*').eq('id', sbUser.id).single();
-    if(!error && data){ hasProfiles = true; name0 = data.full_name || name0; role0 = data.role || role0; }
+    // solo el nombre: profiles.role es el rol de permisos, no el cargo que se muestra aquí
+    if(!error && data){ hasProfiles = true; name0 = data.full_name || name0; }
   }catch(e){}
 
   const initials = topbarInitials();
@@ -4506,9 +4507,12 @@ async function showAccountProfile(){
       // 1) metadata de la sesión (siempre disponible)
       const { error: e1 } = await sb.auth.updateUser({ data: { full_name: name, role: role } });
       if(e1) throw e1;
-      // 2) tabla profiles (si el proyecto la tiene)
+      // 2) tabla profiles (si el proyecto la tiene). Solo el nombre: la columna
+      //    profiles.role es el rol de PERMISOS (member/casting/admin) y se asigna
+      //    únicamente desde SQL; el "cargo" que escribe el usuario queda en los
+      //    metadatos de sesión (paso 1) y no otorga nada.
       if(hasProfiles){
-        try{ await sb.from('profiles').update({ full_name: name, role: role }).eq('id', sbUser.id); }
+        try{ await sb.from('profiles').update({ full_name: name }).eq('id', sbUser.id); }
         catch(e){ console.warn('profiles update', e); }
       }
       // refresca estado local + barra superior
