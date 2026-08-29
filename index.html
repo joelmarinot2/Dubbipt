@@ -4,10 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Desglose Digital de Libreto</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.2/mammoth.browser.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Librerías fijadas por versión + hash SRI (auditoría S10): si el CDN sirviera
+     otro contenido, el navegador lo rechaza en vez de ejecutarlo. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.2/mammoth.browser.min.js" integrity="sha384-0H61yoxfMKjbSjFlpDEsx93BrLviZfSpurY4HWlCB4/moYeBGlCUqx2OBP8PqXog" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4/dist/umd/supabase.js" integrity="sha384-ysv13JVP3fufiEXfjML9OdCa/rRbMJvUBOWyor82wfuK8INNZAvmbxHgKIHi+oqz" crossorigin="anonymous"></script>
 <script src="./config.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
@@ -1475,7 +1477,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.15.2-nube · 28-ago-2026';
+const APP_VERSION = 'v10.16.0-nube · 28-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -2345,34 +2347,74 @@ const _progDirty = new Set();
 function progTouched(k){ _progDirty.add(k); }
 let _cloudTmr = null;
 let _rpcProgress = true;
+let _cloudPending = null;   // { epId, obj, keys } — instantánea del guardado programado
 function cloudSaveProgress(){
   if(!sb || !currentEp) return;
+  // B4 (auditoría): INSTANTÁNEA al programar. Capítulo, progreso y claves tocadas
+  // se capturan AHORA. Si el usuario cambia de capítulo antes de los 800 ms, el
+  // guardado sigue yendo al capítulo correcto y NO manda lápidas (null) al nuevo.
+  const obj = {}; for(const k in progress) obj[k] = [...progress[k]];
+  if(charMerges && Object.keys(charMerges).length) obj._merges = JSON.stringify(charMerges);
+  const keys = [..._progDirty]; _progDirty.clear();
+  if(_cloudPending && _cloudPending.epId !== currentEp.id) _cloudFlushPending();   // pendiente de OTRO capítulo: mandarlo ya
+  const prevKeys = (_cloudPending && _cloudPending.epId === currentEp.id) ? _cloudPending.keys : [];
+  _cloudPending = { epId: currentEp.id, obj, keys: [...new Set([...prevKeys, ...keys])] };
   clearTimeout(_cloudTmr);
-  _cloudTmr = setTimeout(async ()=>{
-    try{
-      const obj = {}; for(const k in progress) obj[k] = [...progress[k]];
-      if(charMerges && Object.keys(charMerges).length) obj._merges = JSON.stringify(charMerges);
-      if(_rpcProgress){
-        // parche = claves tocadas; las presentes llevan su Set, las eliminadas
-        // llevan null (tombstone) para que el servidor las BORRE. Antes las
-        // desmarcas nunca viajaban y otros equipos las conservaban para siempre.
-        const patch = {};
-        for(const k of _progDirty){
-          if(obj[k]!==undefined) patch[k] = obj[k];
-          else patch[k] = null;
-        }
-        _progDirty.clear();
-        const { error } = await sb.rpc('merge_episode_progress', { p_id: currentEp.id, p_patch: Object.keys(patch).length?patch:obj });
-        if(error){
-          if(error.code==='PGRST202' || /function .* does not exist/i.test(error.message||'')) _rpcProgress = false;
-          else throw error;
-        }
+  _cloudTmr = setTimeout(_cloudFlushPending, 800);
+}
+async function _cloudFlushPending(){
+  const p = _cloudPending; if(!p) return;
+  _cloudPending = null; clearTimeout(_cloudTmr);
+  try{
+    if(_rpcProgress){
+      // parche = claves tocadas; las presentes llevan su Set, las eliminadas
+      // llevan null (tombstone) para que el servidor las BORRE.
+      const patch = {};
+      for(const k of p.keys) patch[k] = (p.obj[k]!==undefined) ? p.obj[k] : null;
+      const { error } = await sb.rpc('merge_episode_progress', { p_id: p.epId, p_patch: p.keys.length ? patch : p.obj });
+      if(error){
+        if(error.code==='PGRST202' || /function .* does not exist/i.test(error.message||'')) _rpcProgress = false;
+        else throw error;
       }
-      if(!_rpcProgress){
-        await sb.from('episodes').update({ progress: obj }).eq('id', currentEp.id);
-      }
-    }catch(e){ console.error(e); }
-  }, 800);
+    }
+    if(!_rpcProgress){
+      await sb.from('episodes').update({ progress: p.obj }).eq('id', p.epId);
+    }
+  }catch(e){
+    console.error(e);
+    // fallo transitorio: las claves vuelven a estar sucias y se reintenta
+    if(currentEp && currentEp.id === p.epId){
+      p.keys.forEach(k=> _progDirty.add(k));
+      clearTimeout(_cloudTmr); _cloudTmr = setTimeout(cloudSaveProgress, 5000);
+    }
+    if(typeof DDL_UI!=='undefined') DDL_UI.toast('No se pudo guardar el progreso en la nube; reintentando…', {kind:'err'});
+  }
+}
+// Token de sesión de forma síncrona (para el vaciado al cerrar la pestaña):
+// supabase-js lo guarda en localStorage bajo sb-<ref>-auth-token.
+function _sbTokenSync(){
+  try{ if(window._sbAccessToken) return window._sbAccessToken; }catch(e){}
+  try{
+    const ref = (window.SUPA && window.SUPA.url || '').replace(/^https?:\/\//,'').split('.')[0];
+    const raw = localStorage.getItem('sb-'+ref+'-auth-token'); if(!raw) return null;
+    const j = JSON.parse(raw); return (j && (j.access_token || (j.currentSession && j.currentSession.access_token))) || null;
+  }catch(e){ return null; }
+}
+// Vaciado inmediato sin esperar (beforeunload / pestaña oculta): fetch keepalive
+// sobrevive al cierre de la pestaña; el cliente de supabase-js no.
+function cloudFlushProgressNow(){
+  const p = _cloudPending; if(!p || !_rpcProgress) return;
+  const tok = _sbTokenSync(); if(!tok || !window.SUPA) return;
+  _cloudPending = null; clearTimeout(_cloudTmr);
+  const patch = {};
+  for(const k of p.keys) patch[k] = (p.obj[k]!==undefined) ? p.obj[k] : null;
+  try{
+    fetch(window.SUPA.url+'/rest/v1/rpc/merge_episode_progress', {
+      method:'POST', keepalive:true,
+      headers:{ apikey: window.SUPA.anonKey, Authorization:'Bearer '+tok, 'Content-Type':'application/json' },
+      body: JSON.stringify({ p_id: p.epId, p_patch: p.keys.length ? patch : p.obj })
+    }).catch(()=>{});
+  }catch(e){}
 }
 async function cloudLoadProgress(){
   if(!sb || !currentEp) return;
@@ -2436,8 +2478,10 @@ function flashSaved(){
   clearTimeout(flashSaved._t);
   flashSaved._t = setTimeout(()=>{ if(el.textContent==='💾 guardado') el.textContent = prev.startsWith('💾')?'':prev; }, 1100);
 }
-window.addEventListener('beforeunload', ()=>{ saveProgress(); saveUI(true); });
-document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ saveProgress(); saveUI(true); } });
+// B4 (auditoría): al cerrar u ocultar la pestaña, el guardado programado se manda
+// YA con fetch keepalive (antes solo se re-armaba el temporizador y se perdía).
+window.addEventListener('beforeunload', ()=>{ saveProgress(); saveUI(true); try{ cloudFlushProgressNow(); }catch(e){} });
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden){ saveProgress(); saveUI(true); try{ cloudFlushProgressNow(); }catch(e){} } });
 
 /* ================= carga de archivos ================= */
 function bindDrop(dropId, inputId, handler){
@@ -3581,6 +3625,9 @@ function renderCards(){
         const val = inp.value.trim();
         c.talent = val;
         c.noRec = (typeof NO_REC!=='undefined') ? NO_REC.has((typeof norm==='function'?norm(val):val)) : false;
+        // B1 (auditoría): applyCharMerges() reconstruye chars desde _charsRaw al
+        // reabrir; si el talento no está también en el crudo, se pierde.
+        try{ const raw = (window._charsRaw||[]).find(x=> x.key===c.key); if(raw){ raw.talent = val; raw.noRec = c.noRec; } }catch(e){}
         // persistir en Supabase si hay episodio abierto
         try{
           if(typeof currentEp!=='undefined' && currentEp && currentEp.id && typeof epDataUpsert==='function')
@@ -4607,7 +4654,9 @@ function showDesgloseReview(epName, onSave){
   ov.querySelector('#drvSave').onclick=async ()=>{
     const alive = rows.filter(r=>!r.del);
     const keep = new Set(alive.map(r=>r.key));
-    alive.forEach(r=>{ const c=charIdx[r.key]; if(c){ c.talent=(r.talent||'').trim(); c.noRec=NO_REC.has(norm(c.talent)); } });
+    alive.forEach(r=>{ const c=charIdx[r.key]; if(c){ c.talent=(r.talent||'').trim(); c.noRec=NO_REC.has(norm(c.talent));
+      // B1 (auditoría): reflejar también en el crudo, que es de donde se reconstruye al reabrir
+      try{ const raw=(window._charsRaw||[]).find(x=> x.key===c.key); if(raw){ raw.talent=c.talent; raw.noRec=c.noRec; } }catch(e){} } });
     chars = chars.filter(c=>keep.has(c.key));
     charIdx={}; chars.forEach(c=>charIdx[c.key]=c);
     { const _sa = script || []; const _sd = _sa.filter(b=>keep.has(b.key)); remapSyncMarks(_sa, _sd); script = _sd; }
@@ -4909,17 +4958,53 @@ function hydrateEpisode(d){ _epOpen(true);
   // mientras el motor nuevo genera "OBRIEN". Se unifican aquí para que la comparación
   // b.key === highlight siempre funcione, independientemente de cuándo se guardó el capítulo.
   const normalizeKey = (k) => (typeof norm==='function' && k) ? norm(k) : k;
-  chars = (d.chars || []).map(c=> ({ ...c, key: normalizeKey(c.key) }));
+  // SANEADO (auditoría S7): estos datos vienen de la nube / IndexedDB y pudo
+  // escribirlos otro cliente. Lo que se concatena en HTML como número o color
+  // se fuerza a su tipo, y el color SIEMPRE se recalcula (nunca se confía en el
+  // guardado). Solo se coaccionan campos presentes para no cambiar semántica.
+  const num = (v)=>{ const n = Number(v); return Number.isFinite(n) ? n : 0; };
+  const str = (v)=> (v==null ? '' : String(v));
+  const numIf = (o, k)=>{ if(o[k]!==undefined) o[k] = num(o[k]); };
+  const sanChar = (c)=>{
+    if(!c || typeof c!=='object') return null;
+    const key = normalizeKey(str(c.key));
+    const o = { ...c, key, display: str(c.display || c.key), talent: str(c.talent),
+      color: (typeof charColor==='function') ? charColor(key) : c.color,
+      pages: Array.isArray(c.pages) ? c.pages.filter(p=>p&&typeof p==='object').map(p=> ({ ...p, p: num(p.p)|0, ints: num(p.ints)|0 })) : [] };
+    numIf(o,'totalInts'); numIf(o,'total');
+    if(o.aliases!==undefined && !Array.isArray(o.aliases)) o.aliases = [];
+    return o;
+  };
+  const sanBlock = (b)=>{
+    if(!b || typeof b!=='object') return null;
+    const o = { ...b, lines: Array.isArray(b.lines) ? b.lines.map(str) : [] };
+    if(b.key) o.key = normalizeKey(str(b.key));
+    if(b.who!==undefined) o.who = str(b.who);
+    numIf(o,'page'); numIf(o,'idx'); numIf(o,'tcSec'); numIf(o,'tcEff');
+    return o;
+  };
+  chars = (Array.isArray(d.chars) ? d.chars : []).map(sanChar).filter(Boolean);
   charIdx = {}; chars.forEach(c=> charIdx[c.key] = c);
-  numPages = d.numPages || 0;
-  pdfDoc = null; pdfName = d.pdfName || 'libreto.pdf';
-  xlsFileName = d.xlsName || 'desglose.xlsm';
+  numPages = num(d.numPages)|0;
+  pdfDoc = null; pdfName = str(d.pdfName) || 'libreto.pdf';
+  xlsFileName = str(d.xlsName) || 'desglose.xlsm';
   occByChar = {}; pageData = {}; charMarks = {};
-  tcIndex = d.tcIndex || [];
-  script = (d.script || []).map(b=> b.key ? { ...b, key: normalizeKey(b.key) } : b);
+  tcIndex = Array.isArray(d.tcIndex) ? d.tcIndex : [];
+  script = (Array.isArray(d.script) ? d.script : []).map(sanBlock).filter(Boolean);
   scriptByKey = {};
   script.forEach(b=>{ if(b.key) (scriptByKey[b.key] = scriptByKey[b.key] || []).push(b.idx); });
-  window._charsRaw = (d.charsRaw || chars.map(c=> ({...c, pages:(c.pages||[]).map(p=>({...p}))}))).map(c=>({...c, key:normalizeKey(c.key)}));
+  window._charsRaw = (Array.isArray(d.charsRaw) ? d.charsRaw : chars.map(c=> ({...c, pages:(c.pages||[]).map(p=>({...p}))}))).map(sanChar).filter(Boolean);
+  // B3 (auditoría): al cambiar de capítulo, las marcas del anterior no deben
+  // pintarse ni guardarse en el nuevo. Solo cuando el capítulo REALMENTE cambia
+  // (si se rehidrata el mismo capítulo, se conservan las marcas en memoria).
+  try{
+    const epNow = currentEp ? currentEp.id : null;
+    if(typeof sync!=='undefined' && sync && window._marksEpId !== epNow){
+      sync.marks = {};
+      if(typeof _marksDirty!=='undefined') _marksDirty.clear();
+      window._marksEpId = epNow;
+    }
+  }catch(e){}
   if(typeof buildPronIndex==='function') buildPronIndex();
   window._script = script;
 }
@@ -5367,7 +5452,7 @@ async function saveEpHere(){
     const epId = esNuevo ? uid() : currentEp.id;
     const base = LDB.showId+'/'+epId+'/';
     let xlsPath=null, pdfPath=null;
-    const rlsMsg = (que)=>'❌ Supabase está BLOQUEANDO la subida de '+que+' (permisos del almacenamiento). Corre storage_setup.sql en SQL Editor — o sigue INSTRUCCIONES_STORAGE.md (2 min, una sola vez).';
+    const rlsMsg = (que)=>'❌ Supabase está BLOQUEANDO la subida de '+que+' (permisos del almacenamiento). Corre sql/seguridad-03-bucket-libretos.sql en SQL Editor (1 min, una sola vez).';
     if(lastXlsBuf){
       xlsPath = base+'desglose.xlsm';
       const { error:eX } = await sb.storage.from('libretos').upload(xlsPath, new Blob([lastXlsBuf]), {upsert:true});
@@ -6792,9 +6877,8 @@ function buildLibretoDoc(pc){
   if($t('tClear')) $t('tClear').addEventListener('click', ()=>{
     const vi = pop2.activeBlock; if(vi<0) return;
     const si = pop2.blockMap[vi];
-    delete sync.marks[si];
-    syncSendMark(si, { text:null, pauses:[], accents:[] });
-    delete sync.marks[si]; refreshBlock(si);
+    // B2 (auditoría): lápida en vez de delete, para que el borrado llegue a la nube
+    syncSendMark(si, { text:null, pauses:[], accents:[], draw:[], gmk:[] });
   });
   if($t('tHide')) $t('tHide').addEventListener('click', ()=>{
     d.body.classList.add('rclosed');
@@ -7397,7 +7481,7 @@ async function libDoSplit(si, t1, t2, tcSec){
   try{ scriptByKey = {}; for(let i=0;i<script.length;i++){ const k=script[i].key; if(k){ (scriptByKey[k]=scriptByKey[k]||[]).push(i); } } }catch(e){}
   try{ pop2._hiVi=null; renderLibretoBlocks(); renderLibretoChips(); }catch(e){}
   // persistir: script nuevo + marcas re-indexadas (reemplazo COMPLETO, no merge)
-  try{ if(typeof epDataUpsert==='function') await epDataUpsert(currentEp.id, currentEp.show_id); }catch(e){}
+  try{ if(typeof epDataUpsert==='function') await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}   // B5: era .show_id (no existe) → guardaba NULL
   try{ if(sb && currentEp) await sb.from('episodes').update({ marks: sync.marks }).eq('id', currentEp.id); }catch(e){}
   // sincronizar al otro dispositivo: que re-hidrate el capítulo con la nueva estructura
   try{ if(sync.isOn && sync.channel && typeof syncEmit==='function') syncEmit('reload', { epId: currentEp.id }, true); }catch(e){}
@@ -7451,7 +7535,7 @@ async function libDoMerge(si, mergedText){
   }
   try{ scriptByKey = {}; for(let i=0;i<script.length;i++){ const k=script[i].key; if(k){ (scriptByKey[k]=scriptByKey[k]||[]).push(i); } } }catch(e){}
   try{ pop2._hiVi=null; renderLibretoBlocks(); renderLibretoChips(); }catch(e){}
-  try{ if(typeof epDataUpsert==='function') await epDataUpsert(currentEp.id, currentEp.show_id); }catch(e){}
+  try{ if(typeof epDataUpsert==='function') await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}   // B5: era .show_id (no existe) → guardaba NULL
   try{ if(sb && currentEp) await sb.from('episodes').update({ marks: sync.marks }).eq('id', currentEp.id); }catch(e){}
   try{ if(sync.isOn && sync.channel && typeof syncEmit==='function') syncEmit('reload', { epId: currentEp.id }, true); }catch(e){}
   try{ if(typeof DDL_UI!=='undefined' && DDL_UI.toast) DDL_UI.toast('Cajas unidas', {kind:'ok'}); }catch(e){}
@@ -7748,10 +7832,10 @@ function renderLibretoBlocks(){
     }
     if(act==='clear'){
       setMarkMode(null);
-      delete sync.marks[si];
-      syncSendMark(si, { text:null, pauses:[], accents:[] });
-      delete sync.marks[si];
-      refreshBlock(si);
+      // B2 (auditoría): sin `delete` — una "lápida" con todo vacío es lo que el
+      // merge de la nube puede aplicar; borrando la clave, el parche no la incluía
+      // y las pausas volvían al recargar.
+      syncSendMark(si, { text:null, pauses:[], accents:[], draw:[], gmk:[] });
     }
   };
   const wireFresh = ()=>{
@@ -8618,6 +8702,7 @@ try{
   sb.auth.onAuthStateChange((ev, session)=>{
     if((ev==='TOKEN_REFRESHED'||ev==='SIGNED_IN') && session && sb.realtime && sb.realtime.setAuth){
       try{ sb.realtime.setAuth(session.access_token); }catch(e){}
+      try{ window._sbAccessToken = session.access_token; }catch(e){}   // para cloudFlushProgressNow (síncrono)
     }
   });
 }catch(e){}
@@ -9569,23 +9654,36 @@ function onRemoteMark(p){
 }
 function cloudSaveMarks(){
   if(!sb || !currentEp) return;
+  // B3/B8 (auditoría): INSTANTÁNEA al programar. El capítulo y las marcas se
+  // capturan AHORA: si el usuario cambia de capítulo antes de los 400 ms, el
+  // guardado sigue yendo al capítulo correcto con sus marcas, no al nuevo.
+  const epId = currentEp.id;
+  const dirty = [..._marksDirty];
+  const clone = (o)=> JSON.parse(JSON.stringify(o));
+  const patch = {}; for(const si of dirty) if(sync.marks[si]!==undefined) patch[si] = clone(sync.marks[si]);
+  const full = clone(sync.marks);
   clearTimeout(sync._saveTmr);
   sync._saveTmr = setTimeout(async ()=>{
     try{
       if(_rpcMarks){
-        const patch = {};
-        for(const si of _marksDirty) if(sync.marks[si]!==undefined) patch[si] = sync.marks[si];
-        _marksDirty.clear();
-        const { error } = await sb.rpc('merge_episode_marks', { p_id: currentEp.id, p_patch: Object.keys(patch).length?patch:sync.marks });
+        const { error } = await sb.rpc('merge_episode_marks', { p_id: epId, p_patch: Object.keys(patch).length?patch:full });
         if(error){
           if(error.code==='PGRST202' || /function .* does not exist/i.test(error.message||'')) _rpcMarks = false;
           else throw error;
         }
       }
       if(!_rpcMarks){
-        await sb.from('episodes').update({ marks: sync.marks }).eq('id', currentEp.id);
+        await sb.from('episodes').update({ marks: full }).eq('id', epId);
       }
-    }catch(e){ console.error(e); }
+      // solo tras el éxito, y solo si seguimos en el mismo capítulo (las claves
+      // "sucias" del capítulo nuevo no se tocan)
+      if(currentEp && currentEp.id===epId) dirty.forEach(si=> _marksDirty.delete(si));
+    }catch(e){
+      console.error(e);
+      // fallo transitorio (red/sesión): las claves siguen sucias → reintento
+      if(currentEp && currentEp.id===epId){ clearTimeout(sync._saveTmr); sync._saveTmr = setTimeout(()=> cloudSaveMarks(), 5000); }
+      try{ libMsg('⚠️ No se pudieron guardar las marcas en la nube; reintentando…'); }catch(_){}
+    }
   }, 400);
 }
 async function loadCloudMarks(){

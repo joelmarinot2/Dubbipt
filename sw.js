@@ -1,5 +1,5 @@
 // Service Worker · Dubbipt  (VERSION autogenerada en cada build)
-const VERSION = '2026-08-28T23:40';
+const VERSION = '2026-08-29T00:30';
 const CACHE   = 'dubbipt-' + VERSION;
 
 const SHELL = [
@@ -9,7 +9,7 @@ const SHELL = [
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
   'https://cdn.jsdelivr.net/npm/mammoth@1.7.2/mammoth.browser.min.js',
-  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+  'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4/dist/umd/supabase.js'
 ];
 
 async function networkFirst(req) {
