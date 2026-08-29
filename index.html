@@ -6296,6 +6296,14 @@ body.light .blk .tx .wd.pr{color:#0E7490}
 body.marking .blk.active .tx .wd{cursor:pointer;background:rgba(95,200,90,.10)}
 body.marking[data-mode='pause'] .blk.active .tx .wd:hover{background:rgba(245,158,11,.3);box-shadow:-3px 0 0 #F59E0B}
 body.marking[data-mode='accent'] .blk.active .tx .wd:hover{background:rgba(95,200,90,.3)}
+/* borrar pausas una a una: la «/» se vuelve tocable (también en modo pausa) */
+body.marking[data-mode='pause'] .blk.active .tx .pause,
+body.marking[data-mode='unpause'] .blk.active .tx .pause{cursor:pointer;border-radius:4px;padding:0 6px}
+body.marking[data-mode='pause'] .blk.active .tx .pause:hover,
+body.marking[data-mode='unpause'] .blk.active .tx .pause:hover{background:rgba(239,68,68,.35);color:#EF4444;text-decoration:line-through}
+body.marking[data-mode='unpause'] .blk.active .tx .wd{background:none;cursor:default}
+body.marking[data-mode='unpause'] .blk.active .tx .pause{background:rgba(245,158,11,.18);box-shadow:0 0 0 1px rgba(245,158,11,.5)}
+.mtools button[data-act='unpause'].on, .mtools button[data-act='pause'].on, .mtools button[data-act='accent'].on{background:#F59E0B;color:#1a1200;border-color:transparent;font-weight:700}
 .blk .tx[contenteditable="true"]{outline:2px dashed var(--pc,#5FC85A);outline-offset:4px;border-radius:6px;padding:4px}
 .blk .mtools{display:none;gap:6px;margin-top:9px;flex-wrap:wrap}
 .blk.active .mtools{display:flex}
@@ -6643,6 +6651,7 @@ function buildLibretoDoc(pc){
       <div class="tt">Marcar</div>
       <button id="tEdit">${LIB_ICON.edit} Editar</button>
       <button id="tPause">/ Pausa</button>
+      <button id="tUnpause" title="Borrar pausas una a una">✕ Pausa</button>
       <button id="tAccent">á Acento</button>
       <button id="tClear">Limpiar</button>
       <button id="tPron">${LIB_ICON.speak} Pronunc.</button>
@@ -6751,31 +6760,29 @@ function buildLibretoDoc(pc){
     }
   });
   if(tTCi) tTCi.addEventListener('keydown', ev=>{ if(ev.key==='Enter') tGo.click(); });
-  const tEdit = $t('tEdit'), tP = $t('tPause'), tA = $t('tAccent');
+  const tEdit = $t('tEdit'), tP = $t('tPause'), tA = $t('tAccent'), tU = $t('tUnpause');
+  const tModeBtns = [tP, tA, tU].filter(Boolean);
+  const tSetMode = (btn, mode)=>{
+    if(pop2.editMode && tEdit) tEdit.click();
+    const on = pop2.markMode===mode;
+    setMarkMode(on?null:mode, null);
+    tModeBtns.forEach(b=> b.classList.toggle('on', b===btn && !on));
+  };
   if(tEdit) tEdit.addEventListener('click', ()=>{
     if(pop2.editMode){
       saveEditBox(); pop2.editMode = false;
       tEdit.classList.remove('on'); tEdit.innerHTML = LIB_ICON.edit + ' Editar';
       pop2.els.live.textContent = '';
     } else {
-      setMarkMode(null); if(tP) tP.classList.remove('on'); if(tA) tA.classList.remove('on');
+      setMarkMode(null); tModeBtns.forEach(b=> b.classList.remove('on'));
       pop2.editMode = true;
       tEdit.classList.add('on'); tEdit.textContent = '✓ Guardar';
       pop2.els.live.textContent = 'toca la intervención a editar';
     }
   });
-  if(tP) tP.addEventListener('click', ()=>{
-    if(pop2.editMode && tEdit) tEdit.click();
-    const on = pop2.markMode==='pause';
-    setMarkMode(on?null:'pause', null);
-    tP.classList.toggle('on', !on); if(tA) tA.classList.remove('on');
-  });
-  if(tA) tA.addEventListener('click', ()=>{
-    if(pop2.editMode && tEdit) tEdit.click();
-    const on = pop2.markMode==='accent';
-    setMarkMode(on?null:'accent', null);
-    tA.classList.toggle('on', !on); if(tP) tP.classList.remove('on');
-  });
+  if(tP) tP.addEventListener('click', ()=> tSetMode(tP, 'pause'));
+  if(tU) tU.addEventListener('click', ()=> tSetMode(tU, 'unpause'));
+  if(tA) tA.addEventListener('click', ()=> tSetMode(tA, 'accent'));
   if($t('tClear')) $t('tClear').addEventListener('click', ()=>{
     const vi = pop2.activeBlock; if(vi<0) return;
     const si = pop2.blockMap[vi];
@@ -7203,12 +7210,56 @@ function libDrawRenderAll(){
   if(!pop2.doc || !pop2.els || !pop2.els.blocks) return;
   pop2.els.blocks.querySelectorAll('.blk').forEach(blk=>{ if(libDrawStrokes(+blk.dataset.si) || libDrawGmk(+blk.dataset.si)) libDrawRenderBlock(blk); });
 }
+// punto normalizado (0-1) del canvas → coordenadas de pantalla
+function _libCanvasPt(blk, pt){
+  const cv = blk.querySelector('.blk-canvas'); if(!cv) return null;
+  const r = cv.getBoundingClientRect();
+  return [ r.left + pt[0]*r.width, r.top + pt[1]*r.height ];
+}
+// Gesto de pausa → hueco entre palabras más cercano al trazo.
+// Devuelve el índice wi ANTES del cual va la «/» (igual que el modo «/ Pausa»),
+// o null si la caja no tiene palabras (entonces se cae al símbolo flotante).
+function libGestureWordSlot(blk, cx, cy){
+  const sp = _libCanvasPt(blk, [cx, cy]); if(!sp) return null;
+  const px = sp[0], py = sp[1];
+  const wds = blk.querySelectorAll('.tx .wd'); if(!wds.length) return null;
+  const rects = [];
+  wds.forEach(w=>{ for(const rc of w.getClientRects()){ if(rc.width>0) rects.push({ wi:+w.dataset.wi, l:rc.left, r:rc.right, t:rc.top, b:rc.bottom }); } });
+  if(!rects.length) return null;
+  // 1) la línea que contiene el trazo; si cae entre líneas, la más cercana
+  let line = rects.filter(q=> py>=q.t && py<=q.b);
+  if(!line.length){
+    let best=Infinity, cyBest=0;
+    for(const q of rects){ const d=Math.abs((q.t+q.b)/2 - py); if(d<best){ best=d; cyBest=(q.t+q.b)/2; } }
+    line = rects.filter(q=> Math.abs((q.t+q.b)/2 - cyBest) < 2);
+  }
+  line.sort((a,b)=>a.l-b.l);
+  // 2) el hueco: antes de la primera palabra cuyo centro queda a la derecha del trazo
+  for(const q of line){ if(px < (q.l+q.r)/2) return q.wi; }
+  return line[line.length-1].wi + 1;   // tras la última palabra de la línea
+}
+// Borrador del pincel: también quita la «/» de texto que se toque
+function libDrawErasePauseAt(si, blk, pt){
+  const m = sync.marks && sync.marks[si]; if(!m || !m.pauses || !m.pauses.length) return false;
+  const sp = _libCanvasPt(blk, pt); if(!sp) return false;
+  const PAD = 6;
+  for(const el of blk.querySelectorAll('.tx .pause')){
+    const rc = el.getBoundingClientRect();
+    if(sp[0]>=rc.left-PAD && sp[0]<=rc.right+PAD && sp[1]>=rc.top-PAD && sp[1]<=rc.bottom+PAD){
+      const wi = +el.dataset.wi;
+      syncSendMark(si, { pauses: m.pauses.filter(w=>w!==wi) });
+      return true;
+    }
+  }
+  return false;
+}
 function libDrawEraseAt(si, blk, pt){
   const strokes = libDrawStrokes(si); const gmk = libDrawGmk(si);
   let changed = false;
   if(strokes){ const keep = strokes.filter(s=> !(s.p||[]).some(q=> Math.abs(q[0]-pt[0])<0.03 && Math.abs(q[1]-pt[1])<0.06 )); if(keep.length!==strokes.length){ if(!sync.marks[si]) sync.marks[si]={}; sync.marks[si].draw=keep; changed=true; } }
   if(gmk){ const keepG = gmk.filter(g=> !(Math.abs(g.x-pt[0])<0.06 && Math.abs(g.y-pt[1])<0.4)); if(keepG.length!==gmk.length){ if(!sync.marks[si]) sync.marks[si]={}; sync.marks[si].gmk=keepG; changed=true; } }
   if(changed){ libDrawRenderBlock(blk); blk._eraseDirty = si; }
+  try{ libDrawErasePauseAt(si, blk, pt); }catch(e){}
 }
 function libDrawClearAll(){
   if(typeof sync==='undefined' || !sync.marks) return;
@@ -7266,9 +7317,22 @@ function libDrawSetup(d){
       if(g){
         // gesto reconocido → guardar marca semántica (pausa / rápido / lento) en vez del trazo
         let cx=0,cy=0; for(const q of cur.p){ cx+=q[0]; cy+=q[1]; } cx/=cur.p.length; cy/=cur.p.length;
-        const m0=(sync.marks&&sync.marks[drawSi])||{}; const gmk=Array.isArray(m0.gmk)?m0.gmk.slice():[];
-        gmk.push({ k:g, x:Math.round(cx*1000)/1000, y:Math.round(cy*1000)/1000 });
-        if(typeof syncSendMark==='function') syncSendMark(drawSi, { gmk });
+        const m0=(sync.marks&&sync.marks[drawSi])||{};
+        // PAUSA: se ancla al texto (hueco entre palabras más cercano al trazo) igual
+        // que el modo «/ Pausa» — antes quedaba como símbolo flotante sobre el canvas
+        const slot = (g==='pause') ? libGestureWordSlot(curBlk, cx, cy) : null;
+        if(slot!=null){
+          const set = new Set(m0.pauses||[]); set.add(slot);
+          if(typeof syncSendMark==='function') syncSendMark(drawSi, { pauses:[...set].sort((a,b)=>a-b) });
+          try{
+            const w = curBlk.querySelector('.tx .wd[data-wi="'+slot+'"]');
+            if(pop2.els && pop2.els.live) pop2.els.live.textContent = w ? '/ pausa antes de «'+w.textContent+'»' : '/ pausa al final';
+          }catch(e){}
+        } else {
+          const gmk=Array.isArray(m0.gmk)?m0.gmk.slice():[];
+          gmk.push({ k:g, x:Math.round(cx*1000)/1000, y:Math.round(cy*1000)/1000 });
+          if(typeof syncSendMark==='function') syncSendMark(drawSi, { gmk });
+        }
       } else {
         const m=(sync.marks&&sync.marks[drawSi])||{}; const arr=Array.isArray(m.draw)?m.draw.slice():[]; arr.push(cur);
         if(typeof syncSendMark==='function') syncSendMark(drawSi, { draw: arr });
@@ -7597,6 +7661,7 @@ function renderLibretoBlocks(){
         + '<button class="done'+(recDone?' on':'')+'" data-act="done" data-si="'+i+'">'+(recDone?'↩ Quitar':'✓ Completar')+'</button>'
         + '<button class="edit" data-si="'+i+'">'+LIB_ICON.edit+' Editar</button>'
         + '<button data-act="pause" data-si="'+i+'">/ Pausa</button>'
+        + '<button data-act="unpause" data-si="'+i+'" title="Borrar pausas una a una: toca la / que quieres quitar">✕ Pausa</button>'
         + '<button data-act="accent" data-si="'+i+'">á Acento</button>'
         + '<button data-act="clear" data-si="'+i+'">Limpiar</button>'
         + '<button data-act="compress" data-si="'+i+'">'+LIB_ICON.sliders+' Ajustar</button>'
@@ -7669,7 +7734,7 @@ function renderLibretoBlocks(){
     if(act==='compress'){ libTextTool(si); return; }   // ajustar texto (comprimir/expandir + sílabas)
     if(act==='split'){ libSplitTool(si); return; }      // dividir el parlamento en dos cajas
     if(act==='merge'){ libMergeTool(si); return; }       // unir con la caja siguiente
-    if(act==='pause' || act==='accent'){
+    if(act==='pause' || act==='accent' || act==='unpause'){
       // activar/desactivar el modo; el modo aplica a TODAS las cajas
       const already = pop2.markMode===act && pop2.markSi===si;
       setMarkMode(already ? null : act, si);
@@ -7724,15 +7789,31 @@ function renderLibretoBlocks(){
     pop2.els.blocks.dataset.wordWire = '1';
     pop2.els.blocks.addEventListener('click', (ev)=>{
       if(pop2.editMode) return;
+      if(!pop2.markMode) return;
+      // tocar una «/» en modo pausa o ✕ pausa → borrar SOLO esa pausa
+      const ps = ev.target.closest('.pause');
+      if(ps){
+        ev.stopPropagation();
+        const blk = ps.closest('.blk'); const si = +blk.dataset.si;
+        if(pop2.markSi!=null && si!==pop2.markSi) return;
+        if(pop2.markMode==='pause' || pop2.markMode==='unpause'){
+          const wi = +ps.dataset.wi; const m = sync.marks[si] || {};
+          syncSendMark(si, { pauses:(m.pauses||[]).filter(w=>w!==wi) });
+        }
+        return;
+      }
       const wd = ev.target.closest('.wd');
-      if(!wd || !pop2.markMode) return;
+      if(!wd) return;
       ev.stopPropagation();
       const blk = wd.closest('.blk');
       const si = +blk.dataset.si;
       if(pop2.markSi!=null && si!==pop2.markSi) return;   // solo la caja en edición
       const wi = +wd.dataset.wi;
       const m = sync.marks[si] || {};
-      if(pop2.markMode==='pause'){
+      if(pop2.markMode==='unpause'){
+        // tocar la palabra quita la pausa que la precede (si la hay)
+        if((m.pauses||[]).includes(wi)) syncSendMark(si, { pauses:m.pauses.filter(w=>w!==wi) });
+      } else if(pop2.markMode==='pause'){
         const set = new Set(m.pauses||[]);
         set.has(wi) ? set.delete(wi) : set.add(wi);
         syncSendMark(si, { pauses:[...set] });
@@ -7755,10 +7836,11 @@ function setMarkMode(mode, si){
     const on = mode && b.dataset.act===mode && +b.dataset.si===si;
     b.classList.toggle('on', !!on);
     if(b.dataset.act==='pause') b.textContent = on ? '✓ tocando… (/)' : '/ Pausa';
+    if(b.dataset.act==='unpause') b.textContent = on ? '✓ tocando… (✕)' : '✕ Pausa';
     if(b.dataset.act==='accent') b.textContent = on ? '✓ tocando… (á)' : 'á Acento';
   });
   const live = pop2.els && pop2.els.live;
-  if(live && mode) live.textContent = mode==='pause' ? 'Toca dónde va la pausa' : 'Toca la palabra a acentuar';
+  if(live && mode) live.textContent = mode==='pause' ? 'Toca dónde va la pausa' : mode==='unpause' ? 'Toca la / que quieres borrar' : 'Toca la palabra a acentuar';
 }
 
 function setActiveBlock(vi){
@@ -10677,7 +10759,7 @@ function studioAutoMark(){
       }
       cloudSaveMarks();
       if(pop2 && pop2.doc){ try{ changed.forEach(si=> refreshBlock(si)); }catch(e){} }
-      stMsg('✅ Marcado automático: '+added+' pausa'+(added===1?'':'s')+' colocada'+(added===1?'':'s')+' ('+pauses.length+' silencios). Toca una / para borrarla.');
+      stMsg('✅ Marcado automático: '+added+' pausa'+(added===1?'':'s')+' colocada'+(added===1?'':'s')+' ('+pauses.length+' silencios). Con «✕ Pausa» tocas una / para borrarla.');
     }catch(e){ console.error(e); stMsg('⚠️ Error en el marcado: '+(e.message||e)); }
   }, 30);
 }
