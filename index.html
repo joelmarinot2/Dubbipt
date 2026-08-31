@@ -1519,7 +1519,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.18.1-nube · 31-ago-2026';
+const APP_VERSION = 'v10.19.0-nube · 31-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -6620,7 +6620,15 @@ body.mirror .lbar .goto{opacity:.4;pointer-events:none}
 .blk .tx .wd{border-radius:4px;padding:0 1px;transition:background .1s}
 /* audiodescripción: [referencias de diálogo/sonido] — no se narran */
 .blk .tx .wd.cue{color:#7DD3FC;font-style:italic;opacity:.85}
-.blk .tx .wd.acc{text-decoration:underline;text-decoration-color:var(--pc,#5FC85A);text-decoration-thickness:3px;text-underline-offset:3px;font-weight:800}
+/* ACENTO = la palabra se canta más: mayor y en ámbar, para verla de un vistazo
+   desde el atril. Antes solo iba subrayada y se perdía entre el resto. */
+.blk .tx .wd.acc{
+  font-weight:800; font-size:1.24em; color:#FBBF24; letter-spacing:.3px;
+  text-decoration:underline; text-decoration-color:rgba(251,191,36,.55);
+  text-decoration-thickness:2px; text-underline-offset:4px;
+  text-shadow:0 0 14px rgba(251,191,36,.28);
+}
+body.light .blk .tx .wd.acc{ color:#B45309; text-decoration-color:rgba(180,83,9,.5); text-shadow:none; }
 .blk .tx .wd.prn{color:#67E8F9;font-weight:700}
 .blk .tx .wd.pr{color:#22D3EE;font-weight:700}
 body.light .blk .tx .wd.prn{color:#0891B2}
@@ -7026,7 +7034,7 @@ function buildLibretoDoc(pc){
         <button class="lp-c" data-c="#FFFFFF" style="background:#FFFFFF"></button>
       </div>
       <button class="lp-btn" id="lpErase" title="Borrador">Borrar</button>
-      <button class="lp-btn on" id="lpGest" title="Reconocer gestos: raya diagonal = pausa, flecha → = más rápido, flecha ← = más lento">Gestos ✓</button>
+      <button class="lp-btn on" id="lpGest" title="Reconocer gestos: marca ENCIMA de una palabra = acento, raya diagonal = pausa, flecha → = más rápido, flecha ← = más lento">Gestos ✓</button>
       <button class="lp-btn" id="lpClear" title="Limpiar todo el marcado del libreto">Limpiar</button>
       <button class="lp-btn lp-done" id="lpDone" title="Salir del pincel">Listo</button>
     </div>
@@ -7069,6 +7077,11 @@ function buildLibretoDoc(pc){
   d.body.classList.toggle('deskchips', !roleTab);      // escritorio/espejo: páginas a la derecha
   d.body.classList.toggle('is-talent', (typeof isTalent==='function' && isTalent()));   // tablet actor: herramientas limitadas
   try{ updateTalentGate(); }catch(e){}   // …y en espera hasta que el director empiece
+  // Tamaño compartido: el director lo anuncia; el resto lo pide al abrir.
+  try{
+    if(sync.role==='tablet'){ syncSendTool('boxw', pop2.boxw); syncSendTool('font', pop2.mineFs); }
+    else syncSendToolReq();
+  }catch(e){}
   if(typeof isMirror==='function' && isMirror()) d.body.classList.add('mirror');
   const recBtn = d.getElementById('lRec');
   if(recBtn) recBtn.addEventListener('click', ()=> libretoMarkRecorded());
@@ -7235,6 +7248,16 @@ function buildLibretoDoc(pc){
       if(typeof openTrackpad==='function') openTrackpad(pop2.key!==undefined ? pop2.key : null);
     });
   }
+  // Tamaño COMPARTIDO: si el director ya dijo con qué ancho y letra se trabaja,
+  // esta pantalla abre igual. Antes cada dispositivo abría con lo suyo y los
+  // trazos del lápiz caían en posiciones distintas en cada una.
+  try{
+    const L = (typeof libLayout==='function') ? libLayout() : null;
+    if(L && sync.role!=='tablet'){
+      if(L.font) pop2.mineFs = L.font;
+      if(L.boxw){ pop2.boxw = L.boxw; d.documentElement.style.setProperty('--boxw', L.boxw==='full'?'96%':L.boxw+'px'); }
+    }
+  }catch(e){}
   pop2.mineFs = pop2.mineFs || 19;
   const setMineFs = ()=> d.documentElement.style.setProperty('--minefs', pop2.mineFs+'px');
   setMineFs();
@@ -7551,6 +7574,47 @@ function libDrawRenderBlock(blk){
   }
   if(gmk) for(const g of gmk){ libDrawSymbol(ctx, g, cv.width, cv.height, dpr); }
 }
+/* Gesto de ACENTO: una marca hecha JUSTO ENCIMA de una palabra la acentúa.
+   Se resuelve contra el TEXTO (no contra píxeles del canvas), así que cae en la
+   misma palabra aunque las tres pantallas tengan tamaños distintos.
+   Devuelve el índice de palabra, o null si el trazo no está encima de ninguna. */
+function libGestureAccentWord(blk, pts){
+  if(!pts || !pts.length) return null;
+  const P = [];
+  for(const q of pts){ const c = _libCanvasPt(blk, q); if(c) P.push(c); }
+  if(!P.length) return null;
+  const xs = P.map(q=>q[0]), ys = P.map(q=>q[1]);
+  // un acento suele ser una rayita casi vertical o un toque: sin holgura su
+  // caja no solaparía nada y no se reconocería ninguna palabra
+  const PAD = 5;
+  const x0=Math.min(...xs)-PAD, x1=Math.max(...xs)+PAD;
+  const y0=Math.min(...ys), y1=Math.max(...ys);
+  const wds = blk.querySelectorAll('.tx .wd'); if(!wds.length) return null;
+  const rects = [];
+  wds.forEach(w=>{ for(const rc of w.getClientRects()) if(rc.width>0)
+    rects.push({ wi:+w.dataset.wi, l:rc.left, r:rc.right, t:rc.top, h:rc.height, w:rc.width }); });
+  if(!rects.length) return null;
+  // Si el trazo se METE en alguna palabra, no es un acento: es un subrayado, una
+  // pausa o un dibujo. Sin este veto, una raya dentro de un renglón acentuaba la
+  // palabra del renglón de ABAJO, que también le quedaba "debajo".
+  for(const q of rects){
+    if(y1 > q.t + q.h*0.35 && y0 < q.t + q.h*0.95 && Math.min(x1,q.r) > Math.max(x0,q.l)) return null;
+  }
+  let best=null, bestD=Infinity;
+  for(const q of rects){
+    const gap = q.t - y1;                       // hueco entre el trazo y lo alto de la palabra
+    if(gap < -q.h*0.40) continue;               // el trazo se mete en la palabra: no es "encima"
+    if(gap > q.h*1.15) continue;                // demasiado arriba: no es de esta palabra
+    const ov = Math.min(x1,q.r) - Math.max(x0,q.l);   // solape horizontal
+    if(ov <= 0) continue;
+    if((x1-x0) > q.w*2.6) continue;             // barrido largo: es un subrayado, no un acento
+    const d = Math.abs(gap) - ov*0.05;
+    if(d < bestD){ bestD = d; best = q; }
+  }
+  // el trazo también debe ser corto: un acento, no un dibujo
+  if(best && (y1-y0) > best.h*1.2) return null;
+  return best ? best.wi : null;
+}
 // reconoce gestos: raya diagonal = pausa, flecha/raya → = más rápido, ← = más lento
 function libDrawRecognize(pts, W, H){
   if(!pts || pts.length < 4) return null;
@@ -7619,6 +7683,22 @@ function libDrawErasePauseAt(si, blk, pt){
   }
   return false;
 }
+// la goma sobre una palabra acentuada le quita el acento
+function libDrawEraseAccentAt(si, blk, pt){
+  const m = sync.marks && sync.marks[si]; if(!m || !m.accents || !m.accents.length) return false;
+  const sp = _libCanvasPt(blk, pt); if(!sp) return false;
+  const PAD = 4;
+  for(const el of blk.querySelectorAll('.tx .wd.acc')){
+    for(const rc of el.getClientRects()){
+      if(sp[0]>=rc.left-PAD && sp[0]<=rc.right+PAD && sp[1]>=rc.top-PAD && sp[1]<=rc.bottom+PAD){
+        const wi = +el.dataset.wi;
+        syncSendMark(si, { accents: m.accents.filter(w=>w!==wi) });
+        return true;
+      }
+    }
+  }
+  return false;
+}
 function libDrawEraseAt(si, blk, pt){
   const strokes = libDrawStrokes(si); const gmk = libDrawGmk(si);
   let changed = false;
@@ -7628,6 +7708,7 @@ function libDrawEraseAt(si, blk, pt){
   if(gmk){ const keepG = gmk.filter(g=> !(Math.abs(g.x-pt[0])<0.06 && Math.abs(g.y-pt[1])<0.4)); if(keepG.length!==gmk.length){ drop(gmk, keepG); if(!sync.marks[si]) sync.marks[si]={}; sync.marks[si].gmk=keepG; changed=true; } }
   if(changed){ libDrawRenderBlock(blk); blk._eraseDirty = si; }
   try{ libDrawErasePauseAt(si, blk, pt); }catch(e){}
+  try{ libDrawEraseAccentAt(si, blk, pt); }catch(e){}
 }
 function libDrawClearAll(){
   if(typeof sync==='undefined' || !sync.marks) return;
@@ -7681,6 +7762,19 @@ function libDrawSetup(d){
     if(cur && cur.p.length){
       cur.p = cur.p.map(pt=>[ Math.round(pt[0]*1000)/1000, Math.round(pt[1]*1000)/1000 ]);
       const cv = curBlk.querySelector('.blk-canvas');
+      // ACENTO primero: es el gesto más específico (encima de una palabra).
+      // Una diagonal que entra en el texto no lo cumple y sigue siendo pausa.
+      const accWi = (st.gestos!==false) ? libGestureAccentWord(curBlk, cur.p) : null;
+      if(accWi != null){
+        const m0=(sync.marks&&sync.marks[drawSi])||{};
+        const set = new Set(m0.accents||[]); set.add(accWi);
+        if(typeof syncSendMark==='function') syncSendMark(drawSi, { accents:[...set].sort((a,b)=>a-b) });
+        try{
+          const w = curBlk.querySelector('.tx .wd[data-wi="'+accWi+'"]');
+          if(pop2.els && pop2.els.live) pop2.els.live.textContent = w ? 'acento en «'+w.textContent+'»' : 'acento';
+        }catch(e){}
+        cur=null; curBlk=null; drawSi=null; return;
+      }
       const g = (st.gestos!==false && cv) ? libDrawRecognize(cur.p, cv.width, cv.height) : null;
       if(g){
         // gesto reconocido → guardar marca semántica (pausa / rápido / lento) en vez del trazo
@@ -8847,6 +8941,7 @@ async function syncConnect(role){
     .on('broadcast', { event:'pg'     }, ({payload})=> onRemotePg(payload))
     .on('broadcast', { event:'epreq'  }, ({payload})=> onRemoteEpReq(payload))
     .on('broadcast', { event:'dir'    }, ({payload})=> onRemoteDir(payload))
+    .on('broadcast', { event:'toolreq'}, ({payload})=> onRemoteToolReq(payload))
     .on('presence', { event:'sync' }, ()=>{
       try{ sync.peers = Object.keys(ch.presenceState()).length; }catch(e){}
       updateSyncUI();
@@ -9078,8 +9173,12 @@ function syncSendOpen(key){
   if(typeof isTalent==='function' && isTalent()) return;   // el actor sigue, no dirige
   const epId = (typeof currentEp!=='undefined' && currentEp) ? currentEp.id : null;
   // el rol viaja en el mensaje: la tablet del actor solo abre el libreto cuando
-  // quien lo pide es el DIRECTOR (ver puerta del actor, más abajo)
-  syncEmit('open', { key, epId, role: sync.role }, true);   // nunca en cola
+  // quien lo pide es el DIRECTOR (ver puerta del actor, más abajo).
+  // Y con él viaja el TAMAÑO, para que las tres pantallas abran igual y el
+  // pincel caiga sobre la misma palabra en todas.
+  const lay = (sync.role==='tablet' && typeof pop2!=='undefined')
+    ? { boxw: pop2.boxw, font: pop2.mineFs } : {};
+  syncEmit('open', Object.assign({ key, epId, role: sync.role }, lay), true);   // nunca en cola
 }
 /* ═══ PUERTA DEL ACTOR ═══════════════════════════════════════════════
    La tablet del actor no muestra el libreto por su cuenta: espera a que el
@@ -9146,6 +9245,8 @@ function onRemoteOpen(p){
   // Solo cuenta la tablet del DIRECTOR; 'undefined' cubre a un dispositivo que
   // aún no tenga esta versión (mejor abrir de más que dejarlo esperando siempre).
   if(p.role === 'tablet' || p.role === undefined) setDirOpen(true);
+  // adoptar el tamaño del director antes de construir el libreto
+  if(p.role === 'tablet' && (p.boxw!=null || p.font!=null)) setLibLayout(p.boxw, p.font);
   // ¿el 'open' se refiere a un capítulo que NO tengo? pedirlo y esperar a que llegue
   if(p.epId && (typeof currentEp==='undefined' || !currentEp || currentEp.id!==p.epId)){
     sync._wantOpen = (p.key!==undefined ? p.key : null);
@@ -9903,8 +10004,33 @@ function pipTick(){
 
 // ---- herramientas espejadas (👤/📖, tema, 🎬, 👁) — la tablet manda ----
 function syncSendTool(tool, value){
-  if(!isTablet() || !sync.channel) return;
+  if(!sync.channel) return;
+  if(typeof isTalent==='function' && isTalent()) return;      // el actor sigue, no impone
+  // ANCHO y LETRA los fija SOLO el director: si los empujaran dos dispositivos
+  // el layout oscilaba y el pincel caía en sitios distintos en cada pantalla.
+  if((tool==='boxw' || tool==='font') && sync.role!=='tablet') return;
+  if(tool!=='boxw' && tool!=='font' && !isTablet()) return;   // el resto, como antes
   syncEmit('tool', { tool, value });
+}
+// el tamaño con el que TODAS las pantallas deben abrir el libreto
+function libLayout(){ return sync._layout || null; }
+function setLibLayout(boxw, font){
+  if(boxw==null && font==null) return;
+  const L = sync._layout || (sync._layout = {});
+  if(boxw!=null) L.boxw = boxw;
+  if(font!=null) L.font = +font;
+}
+// un dispositivo que NO es el director acaba de abrir el libreto: pedir el tamaño
+function syncSendToolReq(){
+  if(!sync.isOn || !sync.channel) return;
+  if(sync.role==='tablet') return;
+  syncEmit('toolreq', {});
+}
+function onRemoteToolReq(p){
+  if(!p || p.from===sync.meId) return;
+  if(sync.role!=='tablet') return;                            // responde solo el director
+  if(!pop2 || !pop2.doc) return;
+  try{ syncSendTool('boxw', pop2.boxw); syncSendTool('font', pop2.mineFs); }catch(e){}
 }
 function onRemoteTool(p){
   if(!p || p.from===sync.meId) return;
@@ -9914,10 +10040,12 @@ function onRemoteTool(p){
   if(p.tool==='theme' && pop2.theme!==p.value){ const b=d.getElementById('lTheme'); if(b) b.click(); }
   // ANCHO y LETRA: replicar el layout de la tablet para que el pincel caiga en el mismo lugar
   if(p.tool==='font' && p.value){
+    setLibLayout(null, +p.value);
     pop2.mineFs = +p.value; d.documentElement.style.setProperty('--minefs', pop2.mineFs+'px');
     setTimeout(()=>{ try{ if(typeof libDrawRenderAll==='function') libDrawRenderAll(); }catch(e){} }, 45);
   }
   if(p.tool==='boxw' && p.value){
+    setLibLayout(p.value, null);
     pop2.boxw = p.value; d.documentElement.style.setProperty('--boxw', p.value==='full'?'96%':p.value+'px');
     try{ if(typeof markWidthBtn==='function') markWidthBtn(); }catch(e){}
     setTimeout(()=>{ try{ if(typeof libDrawRenderAll==='function') libDrawRenderAll(); }catch(e){} }, 45);
