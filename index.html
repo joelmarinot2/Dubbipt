@@ -705,6 +705,14 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .card .cname{ font-family:'Inter',sans-serif; font-weight:700; color:#f2f3f5; font-size:18px;
   padding:0; margin-bottom:10px; line-height:1.15; }
 .card .cchips{ display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; padding:0; }
+/* aviso: personaje del desglose que NO aparece en el libreto */
+.card.nolib{ border-color:#F59E0B; }
+.card.nolib .cname{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; justify-content:center; }
+.nolib-b{
+  font-family:'Inter',sans-serif; font-size:10px; font-weight:700; letter-spacing:.6px;
+  text-transform:uppercase; padding:2px 7px; border-radius:99px; white-space:nowrap;
+  background:rgba(245,158,11,.16); color:#F59E0B; border:1px solid rgba(245,158,11,.45);
+}
 /* timecode box encima del nombre */
 .card .ctc{ display:inline-block; font-family:'JetBrains Mono',ui-monospace,monospace; font-size:11px;
   font-weight:600; color:#8b8f97; background:#101215; border:1px solid #23262b; border-radius:6px;
@@ -1477,7 +1485,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.16.1-nube · 31-ago-2026';
+const APP_VERSION = 'v10.17.0-nube · 31-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -2954,6 +2962,33 @@ const LETTER = /[A-Z0-9]/;
 const IGNORABLE = /['"\u201C\u201D\u2018\u2019\u201A\u201B\`\.]/;  // incluye punto: DR. KIM → DRKIM
 function isIgnorable(ch){ return IGNORABLE.test(ch) || ch===' '; }
 
+/* Acotaciones que acompañan a un nombre de personaje sin dejar de ser cabecera:
+   "NILA (V.O.)", "NILA (OFF)", "NILA (CONT'D)", "NILA (SIGUE)"… */
+const CUE_RE = /^(?:V\s*\.?\s*O|O\s*\.?\s*S|O\s*\.?\s*C|OFF|ON|CONT\s*['’`]?\s*D|CONTD|CONTINUED|SIGUE|CONTINUA|MOS|PRE\s*-?\s*LAP|FILTRO|TEL|TELEFONO|TV|RADIO|SUSURRO|GRITO|AD\s*-?\s*LIB|VOZ|VOICE\s*OVER|NARRA|NARRACION)\.?$/i;
+/* Devuelve lo que queda DESPUÉS del nombre en un renglón-cabecera, una vez
+   retirado el relleno que los guiones cuelgan del nombre: puntuación suelta
+   (NILA.  NILA,  NILA -), cierres de comillas o paréntesis, acotaciones
+   ((VO), (OFF), [CONT'D]) y timecodes. Si no queda nada, es una cabecera.
+   Antes cualquiera de esas colas vetaba la cabecera y el personaje del
+   desglose no llegaba nunca al libreto. */
+function headerTail(after){
+  let s = String(after||'').trim(), prev = null;
+  while(s && s !== prev){
+    prev = s;
+    s = s.replace(/^[\s.,;·•\-–—/|*"'“”‘’)\]}]+/,'');   // relleno suelto
+    const lt = (typeof leadTC==='function') ? leadTC(s) : null;
+    if(lt){ s = lt.rest; continue; }                                  // timecode
+    const par = s.match(/^[([{]([^)\]}]*)[)\]}]/);                     // acotación entre paréntesis
+    if(par){
+      const inner = par[1].trim();
+      if(inner === '' || CUE_RE.test(inner) || inner === inner.toUpperCase()){ s = s.slice(par[0].length); continue; }
+    }
+    const bare = s.match(/^[A-Za-z.'’\s]{1,14}?(?=$|[\s.,;:\-–—/|([])/);  // acotación sin paréntesis
+    if(bare && CUE_RE.test(bare[0].trim())){ s = s.slice(bare[0].length); continue; }
+  }
+  return s.trim();
+}
+
 async function scanPdf(){
   occByChar = {}; pageData = {}; charMarks = {}; tcIndex = [];
   const _src = (window._charsRaw && window._charsRaw.length) ? window._charsRaw : chars;
@@ -3035,22 +3070,17 @@ async function scanPdf(){
         }
         if(chosen){
           // veto: una cabecera real es el nombre en MAYÚSCULAS seguido SOLO de
-          // nada, un timecode, o ":" con texto en mayúscula. Si el nombre aparece
-          // dentro del diálogo ("¡XIAIMING!", "Hola, soy Xiaiming (siáiming)",
-          // "XIAIMING, ven acá") NO es una nueva caja.
-          let after = line.text.slice(chosen.at + chosen.len);
-          // saltar el cierre del nombre: ")", comillas, corchetes → "MARCUS (VO):"
-          const closeM = after.match(/^\s*[\)\]"'“”‘’]+\s*/);
-          if(closeM) after = after.slice(closeM[0].length);
-          const hasColon = /^\s*[:：]/.test(after);
-          const restTxt = after.replace(/^[\s:：]+/,'');
+          // relleno (timecode, acotación, puntuación suelta) o de ":" + diálogo.
+          // Si el nombre aparece dentro del diálogo ("¡XIAIMING!", "Hola, soy
+          // Xiaiming (siáiming)", "XIAIMING, ven acá") NO es una nueva caja.
+          const after = line.text.slice(chosen.at + chosen.len);
           const nameTxt = line.text.substr(chosen.at, chosen.len);
           const nameIsUpper = nameTxt === nameTxt.toUpperCase();
-          const restIsTC = restTxt === '' || TC_RE.test(restTxt);
-          const colonThenCap = hasColon && /^[A-ZÁÉÍÓÚÜÑ0-9¡¿"“(\[]/.test(restTxt);
-          // también válido: nombre con paréntesis al final de la línea sin diálogo
-          const closedName = !!closeM && (restTxt==='' || restIsTC || colonThenCap);
-          if(nameIsUpper && (restIsTC || colonThenCap || closedName)){
+          const tail = headerTail(after);            // lo que queda tras quitar el relleno
+          const hasColon = /^[:：]/.test(tail);
+          const dlg = tail.replace(/^[:：]\s*/,'').trim();
+          const colonThenCap = hasColon && /^[A-ZÁÉÍÓÚÜÑ0-9¡¿"“(\[]/.test(dlg);
+          if(nameIsUpper && (tail === '' || colonThenCap)){
             marks.push({key:chosen.key, lineIdx:li, at:chosen.at, len:chosen.len,
                         segs:segsFromRange(line, chosen.at, chosen.at+chosen.len)});
           }
@@ -3085,7 +3115,9 @@ async function scanPdf(){
           const hcCheck = headClean.replace(/\./g,' ').replace(/\s+/g,' ').trim();
           const words = hcCheck.split(/\s+/).filter(Boolean);
           if(words.length > 5) return;
-          if(/[!?¡¿,;]/.test(hcCheck)) return;
+          // una coma o punto y coma FINAL no descarta el nombre ("NILA,"):
+          // solo estorba cuando parte la línea en medio del texto
+          if(/[!?¡¿,;]/.test(hcCheck.replace(/[,;]\s*$/,''))) return;
         } else {
           const after = raw.slice(colonAt+1).trim();
           if(after && !/[A-Za-zÁÉÍÓÚÜÑ0-9¡¿"“(\[]/.test(after) && !TC_RE.test(after)) return;
@@ -3113,12 +3145,52 @@ async function scanPdf(){
     });
   }
   tcIndex.sort((a,b)=> a.sec-b.sec || a.page-b.page || a.lineIdx-b.lineIdx);
+  // ── Verificación desglose ↔ libreto ──────────────────────────────────
+  // Todo personaje del desglose debería tener al menos una cabecera en el
+  // libreto. Los que no aparecen quedan marcados en su tarjeta y se avisa,
+  // en vez de fallar en silencio como hasta ahora (solo iba a la consola).
   const detected = new Set(Object.keys(occByChar));
-  const missing = chars.filter(c=>!detected.has(c.key)).map(c=>c.display);
+  for(const k of Object.keys(occByChar)){
+    const rk = (typeof aliasOf!=='undefined' && aliasOf[k]) ? aliasOf[k] : k;
+    detected.add(rk);   // un personaje fusionado cuenta como detectado
+  }
+  const missingChars = chars.filter(c=> !detected.has(c.key));
+  const missing = missingChars.map(c=>c.display);
+  window._scanMissingKeys = new Set(missingChars.map(c=>c.key));
   console.log('[scan] hoja='+(window._deskSheet||'?')+' · desglose='+chars.length
     +' · detectados='+detected.size+(missing.length?' · SIN detectar: '+missing.join(', '):' · todos ✓'));
   window._scanMissing = missing;
+  if(missing.length){
+    try{
+      DDL_UI.toast(missing.length===1
+          ? '1 personaje del desglose no aparece en el libreto: '+missing[0]
+          : missing.length+' personajes del desglose no aparecen en el libreto',
+        { kind:'err', duration:9000, actionLabel:'Ver cuáles',
+          onAction:()=>{ try{ showScanMissing(); }catch(e){ alert(missing.join(', ')); } } });
+    }catch(e){ console.warn(e); }
+  }
   buildScript();
+}
+
+/* Detalle de los personajes del desglose que no se encontraron en el libreto.
+   Suele deberse a que el nombre está escrito distinto en cada sitio (tildes,
+   puntos, comas, acotaciones) o a que el personaje no habla en este capítulo. */
+function showScanMissing(){
+  const names = window._scanMissing || [];
+  if(!names.length){ try{ DDL_UI.toast('Todos los personajes del desglose están en el libreto'); }catch(e){} return; }
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(10,8,24,.72);display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = '<div style="background:#181233;border:1px solid #2a2350;border-radius:16px;max-width:520px;width:100%;max-height:78vh;overflow:auto;padding:20px 22px;font-family:Inter,sans-serif;color:#ECE9FB">'
+    + '<div style="font-family:Space Grotesk,sans-serif;font-size:17px;font-weight:700;margin-bottom:6px">Sin encontrar en el libreto</div>'
+    + '<div style="font-size:13px;color:#8B84B0;line-height:1.5;margin-bottom:14px">Estos '+names.length+' personajes están en el desglose pero no se localizó ninguna cabecera suya en el libreto. Suele pasar cuando el nombre está escrito distinto en cada sitio (tildes, puntos, comas) o cuando el personaje no habla en este capítulo.</div>'
+    + '<ul style="margin:0 0 16px;padding-left:20px;font-size:14px;line-height:1.8">'
+    + names.map(n=>'<li>'+esc(n)+'</li>').join('')
+    + '</ul>'
+    + '<button id="smClose" style="width:100%;padding:12px;border:none;border-radius:11px;background:#22C55E;color:#06210f;font-family:Space Grotesk,sans-serif;font-weight:700;font-size:14px;cursor:pointer">Cerrar</button>'
+    + '</div>';
+  document.body.appendChild(ov);
+  ov.querySelector('#smClose').onclick = ()=> ov.remove();
+  ov.addEventListener('click', e=>{ if(e.target===ov) ov.remove(); });
 }
 
 /* ===== libreto continuo: lista lineal de intervenciones ===== */
@@ -3282,6 +3354,11 @@ function buildScript(){
       if(/^\d{1,3}$/.test(t) && Math.abs((+t)-p)<=1) return;
       const m = markByLine[li];
       const tc = strictTC(t);
+      // abre un bloque suelto (sin personaje) con el timecode dado
+      const newTCBlock = (sec)=>{
+        cur = { idx:script.length, key:null, display:'', tcSec:sec, page:p, lines:[] };
+        script.push(cur); return cur;
+      };
       if(m){
         const rk = (typeof aliasOf!=='undefined' && aliasOf[m.key]) ? aliasOf[m.key] : m.key;
         const c = charIdx[rk];
@@ -3291,16 +3368,45 @@ function buildScript(){
         (scriptByKey[rk]=scriptByKey[rk]||[]).push(cur.idx);
         // si el renglón trae diálogo DESPUÉS del nombre ("NILA: hola…"),
         // conservarlo — antes se perdía y la línea quedaba cortada
-        const rest = line.text.slice((m.at||0)+(m.len||0)).replace(/^[\s:：'"”’\)]+/,'').trim();
-        if(rest && strictTC(rest)==null){ const r2 = stripPageNum(rest, p); if(r2) cur.lines.push(r2); }
+        const raw = line.text.slice((m.at||0)+(m.len||0));
+        // quitar el relleno de la cabecera (puntuación suelta, acotaciones tipo
+        // "(OFF)", "(V.O.)", timecodes) y quedarnos solo con el diálogo real
+        const head0 = headerTail(raw);
+        const filler = raw.slice(0, Math.max(0, raw.length - head0.length));
+        let rest = head0.replace(/^[:：]\s*/,'').trim();
+        const _lr = leadTC(rest);
+        if(_lr){ if(cur.tcSec==null) cur.tcSec = _lr.sec; rest = _lr.rest; }
+        // un timecode en el MISMO renglón que el nombre ("NILA (V.O.) 01:00:40:00")
+        // es el timecode de esta intervención, nunca su primera línea
+        if(cur.tcSec==null){ const _h = tcFindAll(filler); if(_h.length) cur.tcSec = _h[0].sec; }
+        rest = stripTCs(rest);
+        if(rest){ const r2 = stripPageNum(rest, p); if(r2) cur.lines.push(r2); }
       } else if(tc!=null){
         // un renglón-TC junto a una cabecera aún vacía es SU timecode
         // (el más específico gana); así el diálogo siguiente no se separa
         if(cur && cur.lines.length===0){ cur.tcSec = tc; }
-        else { cur = { idx:script.length, key:null, display:'', tcSec:tc, page:p, lines:[] }; script.push(cur); }
+        else newTCBlock(tc);
       } else if(t){
-        if(!cur){ cur = { idx:script.length, key:null, display:'', tcSec:null, page:p, lines:[] }; script.push(cur); }
-        const t2 = stripPageNum(t, p); if(t2) cur.lines.push(t2);
+        // Renglón mixto: timecode + texto. El timecode va a su casilla y solo
+        // lo que sobra sigue siendo diálogo. Antes el renglón entero se metía
+        // como línea del personaje y el timecode se leía en voz alta.
+        let body = t;
+        const lt = leadTC(body);
+        if(lt){
+          if(cur && cur.lines.length===0) cur.tcSec = lt.sec;
+          else newTCBlock(lt.sec);
+          body = lt.rest;
+        }
+        // timecode AL FINAL: pertenece a la intervención que empieza, no a esta
+        let tailSec = null;
+        const tt = trailTC(body);
+        if(tt){ body = tt.head; tailSec = tt.sec; }
+        body = stripTCs(body);
+        if(body){
+          if(!cur) newTCBlock(null);
+          const t2 = stripPageNum(body, p); if(t2) cur.lines.push(t2);
+        }
+        if(tailSec!=null) newTCBlock(tailSec);
       }
     });
   }
@@ -3330,25 +3436,80 @@ function buildPronIndex(){
   window._pronIdx = pronIdx;
 }
 
-// solo acepta renglones que son ÚNICAMENTE un timecode (evita falsos
-// positivos con cifras dentro de los diálogos o números de escena)
+/* ═══ MOTOR DE TIMECODES ═══════════════════════════════════════════════
+   Un mismo timecode llega escrito de muchas formas según el guion:
+     01:00:15:03   01;00;15;03   01.00.15.03   (01:00:15:03)   [01:00:15:03]
+     TC 01:00:15:03   01:00:15:03 -   01:00:15:03  01:00:18:00  (entrada/salida)
+   Antes solo se reconocía la forma con ":" y sin adornos; cualquier otra caía
+   al cajón de DIÁLOGO y el timecode acababa impreso dentro de la línea del
+   personaje. Aquí se localizan los timecodes ESTÉN DONDE ESTÉN y se separan
+   del texto, para que siempre vayan a su casilla y nunca a la línea. */
+// núcleo: HH:MM:SS[:FF] con cualquier separador y sin dígitos pegados detrás
+const TC_CORE_RE = /(\d{1,2})\s*[:;.,]\s*(\d{2})\s*[:;.,]\s*(\d{2})(?:\s*[:;.,]\s*(\d{2}))?(?!\d)/;
+const TC_CORE   = TC_CORE_RE.source;   // se reutiliza con la bandera /g
+// adornos que un timecode puede arrastrar sin dejar de ser un timecode
+const TC_ADORN  = /^[\s()\[\]{}<>"'“”‘’`*·•\-–—|/.,;]*$/;
+const TC_LABEL  = /(?:t\s*\.?\s*c\s*\.?\s*r?\s*\.?|time\s*code|timecode|tiempo|inicio|start|entrada|salida)\s*[:\-–—]?\s*/gi;
+// todos los timecodes de un texto, con su posición
+function tcFindAll(text){
+  const t = String(text||''), re = new RegExp(TC_CORE, 'g'), out = [];
+  let m;
+  while((m = re.exec(t))){
+    out.push({ start:m.index, end:m.index + m[0].length,
+               sec:(+m[1])*3600 + (+m[2])*60 + (+m[3]) + (m[4]!=null ? (+m[4])/25 : 0) });
+  }
+  return out;
+}
+// ¿este trozo es solo relleno (paréntesis, guiones, puntuación, etiqueta "TC:")?
+function tcOnlyAdorn(s){ return TC_ADORN.test(String(s||'').replace(TC_LABEL,' ')); }
+// solo acepta renglones que son ÚNICAMENTE timecode(s) — con o sin adornos
 function strictTC(text){
   const t = String(text||'').trim();
-  let m = t.match(/^(\d{1,2})\s*:\s*(\d{2})\s*:\s*(\d{2})(?:\s*[:;.]\s*(\d{2}))?$/);
-  if(m) return (+m[1])*3600 + (+m[2])*60 + (+m[3]) + (m[4]? (+m[4])/25 : 0);
-  m = t.match(/^(\d{1,2})\s*:\s*(\d{2})$/);
-  if(m) return (+m[1])*60 + (+m[2]);
-  return null;
+  if(!t) return null;
+  const hits = tcFindAll(t);
+  if(hits.length){
+    let pos = 0;
+    for(const h of hits){ if(!tcOnlyAdorn(t.slice(pos, h.start))) return null; pos = h.end; }
+    return tcOnlyAdorn(t.slice(pos)) ? hits[0].sec : null;
+  }
+  const m2 = t.match(/^(\d{1,2})\s*[:;.]\s*(\d{2})$/);   // MM:SS suelto en su renglón
+  return m2 ? (+m2[1])*60 + (+m2[2]) : null;
 }
-// timecode al INICIO de la línea (HH:MM:SS[:FF]) aunque le siga texto (nombre o
-// diálogo). Devuelve {sec, rest} o null. Exige el formato completo HH:MM:SS para
-// no confundir cifras sueltas del diálogo.
+// timecode al INICIO del renglón aunque le siga texto (nombre o diálogo).
+// Devuelve {sec, rest} o null. Tolera adornos y timecodes encadenados.
 function leadTC(text){
   const t = String(text||'').trim();
-  const m = t.match(/^(\d{1,2})\s*:\s*(\d{2})\s*:\s*(\d{2})(?:\s*[:;.]\s*(\d{2}))?(?:\s+|$)(.*)$/);
-  if(!m) return null;
-  const sec = (+m[1])*3600 + (+m[2])*60 + (+m[3]) + (m[4]? (+m[4])/25 : 0);
-  return { sec, rest:(m[5]||'').trim() };
+  const hits = tcFindAll(t);
+  if(!hits.length) return null;
+  if(!tcOnlyAdorn(t.slice(0, hits[0].start))) return null;   // hay texto real antes → no encabeza
+  let i = 0, pos = hits[0].end;
+  while(i+1 < hits.length && tcOnlyAdorn(t.slice(pos, hits[i+1].start))){ i++; pos = hits[i].end; }
+  return { sec: hits[0].sec, rest: t.slice(pos).replace(/^[\s)\]}>"'“”‘’*·•\-–—|/]+/,'').trim() };
+}
+// timecode al FINAL del renglón, con texto real delante: "…y se fue 01:00:18:00".
+// Ese timecode NO es del parlamento que termina, sino del que empieza.
+function trailTC(text){
+  const t = String(text||'').trim();
+  const hits = tcFindAll(t);
+  if(!hits.length) return null;
+  if(!tcOnlyAdorn(t.slice(hits[hits.length-1].end))) return null;
+  let i = hits.length - 1, pos = hits[i].start;
+  while(i > 0 && tcOnlyAdorn(t.slice(hits[i-1].end, pos))){ i--; pos = hits[i].start; }
+  const head = t.slice(0, pos).replace(/[\s([{<"'“”‘’*·•\-–—|/]+$/,'').trim();
+  if(!head) return null;                       // sin texto delante: es un renglón-TC
+  return { sec: hits[i].sec, head };
+}
+// saca del texto TODOS los timecodes (y los paréntesis que quedan vacíos)
+function stripTCs(text){
+  const t = String(text||''), hits = tcFindAll(t);
+  if(!hits.length) return t.trim();
+  let out = '', pos = 0;
+  for(const h of hits){ out += t.slice(pos, h.start); pos = h.end; }
+  out += t.slice(pos);
+  return out.replace(TC_LABEL,' ')
+            .replace(/[([{<]\s*[)\]}>]/g,' ')
+            .replace(/^[\s\-–—|/·•]+/,'')
+            .replace(/\s{2,}/g,' ').trim();
 }
 function parseTC(s){
   const m = String(s||'').match(/(\d{1,2})\s*:\s*(\d{2})(?:\s*:\s*(\d{2}))?(?:\s*[:;.]\s*(\d{2}))?/);
@@ -3566,7 +3727,9 @@ function renderCards(){
     const done = isCharDone(c);
     const pct = c.pages.length ? Math.round(100*[...rec].filter(p=>c.pages.some(x=>x.p===p)).length/c.pages.length) : 0;
     const card = document.createElement('div');
-    card.className = 'card'+(done?' done':''); card.tabIndex=0;
+    const notInLib = !!(window._scanMissingKeys && window._scanMissingKeys.has(c.key));
+    card.className = 'card'+(done?' done':'')+(notInLib?' nolib':''); card.tabIndex=0;
+    if(notInLib) card.title = 'Este personaje no se encontró en el libreto';
     card.style.setProperty('--cc', c.color);
     const MAXPG=16;
     const pgHtml = c.pages.slice(0,MAXPG).map(pg=>
@@ -3582,8 +3745,8 @@ function renderCards(){
         `<button class="allbtn ${done?'on':''}" title="${done?'Desmarcar':'Marcar terminado'}" aria-label="${done?'Marcar sin terminar':'Marcar terminado'} ${esc(c.display)}">${done?'✓':''}</button></div>`+
       // timecode en cajita encima del nombre
       (tc0 ? `<div class="ctc">${esc(tc0)}</div>` : `<div class="ctc ctc-empty"></div>`)+
-      // nombre grande
-      `<div class="cname">${esc(c.display)}</div>`+
+      // nombre grande (con aviso si no aparece en el libreto)
+      `<div class="cname">${esc(c.display)}${notInLib?'<span class="nolib-b" title="No se encontró en el libreto">sin libreto</span>':''}</div>`+
       // divisor
       `<div class="cdiv"></div>`+
       // talento (o "Sin asignar") — donde antes estaban los chips
@@ -7164,20 +7327,19 @@ function markWidthBtn(){
   pop2.doc.querySelectorAll('.lbar button').forEach(b=> b.classList.toggle('act', b.dataset.w===pop2.boxw));
 }
 
-// ¿la línea es SÓLO un timecode? (tolera espacios: "00: 00: 15: 15")
+// ¿la línea es SÓLO un timecode? (con o sin adornos: "(00;00;15;15)", "TC 00:00:15")
 function isTCLineLoose(l){
-  return /^\s*\d{1,2}\s*:\s*\d{2}\s*:\s*\d{2}(?:\s*[:;.]\s*\d{2})?\s*$/.test(String(l||''));
+  return (typeof strictTC==='function') ? strictTC(l)!=null
+       : /^\s*\d{1,2}\s*:\s*\d{2}\s*:\s*\d{2}(?:\s*[:;.]\s*\d{2})?\s*$/.test(String(l||''));
 }
 // texto de diálogo del bloque, sin timecodes colados (red de seguridad para
 // capítulos ya cargados antes de corregir el parser).
 function blockText(b){
   let lines = (b && b.lines ? b.lines : []).filter(l=> !isTCLineLoose(l));
   if(typeof lineExcluded==='function') lines = lines.filter(l=> !lineExcluded(l));
-  let s = lines.join(' ');
-  // por si un TC quedó pegado al final de una línea de diálogo
-  s = s.replace(/(^|\s)\d{1,2}\s*:\s*\d{2}\s*:\s*\d{2}(?:\s*[:;.]\s*\d{2})?(?=\s|$)/g, '$1')
-       .replace(/\s{2,}/g,' ').trim();
-  return s;
+  // un timecode pegado en cualquier punto de la línea tampoco es diálogo
+  if(typeof stripTCs==='function') lines = lines.map(l=> stripTCs(l)).filter(Boolean);
+  return lines.join(' ').replace(/\s{2,}/g,' ').trim();
 }
 // ── Indicador "Editado" + historial de cambios por parlamento ──
 function origText(si){ try{ return (script[si] && script[si].lines) ? script[si].lines.join(' ') : ''; }catch(e){ return ''; } }
