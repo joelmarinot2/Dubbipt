@@ -1519,7 +1519,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.19.0-nube · 31-ago-2026';
+const APP_VERSION = 'v10.19.1-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -6231,6 +6231,13 @@ body.light .dict-syn{ background:rgba(37,99,235,.1); color:#1d4ed8; border-color
 .spl-tc{ width:180px; background:#0f1215; border:1px solid #2a2f36; color:#e6e7ea; border-radius:9px; padding:9px 12px; font-family:'JetBrains Mono',ui-monospace,monospace; font-size:14px; letter-spacing:1px; outline:none; }
 .spl-tc:focus{ border-color:#4ADE80; }
 
+/* pista del pincel: con el lápiz activo, dos dedos desplazan el libreto */
+.lp-hint{
+  font-family:'Inter',sans-serif; font-size:11.5px; font-weight:600;
+  color:#6b7280; white-space:nowrap; padding:0 4px; align-self:center;
+}
+body.light .lp-hint{ color:#6b6580; }
+
 /* ─── Tablet ACTOR: pantalla de espera hasta que el director empieza ─── */
 .waitdir-ov{ display:none; }
 body.is-talent.waitdir .waitdir-ov{
@@ -7036,7 +7043,7 @@ function buildLibretoDoc(pc){
       <button class="lp-btn" id="lpErase" title="Borrador">Borrar</button>
       <button class="lp-btn on" id="lpGest" title="Reconocer gestos: marca ENCIMA de una palabra = acento, raya diagonal = pausa, flecha → = más rápido, flecha ← = más lento">Gestos ✓</button>
       <button class="lp-btn" id="lpClear" title="Limpiar todo el marcado del libreto">Limpiar</button>
-      <button class="lp-btn lp-done" id="lpDone" title="Salir del pincel">Listo</button>
+      <span class="lp-hint">2 dedos para desplazar</span><button class="lp-btn lp-done" id="lpDone" title="Salir del pincel">Listo</button>
     </div>
     <div class="waitdir-ov" id="lWaitDir" role="status" aria-live="polite">
       <div class="wd-card">
@@ -7721,7 +7728,7 @@ function libDrawClearAll(){
 }
 function libDrawSetup(d){
   const st = libDrawState();
-  const setMode = (on)=>{ st.on=on; d.body.classList.toggle('drawmode', on); if(on){ if(typeof syncSendTool==='function'){ try{ syncSendTool('boxw', pop2.boxw); syncSendTool('font', pop2.mineFs); }catch(e){} } libDrawRenderAll(); } };
+  const setMode = (on)=>{ st.on=on; d.body.classList.toggle('drawmode', on); try{ ptrs.clear(); panning=false; }catch(e){} if(on){ if(typeof syncSendTool==='function'){ try{ syncSendTool('boxw', pop2.boxw); syncSendTool('font', pop2.mineFs); }catch(e){} } libDrawRenderAll(); } };
   const brush = d.getElementById('lDraw'); if(brush) brush.addEventListener('click', ()=> setMode(!st.on));
   const tbrush = d.getElementById('tDraw'); if(tbrush) tbrush.addEventListener('click', ()=> setMode(!st.on));
   const paint = d.getElementById('lPaint');
@@ -7735,9 +7742,29 @@ function libDrawSetup(d){
   }
   const wrap = pop2.els.wrap;
   let cur=null, curBlk=null, drawSi=null;
+  /* DESPLAZARSE CON DOS DEDOS MIENTRAS SE DIBUJA
+     Con el pincel activo el libreto queda con touch-action:none para que el
+     trazo sea preciso, asi que un dedo NO podia bajar: pintaba encima de los
+     parlamentos. Ahora el segundo dedo convierte el gesto en desplazamiento:
+     se descarta lo que se llevara dibujado y el libreto sigue a los dedos. */
+  const ptrs = new Map();               // punteros activos (dedos / lapiz)
+  let panning = false, panY = 0;
+  const midY = ()=>{ let t=0,n=0; for(const q of ptrs.values()){ t+=q.y; n++; } return n? t/n : 0; };
+  const abortStroke = ()=>{             // el trazo a medias no se guarda ni se ve
+    if(cur && curBlk){ try{ libDrawRenderBlock(curBlk); }catch(_){} }
+    cur = null;
+  };
   const norm=(cv,e)=>{ const r=cv.getBoundingClientRect(); return [ Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)), Math.max(0,Math.min(1,(e.clientY-r.top)/r.height)) ]; };
   wrap.addEventListener('pointerdown', (e)=>{
     if(!st.on) return;
+    ptrs.set(e.pointerId, { y:e.clientY });
+    if(ptrs.size >= 2){                 // segundo dedo → esto era un desplazamiento
+      abortStroke();
+      // en la tablet del ACTOR el desplazamiento lo manda el director: el
+      // segundo dedo solo sirve para cancelar el trazo, no para bajar
+      if(!(typeof isTalent==='function' && isTalent())){ panning = true; panY = midY(); }
+      return;
+    }
     const blk = e.target.closest && e.target.closest('.blk'); if(!blk) return;
     e.preventDefault();
     curBlk = blk; drawSi = +blk.dataset.si;
@@ -7747,6 +7774,15 @@ function libDrawSetup(d){
     cur = { c:st.color, w:st.width, p:[pt], i:strokeId() };
   });
   wrap.addEventListener('pointermove', (e)=>{
+    const q = ptrs.get(e.pointerId); if(q) q.y = e.clientY;
+    if(panning){
+      const y = midY(), dy = panY - y; panY = y;
+      if(dy){
+        const max = (typeof libMaxTop==='function') ? libMaxTop() : Math.max(0, wrap.scrollHeight - wrap.clientHeight);
+        wrap.scrollTop = Math.max(0, Math.min(max, wrap.scrollTop + dy));
+      }
+      return;
+    }
     if(!st.on || !curBlk) return;
     const cv = curBlk.querySelector('.blk-canvas'); if(!cv) return;
     const pt = norm(cv,e);
@@ -7806,8 +7842,18 @@ function libDrawSetup(d){
     }
     cur=null; curBlk=null; drawSi=null;
   };
-  wrap.addEventListener('pointerup', endStroke);
-  wrap.addEventListener('pointercancel', endStroke);
+  const onUp = (e)=>{
+    ptrs.delete(e.pointerId);
+    if(panning){
+      // al levantar el penúltimo dedo se acaba el desplazamiento; el que quede
+      // apoyado NO reanuda el trazo (cur ya está descartado)
+      if(ptrs.size < 2){ panning = false; curBlk = null; drawSi = null; }
+      return;
+    }
+    endStroke(e);
+  };
+  wrap.addEventListener('pointerup', onUp);
+  wrap.addEventListener('pointercancel', onUp);
 }
 // ═══════════════ Dividir parlamento en dos cajas ═══════════════
 function libSplitTool(si){
