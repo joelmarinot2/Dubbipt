@@ -1485,7 +1485,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.17.0-nube · 31-ago-2026';
+const APP_VERSION = 'v10.18.0-nube · 31-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -1821,6 +1821,7 @@ function applyDeviceRole(){
   try{ updateWorkspaceChip(); }catch(e){}
   try{ refreshTopbar(); }catch(e){}
   try{ if(typeof pop2!=='undefined' && pop2.doc){ pop2.doc.body.classList.toggle('is-talent', DEVROLE==='talent'); renderLibretoBlocks(); renderLibretoChips(); } }catch(e){}
+  try{ updateTalentGate(); }catch(e){}
 }
 /* ===== Módulo 0 · relleno dinámico de la barra superior ===== */
 function refreshTopbar(){
@@ -6196,6 +6197,37 @@ body.light .dict-syn{ background:rgba(37,99,235,.1); color:#1d4ed8; border-color
 .spl-tc{ width:180px; background:#0f1215; border:1px solid #2a2f36; color:#e6e7ea; border-radius:9px; padding:9px 12px; font-family:'JetBrains Mono',ui-monospace,monospace; font-size:14px; letter-spacing:1px; outline:none; }
 .spl-tc:focus{ border-color:#4ADE80; }
 
+/* ─── Tablet ACTOR: pantalla de espera hasta que el director empieza ─── */
+.waitdir-ov{ display:none; }
+body.is-talent.waitdir .waitdir-ov{
+  display:flex; position:fixed; inset:0; z-index:60;
+  align-items:center; justify-content:center; padding:24px;
+  background:#0e1013;
+}
+/* con la puerta cerrada no hay libreto ni herramientas que tocar */
+body.is-talent.waitdir .lwrap,
+body.is-talent.waitdir .ltools,
+body.is-talent.waitdir .lpaint,
+body.is-talent.waitdir .readline,
+body.is-talent.waitdir .dtab{ visibility:hidden !important; }
+.wd-card{ text-align:center; max-width:420px; }
+.wd-dot{
+  width:13px; height:13px; border-radius:50%; margin:0 auto 18px;
+  background:#22C55E; box-shadow:0 0 0 0 rgba(34,197,94,.55);
+  animation:wdPulse 1.8s ease-out infinite;
+}
+@keyframes wdPulse{
+  0%{ box-shadow:0 0 0 0 rgba(34,197,94,.55); }
+  70%{ box-shadow:0 0 0 18px rgba(34,197,94,0); }
+  100%{ box-shadow:0 0 0 0 rgba(34,197,94,0); }
+}
+@media (prefers-reduced-motion:reduce){ .wd-dot{ animation:none; } }
+.wd-t{
+  font-family:'Space Grotesk',sans-serif; font-size:21px; font-weight:700;
+  color:#f2f3f5; margin-bottom:10px;
+}
+.wd-s{ font-family:'Inter',sans-serif; font-size:14px; line-height:1.6; color:#8b9099; }
+
 /* ─── Tablet ACTOR: SOLO el pincel ─── */
 /* El actor no navega ni edita: el director manda la posición y el actor solo
    marca encima con el pincel. Se oculta todo lo demás de la barra superior… */
@@ -6963,6 +6995,13 @@ function buildLibretoDoc(pc){
       <button class="lp-btn on" id="lpGest" title="Reconocer gestos: raya diagonal = pausa, flecha → = más rápido, flecha ← = más lento">Gestos ✓</button>
       <button class="lp-btn" id="lpClear" title="Limpiar todo el marcado del libreto">Limpiar</button>
       <button class="lp-btn lp-done" id="lpDone" title="Salir del pincel">Listo</button>
+    </div>
+    <div class="waitdir-ov" id="lWaitDir" role="status" aria-live="polite">
+      <div class="wd-card">
+        <div class="wd-dot"></div>
+        <div class="wd-t">En espera del director</div>
+        <div class="wd-s">El libreto se abrirá en cuanto el director empiece a grabar el personaje.</div>
+      </div>
     </div>`;
   pop2.doc = d;
   pop2._epId = (typeof currentEp!=='undefined' && currentEp) ? currentEp.id : null;   // a qué capítulo pertenece este libreto
@@ -6995,6 +7034,7 @@ function buildLibretoDoc(pc){
   d.body.classList.toggle('haschips', roleTab);        // tablet: páginas izq + herramientas der
   d.body.classList.toggle('deskchips', !roleTab);      // escritorio/espejo: páginas a la derecha
   d.body.classList.toggle('is-talent', (typeof isTalent==='function' && isTalent()));   // tablet actor: herramientas limitadas
+  try{ updateTalentGate(); }catch(e){}   // …y en espera hasta que el director empiece
   if(typeof isMirror==='function' && isMirror()) d.body.classList.add('mirror');
   const recBtn = d.getElementById('lRec');
   if(recBtn) recBtn.addEventListener('click', ()=> libretoMarkRecorded());
@@ -7053,7 +7093,7 @@ function buildLibretoDoc(pc){
     const vi = pop2.activeBlock; if(vi<0) return;
     const si = pop2.blockMap[vi];
     // B2 (auditoría): lápida en vez de delete, para que el borrado llegue a la nube
-    syncSendMark(si, { text:null, pauses:[], accents:[], draw:[], gmk:[] });
+    syncSendMark(si, { text:null, pauses:[], accents:[], draw:[], gmk:[] }, '*');
   });
   if($t('tHide')) $t('tHide').addEventListener('click', ()=>{
     d.body.classList.add('rclosed');
@@ -7106,6 +7146,8 @@ function buildLibretoDoc(pc){
     });
   }
   d.getElementById('lBack').addEventListener('click', ()=>{
+    // el director deja el libreto → la tablet del actor vuelve a «en espera»
+    try{ if(typeof syncSendDir==='function') syncSendDir(false); }catch(e){}
     try{
       if(pop2.type==='inline'){ hideLibretoInline(); }
       else if(pop2.win && pop2.win!==window){ pop2.win.close(); }
@@ -7410,6 +7452,27 @@ function showEditHistory(si, anchor){
   setTimeout(()=> d.addEventListener('mousedown', close, true), 0);
 }
 // ═══════════════ Marcado libre (pincel / pizarrón por caja) ═══════════════
+/* Cada trazo y cada gesto llevan un id propio del dispositivo que lo hizo.
+   Sin id, el receptor REEMPLAZABA la lista entera con la del emisor: si el
+   actor y el director marcaban el mismo parlamento, cada envío borraba lo del
+   otro y los trazos del actor desaparecían de las demás pantallas. */
+let _strokeN = 0;
+function strokeId(){ return (typeof sync!=='undefined' ? sync.meId : 'x') + (++_strokeN).toString(36); }
+// funde dos listas de trazos/gestos por id: nadie pierde lo que dibujó el otro.
+// `del` = ids borrados con la goma (o '*' para vaciar del todo).
+function mergeDrawList(mine, theirs, del){
+  if(del === '*') return (theirs||[]).slice();
+  const dead = new Set(Array.isArray(del) ? del : []);
+  const seen = new Set(), out = [];
+  for(const s of [].concat(mine||[], theirs||[])){
+    if(!s) continue;
+    if(s.i && dead.has(s.i)) continue;
+    const id = s.i || JSON.stringify(s);          // trazos antiguos sin id: por contenido
+    if(seen.has(id)) continue;
+    seen.add(id); out.push(s);
+  }
+  return out;
+}
 function libDrawState(){ if(!pop2._draw) pop2._draw = { on:false, color:'#22C55E', width:4, erase:false, gestos:true }; return pop2._draw; }
 function libDrawStrokes(si){ const m = (typeof sync!=='undefined' && sync.marks) ? sync.marks[si] : null; return (m && Array.isArray(m.draw) && m.draw.length) ? m.draw : null; }
 function libDrawEnsureCanvas(blk){
@@ -7525,8 +7588,10 @@ function libDrawErasePauseAt(si, blk, pt){
 function libDrawEraseAt(si, blk, pt){
   const strokes = libDrawStrokes(si); const gmk = libDrawGmk(si);
   let changed = false;
-  if(strokes){ const keep = strokes.filter(s=> !(s.p||[]).some(q=> Math.abs(q[0]-pt[0])<0.03 && Math.abs(q[1]-pt[1])<0.06 )); if(keep.length!==strokes.length){ if(!sync.marks[si]) sync.marks[si]={}; sync.marks[si].draw=keep; changed=true; } }
-  if(gmk){ const keepG = gmk.filter(g=> !(Math.abs(g.x-pt[0])<0.06 && Math.abs(g.y-pt[1])<0.4)); if(keepG.length!==gmk.length){ if(!sync.marks[si]) sync.marks[si]={}; sync.marks[si].gmk=keepG; changed=true; } }
+  const gone = blk._eraseDel || (blk._eraseDel = []);
+  const drop = (arr, keep)=>{ for(const s of arr) if(s && s.i && !keep.includes(s)) gone.push(s.i); };
+  if(strokes){ const keep = strokes.filter(s=> !(s.p||[]).some(q=> Math.abs(q[0]-pt[0])<0.03 && Math.abs(q[1]-pt[1])<0.06 )); if(keep.length!==strokes.length){ drop(strokes, keep); if(!sync.marks[si]) sync.marks[si]={}; sync.marks[si].draw=keep; changed=true; } }
+  if(gmk){ const keepG = gmk.filter(g=> !(Math.abs(g.x-pt[0])<0.06 && Math.abs(g.y-pt[1])<0.4)); if(keepG.length!==gmk.length){ drop(gmk, keepG); if(!sync.marks[si]) sync.marks[si]={}; sync.marks[si].gmk=keepG; changed=true; } }
   if(changed){ libDrawRenderBlock(blk); blk._eraseDirty = si; }
   try{ libDrawErasePauseAt(si, blk, pt); }catch(e){}
 }
@@ -7535,7 +7600,7 @@ function libDrawClearAll(){
   Object.keys(sync.marks).forEach(k=>{
     const m=sync.marks[k]; if(!m) return;
     const hasD=Array.isArray(m.draw)&&m.draw.length, hasG=Array.isArray(m.gmk)&&m.gmk.length;
-    if((hasD||hasG) && typeof syncSendMark==='function') syncSendMark(+k, { draw: [], gmk: [] });
+    if((hasD||hasG) && typeof syncSendMark==='function') syncSendMark(+k, { draw: [], gmk: [] }, '*');
   });
   try{ pop2.els.blocks.querySelectorAll('.blk-canvas').forEach(c=>{ const x=c.getContext('2d'); x.clearRect(0,0,c.width,c.height); }); }catch(e){}
 }
@@ -7564,7 +7629,7 @@ function libDrawSetup(d){
     const cv = libDrawEnsureCanvas(blk); try{ cv.setPointerCapture(e.pointerId); }catch(_){}
     const pt = norm(cv,e);
     if(st.erase){ cur=null; libDrawEraseAt(drawSi, blk, pt); return; }
-    cur = { c:st.color, w:st.width, p:[pt] };
+    cur = { c:st.color, w:st.width, p:[pt], i:strokeId() };
   });
   wrap.addEventListener('pointermove', (e)=>{
     if(!st.on || !curBlk) return;
@@ -7599,7 +7664,7 @@ function libDrawSetup(d){
           }catch(e){}
         } else {
           const gmk=Array.isArray(m0.gmk)?m0.gmk.slice():[];
-          gmk.push({ k:g, x:Math.round(cx*1000)/1000, y:Math.round(cy*1000)/1000 });
+          gmk.push({ k:g, x:Math.round(cx*1000)/1000, y:Math.round(cy*1000)/1000, i:strokeId() });
           if(typeof syncSendMark==='function') syncSendMark(drawSi, { gmk });
         }
       } else {
@@ -7608,7 +7673,8 @@ function libDrawSetup(d){
       }
     } else if(curBlk._eraseDirty!=null){
       const si=curBlk._eraseDirty; curBlk._eraseDirty=null;
-      if(typeof syncSendMark==='function') syncSendMark(si, { draw: (sync.marks[si]&&sync.marks[si].draw)||[], gmk: (sync.marks[si]&&sync.marks[si].gmk)||[] });
+      const del = curBlk._eraseDel || []; curBlk._eraseDel = null;
+      if(typeof syncSendMark==='function') syncSendMark(si, { draw: (sync.marks[si]&&sync.marks[si].draw)||[], gmk: (sync.marks[si]&&sync.marks[si].gmk)||[] }, del);
     }
     cur=null; curBlk=null; drawSi=null;
   };
@@ -8014,7 +8080,7 @@ function renderLibretoBlocks(){
       // B2 (auditoría): sin `delete` — una "lápida" con todo vacío es lo que el
       // merge de la nube puede aplicar; borrando la clave, el parche no la incluía
       // y las pausas volvían al recargar.
-      syncSendMark(si, { text:null, pauses:[], accents:[], draw:[], gmk:[] });
+      syncSendMark(si, { text:null, pauses:[], accents:[], draw:[], gmk:[] }, '*');
     }
   };
   const wireFresh = ()=>{
@@ -8746,6 +8812,7 @@ async function syncConnect(role){
     .on('broadcast', { event:'ctl'    }, ({payload})=> onRemoteCtl(payload))
     .on('broadcast', { event:'pg'     }, ({payload})=> onRemotePg(payload))
     .on('broadcast', { event:'epreq'  }, ({payload})=> onRemoteEpReq(payload))
+    .on('broadcast', { event:'dir'    }, ({payload})=> onRemoteDir(payload))
     .on('presence', { event:'sync' }, ()=>{
       try{ sync.peers = Object.keys(ch.presenceState()).length; }catch(e){}
       updateSyncUI();
@@ -8971,8 +9038,41 @@ async function onRemoteEp(p){
 function syncSendOpen(key){
   if(!sync.isOn || !sync.channel) return;
   if(sync._applyingEp) return;
+  if(typeof isTalent==='function' && isTalent()) return;   // el actor sigue, no dirige
   const epId = (typeof currentEp!=='undefined' && currentEp) ? currentEp.id : null;
-  syncEmit('open', { key, epId }, true);   // nunca en cola
+  // el rol viaja en el mensaje: la tablet del actor solo abre el libreto cuando
+  // quien lo pide es el DIRECTOR (ver puerta del actor, más abajo)
+  syncEmit('open', { key, epId, role: sync.role }, true);   // nunca en cola
+}
+/* ═══ PUERTA DEL ACTOR ═══════════════════════════════════════════════
+   La tablet del actor no muestra el libreto por su cuenta: espera a que el
+   director abra el personaje que va a grabar. Hasta entonces enseña
+   «En espera del director…». */
+function dirIsWorking(){ return !!sync._dirOpen; }
+function setDirOpen(on){
+  const v = !!on;
+  if(sync._dirOpen === v) return;
+  sync._dirOpen = v;
+  try{ updateTalentGate(); }catch(e){}
+}
+// el director avisa de que sale del libreto → el actor vuelve a la espera
+function syncSendDir(open){
+  if(!sync.isOn || !sync.channel) return;
+  if(typeof isTalent==='function' && isTalent()) return;
+  if(sync.role !== 'tablet') return;                 // solo la tablet del director
+  syncEmit('dir', { open: !!open }, true);
+}
+function onRemoteDir(p){
+  if(!p || p.from===sync.meId) return;
+  setDirOpen(!!p.open);
+}
+// pinta u oculta el aviso de espera en la ventana del libreto del actor
+function updateTalentGate(){
+  try{
+    const d = (typeof pop2!=='undefined') ? pop2.doc : null; if(!d || !d.body) return;
+    const waiting = (typeof isTalent==='function' && isTalent()) && !dirIsWorking();
+    d.body.classList.toggle('waitdir', waiting);
+  }catch(e){}
 }
 // cambio de personaje RESALTADO (ligero): el otro dispositivo actualiza el
 // resaltado sin reconstruir el libreto → no pierde la posición de lectura.
@@ -8993,6 +9093,10 @@ function onRemoteHl(p){
 }
 function onRemoteOpen(p){
   if(!p || p.from===sync.meId) return;
+  // el director empezó a trabajar un personaje → se le abre el libreto al actor.
+  // Solo cuenta la tablet del DIRECTOR; 'undefined' cubre a un dispositivo que
+  // aún no tenga esta versión (mejor abrir de más que dejarlo esperando siempre).
+  if(p.role === 'tablet' || p.role === undefined) setDirOpen(true);
   // ¿el 'open' se refiere a un capítulo que NO tengo? pedirlo y esperar a que llegue
   if(p.epId && (typeof currentEp==='undefined' || !currentEp || currentEp.id!==p.epId)){
     sync._wantOpen = (p.key!==undefined ? p.key : null);
@@ -9022,6 +9126,14 @@ function onRemoteOpen(p){
 function onRemoteEpReq(p){
   if(!p || p.from===sync.meId) return;
   if(typeof currentEp!=='undefined' && currentEp && typeof syncSendEp==='function') syncSendEp();
+  // si soy el director y tengo el libreto abierto, repetir el estado: así la
+  // tablet del actor que se conecta más tarde no se queda esperando de balde
+  try{
+    if(sync.role==='tablet' && pop2 && pop2.doc && pop2.win && !pop2.win.closed){
+      syncSendDir(true);
+      if(pop2.key!==undefined) syncSendOpen(pop2.key);
+    }
+  }catch(e){}
 }
 // El escritorio recibe el libreto por sincronía (un mensaje de red, no un clic),
 // y el navegador BLOQUEA las ventanas emergentes que no nacen de un toque del
@@ -9816,20 +9928,38 @@ function onRemoteSave(p){
 // ---- marcas del libreto ----
 const _marksDirty = new Set();
 let _rpcMarks = true;
-function syncSendMark(si, mark){
+function syncSendMark(si, mark, del){
   const prev = Object.assign({}, sync.marks[si]);   // estado ANTES del cambio (para el historial)
-  sync.marks[si] = Object.assign(sync.marks[si]||{}, mark);
+  if(del === '*'){ sync.marks[si] = Object.assign(sync.marks[si]||{}, mark); }
+  else {
+    const curM = sync.marks[si] || {};
+    const next = Object.assign({}, curM, mark);
+    if(mark.draw !== undefined) next.draw = mergeDrawList(curM.draw, mark.draw, del);
+    if(mark.gmk  !== undefined) next.gmk  = mergeDrawList(curM.gmk,  mark.gmk,  del);
+    sync.marks[si] = next;
+  }
   try{ if(typeof recordEdit==='function') recordEdit(si, prev, mark); }catch(e){}
   _marksDirty.add(si);
   if(sync.channel){
-    syncEmit('mark', { si, mark:sync.marks[si] });
+    // 'd' = SOLO lo que cambió. Antes se enviaba el objeto completo y el receptor
+    // lo REEMPLAZABA: cuando dos dispositivos marcaban el mismo parlamento, cada
+    // envío borraba lo del otro y los trazos del actor no llegaban a las demás
+    // pantallas. 'mark' se conserva para clientes que aún no tengan esta versión.
+    syncEmit('mark', { si, d:mark, del: (del||null), mark:sync.marks[si] });
   }
   cloudSaveMarks();
   if(pop2 && pop2.doc) refreshBlock(si);
 }
 function onRemoteMark(p){
   if(!p || p.from===sync.meId) return;
-  sync.marks[p.si] = p.mark;
+  const delta = (p.d && typeof p.d==='object') ? p.d : (p.mark || {});
+  const cur = sync.marks[p.si] || {};
+  const next = Object.assign({}, cur, delta);
+  // trazos y gestos se FUNDEN por id: cada dispositivo aporta los suyos y nadie
+  // borra los del otro. El resto de campos los manda quien acaba de escribir.
+  if(delta.draw !== undefined) next.draw = mergeDrawList(cur.draw, delta.draw, p.del);
+  if(delta.gmk  !== undefined) next.gmk  = mergeDrawList(cur.gmk,  delta.gmk,  p.del);
+  sync.marks[p.si] = next;
   if(pop2 && pop2.doc) refreshBlock(p.si);
 }
 function cloudSaveMarks(){
