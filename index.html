@@ -1477,7 +1477,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.16.0-nube · 28-ago-2026';
+const APP_VERSION = 'v10.16.1-nube · 31-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -1765,7 +1765,7 @@ function askRoleAtLogin(done){
     +      '<span class="lab">Tablet · Director<small>Control total del desglose<br>y todas las herramientas</small></span>'
     +    '</button>'
     +    '<button class="rp-opt" id="rTal">'+tabletSVG
-    +      '<span class="lab">Tablet · Actor<small>Solo marcar: pincel, pausas<br>y más rápido / más lento</small></span>'
+    +      '<span class="lab">Tablet · Actor<small>Solo el pincel; el director<br>controla el desplazamiento</small></span>'
     +    '</button>'
     +  '</div>'
     +'</div>'
@@ -6033,18 +6033,30 @@ body.light .dict-syn{ background:rgba(37,99,235,.1); color:#1d4ed8; border-color
 .spl-tc{ width:180px; background:#0f1215; border:1px solid #2a2f36; color:#e6e7ea; border-radius:9px; padding:9px 12px; font-family:'JetBrains Mono',ui-monospace,monospace; font-size:14px; letter-spacing:1px; outline:none; }
 .spl-tc:focus{ border-color:#4ADE80; }
 
-/* ─── Tablet ACTOR: solo marcar (pincel, pausas, más rápido / más lento) ─── */
+/* ─── Tablet ACTOR: SOLO el pincel ─── */
+/* El actor no navega ni edita: el director manda la posición y el actor solo
+   marca encima con el pincel. Se oculta todo lo demás de la barra superior… */
 body.is-talent #lVid, body.is-talent #lFind, body.is-talent #lPron, body.is-talent #lTpad,
 body.is-talent #lFontDn, body.is-talent #lFontUp, body.is-talent #lCharSel, body.is-talent #lScope,
-body.is-talent .lbar,
-body.is-talent #tComp, body.is-talent #tDict, body.is-talent #tFind, body.is-talent #tPron,
-body.is-talent .ltools .tt, body.is-talent #tPg, body.is-talent #tTime, body.is-talent #tGoTime,
-body.is-talent .mtools .edit,
-body.is-talent .mtools [data-act="compress"],
-body.is-talent .mtools [data-act="split"],
-body.is-talent .mtools [data-act="merge"],
-body.is-talent .mtools [data-act="done"]{ display:none !important; }
-/* del cajón de la tablet, el actor conserva: Pincel (tDraw) y Grabada */
+body.is-talent #lTablet, body.is-talent .lh .goto,
+/* …la barra de anchos, el riel de páginas y el botón de página grabada… */
+body.is-talent .lbar, body.is-talent .lchips, body.is-talent .lrec,
+body.is-talent #dtabL,
+/* …y las herramientas de marcación en línea (pausa, acento, dividir, unir…). */
+body.is-talent .mtools{ display:none !important; }
+/* Del cajón de herramientas el actor conserva SOLO el Pincel. */
+body.is-talent .ltools > *{ display:none !important; }
+body.is-talent .ltools > #tHide,
+body.is-talent .ltools > #tDraw{ display:block !important; }
+
+/* El scroll lo mueve el DIRECTOR: en el actor el libreto no se desplaza solo
+   con el dedo — sigue la posición que llega por sincronía (scrollTop remoto
+   sigue funcionando con overflow:hidden). */
+body.is-talent .lwrap{
+  overflow:hidden !important;
+  touch-action:none !important;
+  overscroll-behavior:none !important;
+}
 body.light .comp-card{ background:#fff; border-color:#e2ddf2; }
 body.light .comp-orig{ background:#f3f1fb; color:#2a2540; border-color:#e2ddf2; }
 
@@ -7084,6 +7096,9 @@ function buildLibretoDoc(pc){
   pop2._lastScrollTx = 0;
   // marcar interacción real del usuario (dedo/rueda/teclado) → solo entonces emitimos
   const mark = ()=>{
+    // Tablet ACTOR: tocar el libreto es DIBUJAR, no navegar → nunca toma el mando
+    // del scroll ni corta el seguimiento remoto del director.
+    if(typeof isTalent==='function' && isTalent()) return;
     pop2._interact = performance.now();
     pop2._rTargetPx = null; pop2._rVel = 0;       // mi mano manda: cortar el seguimiento remoto YA
     pop2._applyRemote = false;
@@ -7097,6 +7112,7 @@ function buildLibretoDoc(pc){
     const now = performance.now();
     pop2._navAt = now;
     try{ libHighlightCenter(); }catch(e){}          // mantener el chip de página al día con la lectura
+    if(typeof isTalent==='function' && isTalent()) return;   // tablet actor: solo recibe, nunca manda scroll
     if(typeof sync==='undefined' || !sync.isOn) return;
     if(now < (pop2._suppressTx||0)) return;        // silencio breve tras abrir (evita floods de layout)
     const pos = libViewPos();
@@ -7131,6 +7147,7 @@ function libViewPos(){
 // emisor unificado: solo la tablet, y solo si hubo interacción real del usuario
 function emitLibPos(force){
   if(typeof TP!=='undefined' && TP.on) return;   // modo trackpad: no emitir posición
+  if(typeof isTalent==='function' && isTalent()) return;   // tablet actor: no controla el scroll
   if(!sync.isOn || !pop2.els) return;
   if(!force){
     const t = pop2._interact || 0;
@@ -9226,6 +9243,7 @@ function onRemotePos(p){
 // ---- scroll manual espejado (deslizar la tablet mueve el computador) ----
 function syncSendScroll(pos){
   if(!sync.isOn || !sync.channel) return;
+  if(typeof isTalent==='function' && isTalent()) return;   // tablet actor: el scroll lo manda el director
   syncEmit('scroll', pos, true);       // {b,f} — no se encola
 }
 function resolveTargetPx(p){
