@@ -226,6 +226,28 @@ body:not(.ep-open) #epLine{display:none !important}
 @keyframes sp{to{transform:rotate(360deg)}}
 /* ===== acceso ===== */
 body.locked .wrap{filter:blur(7px);pointer-events:none;user-select:none}
+/* ─── Tablet ACTOR en espera: la app entera desaparece ─── */
+#talentGate{ display:none; }
+body.talent-wait .wrap,
+body.talent-wait .appbar,
+body.talent-wait #ddlToasts{ display:none !important; }
+body.talent-wait #talentGate{
+  display:flex; position:fixed; inset:0; z-index:8000;
+  align-items:center; justify-content:center; padding:26px;
+  background:#0b0718;
+}
+.tg-card{ text-align:center; max-width:430px; }
+.tg-dot{ width:13px; height:13px; border-radius:50%; margin:0 auto 20px; background:#22C55E;
+  box-shadow:0 0 0 0 rgba(34,197,94,.55); animation:tgPulse 1.8s ease-out infinite; }
+@keyframes tgPulse{ 0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)} 70%{box-shadow:0 0 0 18px rgba(34,197,94,0)} 100%{box-shadow:0 0 0 0 rgba(34,197,94,0)} }
+@media (prefers-reduced-motion:reduce){ .tg-dot{ animation:none; } }
+.tg-t{ font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700; color:#ECE9FB; margin-bottom:10px; }
+.tg-s{ font-family:'Inter',sans-serif; font-size:14px; line-height:1.6; color:#8B84B0; }
+.tg-who{ font-family:'Inter',sans-serif; font-size:12px; color:#5d5680; margin-top:18px; }
+.tg-btn{ margin-top:14px; padding:9px 18px; border-radius:99px; cursor:pointer;
+  background:transparent; border:1px solid #2a2350; color:#8B84B0;
+  font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; }
+.tg-btn:hover{ border-color:#22C55E; color:#ECE9FB; }
 .gate{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;
   background:radial-gradient(900px 500px at 70% 20%, rgba(95,200,90,.16), transparent 60%), rgba(10,6,26,.88);
   backdrop-filter:blur(4px)}
@@ -1378,6 +1400,18 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
   </div>
 </div>
 
+<!-- Tablet ACTOR: nada a la vista (ni programas ni episodios) hasta que el
+     director abre un personaje. Fuera de .wrap para que no herede su blur. -->
+<div id="talentGate" role="status" aria-live="polite">
+  <div class="tg-card">
+    <div class="tg-dot"></div>
+    <div class="tg-t">En espera del director</div>
+    <div class="tg-s">El libreto aparecerá aquí en cuanto el director abra el personaje que vas a grabar.</div>
+    <div class="tg-who" id="tgWho"></div>
+    <button class="tg-btn" id="tgRole" type="button">Cambiar de dispositivo</button>
+  </div>
+</div>
+
 <script>
 /* ============================================================
    DDL_UI · toasts, modal de confirmación, skeleton, progreso,
@@ -1485,7 +1519,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.18.0-nube · 31-ago-2026';
+const APP_VERSION = 'v10.18.1-nube · 31-ago-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -1736,7 +1770,7 @@ function pickRole(){
     +'<button id="rTab" style="width:100%;padding:15px;margin-bottom:10px;border:none;border-radius:12px;background:linear-gradient(135deg,#5FC85A,#4CB84C);color:#160f33;font-family:\'Space Grotesk\',sans-serif;font-weight:700;font-size:15px;cursor:pointer">📱 Soy la TABLET (control)</button>'
     +'<button id="rPc" style="width:100%;padding:15px;border:1px solid #2a2350;border-radius:12px;background:#191238;color:#ECE9FB;font-family:\'Space Grotesk\',sans-serif;font-weight:600;font-size:15px;cursor:pointer">💻 Soy el ESCRITORIO (muestra el libreto)</button>';
   ov.appendChild(card); document.body.appendChild(ov);
-  const choose=(role)=>{ try{localStorage.setItem('ddl_role',role);}catch(e){} DEVROLE=role; sync.role=role; ov.remove(); if(sync.isOn) syncDisconnect(); syncConnect(role); };
+  const choose=(role)=>{ try{localStorage.setItem('ddl_role',role);}catch(e){} DEVROLE=role; sync.role=role; ov.remove(); try{ applyDeviceRole(); }catch(e){} if(sync.isOn) syncDisconnect(); syncConnect(role); };
   card.querySelector('#rTab').onclick=()=>choose('tablet');
   card.querySelector('#rPc').onclick=()=>choose('pc');
 }
@@ -8828,6 +8862,9 @@ async function syncConnect(role){
         updateSyncUI();
         // marcas al día en segundo plano (no bloquea la conexión)
         if(typeof loadCloudMarks==='function') loadCloudMarks().catch(()=>{});
+        // tablet ACTOR: preguntar si el director ya está en un personaje, para no
+        // quedarse en «en espera» cuando en realidad la sesión ya había empezado
+        if(role0==='talent'){ try{ syncEmit('epreq', {}); }catch(e){} }
         if(currentEp) syncSendEp();
         // TABLET (trackpad): reenviar al escritorio qué libreto mostrar
         if(typeof TP!=='undefined' && TP.on && typeof syncSendOpen==='function'){
@@ -9068,10 +9105,22 @@ function onRemoteDir(p){
 }
 // pinta u oculta el aviso de espera en la ventana del libreto del actor
 function updateTalentGate(){
+  const waiting = (typeof isTalent==='function' && isTalent()) && !dirIsWorking();
+  // ventana principal: sin biblioteca, sin programas y sin episodios
   try{
-    const d = (typeof pop2!=='undefined') ? pop2.doc : null; if(!d || !d.body) return;
-    const waiting = (typeof isTalent==='function' && isTalent()) && !dirIsWorking();
-    d.body.classList.toggle('waitdir', waiting);
+    document.body.classList.toggle('talent-wait', waiting);
+    const btn = document.getElementById('tgRole');
+    if(btn && !btn._wired){ btn._wired = true; btn.onclick = ()=>{ try{ askRoleAtLogin(()=>{}); }catch(e){ try{ pickRole(); }catch(_){} } }; }
+    if(waiting){
+      const w = document.getElementById('tgWho');
+      if(w) w.textContent = (typeof WORKSPACE!=='undefined' && WORKSPACE && WORKSPACE.name)
+        ? WORKSPACE.name + ' · Tablet Actor' : 'Tablet Actor';
+    }
+  }catch(e){}
+  // ventana del libreto (si estaba abierta de antes)
+  try{
+    const d = (typeof pop2!=='undefined') ? pop2.doc : null;
+    if(d && d.body) d.body.classList.toggle('waitdir', waiting);
   }catch(e){}
 }
 // cambio de personaje RESALTADO (ligero): el otro dispositivo actualiza el
