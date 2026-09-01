@@ -993,6 +993,32 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .ddlm-go:disabled{ opacity:.6; cursor:default; }
 .ddlm-fmt{ margin-right:auto; background:transparent; color:#8ab6ff; border:1px solid #2a3550; border-radius:9px; padding:9px 12px; font-family:'Inter',sans-serif; font-weight:600; font-size:13px; cursor:pointer; }
 .ddlm-fmt:hover{ border-color:#4d7cff; color:#a9c8ff; }
+/* ===== Cuentas y accesos ===== */
+.acc2card{ width:min(560px,96vw); }
+.acc2-load, .acc2-msg{ color:#8b9099; font-size:13px; text-align:center; padding:22px 10px; line-height:1.6; }
+.acc2-msg b{ color:#f2f3f5; }
+.acc2-msg small, .acc2-load small{ color:#6b7280; font-size:11.5px; }
+.acc2-sum{ font-size:12px; color:#6b7280; margin-bottom:10px; }
+.acc2-list{ display:flex; flex-direction:column; gap:6px; max-height:48vh; overflow:auto; }
+.acc2-row{ display:flex; align-items:center; gap:11px; padding:9px 11px; border-radius:11px;
+  background:#0f1215; border:1px solid #1c1e22; }
+.acc2-row.on{ border-color:rgba(34,197,94,.4); background:rgba(34,197,94,.06); }
+.acc2-av{ flex:0 0 auto; width:30px; height:30px; border-radius:9px; display:grid; place-items:center;
+  background:#1b1f24; color:#8b9099; font-size:11px; font-weight:700; }
+.acc2-row.on .acc2-av{ background:rgba(34,197,94,.16); color:#4ADE80; }
+.acc2-meta{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.acc2-meta b{ font-size:13px; font-weight:600; color:#e6e7ea; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.acc2-meta b i{ font-style:normal; color:#6b7280; font-weight:500; }
+.acc2-meta code{ font-family:'JetBrains Mono',ui-monospace,monospace; font-size:11.5px; color:#8b9099;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.acc2-tags{ flex:0 0 auto; display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
+.acc2-rol{ font-size:10px; font-weight:700; letter-spacing:.4px; text-transform:uppercase;
+  color:#8b9099; background:#1b1f24; border-radius:99px; padding:2px 8px; white-space:nowrap; }
+.acc2-rol.adm{ color:#FBBF24; background:rgba(251,191,36,.14); }
+.acc2-on{ font-size:10.5px; font-weight:700; color:#4ADE80; white-space:nowrap; }
+.acc2-since{ font-size:10.5px; color:#6b7280; white-space:nowrap; }
+.acc2-foot{ margin-top:12px; padding-top:10px; border-top:1px solid #1c1e22; font-size:11.5px; color:#6b7280; line-height:1.5; }
+
 /* ===== Quién está conectado (presencia global) ===== */
 .tb-online{
   background:#0f1215; border:1px solid #23262b; border-radius:99px;
@@ -1383,6 +1409,7 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
         <div class="mh">Configuración</div>
         <button role="menuitem" onclick="closeUserMenu();showAccountProfile()">Perfil de la cuenta</button>
         <button role="menuitem" onclick="closeUserMenu();showWorkspacePicker(true)">Espacio de trabajo</button>
+        <button role="menuitem" id="miAccounts" style="display:none" onclick="closeUserMenu();showAccounts()">Cuentas y accesos</button>
         <div class="mdiv" aria-hidden="true"></div>
         <button role="menuitem" onclick="closeUserMenu();showTutorial()">Ayuda y documentación</button>
         <button role="menuitem" class="danger" onclick="closeUserMenu();document.getElementById('btnOut').click()">Cerrar sesión</button>
@@ -1593,7 +1620,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.23.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.24.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -1686,6 +1713,7 @@ function authUnlock(){
     if(typeof ddlWorkerStart==='function' && typeof libBoot==='function'){
       try{ ddlWorkerStart(); libBoot(); }catch(e){ console.error(e); }
       try{ onlineConnect(); }catch(e){}   // presencia global: quien esta conectado
+      try{ loadMyRole(); }catch(e){}      // ¿admin? -> se le ofrece la lista de cuentas
       try{ refreshTopbar(); }catch(e){}
     } else setTimeout(hook, 120);
   })();
@@ -9474,6 +9502,95 @@ function renderOnlinePanel(){
     + (online.others
         ? '<div class="onl-foot">y '+online.others+' persona'+(online.others===1?'':'s')+' en otros espacios de trabajo</div>'
         : '');
+}
+
+
+/* ═══ CUENTAS Y ACCESOS ════════════════════════════════════════════════
+   De donde salen los correos: de la tabla `profiles`. Su politica RLS
+   (profiles_read) deja leer SOLO la propia fila... salvo a un administrador,
+   que las ve todas. Asi que la lista completa la sirve la base de datos, no el
+   navegador, y un usuario normal no puede sacarla aunque abra la consola.
+   Ojo: `created_at` es cuando se REGISTRO la cuenta. La ultima entrada la
+   guarda auth.users.last_sign_in_at, que no es accesible desde el navegador
+   sin una funcion SQL; por eso aqui se muestra el registro y quien esta en
+   linea AHORA (eso viene de la presencia en vivo). */
+let MYROLE = null;
+let acctDir = null;                       // id de usuario -> fila de profiles
+async function loadMyRole(){
+  if(!sb || !sbUser || window.OFFLINE) return;
+  try{
+    const { data } = await sb.from('profiles').select('role').eq('id', sbUser.id).single();
+    MYROLE = (data && data.role) || 'member';
+  }catch(e){ MYROLE = null; }
+  try{
+    const it = document.getElementById('miAccounts');
+    if(it) it.style.display = (MYROLE==='admin') ? '' : 'none';
+  }catch(e){}
+}
+function acctRoleLabel(r){
+  return r==='admin' ? 'Administrador' : r==='casting' ? 'Casting' : 'Miembro';
+}
+function acctDate(s){
+  try{ return new Date(s).toLocaleDateString('es', {day:'2-digit', month:'short', year:'numeric'}); }
+  catch(e){ return ''; }
+}
+async function showAccounts(){
+  const old=document.getElementById('acctsOv'); if(old) old.remove();
+  const ov=document.createElement('div'); ov.id='acctsOv'; ov.className='ddlm-ov';
+  ov.innerHTML='<div class="ddlm-card acc2card" role="dialog" aria-modal="true" aria-label="Cuentas y accesos">'
+    +'<div class="ddlm-kicker">Plataforma</div>'
+    +'<h2>Cuentas y accesos</h2>'
+    +'<div class="acc2-body" id="acc2Body"><div class="acc2-load">Cargando cuentas…</div></div>'
+    +'<div class="ddlm-btns"><button class="ddlm-cancel" id="acc2Close">Cerrar</button></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  ov.querySelector('#acc2Close').onclick=()=> ov.remove();
+  ov.addEventListener('mousedown', e=>{ if(e.target===ov) ov.remove(); });
+
+  let rows=[], err=null;
+  try{
+    const r = await sb.from('profiles').select('id,email,full_name,role,created_at').order('created_at');
+    if(r.error) err=r.error; else rows = r.data || [];
+  }catch(e){ err=e; }
+
+  const body = document.getElementById('acc2Body'); if(!body) return;
+  if(err){
+    body.innerHTML='<div class="acc2-msg">No se pudieron leer las cuentas.<br><small>'+esc((err&&err.message)||'')+'</small></div>';
+    return;
+  }
+  acctDir = {}; for(const r of rows) acctDir[r.id] = r;
+  const soyAdmin = !!rows.find(r=> r.id===(sbUser&&sbUser.id) && r.role==='admin');
+  if(!soyAdmin && rows.length<=1){
+    body.innerHTML='<div class="acc2-msg">Solo un <b>administrador</b> puede ver la lista de cuentas de la plataforma.'
+      +'<br><small>Tu cuenta: '+esc((sbUser&&sbUser.email)||'')+'</small></div>';
+    return;
+  }
+  const enLinea = new Set((online.people||[]).map(p=>p.id));
+  const orden = rows.slice().sort((a,b)=>
+      (enLinea.has(b.id)?1:0)-(enLinea.has(a.id)?1:0)
+   || String(a.full_name||a.email||'').localeCompare(String(b.full_name||b.email||'')));
+  body.innerHTML =
+      '<div class="acc2-sum">'+rows.length+' cuenta'+(rows.length===1?'':'s')
+    + ' · '+enLinea.size+' en línea ahora</div>'
+    + '<div class="acc2-list">'
+    + orden.map(r=>{
+        const nom = r.full_name || (r.email||'').split('@')[0] || 'Sin nombre';
+        const on  = enLinea.has(r.id);
+        return '<div class="acc2-row'+(on?' on':'')+'">'
+          + '<span class="acc2-av">'+esc(nom.trim().slice(0,2).toUpperCase())+'</span>'
+          + '<span class="acc2-meta">'
+          +   '<b>'+esc(nom)+(r.id===(sbUser&&sbUser.id)?' <i>(tú)</i>':'')+'</b>'
+          +   '<code>'+esc(r.email||'sin correo')+'</code>'
+          + '</span>'
+          + '<span class="acc2-tags">'
+          +   '<span class="acc2-rol'+(r.role==='admin'?' adm':'')+'">'+acctRoleLabel(r.role)+'</span>'
+          +   (on ? '<span class="acc2-on">● En línea</span>'
+                  : '<span class="acc2-since">Alta '+esc(acctDate(r.created_at))+'</span>')
+          + '</span>'
+          + '</div>';
+      }).join('')
+    + '</div>'
+    + '<div class="acc2-foot">«En línea» es en tiempo real. La fecha es el alta de la cuenta: la plataforma no guarda un historial de entradas.</div>';
 }
 
 function updateSyncUI(){
