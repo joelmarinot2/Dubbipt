@@ -1519,7 +1519,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.19.1-nube · 01-sep-2026';
+const APP_VERSION = 'v10.20.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -2611,7 +2611,7 @@ function contarIntervenciones(dial){
   const t = (dial||'').replace(/\s+/g,' ').trim();
   if(!t) return 0;
   const habladas = t.replace(/[\(\[][^)\]]*[\)\]]/g,' ').replace(/\s+/g,' ').trim();
-  const nPal = habladas ? habladas.split(/\s+/).filter(w=>/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9]/.test(w)).length : 0;
+  const nPal = habladas ? habladas.split(/\s+/).filter(w=>/[\p{L}\p{N}]/u.test(w)).length : 0;
   if(nPal > 0) return Math.max(1, Math.ceil(nPal/12));
   if(/[\(\[][^)\]]*[\)\]]/.test(t)) return 1;   // solo acotación
   return 1;                                          // algún texto suelto
@@ -2673,7 +2673,7 @@ function desgloseByRules(){
     // Un nombre válido va en MAYÚSCULAS (incluidas abreviaturas como REV./DR.) y
     // contiene al menos una letra o dígito.
     const nameCore = name.replace(/[\.\'\u2019]/g,'').replace(/\s+/g,' ').trim();
-    const esNombre = nameCore && nameCore.length>=1 && name.toUpperCase()===name && /[A-ZÁÉÍÓÚÜÑ0-9]/.test(name);
+    const esNombre = nameCore && nameCore.length>=1 && name.toUpperCase()===name && /[\p{Lu}\p{N}]/u.test(name);
     if(esNombre){
       const ints = contarIntervenciones(dial);
       if(ints>0){
@@ -2726,7 +2726,7 @@ function docxCue(text){
   let rest = colon>=0 ? text.slice(colon+1).trim() : '';
   head = head.replace(/\s*[\(\[][^)\]]*[\)\]]\s*$/,'').trim();   // quita "(V.O.)" final
   if(head.length < 2 || head.length > 48) return null;
-  if(!/[A-ZÁÉÍÓÚÜÑ]/.test(head)) return null;
+  if(!/\p{Lu}/u.test(head)) return null;
   if(head !== head.toUpperCase()) return null;                  // el nombre va en MAYÚSCULAS
   if(colon < 0){
     const hc = head.replace(/\./g,' ').replace(/\s+/g,' ').trim();   // permite REV./DR./SR.
@@ -2988,7 +2988,18 @@ let pageData = {};   // página -> {items, lines, marks}
 let charMarks = {};  // key -> [{page, mi, tcSec}] en orden de lectura
 let tcIndex = [];    // [{sec, page, lineIdx}] todos los TC del libreto, en orden
 
+/* Letras cuyo diacritico es un TRAZO, no una marca combinable: NFD no las
+   descompone, asi que se caian de la clave. La Ł de MSCISŁAWSKI desaparecia
+   y el nombre quedaba como MSCISAWSKI: funcionaba de milagro (se caia en los
+   dos lados) pero descuadraba el resaltado y confundia nombres parecidos.
+   El mapa es 1 caracter -> 1 caracter: normSameLen DEBE conservar la longitud
+   para que las posiciones sigan cuadrando con el texto del PDF. */
+const LAT_STROKE = { 'Ł':'L','ł':'L','Ø':'O','ø':'O','Đ':'D','đ':'D','Ð':'D','ð':'D','Ħ':'H','ħ':'H','Ŧ':'T','ŧ':'T','Ɨ':'I','ɨ':'I','Ɖ':'D','Ƶ':'Z','ƶ':'Z' };
+const LAT_STROKE_RE = /[ŁłØøĐđÐðĦħŦŧƗɨƉƵƶ]/g;
+function latFold(s){ return String(s||'').replace(LAT_STROKE_RE, ch => LAT_STROKE[ch] || ch); }
 function normChar(ch){
+  const m = LAT_STROKE[ch];
+  if(m) return m;                       // Ł -> L (NFD no la descompone)
   const d = ch.normalize('NFD');
   return (d[0]||ch).toUpperCase();
 }
@@ -3094,7 +3105,7 @@ async function scanPdf(){
         if(hs.length < 2) return;
         let chosen=null;
         for(const key of wanted){
-          const ks = key.replace(/[^A-Z0-9]/g,'');  // strip apostrophes, dots, spaces → OBRIEN, DRKIM
+          const ks = latFold(key).replace(/[^A-Z0-9]/g,'');  // Ł->L, y fuera apostrofos, puntos y espacios: OBRIEN, DRKIM, MSCISLAWSKI
           if(ks.length < 2) continue;
           if(hs.startsWith(ks)){
             const a0 = hmap[0], a1 = hmap[ks.length-1];
@@ -3114,7 +3125,7 @@ async function scanPdf(){
           const tail = headerTail(after);            // lo que queda tras quitar el relleno
           const hasColon = /^[:：]/.test(tail);
           const dlg = tail.replace(/^[:：]\s*/,'').trim();
-          const colonThenCap = hasColon && /^[A-ZÁÉÍÓÚÜÑ0-9¡¿"“(\[]/.test(dlg);
+          const colonThenCap = hasColon && /^[\p{Lu}\p{N}¡¿"“(\[]/u.test(dlg);
           if(nameIsUpper && (tail === '' || colonThenCap)){
             marks.push({key:chosen.key, lineIdx:li, at:chosen.at, len:chosen.len,
                         segs:segsFromRange(line, chosen.at, chosen.at+chosen.len)});
@@ -3138,7 +3149,7 @@ async function scanPdf(){
         let head = colonAt>=0 ? raw.slice(0,colonAt) : raw;
         const headClean = head.replace(/[\(\[][^)\]]*[\)\]]/g,' ').replace(/['"“”‘’]/g,'').replace(/\s+/g,' ').trim();
         if(headClean.length < 2 || headClean.length > 40) return;
-        if(!/[A-ZÁÉÍÓÚÜÑ]/.test(headClean)) return;
+        if(!/\p{Lu}/u.test(headClean)) return;
         if(headClean !== headClean.toUpperCase()) return;
         const keyN = norm(headClean);
         const flat = keyN.replace(/[^A-Z0-9]/g,'');
@@ -3155,10 +3166,10 @@ async function scanPdf(){
           if(/[!?¡¿,;]/.test(hcCheck.replace(/[,;]\s*$/,''))) return;
         } else {
           const after = raw.slice(colonAt+1).trim();
-          if(after && !/[A-Za-zÁÉÍÓÚÜÑ0-9¡¿"“(\[]/.test(after) && !TC_RE.test(after)) return;
+          if(after && !/[\p{L}\p{N}¡¿"“(\[]/u.test(after) && !TC_RE.test(after)) return;
         }
         let at = line.text.indexOf(headClean);
-        if(at < 0){ at = line.text.search(/[A-ZÁÉÍÓÚÜÑ]/); if(at < 0) at = 0; }
+        if(at < 0){ at = line.text.search(/\p{Lu}/u); if(at < 0) at = 0; }
         const len = Math.min(headClean.length, Math.max(1, line.text.length - at));
         marks.push({ key:keyN, lineIdx:li, at, len, segs:segsFromRange(line, at, at+len) });
       });
@@ -3455,7 +3466,7 @@ function buildScript(){
 let pronIdx = {};
 function buildPronIndex(){
   pronIdx = {};
-  const re = /([A-ZÁÉÍÓÚÜÑ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ'’-]*)\s*\(\s*([a-záéíóúüñ][^)]{0,48})\)/g;
+  const re = /(\p{Lu}[\p{L}'’-]*)\s*\(\s*(\p{Ll}[^)]{0,48})\)/gu;
   for(const b of script){
     const txt = b.lines.join(' ');
     let m;
@@ -8483,7 +8494,7 @@ function applyMarks(si, rawText){
       while(j<words.length && !/\)/.test(words[j].t)) j++;
       if(j<words.length){
         for(let k2=i;k2<=j;k2++) pr.add(words[k2].wi);
-        if(i>0 && /^[¡¿"“(]*[A-ZÁÉÍÓÚÜÑ]/.test(words[i-1].t)) prn.add(words[i-1].wi);
+        if(i>0 && /^[¡¿"“(]*\p{Lu}/u.test(words[i-1].t)) prn.add(words[i-1].wi);
         i = j;
       }
     }
@@ -11369,7 +11380,7 @@ function studioAutoMark(){
         // Peso de cada palabra ≈ su duración al decirla (letras + transición),
         // en vez de repartir el tiempo por igual entre todas.
         const wpe = words.map(w=>{
-          const letras = (w.match(/[0-9A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g)||[]).length;
+          const letras = (w.match(/[\p{L}\p{N}]/gu)||[]).length;
           return Math.max(1, letras) + 1.7;
         });
         const wsum = wpe.reduce((a2,v)=>a2+v, 0);
