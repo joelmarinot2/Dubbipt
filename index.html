@@ -1519,7 +1519,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.20.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.20.1-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -3094,14 +3094,22 @@ async function scanPdf(){
     if(wanted.length){
       lines.forEach((line,li)=>{
         const ns = normSameLen(line.text);
-        let colonAt = -1;
-        const isTCline = /^\s*\d{1,2}\s*:/.test(line.text);
-        if(!isTCline){
-          for(let i=0;i<ns.length;i++){ const ch=line.text[i]; if(ch===':'||ch==='：'){ colonAt=i; break; } }
+        // Un TIMECODE al principio del renglón no forma parte del nombre.
+        // LETTER acepta cifras, así que "01:00:15:03 MSCISLAWSKI" producía
+        // "01001503MSCISLAWSKI" y la comparación (que ancla al principio)
+        // fallaba: el personaje no se detectaba nunca en esos guiones.
+        let scanFrom = 0;
+        const _ltc = (typeof leadTC==='function') ? leadTC(line.text) : null;
+        if(_ltc){
+          if(!_ltc.rest) return;                       // el renglón es solo timecode
+          const k = line.text.lastIndexOf(_ltc.rest);
+          if(k > 0) scanFrom = k;
         }
+        let colonAt = -1;
+        for(let i=scanFrom;i<ns.length;i++){ const ch=line.text[i]; if(ch===':'||ch==='：'){ colonAt=i; break; } }
         const headEnd = colonAt>=0 ? colonAt : ns.length;
         let hs=''; const hmap=[];
-        for(let i=0;i<headEnd;i++){ if(LETTER.test(ns[i]) && !isIgnorable(ns[i])){ hs+=ns[i]; hmap.push(i); } }
+        for(let i=scanFrom;i<headEnd;i++){ if(LETTER.test(ns[i]) && !isIgnorable(ns[i])){ hs+=ns[i]; hmap.push(i); } }
         if(hs.length < 2) return;
         let chosen=null;
         for(const key of wanted){
@@ -3109,8 +3117,8 @@ async function scanPdf(){
           if(ks.length < 2) continue;
           if(hs.startsWith(ks)){
             const a0 = hmap[0], a1 = hmap[ks.length-1];
-            const cand = { key, at:a0, len:a1-a0+1 };
-            if(hs.length === ks.length){ chosen=cand; break; }
+            const cand = { key, at:a0, len:a1-a0+1, exact:(hs.length === ks.length) };
+            if(cand.exact){ chosen=cand; break; }
             if(!chosen){ chosen=cand; }
           }
         }
@@ -3126,7 +3134,11 @@ async function scanPdf(){
           const hasColon = /^[:：]/.test(tail);
           const dlg = tail.replace(/^[:：]\s*/,'').trim();
           const colonThenCap = hasColon && /^[\p{Lu}\p{N}¡¿"“(\[]/u.test(dlg);
-          if(nameIsUpper && (tail === '' || colonThenCap)){
+          // No todos los guiones escriben el nombre en VERSALES: muchos guiones
+          // polacos usan "Mścisławski:". Se acepta si el renglón no contiene
+          // nada más que ese nombre del desglose y detrás vienen los dos puntos.
+          const nameOk = nameIsUpper || (chosen.exact && hasColon);
+          if(nameOk && (tail === '' || colonThenCap)){
             marks.push({key:chosen.key, lineIdx:li, at:chosen.at, len:chosen.len,
                         segs:segsFromRange(line, chosen.at, chosen.at+chosen.len)});
           }
@@ -3202,6 +3214,26 @@ async function scanPdf(){
   }
   const missingChars = chars.filter(c=> !detected.has(c.key));
   const missing = missingChars.map(c=>c.display);
+  // Para cada personaje que falta: ¿su nombre aparece siquiera en el PDF? Saber
+  // si el guion NO lo nombra o si está y el lector lo descartó ahorra adivinar.
+  window._scanMissingWhy = {};
+  try{
+    for(const c of missingChars){
+      const ks = latFold(c.key).replace(/[^A-Z0-9]/g,'');
+      if(ks.length < 2) continue;
+      let hit = null;
+      for(let pp=1; pp<=numPages && !hit; pp++){
+        const pd = pageData[pp]; if(!pd) continue;
+        for(const ln of pd.lines){
+          const flat = normSameLen(ln.text).replace(/[^A-Z0-9]/g,'');
+          if(flat.includes(ks)){ hit = { page:pp, text:ln.text.trim().slice(0,90) }; break; }
+        }
+      }
+      window._scanMissingWhy[c.key] = hit
+        ? { display:c.display, page:hit.page, sample:hit.text }
+        : { display:c.display, page:null, sample:null };
+    }
+  }catch(e){ console.warn('diagnostico de personajes', e); }
   window._scanMissingKeys = new Set(missingChars.map(c=>c.key));
   console.log('[scan] hoja='+(window._deskSheet||'?')+' · desglose='+chars.length
     +' · detectados='+detected.size+(missing.length?' · SIN detectar: '+missing.join(', '):' · todos ✓'));
@@ -3229,8 +3261,16 @@ function showScanMissing(){
   ov.innerHTML = '<div style="background:#181233;border:1px solid #2a2350;border-radius:16px;max-width:520px;width:100%;max-height:78vh;overflow:auto;padding:20px 22px;font-family:Inter,sans-serif;color:#ECE9FB">'
     + '<div style="font-family:Space Grotesk,sans-serif;font-size:17px;font-weight:700;margin-bottom:6px">Sin encontrar en el libreto</div>'
     + '<div style="font-size:13px;color:#8B84B0;line-height:1.5;margin-bottom:14px">Estos '+names.length+' personajes están en el desglose pero no se localizó ninguna cabecera suya en el libreto. Suele pasar cuando el nombre está escrito distinto en cada sitio (tildes, puntos, comas) o cuando el personaje no habla en este capítulo.</div>'
-    + '<ul style="margin:0 0 16px;padding-left:20px;font-size:14px;line-height:1.8">'
-    + names.map(n=>'<li>'+esc(n)+'</li>').join('')
+    + '<ul style="margin:0 0 16px;padding-left:20px;font-size:14px;line-height:1.7">'
+    + names.map(n=>{
+        const w = Object.values(window._scanMissingWhy||{}).find(x=>x && x.display===n);
+        if(!w) return '<li>'+esc(n)+'</li>';
+        return '<li>'+esc(n)
+          + (w.page
+             ? '<div style="font-size:12px;color:#8B84B0;margin:2px 0 8px">Sí está en el libreto (pág. '+w.page+'), pero el renglón no se leyó como cabecera:<br><code style="color:#c7c9cd">'+esc(w.sample)+'</code></div>'
+             : '<div style="font-size:12px;color:#8B84B0;margin:2px 0 8px">No aparece en ninguna página del libreto.</div>')
+          + '</li>';
+      }).join('')
     + '</ul>'
     + '<button id="smClose" style="width:100%;padding:12px;border:none;border-radius:11px;background:#22C55E;color:#06210f;font-family:Space Grotesk,sans-serif;font-weight:700;font-size:14px;cursor:pointer">Cerrar</button>'
     + '</div>';
