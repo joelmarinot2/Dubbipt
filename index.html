@@ -219,11 +219,7 @@ body:not(.ep-open) #epLine{display:none !important}
   font-family:'Inter',sans-serif;font-weight:700;font-size:13.5px;padding:11px 20px;border-radius:10px;cursor:pointer}
 .empty .cta:hover{filter:brightness(1.08)}
 .empty.err .ic{background:radial-gradient(120px 120px at 50% 30%,rgba(244,114,182,.14),transparent 70%),#15171a;border-color:#3a2733}
-.loading{display:none;text-align:center;padding:40px;color:var(--violet-2);font-family:var(--disp)}
-.loading.show{display:block}
-.spin{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--violet);
-  border-radius:50%;margin:0 auto 12px;animation:sp 1s linear infinite}
-@keyframes sp{to{transform:rotate(360deg)}}
+/* .loading y .spin: definidos abajo con el sistema nuevo */
 /* ===== acceso ===== */
 body.locked .wrap{filter:blur(7px);pointer-events:none;user-select:none}
 /* ─── Tablet ACTOR en espera: la app entera desaparece ─── */
@@ -812,19 +808,7 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 </style>
 <style>
 /* ===== Modal Espacios de trabajo (imagen 6) ===== */
-.wscard{ width:min(560px,94vw); }
-.wscard .dlgtitle{ font-size:30px; margin-bottom:22px; }
-#wsList{ display:flex; flex-direction:column; gap:14px; margin-bottom:16px; }
-.wsrow{ position:relative; display:flex; align-items:center; }
-.wsrow .wsname{ flex:1; background:#5FC85A; border:none; border-radius:24px; padding:16px 52px; color:#123317; font-family:'Open Serif',monospace; font-size:16px; cursor:pointer; text-align:center; }
-.wsrow .wsname:hover{ filter:brightness(1.06); }
-.wsrow .wsedit,.wsrow .wsdel{ position:absolute; border:none; background:transparent; cursor:pointer; padding:6px; display:grid; place-items:center; }
-.wsrow .wsedit{ right:50px; }
-.wsrow .wsdel{ right:14px; }
-.wscard .wsnew{ width:100%; background:transparent; border:2px solid #5FC85A; border-radius:24px; padding:16px; color:#8fe08f; font-family:'Open Serif',monospace; font-size:15px; cursor:pointer; }
-.wscard .wsnew:hover{ background:rgba(95,200,90,.10); color:#bff5bf; }
-.wscard .wsclose{ display:block; width:100%; margin-top:12px; background:transparent; border:none; color:#8B84B0; font-family:'Open Serif',monospace; font-size:13px; cursor:pointer; }
-.wscard .wsempty{ color:#8B84B0; text-align:center; padding:10px; font-size:13px; }
+/* (estilos del selector de espacios ANTIGUO eliminados: ahora usa .ws2-* ) */
 </style>
 <style>
 /* ===== Módulo 0 · Barra de navegación superior (rediseño) ===== */
@@ -1009,6 +993,59 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .ddlm-go:disabled{ opacity:.6; cursor:default; }
 .ddlm-fmt{ margin-right:auto; background:transparent; color:#8ab6ff; border:1px solid #2a3550; border-radius:9px; padding:9px 12px; font-family:'Inter',sans-serif; font-weight:600; font-size:13px; cursor:pointer; }
 .ddlm-fmt:hover{ border-color:#4d7cff; color:#a9c8ff; }
+
+/* ===== Espacios de trabajo · interfaz nueva ===== */
+.ws2card{ width:min(520px,96vw); }
+.ws2-hint{ font-size:12.5px; color:#8b9099; line-height:1.55; margin:-10px 0 16px; }
+.ws2-list{ display:flex; flex-direction:column; gap:8px; margin-bottom:12px; max-height:46vh; overflow:auto; }
+.ws2-row{ display:flex; align-items:stretch; gap:6px; }
+.ws2-row .ws2-pick{
+  flex:1; min-width:0; display:flex; align-items:center; gap:12px; text-align:left; cursor:pointer;
+  background:#0f1215; border:1px solid #23262b; border-radius:12px; padding:11px 13px;
+  font-family:'Inter',sans-serif; color:#e6e7ea; transition:border-color .12s, background .12s;
+}
+.ws2-row .ws2-pick:hover{ border-color:#3a3f46; background:#131719; }
+.ws2-row.on .ws2-pick{ border-color:#22C55E; background:rgba(34,197,94,.08); }
+.ws2-ic{
+  flex:0 0 auto; width:34px; height:34px; border-radius:9px; display:grid; place-items:center;
+  background:#1b1f24; color:#8b9099; font-size:12px; font-weight:700; letter-spacing:.5px;
+}
+.ws2-row.on .ws2-ic{ background:rgba(34,197,94,.16); color:#4ADE80; }
+.ws2-meta{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.ws2-meta b{ font-size:14px; font-weight:600; color:#f2f3f5; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ws2-meta small{ font-size:11.5px; color:#6b7280; }
+.ws2-cur{
+  flex:0 0 auto; font-size:10px; font-weight:700; letter-spacing:.6px; text-transform:uppercase;
+  color:#4ADE80; background:rgba(34,197,94,.14); border:1px solid rgba(34,197,94,.4);
+  border-radius:99px; padding:3px 8px;
+}
+.ws2-edit, .ws2-del{
+  flex:0 0 auto; width:34px; border:1px solid #23262b; border-radius:10px; background:#0f1215;
+  color:#6b7280; cursor:pointer; display:grid; place-items:center; transition:color .12s, border-color .12s;
+}
+.ws2-edit:hover{ color:#4ADE80; border-color:#22C55E; }
+.ws2-del:hover{ color:#F43F5E; border-color:#F43F5E; }
+.ws2-new{
+  width:100%; background:transparent; border:1px dashed #2c3036; border-radius:12px; padding:11px;
+  color:#8b9099; font-family:'Inter',sans-serif; font-size:13px; font-weight:600; cursor:pointer;
+}
+.ws2-new:hover{ border-color:#22C55E; color:#4ADE80; background:rgba(34,197,94,.05); }
+.ws2-empty{ color:#6b7280; font-size:13px; text-align:center; padding:18px 10px; }
+
+/* ===== Carga de un capítulo · interfaz nueva ===== */
+.loading{
+  display:none; margin:26px auto; max-width:420px; text-align:center;
+  background:#111316; border:1px solid #23262b; border-radius:16px; padding:26px 24px;
+  font-family:'Inter',sans-serif; color:#c7c9cd;
+}
+.loading.show{ display:block; }
+.loading #loadMsg{ display:block; font-size:14px; font-weight:600; color:#f2f3f5; }
+.spin{
+  width:26px; height:26px; border:3px solid #23262b; border-top-color:#4ADE80;
+  border-radius:50%; margin:0 auto 14px; animation:sp 1s linear infinite;
+}
+@keyframes sp{ to{ transform:rotate(360deg); } }
+
 /* Perfil de formato */
 .fmt-card{ max-width:600px; }
 .fmt-lead{ color:#9aa0ab; font-family:'Inter',sans-serif; font-size:12.5px; line-height:1.5; margin:-4px 0 14px; }
@@ -1527,7 +1564,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.21.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.22.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -1706,43 +1743,73 @@ function setWorkspace(ws){
 function accountLastWs(){
   try{ return (sbUser && sbUser.user_metadata && sbUser.user_metadata.last_ws) || null; }catch(e){ return null; }
 }
+/* ===== Espacios de trabajo - interfaz nueva (sistema ddlm) =====
+   La anterior eran botones verdes gigantes con serif, del diseno viejo. Esta
+   usa el mismo lenguaje que los demas modales y ademas dice cuantos programas
+   tiene cada espacio, que era justo el dato que faltaba para saber donde
+   estaban los libretos que "no aparecian". */
+function wsCounts(id){
+  try{
+    const shows = (LDB.shows||[]).filter(sh=> sh.workspace_id===id);
+    const eps = shows.reduce((n,sh)=> n + (LDB.epsAll||[]).filter(e=> e.show_id===sh.id).length, 0);
+    return { shows: shows.length, eps };
+  }catch(e){ return { shows:0, eps:0 }; }
+}
 function showWorkspacePicker(force){
   const old=document.getElementById('wsPickOv'); if(old) old.remove();
-  const PEN='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#123317" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
-  const TRASH='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF4D4D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>';
-  const ov=document.createElement('div'); ov.id='wsPickOv'; ov.className='dlgov';
-  const rows = libWorkspaces.map(w=>
-    '<div class="wsrow">'
-    +'<button class="wsname" data-id="'+w.id+'">'+esc(w.name)+'</button>'
-    +'<button class="wsedit" data-id="'+w.id+'" title="Renombrar">'+PEN+'</button>'
-    +'<button class="wsdel" data-id="'+w.id+'" title="Borrar">'+TRASH+'</button>'
-    +'</div>').join('');
-  ov.innerHTML='<div class="dlgcard wscard">'
-    +'<h2 class="dlgtitle">Espacios de trabajo</h2>'
-    +'<div id="wsList">'+(rows||'<div class="wsempty">Aún no tienes espacios. Crea el primero.</div>')+'</div>'
-    +'<button class="wsnew" id="wsNew">Crear un nuevo</button>'
-    +'<div id="wsCreate" style="display:none;margin-top:12px">'
-    +  '<div class="dlgfield"><input id="wsNewName" placeholder="Nombre del espacio"></div>'
-    +  '<button class="dlgbtn" id="wsNewGo">Crear</button>'
-    +'</div>'
-    +(WORKSPACE?'<button class="wsclose" id="wsClose">Cerrar</button>':'')
+  const PEN='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  const TRASH='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/><path d="M10 11v6M14 11v6"/></svg>';
+  const ov=document.createElement('div'); ov.id='wsPickOv'; ov.className='ddlm-ov';
+  const rows = libWorkspaces.map(w=>{
+    const cur = !!(WORKSPACE && WORKSPACE.id===w.id);
+    const c = wsCounts(w.id);
+    const sub = c.shows
+      ? c.shows+' programa'+(c.shows===1?'':'s')+' · '+c.eps+' cap'+(c.eps===1?'':'s')
+      : 'Vacío';
+    return '<div class="ws2-row'+(cur?' on':'')+'">'
+      +'<button class="ws2-pick" data-id="'+w.id+'">'
+      +  '<span class="ws2-ic">'+esc((w.name||'?').trim().slice(0,2).toUpperCase())+'</span>'
+      +  '<span class="ws2-meta"><b>'+esc(w.name)+'</b><small>'+sub+'</small></span>'
+      +  (cur?'<span class="ws2-cur">Actual</span>':'')
+      +'</button>'
+      +'<button class="ws2-edit" data-id="'+w.id+'" title="Renombrar">'+PEN+'</button>'
+      +'<button class="ws2-del" data-id="'+w.id+'" title="Borrar">'+TRASH+'</button>'
+      +'</div>';
+  }).join('');
+  ov.innerHTML='<div class="ddlm-card ws2card" role="dialog" aria-modal="true" aria-label="Espacios de trabajo">'
+    +'<div class="ddlm-kicker">Cuenta</div>'
+    +'<h2>Espacios de trabajo</h2>'
+    +'<div class="ws2-hint">Cada espacio guarda sus propios programas. El que elijas aquí se usa también en tus otros equipos.</div>'
+    +'<div class="ws2-list" id="wsList">'+(rows||'<div class="ws2-empty">Aún no tienes espacios. Crea el primero.</div>')+'</div>'
+    +'<button class="ws2-new" id="wsNew">+ Nuevo espacio</button>'
+    +'<div class="ddlm-btns">'+(WORKSPACE?'<button class="ddlm-cancel" id="wsClose">Cerrar</button>':'')+'</div>'
     +'</div>';
   document.body.appendChild(ov);
   ov.addEventListener('mousedown', e=>{ if(e.target===ov && WORKSPACE) ov.remove(); });
   const q=(sel)=>ov.querySelector(sel);
-  ov.querySelectorAll('.wsname').forEach(b=> b.onclick=()=>{ const w=libWorkspaces.find(x=>x.id===b.dataset.id); if(w){ ov.remove(); setWorkspace(w); } });
-  ov.querySelectorAll('.wsedit').forEach(b=> b.onclick=async(e)=>{ e.stopPropagation();
+  ov.querySelectorAll('.ws2-pick').forEach(b=> b.onclick=()=>{ const w=libWorkspaces.find(x=>x.id===b.dataset.id); if(w){ ov.remove(); setWorkspace(w); } });
+  ov.querySelectorAll('.ws2-edit').forEach(b=> b.onclick=(e)=>{ e.stopPropagation();
     const w=libWorkspaces.find(x=>x.id===b.dataset.id); if(!w) return;
-    const nm=prompt('Nuevo nombre del espacio:', w.name); if(!nm||!nm.trim()||nm.trim()===w.name) return;
-    const {error}=await sb.from('workspaces').update({name:nm.trim()}).eq('id',w.id);
-    if(error){ libMsg('No se pudo renombrar: '+error.message); return; }
-    w.name=nm.trim();
-    if(WORKSPACE&&WORKSPACE.id===w.id){ WORKSPACE.name=w.name; try{localStorage.setItem('ddl_ws',JSON.stringify(WORKSPACE));}catch(_){}; updateWorkspaceChip(); try{renderLibrary(true);}catch(_){} }
-    showWorkspacePicker(true);
+    wsRenameModal(w, async (nm)=>{
+      const {error}=await sb.from('workspaces').update({name:nm}).eq('id',w.id);
+      if(error){ try{ DDL_UI.toast(DDL_UI.friendlyError(error), {kind:'err'}); }catch(_){ libMsg('No se pudo renombrar'); } return; }
+      w.name=nm;
+      if(WORKSPACE&&WORKSPACE.id===w.id){ WORKSPACE.name=nm; try{localStorage.setItem('ddl_ws',JSON.stringify(WORKSPACE));}catch(_){}; updateWorkspaceChip(); try{renderLibrary(true);}catch(_){} }
+      showWorkspacePicker(true);
+    });
   });
-  ov.querySelectorAll('.wsdel').forEach(b=> b.onclick=async(e)=>{ e.stopPropagation();
+  ov.querySelectorAll('.ws2-del').forEach(b=> b.onclick=async(e)=>{ e.stopPropagation();
     const w=libWorkspaces.find(x=>x.id===b.dataset.id); if(!w) return;
-    if(!confirm('¿Borrar el espacio «'+w.name+'» y TODOS sus programas y capítulos?')) return;
+    const c = wsCounts(w.id);
+    let ok=false;
+    try{
+      ok = await DDL_UI.confirmModal({
+        title:'Borrar espacio de trabajo',
+        body:'Se borrará «'+w.name+'» y TODO lo que contiene. No se puede deshacer.',
+        items: c.shows ? [{label:c.shows+' programa'+(c.shows===1?'':'s'), meta:c.eps+' capítulo'+(c.eps===1?'':'s')}] : [],
+        confirmLabel:'Borrar', cancelLabel:'Cancelar', danger:true });
+    }catch(_){ ok = confirm('¿Borrar el espacio «'+w.name+'» y TODOS sus programas y capítulos?'); }
+    if(!ok) return;
     try{ await sb.from('workspaces').delete().eq('id',w.id); }catch(err){ libMsg('No se pudo borrar: '+err.message); return; }
     libWorkspaces=libWorkspaces.filter(x=>x.id!==w.id);
     if(WORKSPACE&&WORKSPACE.id===w.id){ WORKSPACE=null; try{localStorage.removeItem('ddl_ws');}catch(_){}}
@@ -1750,6 +1817,31 @@ function showWorkspacePicker(force){
   });
   const nb=q('#wsNew'); if(nb) nb.onclick=()=>{ ov.remove(); newWorkspaceModal((w)=> setWorkspace(w)); };
   const cl=q('#wsClose'); if(cl) cl.onclick=()=> ov.remove();
+}
+/* renombrar con el modal nuevo, en vez del prompt() del navegador */
+function wsRenameModal(w, onOk){
+  const old=document.getElementById('wsRenOv'); if(old) old.remove();
+  const ov=document.createElement('div'); ov.id='wsRenOv'; ov.className='ddlm-ov';
+  ov.innerHTML='<div class="ddlm-card" role="dialog" aria-modal="true" aria-label="Renombrar espacio">'
+    +'<div class="ddlm-kicker">Espacio de trabajo</div>'
+    +'<h2>Renombrar</h2>'
+    +'<div class="ddlm-field"><label for="wsRenName">Nombre del espacio</label>'
+    +  '<input id="wsRenName" value="'+esc(w.name)+'" placeholder="Ej. Estudio Andino"></div>'
+    +'<div class="ddlm-err" id="wsRenErr"></div>'
+    +'<div class="ddlm-btns"><button class="ddlm-cancel" id="wsRenNo">Cancelar</button>'
+    +  '<button class="ddlm-go" id="wsRenGo">Guardar</button></div>'
+    +'</div>';
+  document.body.appendChild(ov);
+  const q=(id)=>ov.querySelector('#'+id);
+  const go=()=>{ const nm=(q('wsRenName').value||'').trim();
+    if(!nm){ q('wsRenErr').textContent='Escribe un nombre.'; return; }
+    if(nm===w.name){ ov.remove(); return; }
+    ov.remove(); onOk(nm); };
+  q('wsRenNo').onclick=()=> ov.remove();
+  q('wsRenGo').onclick=go;
+  q('wsRenName').addEventListener('keydown', e=>{ if(e.key==='Enter') go(); });
+  ov.addEventListener('mousedown', e=>{ if(e.target===ov) ov.remove(); });
+  setTimeout(()=>{ const n=q('wsRenName'); if(n){ n.focus(); n.select(); } }, 60);
 }
 function applyWorkspace(){
   updateWorkspaceChip();
