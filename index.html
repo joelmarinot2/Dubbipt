@@ -634,6 +634,14 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .dash-head .dh-title{ display:flex; flex-direction:column; gap:2px; }
 .dash-head .dh-title h2{ font-family:'Inter',sans-serif; font-weight:700; color:#f2f3f5; font-size:20px; }
 .dash-head .dh-title .dh-sub{ font-family:'Inter',sans-serif; color:#9CA3AF; font-size:12.5px; }
+/* aviso: la cuenta tiene programas en OTRO espacio de trabajo */
+.dash-head .dh-title .dh-other{
+  font-family:'Inter',sans-serif; font-size:12px; margin-top:5px; cursor:pointer;
+  display:inline-block; padding:3px 10px; border-radius:99px;
+  background:rgba(245,158,11,.14); color:#F59E0B; border:1px solid rgba(245,158,11,.38);
+}
+.dash-head .dh-title .dh-other:hover{ background:rgba(245,158,11,.22); }
+.dash-head .dh-title .dh-other b{ font-weight:700; text-decoration:underline; }
 .dash-head .dh-search{ margin-left:auto; display:flex; align-items:center; gap:8px; background:#101215;
   border:1px solid #23262b; border-radius:10px; padding:9px 13px; min-width:230px; }
 .dash-head .dh-search .fi{ color:#4ADE80; font-size:13px; }
@@ -1519,7 +1527,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.20.1-nube · 01-sep-2026';
+const APP_VERSION = 'v10.21.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -1683,7 +1691,20 @@ function newWorkspaceModal(onCreated){
 function setWorkspace(ws){
   WORKSPACE = ws ? { id:ws.id, name:ws.name } : null;
   try{ localStorage.setItem('ddl_ws', JSON.stringify(WORKSPACE)); }catch(e){}
+  // …y también en la CUENTA: así el siguiente equipo entra en el mismo espacio.
+  // Antes la elección vivía solo en este equipo y cada uno acababa mirando un
+  // espacio distinto, con la sensación de que faltaban programas.
+  try{
+    if(sb && WORKSPACE && WORKSPACE.id && accountLastWs() !== WORKSPACE.id){
+      sb.auth.updateUser({ data:{ last_ws: WORKSPACE.id } }).catch(()=>{});
+      try{ if(sbUser){ sbUser.user_metadata = Object.assign({}, sbUser.user_metadata, { last_ws: WORKSPACE.id }); } }catch(_){}
+    }
+  }catch(e){}
   applyWorkspace();
+}
+// espacio que la cuenta uso por ultima vez (en cualquier equipo)
+function accountLastWs(){
+  try{ return (sbUser && sbUser.user_metadata && sbUser.user_metadata.last_ws) || null; }catch(e){ return null; }
 }
 function showWorkspacePicker(force){
   const old=document.getElementById('wsPickOv'); if(old) old.remove();
@@ -1753,11 +1774,16 @@ async function ensureWorkspace(){
   if(WORKSPACE && libWorkspaces.some(w=>w.id===WORKSPACE.id)){
     const w = libWorkspaces.find(x=>x.id===WORKSPACE.id); WORKSPACE.name = w.name;
     applyWorkspace();
-  } else if(libWorkspaces.length){
-    setWorkspace(libWorkspaces[0]);
-  } else {
-    updateWorkspaceChip(); showWorkspacePicker(true);
+    return;
   }
+  // este equipo no tiene espacio elegido: usar el ULTIMO de la cuenta
+  const last = accountLastWs();
+  const w0 = last ? libWorkspaces.find(w=>w.id===last) : null;
+  if(w0){ setWorkspace(w0); return; }
+  if(libWorkspaces.length === 1){ setWorkspace(libWorkspaces[0]); return; }
+  // Con varios espacios ya no se coge el primero a ciegas: cada equipo acababa
+  // en uno distinto y parecia que faltaban programas. Se pregunta.
+  updateWorkspaceChip(); showWorkspacePicker(true);
 }
 // rol del dispositivo (una vez): tablet controla / escritorio muestra
 function pickRole(){
@@ -4330,6 +4356,25 @@ async function precacheShow(showId){
   await Promise.all(Array.from({length: Math.min(POOL, need.length)}, worker));
   note(null);
 }
+/* Aviso cuando la cuenta tiene programas en OTRO espacio de trabajo.
+   Es la causa mas comun de "en este equipo no me salen todos": no faltan, estan
+   en otro espacio. Aqui se dice cuantos y donde, con un clic para cambiar. */
+function otherWsNote(){
+  try{
+    if(!WORKSPACE || !WORKSPACE.id) return '';
+    const fuera = (LDB.shows||[]).filter(sh=> sh.workspace_id !== WORKSPACE.id);
+    if(!fuera.length) return '';
+    const porWs = {};
+    for(const sh of fuera) porWs[sh.workspace_id] = (porWs[sh.workspace_id]||0) + 1;
+    const nombres = Object.keys(porWs).map(id=>{
+      const w = (libWorkspaces||[]).find(x=>x.id===id);
+      return (w ? w.name : 'otro espacio') + ' (' + porWs[id] + ')';
+    }).join(', ');
+    return '<div class="dh-other" id="dhOther" title="Cambiar de espacio de trabajo">'
+      + fuera.length + ' programa' + (fuera.length===1?'':'s') + ' más en: ' + esc(nombres)
+      + ' · <b>cambiar</b></div>';
+  }catch(e){ return ''; }
+}
 async function renderLibrary(silent){
   if((!sb || !sbUser) && !window.OFFLINE) return;
   try{ refreshTopbar(); }catch(e){}
@@ -4379,6 +4424,7 @@ async function renderLibrary(silent){
         '<div class="dh-title"><h2>Programas</h2><div class="dh-sub">'
           + shows.length + ' programa'+(shows.length===1?'':'s')
           + ' · ' + shows.reduce((s,sh)=> s+sbEps(sh.id).length, 0) + ' cap'+(shows.reduce((s,sh)=> s+sbEps(sh.id).length,0)===1?'':'s')
+          + otherWsNote()
           + '</div></div>'
         + '<label class="dh-search"><span class="fi">🔍</span>'
           + '<input type="text" id="dashSearch" placeholder="Buscar programa…" value="'+esc(window._dashQuery||'')+'"></label>'
@@ -4387,6 +4433,7 @@ async function renderLibrary(silent){
         if(ds){ ds.oninput=()=>{ window._dashQuery=ds.value; renderLibrary(true);
           const d2=document.getElementById('dashSearch'); if(d2){ d2.focus(); d2.setSelectionRange(d2.value.length,d2.value.length); } }; } }
       { const dn=head.querySelector('#dashNew'); if(dn) dn.onclick=newShow; }
+      { const dO=head.querySelector('#dhOther'); if(dO) dO.onclick=()=> showWorkspacePicker(true); }
       // breadcrumb de espacio (queda como migaja discreta encima del panel)
       crumb.className='dashcrumb';
       crumb.innerHTML = '<span class="dseg on">Programas</span>'
