@@ -993,6 +993,33 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .ddlm-go:disabled{ opacity:.6; cursor:default; }
 .ddlm-fmt{ margin-right:auto; background:transparent; color:#8ab6ff; border:1px solid #2a3550; border-radius:9px; padding:9px 12px; font-family:'Inter',sans-serif; font-weight:600; font-size:13px; cursor:pointer; }
 .ddlm-fmt:hover{ border-color:#4d7cff; color:#a9c8ff; }
+/* ===== Quién está conectado (presencia global) ===== */
+.tb-online{
+  background:#0f1215; border:1px solid #23262b; border-radius:99px;
+  color:#c7c9cd; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600;
+  padding:6px 12px; cursor:pointer; white-space:nowrap; transition:border-color .12s, color .12s;
+}
+.tb-online:hover{ border-color:#22C55E; color:#f2f3f5; }
+.onl-pop{
+  position:fixed; z-index:12000; width:min(300px,92vw);
+  background:#111316; border:1px solid #23262b; border-radius:14px; padding:12px;
+  box-shadow:0 18px 50px rgba(0,0,0,.55); font-family:'Inter',sans-serif;
+}
+.onl-head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:10px; }
+.onl-head b{ font-size:14px; color:#f2f3f5; }
+.onl-head span{ font-size:11px; color:#6b7280; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.onl-list{ display:flex; flex-direction:column; gap:6px; max-height:44vh; overflow:auto; }
+.onl-row{ display:flex; align-items:center; gap:10px; padding:7px 8px; border-radius:10px; background:#0f1215; border:1px solid #1c1e22; }
+.onl-av{ flex:0 0 auto; width:28px; height:28px; border-radius:8px; display:grid; place-items:center;
+  background:rgba(34,197,94,.14); color:#4ADE80; font-size:11px; font-weight:700; }
+.onl-meta{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.onl-meta b{ font-size:13px; font-weight:600; color:#e6e7ea; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.onl-meta b i{ font-style:normal; color:#6b7280; font-weight:500; }
+.onl-meta small{ font-size:11px; color:#6b7280; }
+.onl-dot{ flex:0 0 auto; width:8px; height:8px; border-radius:50%; background:#22C55E; box-shadow:0 0 8px rgba(34,197,94,.6); }
+.onl-empty{ color:#6b7280; font-size:12.5px; text-align:center; padding:12px 6px; }
+.onl-foot{ margin-top:10px; padding-top:9px; border-top:1px solid #1c1e22; font-size:11.5px; color:#6b7280; }
+
 
 /* ===== Espacios de trabajo · interfaz nueva ===== */
 .ws2card{ width:min(520px,96vw); }
@@ -1344,6 +1371,8 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
       <span class="tb-loc" id="tbLoc" style="display:none">
         <span id="tbLocShow"></span><span class="sep">/</span><b id="tbLocEp"></b>
       </span>
+      <button class="tb-online" id="onlineChip" onclick="toggleOnlinePanel(event)" style="display:none"
+        title="Personas conectadas" aria-label="Personas conectadas ahora">👥 0</button>
       <span class="tb-dev" id="devStat" role="status" aria-live="polite">Listo</span>
       <button class="tb-sync" id="syncChip" onclick="syncMenu()" title="Sincronización tablet ↔ escritorio" aria-label="Estado de sincronización entre tablet y escritorio" style="display:none">sincronización</button>
       <div class="tb-divider" aria-hidden="true"></div>
@@ -1564,7 +1593,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.22.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.23.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -1656,6 +1685,7 @@ function authUnlock(){
   (function hook(){
     if(typeof ddlWorkerStart==='function' && typeof libBoot==='function'){
       try{ ddlWorkerStart(); libBoot(); }catch(e){ console.error(e); }
+      try{ onlineConnect(); }catch(e){}   // presencia global: quien esta conectado
       try{ refreshTopbar(); }catch(e){}
     } else setTimeout(hook, 120);
   })();
@@ -1845,6 +1875,7 @@ function wsRenameModal(w, onOk){
 }
 function applyWorkspace(){
   updateWorkspaceChip();
+  try{ onlineTouch(); }catch(e){}   // el espacio cambia: reanunciarse
   autoSync();
   try{ if(typeof LDB!=='undefined') LDB.showId=null; if(typeof renderLibrary==='function') renderLibrary(true); }catch(e){}
 }
@@ -1967,6 +1998,7 @@ function askRoleAtLogin(done){
   });
 }
 function applyDeviceRole(){
+  try{ onlineTouch(); }catch(e){}   // el rol cambia: reanunciarse
   try{ document.body.classList.toggle('is-tablet', DEVROLE==='tablet' || DEVROLE==='talent'); }catch(e){}
   try{ document.body.classList.toggle('is-talent', DEVROLE==='talent'); }catch(e){}
   try{ const d=document.getElementById('devStat'); if(d){ d.textContent = DEVROLE==='talent' ? 'Tablet Actor' : (DEVROLE==='tablet' ? 'Tablet Director' : (DEVROLE==='pc' ? 'Escritorio Listo' : 'Listo')); d.classList.toggle('off', !DEVROLE); } }catch(e){}
@@ -2152,6 +2184,7 @@ async function authInit(){
   }
 }
 document.getElementById('btnOut').addEventListener('click', async ()=>{
+  try{ onlineDisconnect(); }catch(e){}
   try{ if(sb) await sb.auth.signOut(); }catch(e){}
   try{ if(pop.win && !pop.win.closed) pop.win.close(); }catch(e){}
   try{ if(typeof pop2!=='undefined' && pop2.win && pop2.win!==window && !pop2.win.closed) pop2.win.close(); }catch(e){}
@@ -9323,6 +9356,125 @@ try{
 function isTablet(){ return sync.isOn && (sync.role==='tablet' || sync.role==='talent'); }
 function isTalent(){ return DEVROLE==='talent'; }
 function isMirror(){ return sync.isOn && sync.role==='pc'; }
+
+
+/* ═══ QUIÉN ESTÁ CONECTADO A LA PLATAFORMA (presencia global) ═══════════
+   Canal aparte del de sincronía: aquel es por espacio de trabajo (ws:<id>) y
+   solo sirve para emparejar los dispositivos de una sesión. Este lo comparte
+   TODA la cuenta, y la clave de presencia es el id de usuario, asi que
+   Object.keys() cuenta PERSONAS y las entradas de cada clave, sus dispositivos.
+   Fuera de tu espacio de trabajo solo se publica el numero, nunca los nombres. */
+const online = { ch:null, people:[], mine:0, others:0, total:0 };
+function onlineName(){
+  try{
+    const m = (sbUser && sbUser.user_metadata) || {};
+    return m.full_name || m.name || (sbUser && sbUser.email) || 'Alguien';
+  }catch(e){ return 'Alguien'; }
+}
+function onlineRoleLabel(r){
+  return r==='tablet' ? 'Tablet Director'
+       : r==='talent' ? 'Tablet Actor'
+       : r==='pc'     ? 'Escritorio' : 'Sin rol';
+}
+function onlinePayload(){
+  return { n:onlineName(),
+           ws:(WORKSPACE&&WORKSPACE.id)||null,
+           wsn:(WORKSPACE&&WORKSPACE.name)||'',
+           role: (typeof DEVROLE!=='undefined' && DEVROLE) || null };
+}
+function onlineConnect(){
+  if(!sb || !sbUser || online.ch || window.OFFLINE) return;
+  try{
+    const ch = sb.channel('ddl:online', { config:{ presence:{ key: sbUser.id } } });
+    online.ch = ch;
+    ch.on('presence', { event:'sync'  }, ()=> onlineRefresh())
+      .on('presence', { event:'join'  }, ()=> onlineRefresh())
+      .on('presence', { event:'leave' }, ()=> onlineRefresh())
+      .subscribe(async (st)=>{
+        if(st==='SUBSCRIBED'){
+          try{ await ch.track(onlinePayload()); }catch(e){}
+          onlineRefresh();
+        } else if(st==='CHANNEL_ERROR' || st==='TIMED_OUT' || st==='CLOSED'){
+          online.ch = null; online.people = []; online.total = 0;
+          updateOnlineChip();
+          setTimeout(onlineConnect, 4000);      // reintento suave
+        }
+      });
+  }catch(e){ console.warn('presencia global', e); }
+}
+function onlineDisconnect(){
+  try{ if(online.ch) sb.removeChannel(online.ch); }catch(e){}
+  online.ch = null; online.people = []; online.total = 0; online.mine = 0; online.others = 0;
+  updateOnlineChip();
+}
+// al cambiar de espacio o de rol hay que volver a anunciarse
+function onlineTouch(){ try{ if(online.ch) online.ch.track(onlinePayload()); }catch(e){} }
+function onlineRefresh(){
+  if(!online.ch) return;
+  let st = {};
+  try{ st = online.ch.presenceState() || {}; }catch(e){ return; }
+  const wsId = (WORKSPACE && WORKSPACE.id) || null;
+  online.people = Object.keys(st).map(k=>{
+    const ent = st[k] || [], e0 = ent[0] || {};
+    return { id:k, name:e0.n||'Alguien', ws:e0.ws||null, wsn:e0.wsn||'',
+             roles: ent.map(x=>x.role||null), devices: ent.length,
+             me: !!(sbUser && k===sbUser.id) };
+  }).sort((a,b)=> (b.me?1:0)-(a.me?1:0) || a.name.localeCompare(b.name));
+  online.total  = online.people.length;
+  online.mine   = online.people.filter(p=>p.ws===wsId).length;
+  online.others = online.total - online.mine;
+  updateOnlineChip();
+  if(document.getElementById('onlinePop')) renderOnlinePanel();
+}
+function updateOnlineChip(){
+  const c = document.getElementById('onlineChip'); if(!c) return;
+  if(!sbUser || !online.ch){ c.style.display='none'; return; }
+  c.style.display='';
+  const n = online.total;
+  c.textContent = '👥 ' + n;
+  c.title = n===1 ? 'Solo tú en línea' : n+' personas conectadas ahora';
+  c.setAttribute('aria-label', c.title);
+}
+function toggleOnlinePanel(ev){
+  if(ev) ev.stopPropagation();
+  const old = document.getElementById('onlinePop');
+  if(old){ old.remove(); return; }
+  const pop = document.createElement('div');
+  pop.id='onlinePop'; pop.className='onl-pop'; pop.setAttribute('role','dialog');
+  document.body.appendChild(pop);
+  renderOnlinePanel();
+  setTimeout(()=>{
+    const away = (e)=>{ if(!pop.contains(e.target) && e.target.id!=='onlineChip'){ pop.remove(); document.removeEventListener('mousedown', away); } };
+    document.addEventListener('mousedown', away);
+  }, 0);
+}
+function renderOnlinePanel(){
+  const pop = document.getElementById('onlinePop'); if(!pop) return;
+  const chip = document.getElementById('onlineChip');
+  if(chip){ const r = chip.getBoundingClientRect();
+    pop.style.top = (r.bottom + 8) + 'px';
+    pop.style.right = Math.max(12, window.innerWidth - r.right) + 'px'; }
+  const wsId = (WORKSPACE && WORKSPACE.id) || null;
+  const aqui = online.people.filter(p=> p.ws===wsId);
+  const filas = aqui.map(p=>{
+    const ini = (p.name||'?').trim().slice(0,2).toUpperCase();
+    const rol = p.roles.filter(Boolean).map(onlineRoleLabel);
+    const sub = (rol.length ? rol.join(' · ') : 'Sin rol')
+              + (p.devices>1 ? ' · '+p.devices+' dispositivos' : '');
+    return '<div class="onl-row">'
+      + '<span class="onl-av">'+esc(ini)+'</span>'
+      + '<span class="onl-meta"><b>'+esc(p.name)+(p.me?' <i>(tú)</i>':'')+'</b><small>'+esc(sub)+'</small></span>'
+      + '<span class="onl-dot" aria-hidden="true"></span>'
+      + '</div>';
+  }).join('');
+  pop.innerHTML =
+      '<div class="onl-head"><b>'+online.total+' en línea</b>'
+    + '<span>'+(WORKSPACE&&WORKSPACE.name ? esc(WORKSPACE.name) : 'Sin espacio')+'</span></div>'
+    + '<div class="onl-list">'+(filas || '<div class="onl-empty">Nadie más en este espacio.</div>')+'</div>'
+    + (online.others
+        ? '<div class="onl-foot">y '+online.others+' persona'+(online.others===1?'':'s')+' en otros espacios de trabajo</div>'
+        : '');
+}
 
 function updateSyncUI(){
   const b = document.getElementById('btnSync');
