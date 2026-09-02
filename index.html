@@ -1620,7 +1620,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.24.2-nube · 01-sep-2026';
+const APP_VERSION = 'v10.25.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -2801,6 +2801,12 @@ function separaNombreDialogo(line){
   let ni=0; const nameW=[];
   for(; ni<words.length; ni++){
     const w=words[ni]; if(!w) continue;
+    // Un APODO ENTRE COMILLAS forma parte del nombre: ANTHONY “TONY” VEGA.
+    // Antes la comilla CURVA de apertura cortaba aqui (la recta no) y el personaje
+    // quedaba registrado como ANTHONY, con el apodo y el apellido colados en el
+    // dialogo: de ahi que su tarjeta saliera con el nombre corto y su libreto
+    // vacio. Solo cuenta si lo entrecomillado va en MAYUSCULAS; “Ya voy” es dialogo.
+    if(/^["“‘'][\p{Lu}\p{N}][\p{Lu}\p{N}.'’-]*["”’']?$/u.test(w)){ nameW.push(w); continue; }
     // Solo romper si empieza con comilla/acotación de APERTURA, no mid-word apostrophe (O'BRIEN) ni punto abreviativo (DR.)
     if(/^[\(\[¡¿\u201C\u2014]/.test(w)) break;            // acotación / diálogo
     if(/^[\u2018\u201A]/.test(w)) break;                    // comilla curva de apertura
