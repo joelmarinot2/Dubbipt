@@ -1634,7 +1634,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.25.1-nube · 01-sep-2026';
+const APP_VERSION = 'v10.25.2-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -8487,10 +8487,28 @@ function libDiagData(key){
       if(renglones.length >= 8) break;
     }
   }catch(e){}
+  // MARCAS: lo que el escaneo del PDF reconocio como cabecera, ANTES de armar
+  // los parlamentos. Si hay marcas suyas pero ningun parlamento, el fallo esta
+  // entre los dos pasos y no en el reconocimiento del nombre.
+  const clavesMarcas = new Set();
+  let marcasSuyas = 0;
+  try{
+    for(const pp in pageData){
+      const pd = pageData[pp]; if(!pd || !pd.marks) continue;
+      for(const mk of pd.marks){
+        if(!mk || !mk.key) continue;
+        clavesMarcas.add(mk.key);
+        if(flat(mk.key) === objetivo) marcasSuyas++;
+      }
+    }
+  }catch(e){}
   return {
     desglose: key,
     desgloseNormalizado: objetivo,
+    marcasDetectadasParaEl: marcasSuyas,
     parlamentosConEseNombre: casi,
+    clavesDelDesglose: Object.keys(charIdx||{}),
+    clavesDeMarcas: [...clavesMarcas].slice(0, 40),
     clavesDeParlamentos: clavesBloques.slice(0, 40),
     totalParlamentos: (script||[]).length,
     renglonesDelPdf: renglones
@@ -8503,6 +8521,7 @@ function libDiagHtml(key){
     + '<b>Este personaje no tiene parlamentos en el libreto</b>'
     + '<p>El desglose lo registró como <code>'+esc(d.desglose)+'</code>, pero ningún parlamento quedó marcado con ese nombre.</p>'
     + '<div class="ld-sec">Renglones del PDF donde aparece ese nombre<ul>'+li(d.renglonesDelPdf)+'</ul></div>'
+    + '<div class="ld-sec">Cabeceras suyas reconocidas en el PDF: <b style="color:#FBBF24">'+d.marcasDetectadasParaEl+'</b></div>'
     + '<div class="ld-sec">Nombres con los que SÍ hay parlamentos<ul>'+li(d.clavesDeParlamentos.slice(0,12))+'</ul></div>'
     + '<button class="ld-copy" id="lDiagCopy">Copiar diagnóstico</button>'
     + '</div>';
