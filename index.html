@@ -1628,7 +1628,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.32.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.33.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -5523,46 +5523,57 @@ function newEpisodeModal(){
   });
   setTimeout(()=>{ const n=q('neName'); if(n) n.focus(); },60);
 }
-function toggleLibColorPanel(d){
+/* Colores del libreto: caja del personaje abierto y fondo.
+   Sustituye a toggleLibColorPanel() y libretoColors(), que estaban en el
+   archivo pero NO se llamaban desde ningun sitio y usaban una variable (--hl)
+   que ninguna regla leia. Se guardan por dispositivo, como el modo claro. */
+const LIB_BOXC_DEF = '#5B8DEF';
+const LIB_BG_DEF   = '#0b0c0e';
+function libColorsGet(){
+  let c = LIB_BOXC_DEF, b = LIB_BG_DEF;
+  try{ c = localStorage.getItem('ddl_boxc') || c; b = localStorage.getItem('ddl_libbg') || b; }catch(e){}
+  return { boxc:c, bg:b };
+}
+function libColorsApply(c, b){
   try{
-    let p = d.getElementById('lColorPanel');
-    if(p){ p.remove(); return; }
-    const cs = d.defaultView.getComputedStyle(d.documentElement);
-    const hl = (localStorage.getItem('ddl_hl') || '#5FC85A');
-    const bg = (localStorage.getItem('ddl_libbg') || (cs.getPropertyValue('--libbg')||'#201c50')).trim() || '#201c50';
-    p = d.createElement('div'); p.id='lColorPanel';
-    p.style.cssText='position:fixed;top:74px;right:16px;z-index:99;background:#171232;border:2px solid #5FC85A;border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 14px 34px rgba(0,0,0,.55);font-family:system-ui;color:#fff;font-size:13px;min-width:180px';
-    p.innerHTML='<b style="font-size:14px">Colores del libreto</b>'
-      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px">Resaltado <input type="color" id="lcHl" value="'+hl+'" style="width:44px;height:30px;border:none;background:none;cursor:pointer"></label>'
-      +'<label style="display:flex;justify-content:space-between;align-items:center;gap:10px">Fondo <input type="color" id="lcBg" value="'+bg+'" style="width:44px;height:30px;border:none;background:none;cursor:pointer"></label>'
-      +'<button id="lcClose" style="margin-top:4px;border:none;background:#5FC85A;color:#123317;border-radius:10px;padding:8px;cursor:pointer;font-weight:700">Cerrar</button>';
-    d.body.appendChild(p);
-    const apply=()=>{ const h=p.querySelector('#lcHl').value, b=p.querySelector('#lcBg').value;
-      d.documentElement.style.setProperty('--hl',h); d.documentElement.style.setProperty('--libbg',b);
-      try{ localStorage.setItem('ddl_hl',h); localStorage.setItem('ddl_libbg',b); }catch(e){} };
-    p.querySelector('#lcHl').addEventListener('input', apply);
-    p.querySelector('#lcBg').addEventListener('input', apply);
-    p.querySelector('#lcClose').onclick=()=> p.remove();
-  }catch(e){ console.error('color panel', e); }
+    const d = pop2 && pop2.doc; if(!d) return;
+    d.documentElement.style.setProperty('--boxc', c);
+    d.documentElement.style.setProperty('--libbg', b);
+  }catch(e){}
 }
-function libretoColors(){
-  const hl = localStorage.getItem('ddl_hl') || '#5FC85A';
-  const bg = localStorage.getItem('ddl_libbg') || '#201c50';
-  const { card, close } = dlgOpen(
-    '<h2 class="dlgtitle">Colores del libreto</h2>'
-    +'<div class="dlglabel">Color del resaltado</div>'
-    +'<input type="color" id="cHl" value="'+hl+'" style="width:100%;height:54px;border:none;border-radius:16px;background:#241f52;cursor:pointer">'
-    +'<div class="dlglabel" style="margin-top:16px">Color de fondo del libreto</div>'
-    +'<input type="color" id="cBg" value="'+bg+'" style="width:100%;height:54px;border:none;border-radius:16px;background:#241f52;cursor:pointer">'
-    +'<button class="dlgbtn" id="cGo">Guardar</button>'
-  );
-  card.querySelector('#cGo').onclick=()=>{
-    const h=card.querySelector('#cHl').value, b=card.querySelector('#cBg').value;
-    try{ localStorage.setItem('ddl_hl',h); localStorage.setItem('ddl_libbg',b); }catch(e){}
-    try{ if(typeof pop2!=='undefined' && pop2.doc){ pop2.doc.documentElement.style.setProperty('--hl',h); pop2.doc.documentElement.style.setProperty('--libbg',b); } }catch(e){}
-    close(); if(typeof libMsg==='function') libMsg('🎨 Colores del libreto guardados');
+function libColorsPanel(){
+  const d = pop2 && pop2.doc; if(!d) return;
+  const old = d.getElementById('lColPanel'); if(old){ old.remove(); return; }
+  const cur = libColorsGet();
+  const p = d.createElement('div'); p.id='lColPanel'; p.className='lcol';
+  p.innerHTML = '<h4>Colores del libreto</h4>'
+    + '<label>Caja del personaje <input type="color" id="lcBox" value="'+cur.boxc+'"></label>'
+    + '<label>Fondo <input type="color" id="lcBg" value="'+cur.bg+'"></label>'
+    + '<div class="lcol-btns"><button class="lc-reset" id="lcReset">Restablecer</button>'
+    + '<button class="lc-ok" id="lcOk">Listo</button></div>';
+  // colgado del engranaje
+  const g = d.getElementById('lGear');
+  d.body.appendChild(p);
+  try{
+    const r = g.getBoundingClientRect();
+    p.style.top = (r.bottom + 8) + 'px';
+    p.style.right = Math.max(12, d.documentElement.clientWidth - r.right) + 'px';
+  }catch(e){ p.style.top='70px'; p.style.right='16px'; }
+  const guardar = ()=>{
+    const c = p.querySelector('#lcBox').value, b = p.querySelector('#lcBg').value;
+    libColorsApply(c, b);
+    try{ localStorage.setItem('ddl_boxc', c); localStorage.setItem('ddl_libbg', b); }catch(e){}
   };
+  p.querySelector('#lcBox').addEventListener('input', guardar);
+  p.querySelector('#lcBg').addEventListener('input', guardar);
+  p.querySelector('#lcReset').onclick = ()=>{
+    p.querySelector('#lcBox').value = LIB_BOXC_DEF;
+    p.querySelector('#lcBg').value  = LIB_BG_DEF;
+    guardar();
+  };
+  p.querySelector('#lcOk').onclick = ()=> p.remove();
 }
+
 function showTutorial(onDone){
   const old=document.getElementById('tutOv'); if(old) old.remove();
   const slides=[
@@ -7074,6 +7085,55 @@ body.fixedlay #lBlocks .blk .tx{ font-size:16px !important; }
    por eso al agrandar solo crecia el timecode. */
 body.fixedlay #lBlocks .blk.mine .tx{ font-size:var(--minefs,17px) !important; }
 body.fixedlay #lBlocks .blk .bhead{ font-size:12px !important; }
+
+/* ═══ Color de la caja y del fondo ════════════════════════════════════
+   La caja del personaje abierto era VERDE, el mismo verde que "Completado":
+   de un vistazo no se distinguia lo abierto de lo ya grabado. Ahora la caja
+   usa --boxc (azul por defecto, configurable) y el verde queda SOLO para
+   completado. Se excluye .rec a proposito, para que la marca de grabado siga
+   ganando. */
+body #lBlocks .blk.mine:not(.rec){
+  border-color:var(--boxc,#5B8DEF) !important;
+  background:color-mix(in srgb, var(--boxc,#5B8DEF) 13%, var(--libbg,#0c0e11)) !important;
+  box-shadow:0 0 0 1px color-mix(in srgb, var(--boxc,#5B8DEF) 26%, transparent) inset !important;
+}
+body #lBlocks .blk.mine:not(.rec) .tc{
+  color:var(--boxc,#5B8DEF) !important;
+  background:color-mix(in srgb, var(--boxc,#5B8DEF) 20%, #0c0e11) !important;
+  border-color:color-mix(in srgb, var(--boxc,#5B8DEF) 45%, transparent) !important;
+}
+body #lBlocks .blk.mine:not(.rec) .who{ color:var(--boxc,#5B8DEF) !important; }
+body.dark #lBlocks .blk.mine:not(.rec).active{
+  background:color-mix(in srgb, var(--boxc,#5B8DEF) 28%, var(--libbg,#0c0e11)) !important;
+}
+body.light #lBlocks .blk.mine:not(.rec){
+  background:color-mix(in srgb, var(--boxc,#5B8DEF) 12%, #ffffff) !important;
+  border-color:var(--boxc,#5B8DEF) !important;
+}
+body.light #lBlocks .blk.mine:not(.rec) .tc{
+  color:var(--boxc,#2E5FD0) !important;
+  background:color-mix(in srgb, var(--boxc,#5B8DEF) 20%, #ffffff) !important;
+}
+body.light #lBlocks .blk.mine:not(.rec).active{
+  background:color-mix(in srgb, var(--boxc,#5B8DEF) 24%, #ffffff) !important;
+}
+/* el fondo del libreto */
+body.dark{ background:var(--libbg,#0b0c0e) !important; }
+
+/* panel de colores */
+.lcol{ position:absolute; z-index:75; width:min(280px,92vw); background:#111316; border:1px solid #23262b;
+  border-radius:14px; padding:14px; box-shadow:0 18px 50px rgba(0,0,0,.55); font-family:'Inter',sans-serif; }
+.lcol h4{ font-size:13px; font-weight:700; color:#f2f3f5; margin:0 0 12px; }
+.lcol label{ display:flex; align-items:center; justify-content:space-between; gap:12px;
+  font-size:12.5px; color:#c7c9cd; margin-bottom:10px; }
+.lcol input[type=color]{ width:52px; height:32px; border:1px solid #2c3036; border-radius:8px;
+  background:#0f1215; cursor:pointer; padding:2px; }
+.lcol .lcol-btns{ display:flex; gap:8px; margin-top:6px; }
+.lcol button{ flex:1; border-radius:9px; padding:9px; font-family:'Inter',sans-serif; font-size:12.5px;
+  font-weight:600; cursor:pointer; }
+.lcol .lc-reset{ background:transparent; border:1px solid #3a3f46; color:#c7c9cd; }
+.lcol .lc-reset:hover{ border-color:#4ADE80; color:#f2f3f5; }
+.lcol .lc-ok{ background:#22C55E; border:none; color:#06210f; font-weight:700; }
 `;
 const LIB_CSS = `
 *{margin:0;padding:0;box-sizing:border-box}
@@ -7617,8 +7677,9 @@ function buildLibretoDoc(pc){
     +'<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></head><body></body>';
   const st = d.createElement('style'); st.textContent = LIB_CSS; d.head.appendChild(st);
   const st2 = d.createElement('style'); st2.textContent = LIB_OVERRIDE; d.head.appendChild(st2);
-  try{ const _hl=localStorage.getItem('ddl_hl'); if(_hl) d.documentElement.style.setProperty('--hl',_hl);
-       const _bg=localStorage.getItem('ddl_libbg'); if(_bg) d.documentElement.style.setProperty('--libbg',_bg); }catch(e){}
+  try{ const c = libColorsGet();
+       d.documentElement.style.setProperty('--boxc', c.boxc);
+       d.documentElement.style.setProperty('--libbg', c.bg); }catch(e){}
   d.body.className = pop2.theme + (pop2.type==='inline' ? ' inlinemode' : '');
   d.documentElement.style.setProperty('--pc', pc);
   d.documentElement.style.setProperty('--boxw', pop2.boxw==='full' ? '96%' : pop2.boxw+'px');
@@ -7730,6 +7791,7 @@ function buildLibretoDoc(pc){
         <button class="gm-b" data-act="compress">${LIB_ICON.sliders} Ajustar</button>
         <button class="gm-b" data-act="split">⊟ Dividir</button>
         <button class="gm-b" data-act="merge">⊞ Unir</button>
+        <button class="gm-b gm-col" id="gmColors">🎨 Colores</button>
       </div>
       <div class="gm-hint" id="gmHint">Toca una caja del libreto para elegirla.</div>
     </div>
@@ -7895,8 +7957,11 @@ function buildLibretoDoc(pc){
       g.addEventListener('click', (e)=>{ e.stopPropagation(); gearToggle(); });
       menu.addEventListener('click', (e)=>{
         const b = e.target.closest && e.target.closest('.gm-b');
-        if(!b || b.disabled) return;
+        if(!b) return;
         e.stopPropagation();
+        // los colores no dependen de que haya una caja elegida
+        if(b.id === 'gmColors'){ gearToggle(false); try{ libColorsPanel(); }catch(err){ console.error(err); } return; }
+        if(b.disabled) return;
         if(b.dataset.si == null){ return; }
         // mismo despachador que tenian los botones dentro de cada caja
         try{ if(typeof pop2._onToolClick === 'function') pop2._onToolClick({ currentTarget:b, stopPropagation(){} }); }catch(err){ console.error(err); }
@@ -9270,6 +9335,7 @@ function gearSync(){
   const hint = d.getElementById('gmHint');
   if(hint) hint.style.display = b ? 'none' : '';
   menu.querySelectorAll('.gm-b').forEach(btn=>{
+    if(btn.id === 'gmColors'){ btn.disabled = false; return; }
     if(si==null){ btn.disabled = true; delete btn.dataset.si; return; }
     btn.disabled = false; btn.dataset.si = si;
   });
