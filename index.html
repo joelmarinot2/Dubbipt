@@ -1628,7 +1628,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.31.1-nube · 01-sep-2026';
+const APP_VERSION = 'v10.32.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -7984,8 +7984,8 @@ function buildLibretoDoc(pc){
   pop2.mineFs = pop2.mineFs || 19;
   const setMineFs = ()=> d.documentElement.style.setProperty('--minefs', pop2.mineFs+'px');
   setMineFs();
-  d.getElementById('lFontUp').addEventListener('click', ()=>{ pop2.mineFs=Math.min(34,pop2.mineFs+2); setMineFs(); if(typeof syncSendTool==='function') syncSendTool('font', pop2.mineFs); setTimeout(()=>{ try{ libApplyZoom(); libDrawRenderAll(); }catch(e){} }, 40); });
-  d.getElementById('lFontDn').addEventListener('click', ()=>{ pop2.mineFs=Math.max(13,pop2.mineFs-2); setMineFs(); if(typeof syncSendTool==='function') syncSendTool('font', pop2.mineFs); setTimeout(()=>{ try{ libApplyZoom(); libDrawRenderAll(); }catch(e){} }, 40); });
+  d.getElementById('lFontUp').addEventListener('click', ()=>{ pop2.mineFs=libFsUp(pop2.mineFs); setMineFs(); if(typeof syncSendTool==='function') syncSendTool('font', pop2.mineFs); setTimeout(()=>{ try{ libApplyZoom(); libDrawRenderAll(); }catch(e){} }, 40); });
+  d.getElementById('lFontDn').addEventListener('click', ()=>{ pop2.mineFs=libFsDn(pop2.mineFs); setMineFs(); if(typeof syncSendTool==='function') syncSendTool('font', pop2.mineFs); setTimeout(()=>{ try{ libApplyZoom(); libDrawRenderAll(); }catch(e){} }, 40); });
   d.getElementById('lScope').addEventListener('click', ()=>{
     pop2.scopeAll = !pop2.scopeAll;
     pop2.els.scope.innerHTML = pop2.scopeAll ? LIB_ICON.scopeAll : LIB_ICON.scopeOne;
@@ -10738,6 +10738,11 @@ function wireTrackpadGestures(pad){
    CUIDADO: con `zoom`, scrollTop / clientHeight / scrollHeight YA vienen
    escalados, pero offsetTop / offsetHeight NO (siguen en unidades sin escalar).
    Por eso todo el motor de desplazamiento pasa por oTop() y oH(). */
+/* Tamano de letra del parlamento. El tope estaba en 34 px y se quedaba corto
+   para leer desde el atril; ahora llega a 60. El paso crece a partir de 30 para
+   no tener que dar diez toques. */
+function libFsUp(v){ v = +v || 19; return Math.min(60, v + (v >= 30 ? 4 : 2)); }
+function libFsDn(v){ v = +v || 19; return Math.max(13, v - (v > 30 ? 4 : 2)); }
 function libZoom(){ const k = (typeof pop2!=='undefined') && pop2._zoom; return (k && isFinite(k) && k>0) ? k : 1; }
 /* offsetTop de una caja va medido desde #lBlocksBox (que es position:relative),
    asi que hay que sumarle donde empieza ESE envoltorio dentro del desplazador:
@@ -10777,7 +10782,7 @@ function libApplyZoom(){
     const cs = pop2.win.getComputedStyle(w);
     const pad = (parseFloat(cs.paddingLeft)||0) + (parseFloat(cs.paddingRight)||0);
     const disp = Math.max(140, w.clientWidth - pad);
-    let k = Math.max(0.35, Math.min(1.25, disp / ref));
+    let k = Math.max(0.35, Math.min(1.6, disp / ref));   // hasta 1.6x en pantallas amplias
     k = Math.round(k*10000)/10000;
     const cambia = (pop2._zoom !== k);
     const antes = cambia ? (w.scrollTop / Math.max(0.0001, (pop2._zoom||1))) : 0;
