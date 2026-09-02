@@ -993,6 +993,20 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .ddlm-go:disabled{ opacity:.6; cursor:default; }
 .ddlm-fmt{ margin-right:auto; background:transparent; color:#8ab6ff; border:1px solid #2a3550; border-radius:9px; padding:9px 12px; font-family:'Inter',sans-serif; font-weight:600; font-size:13px; cursor:pointer; }
 .ddlm-fmt:hover{ border-color:#4d7cff; color:#a9c8ff; }
+/* diagnóstico de libreto vacío */
+.ldiag{ max-width:min(760px,92%); margin:26px auto; background:#15181c; border:1px solid #2a2f36;
+  border-left:3px solid #F59E0B; border-radius:12px; padding:18px 20px; font-family:'Inter',sans-serif; }
+.ldiag b{ display:block; font-size:15px; color:#f2f3f5; margin-bottom:8px; }
+.ldiag p{ font-size:13px; color:#9CA3AF; line-height:1.6; margin:0 0 14px; }
+.ldiag code{ font-family:'JetBrains Mono',monospace; font-size:12.5px; color:#FBBF24; background:rgba(251,191,36,.1); padding:1px 6px; border-radius:5px; }
+.ld-sec{ font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#6b7280; margin-bottom:12px; }
+.ld-sec ul{ margin:6px 0 0; padding-left:18px; text-transform:none; letter-spacing:0; }
+.ld-sec li{ font-family:'JetBrains Mono',monospace; font-size:12px; color:#c7c9cd; line-height:1.7; word-break:break-word; }
+.ld-sec li.no{ color:#6b7280; font-family:'Inter',sans-serif; }
+.ld-copy{ background:#22C55E; border:none; color:#06210f; font-family:'Inter',sans-serif; font-weight:700;
+  font-size:13px; padding:9px 16px; border-radius:9px; cursor:pointer; }
+.ld-copy:hover{ filter:brightness(1.07); }
+
 /* ===== Cuentas y accesos ===== */
 .acc2card{ width:min(560px,96vw); }
 .acc2-load, .acc2-msg{ color:#8b9099; font-size:13px; text-align:center; padding:22px 10px; line-height:1.6; }
@@ -1620,7 +1634,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.25.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.25.1-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -8449,6 +8463,51 @@ function libTextModal(){
     close();
   };
 }
+/* Diagnóstico cuando el libreto de un personaje sale VACÍO.
+   En vez de una pantalla en blanco, se dice con qué nombre quedó registrado en
+   el desglose, con qué nombres quedaron marcados los parlamentos, y qué
+   renglones del PDF contienen ese nombre. Un botón lo copia entero, para poder
+   pegarlo sin pasar por la consola del navegador. */
+function libDiagData(key){
+  const flat = (k)=> String(k||'').replace(/[^A-Z0-9]/g,'');
+  const objetivo = flat(key);
+  const clavesBloques = [...new Set((script||[]).map(b=>b.key).filter(Boolean))];
+  const casi = clavesBloques.filter(k=> flat(k).includes(objetivo) || objetivo.includes(flat(k)));
+  const renglones = [];
+  try{
+    for(const p in pageData){
+      const pd = pageData[p]; if(!pd || !pd.lines) continue;
+      for(const l of pd.lines){
+        const t = (l.text||'').trim();
+        if(t && flat(normSameLen(t)).includes(objetivo)){
+          renglones.push('p.'+p+'  '+t.slice(0,110));
+          if(renglones.length >= 8) break;
+        }
+      }
+      if(renglones.length >= 8) break;
+    }
+  }catch(e){}
+  return {
+    desglose: key,
+    desgloseNormalizado: objetivo,
+    parlamentosConEseNombre: casi,
+    clavesDeParlamentos: clavesBloques.slice(0, 40),
+    totalParlamentos: (script||[]).length,
+    renglonesDelPdf: renglones
+  };
+}
+function libDiagHtml(key){
+  const d = libDiagData(key);
+  const li = (a)=> a.length ? a.map(x=>'<li>'+esc(String(x))+'</li>').join('') : '<li class="no">(ninguno)</li>';
+  return '<div class="ldiag" id="lDiag">'
+    + '<b>Este personaje no tiene parlamentos en el libreto</b>'
+    + '<p>El desglose lo registró como <code>'+esc(d.desglose)+'</code>, pero ningún parlamento quedó marcado con ese nombre.</p>'
+    + '<div class="ld-sec">Renglones del PDF donde aparece ese nombre<ul>'+li(d.renglonesDelPdf)+'</ul></div>'
+    + '<div class="ld-sec">Nombres con los que SÍ hay parlamentos<ul>'+li(d.clavesDeParlamentos.slice(0,12))+'</ul></div>'
+    + '<button class="ld-copy" id="lDiagCopy">Copiar diagnóstico</button>'
+    + '</div>';
+}
+
 function renderLibretoBlocks(){
   if(!pop2.els) return;
   // (marcado libre + compresión definidos arriba)
@@ -8460,11 +8519,13 @@ function renderLibretoBlocks(){
   const c = charIdx[key];
   const pc = c ? c.color : '#5FC85A';
   const html = [];
+  let mineCount = 0;
   pop2.blockMap = [];
   let lastPage = 0;
   script.forEach((b, i)=>{
     const keyFlat = (k)=> (k||'').replace(/[^A-Z0-9]/g,'');
     const mine = b.key === highlight || (highlight && b.key && keyFlat(b.key)===keyFlat(highlight) && keyFlat(highlight).length>=2);
+    if(mine) mineCount++;
     if(!pop2.scopeAll){
       const near = mine || (script[i-1] && (script[i-1].key===key || keyFlat(script[i-1].key)===keyFlat(key))) || (script[i+1] && (script[i+1].key===key || keyFlat(script[i+1].key)===keyFlat(key)));
       if(!near) return;
@@ -8506,11 +8567,32 @@ function renderLibretoBlocks(){
       + '</div>'
       + '</div>');
   });
+  // libreto vacio para este personaje: explicar por que, en vez de dejarlo en blanco
+  if(key && charIdx[key] && !mineCount){ try{ html.unshift(libDiagHtml(key)); }catch(e){} }
   /* PINTADO PROGRESIVO: antes todo el guion se insertaba en un solo innerHTML
      (un capítulo largo = miles de .blk de golpe → tirones en la tablet).
      Ahora: primeras 120 cajas al instante y el resto por tandas en reposo,
      enlazando los listeners por tanda. Un render nuevo cancela el anterior. */
   pop2.els.blocks.innerHTML = '';
+  // boton "Copiar diagnostico": por delegacion, una sola vez por documento.
+  // Ademas del portapapeles deja el texto a la vista, porque el permiso de
+  // portapapeles falla en algunos navegadores y no se puede depender de el.
+  if(!pop2.els.blocks._diagWired){
+    pop2.els.blocks._diagWired = true;
+    pop2.els.blocks.addEventListener('click', (ev)=>{
+      const b = ev.target.closest && ev.target.closest('#lDiagCopy'); if(!b) return;
+      ev.stopPropagation();
+      let txt = '';
+      try{ txt = JSON.stringify(libDiagData(pop2.key), null, 1); }catch(e){ txt = 'error: '+e; }
+      try{ pop2.win.navigator.clipboard.writeText(txt); }catch(e){}
+      const ta = pop2.doc.createElement('textarea');
+      ta.readOnly = true; ta.value = txt;
+      ta.style.cssText = 'width:100%;height:190px;margin-top:12px;background:#0f1215;color:#c7c9cd;'
+        + 'border:1px solid #2a2f36;border-radius:9px;padding:10px;font-family:JetBrains Mono,monospace;font-size:11.5px';
+      b.replaceWith(ta);
+      try{ ta.focus(); ta.select(); }catch(e){}
+    });
+  }
   pop2.blockEls = [];
   pop2._renderSeq = (pop2._renderSeq||0) + 1;
   const seq = pop2._renderSeq;
