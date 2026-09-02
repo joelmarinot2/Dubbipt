@@ -1621,7 +1621,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.27.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.27.1-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -2193,24 +2193,69 @@ async function authInit(){
     try{
       if(mode==='signup'){
         const { data, error } = await sb.auth.signUp({ email, password:pass, options:{ data:{ full_name:full } } });
-        if(error){ shake(); err.textContent = /registered/i.test(error.message)?'Ese correo ya tiene cuenta. Inicia sesión.':error.message; return; }
+        if(error){
+          console.error('[acceso] fallo al crear la cuenta', error);
+          shake();
+          err.style.color = '#F472B6';
+          err.textContent = /registered|already/i.test(error.message||'')
+            ? 'Ese correo ya tiene cuenta. Inicia sesión.'
+            : authErrMsg(error).txt;
+          return;
+        }
         if(data.session){ sbUser=data.session.user; authUnlock(); renderLibrary(); showTutorial(()=> postLogin()); }
         else { err.style.color='#4ADE80'; err.textContent='Cuenta creada. Revisa tu correo para confirmar y luego inicia sesión.'; setMode('login'); }
       } else {
         const { data, error } = await sb.auth.signInWithPassword({ email, password:pass });
-        if(error || !data.session){ shake(); err.textContent = /confirm/i.test((error&&error.message)||'')?'Confirma tu correo antes de entrar':'Correo o contraseña incorrectos';
-          document.getElementById('gPass').value=''; document.getElementById('gPass').focus(); return; }
+        if(error || !data || !data.session){
+          console.error('[acceso] fallo al iniciar sesión', error);
+          shake();
+          const r = authErrMsg(error, !error);
+          err.style.color = '#F472B6'; err.textContent = r.txt;
+          document.getElementById('gPass').value=''; document.getElementById('gPass').focus(); return;
+        }
         sbUser=data.user; authUnlock(); renderLibrary(); postLogin();
       }
     } finally { btn.disabled=false; btn.textContent=old; }
   });
   document.getElementById('gUser').focus();
   }catch(e){
-    console.warn('authInit sin red:', e);
-    showOfflineGate('Sin conexión con la nube — puedes trabajar con la caché local');
+    console.error('[acceso] no se pudo preparar el inicio de sesión', e);
+    // Decir POR QUE. Antes siempre ponia "sin conexion", aunque el motivo fuera
+    // otro (biblioteca bloqueada por la red, clave del proyecto...), y en un
+    // dispositivo nuevo eso dejaba al usuario sin pista de que arreglar.
+    const det = (e && (e.message || e.error_description)) || '';
+    showOfflineGate('No se pudo conectar con la nube en este dispositivo'
+      + (det ? ' — ' + det : '') + '. Puedes trabajar con la caché local.');
     // reintentar la sesión normal en segundo plano por si fue un tropiezo puntual
     setTimeout(()=>{ if(!sbUser && !window.OFFLINE) authInit(); }, 8000);
   }
+}
+/* Por que fallo el acceso, de verdad.
+   Antes CUALQUIER error de inicio de sesion se mostraba como "Correo o
+   contrasena incorrectos": limite de intentos, corte de red, sesion caducada o
+   correo sin confirmar salian todos igual, y era imposible saber que pasaba
+   -sobre todo al entrar desde otro dispositivo o desde otra red-. */
+function authErrMsg(error, sinSesion){
+  const raw = (error && (error.message || error.error_description)) || '';
+  const m = String(raw).toLowerCase();
+  const code = (error && (error.code || error.status)) || '';
+  if(!error && sinSesion) return { txt:'Cuenta creada. Revisa tu correo para confirmar y luego inicia sesión.', ok:true };
+  if(m.includes('email not confirmed') || m.includes('not confirmed') || m.includes('confirm'))
+    return { txt:'Tu correo aún no está confirmado. Busca el mensaje de confirmación (mira también la carpeta de spam).' };
+  if(m.includes('invalid login') || m.includes('invalid credentials') || code==='invalid_credentials')
+    return { txt:'Correo o contraseña incorrectos.' };
+  if(m.includes('rate limit') || m.includes('too many') || code===429 || String(code)==='429')
+    return { txt:'Demasiados intentos seguidos. Espera unos minutos y vuelve a probar.' };
+  if(m.includes('failed to fetch') || m.includes('networkerror') || m.includes('network request failed') || m.includes('load failed'))
+    return { txt:'No se pudo conectar con el servidor. Revisa la conexión de este dispositivo (o si la red bloquea el acceso).' };
+  if(m.includes('user not found')) return { txt:'No hay ninguna cuenta con ese correo.' };
+  if(m.includes('captcha')) return { txt:'Verificación de seguridad pendiente. Vuelve a intentarlo.' };
+  if(m.includes('signups not allowed') || m.includes('signup is disabled'))
+    return { txt:'El registro de cuentas nuevas está desactivado en el servidor.' };
+  if(m.includes('anonymous') || m.includes('api key') || m.includes('apikey') || m.includes('project'))
+    return { txt:'Este dispositivo no puede hablar con el servidor (clave o proyecto). Detalle: ' + raw };
+  // desconocido: mostrarlo tal cual, que es lo unico que permite diagnosticar
+  return { txt: raw ? ('No se pudo entrar. Detalle: ' + raw) : 'No se pudo entrar. Vuelve a intentarlo.' };
 }
 document.getElementById('btnOut').addEventListener('click', async ()=>{
   try{ onlineDisconnect(); }catch(e){}
