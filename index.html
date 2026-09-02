@@ -1621,7 +1621,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.26.1-nube · 01-sep-2026';
+const APP_VERSION = 'v10.26.2-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -8491,13 +8491,37 @@ async function reanalizarGuion(btn){
   };
   try{
     if(!sb || typeof currentEp==='undefined' || !currentEp){ say('Abre un capítulo primero', true); return; }
-    const ep = ((typeof LDB!=='undefined' && LDB.epsAll)||[]).find(e=> e.id===currentEp.id) || currentEp;
-    if(!ep.pdf_path){ say('Este capítulo no tiene el PDF guardado en la nube: vuelve a subirlo', true); return; }
     if(btn){ btn.disabled = true; btn.textContent = 'Analizando…'; }
-    say('Descargando el PDF del capítulo…');
-    const r = await sb.storage.from('libretos').download(ep.pdf_path);
-    if(!r || !r.data) throw new Error('no se pudo descargar el PDF');
-    await loadPdfBuf(await r.data.arrayBuffer(), ep.pdf_name || 'libreto.pdf');
+    let buf = null, nombre = 'libreto.pdf';
+    // 1) el PDF que este equipo ya tiene guardado: sin red y al instante
+    try{
+      const cache = await idbGet('ddl-files::' + currentEp.id);
+      if(cache && cache.pdf){ buf = cache.pdf; nombre = cache.pdf_name || nombre; say('Analizando el PDF guardado en este equipo…'); }
+    }catch(e){}
+    // 2) el de la nube. OJO: la lista de la biblioteca NO trae la columna
+    //    pdf_path (libFetchAll no la pide), asi que hay que consultar la fila.
+    if(!buf){
+      let ep = ((typeof LDB!=='undefined' && LDB.epsAll)||[]).find(e=> e.id===currentEp.id) || currentEp;
+      if(!ep.pdf_path){
+        try{
+          const q = await sb.from('episodes').select('pdf_path,pdf_name').eq('id', currentEp.id).maybeSingle();
+          if(q && q.data) ep = Object.assign({}, ep, q.data);
+        }catch(e){}
+      }
+      if(ep.pdf_path){
+        say('Descargando el PDF del capítulo…');
+        const r = await sb.storage.from('libretos').download(ep.pdf_path);
+        if(r && r.data){ buf = await r.data.arrayBuffer(); nombre = ep.pdf_name || nombre; }
+      }
+    }
+    // 3) ultimo recurso: el PDF que se leyo en esta misma sesion
+    if(!buf && typeof lastPdfBuf!=='undefined' && lastPdfBuf){ buf = lastPdfBuf.slice(0); nombre = pdfName || nombre; }
+    if(!buf){
+      say('No encuentro el PDF de este capítulo (ni aquí ni en la nube): vuelve a subirlo desde el capítulo', true);
+      if(btn){ btn.disabled = false; btn.textContent = 'Volver a analizar el guion'; }
+      return;
+    }
+    await loadPdfBuf(buf, nombre);
     try{ if(typeof epDataUpsert==='function') await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ console.warn('guardar', e); }
     try{ if(typeof refreshOpenLibretoForEpisode==='function') refreshOpenLibretoForEpisode();
          else if(typeof renderLibretoBlocks==='function') renderLibretoBlocks(); }catch(e){}
