@@ -1288,20 +1288,27 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .actrow .act-nav:hover{ background:transparent !important; border-color:#4ADE80 !important; color:#f2f3f5 !important; }
 </style>
 <style>
-#tutOv{ position:fixed; inset:0; z-index:9800; background:rgba(10,7,26,.9); -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:20px; font-family:'Open Serif',serif; }
-.tut-card{ position:relative; width:min(520px,94vw); background:#1e1a40; border:3px solid #5FC85A; border-radius:26px; padding:30px 28px 24px; text-align:center; box-shadow:0 24px 70px rgba(0,0,0,.55); }
-.tut-skip{ position:absolute; top:16px; right:18px; background:none; border:none; color:#8B84B0; cursor:pointer; font-size:13px; font-family:'Open Serif',serif; }
-.tut-ic{ font-size:56px; margin-bottom:8px; line-height:1; }
-.tut-t{ color:#fff; font-size:22px; margin-bottom:10px; }
-.tut-d{ color:#c9c5ec; font-size:15px; line-height:1.55; min-height:74px; }
-.tut-d b{ color:#eafff0; }
-.tut-dots{ display:flex; gap:7px; justify-content:center; margin:16px 0 18px; }
-.tut-dots span{ width:8px; height:8px; border-radius:50%; background:#3a3568; transition:all .15s; }
-.tut-dots span.on{ background:#5FC85A; width:22px; border-radius:5px; }
-.tut-nav{ display:flex; justify-content:space-between; gap:10px; }
-.tut-prev{ background:transparent; border:2px solid #3a3568; color:#c9c5ec; border-radius:20px; padding:12px 18px; cursor:pointer; font-family:'Open Serif',serif; }
-.tut-next{ background:#5FC85A; border:none; color:#123317; border-radius:20px; padding:12px 26px; cursor:pointer; font-weight:700; font-family:'Open Serif',serif; box-shadow:0 4px 0 #3f9e3c; }
-.tut-next:active{ transform:translateY(2px); box-shadow:0 2px 0 #3f9e3c; }
+#tutOv{ position:fixed; inset:0; z-index:9800; background:rgba(8,9,11,.78); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; padding:20px; font-family:'Inter',sans-serif; overflow:auto; }
+.tut-card{ position:relative; width:min(520px,96vw); background:#111316; border:1px solid #23262b; border-radius:18px; padding:26px 26px 20px; box-shadow:0 24px 70px rgba(0,0,0,.55); }
+.tut-skip{ position:absolute; top:14px; right:16px; background:none; border:none; color:#6b7280; cursor:pointer; font-size:12.5px; font-family:'Inter',sans-serif; font-weight:600; }
+.tut-skip:hover{ color:#c7c9cd; }
+.tut-step{ font-size:11px; text-transform:uppercase; letter-spacing:.7px; color:#6b7280; font-weight:700; margin-bottom:12px; }
+.tut-ic{ width:46px; height:46px; border-radius:13px; display:grid; place-items:center; font-size:24px; line-height:1;
+  background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); margin-bottom:14px; }
+.tut-t{ color:#f2f3f5; font-size:19px; font-weight:700; margin-bottom:8px; }
+.tut-d{ color:#9CA3AF; font-size:14px; line-height:1.65; min-height:88px; }
+.tut-d b{ color:#e6e7ea; font-weight:600; }
+.tut-d code{ font-family:'JetBrains Mono',ui-monospace,monospace; font-size:12.5px; color:#4ADE80;
+  background:rgba(34,197,94,.1); padding:1px 6px; border-radius:5px; }
+.tut-d .tut-tip{ display:block; margin-top:10px; font-size:12.5px; color:#6b7280; border-left:2px solid #2c3036; padding-left:10px; }
+.tut-dots{ display:flex; gap:5px; justify-content:center; margin:18px 0 16px; flex-wrap:wrap; }
+.tut-dots span{ width:6px; height:6px; border-radius:50%; background:#2c3036; transition:all .15s; }
+.tut-dots span.on{ background:#22C55E; width:18px; border-radius:4px; }
+.tut-nav{ display:flex; justify-content:space-between; gap:10px; align-items:center; }
+.tut-prev{ background:transparent; border:1px solid #3a3f46; color:#c7c9cd; border-radius:10px; padding:10px 16px; cursor:pointer; font-family:'Inter',sans-serif; font-size:13px; font-weight:600; }
+.tut-prev:hover{ border-color:#4ADE80; color:#f2f3f5; }
+.tut-next{ background:#22C55E; border:none; color:#06210f; border-radius:10px; padding:10px 22px; cursor:pointer; font-weight:700; font-family:'Inter',sans-serif; font-size:13.5px; }
+.tut-next:hover{ filter:brightness(1.06); }
 </style>
 <style>
 .actrow .act-g.on{ background:#123b23 !important; border-color:#1d4a30 !important; color:#4ADE80 !important; }
@@ -1621,7 +1628,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.29.1-nube · 01-sep-2026';
+const APP_VERSION = 'v10.30.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -5559,14 +5566,53 @@ function libretoColors(){
 function showTutorial(onDone){
   const old=document.getElementById('tutOv'); if(old) old.remove();
   const slides=[
-    {ic:'\uD83D\uDC4B', t:'Bienvenido a Dubbipt', d:'Genera el desglose de personajes autom\u00e1ticamente desde el guion y trabaja tus doblajes. Te mostramos lo esencial en un minuto.'},
-    {ic:'\uD83D\uDCF1', t:'Elige tu dispositivo', d:'Al entrar eliges si este equipo es <b>Tablet</b> (control) o <b>Escritorio</b> (muestra el libreto). Puedes cambiarlo cuando quieras.'},
-    {ic:'\uD83D\uDDC2\uFE0F', t:'Crea un espacio de trabajo', d:'Agrupa tus programas por cliente o estudio. En <b>Usuario \u2192 Espacios de trabajo</b> puedes crear, renombrar o borrar.'},
-    {ic:'\uD83C\uDFAC', t:'Crea un programa', d:'Pulsa <b>\uFF0B Nuevo Programa</b>, ponle nombre y, si quieres, sube su <b>car\u00e1tula</b> y <b>portada</b>.'},
-    {ic:'\uD83D\uDCC4', t:'Crea un episodio', d:'Dentro del programa, <b>\uFF0B Nuevo Episodio</b>: escribe el nombre y sube el guion (<b>PDF, Word o Excel</b>). El desglose se genera solo.'},
-    {ic:'\u2705', t:'Revisa el desglose', d:'Antes de entrar, asigna el <b>talento</b> de cada personaje y quita los que no correspondan. Luego pulsa <b>Guardar desglose</b>.'},
-    {ic:'\uD83C\uDF99\uFE0F', t:'Trabaja el episodio', d:'Ver\u00e1s las <b>cajas de personaje</b> (marca el check al grabar), abre el <b>libreto</b> para leer y marcar, y <b>sincroniza</b> tablet \u2194 escritorio.'},
-    {ic:'\uD83D\uDE80', t:'\u00a1Listo!', d:'Ya puedes empezar. Puedes volver a ver este tutorial en <b>Usuario \u2192 Tutorial</b>.'}
+    { s:'Bienvenida', ic:'👋', t:'Bienvenido a Dubbipt',
+      d:'Subes el guion y Dubbipt <b>saca solo la lista de personajes</b> con sus intervenciones. Desde ahí trabajas el libreto y sincronizas los equipos de la sala. Diez pasos, un minuto.' },
+
+    { s:'Paso 1 · Dispositivo', ic:'📱', t:'Di qué es este equipo',
+      d:'Al entrar eliges el papel de ESTE aparato, y de eso depende lo que ve:<br>'
+       +'· <b>Tablet · Director</b>: control total, manda el desplazamiento.<br>'
+       +'· <b>Tablet · Actor</b>: solo el pincel; el libreto le aparece cuando el director abre el personaje.<br>'
+       +'· <b>Escritorio</b>: muestra el libreto en grande.'
+       +'<span class="tut-tip">Se puede cambiar luego desde ⚙ → Perfil de la cuenta.</span>' },
+
+    { s:'Paso 2 · Espacio de trabajo', ic:'🗂️', t:'Elige tu espacio',
+      d:'Un <b>espacio de trabajo</b> agrupa programas por estudio o cliente. La app solo enseña los programas del espacio activo.'
+       +'<span class="tut-tip">Si te faltan programas, casi siempre están en otro espacio: mira el aviso naranja bajo «Programas» o el chip del espacio.</span>' },
+
+    { s:'Paso 3 · Programas', ic:'🎬', t:'Crea un programa',
+      d:'En la pantalla <b>Programas</b>, pulsa <b>＋ Nuevo programa</b> y ponle nombre. Cada tarjeta muestra cuántos capítulos tiene y cuánto llevas grabado.' },
+
+    { s:'Paso 4 · Capítulos', ic:'📄', t:'Sube el guion',
+      d:'Entra al programa y usa <b>Cargar un capítulo</b>: arrastra el guion en <b>PDF o Word</b> y pulsa <b>Guardar capítulo</b>.'
+       +'<span class="tut-tip">El PDF tiene que llevar texto seleccionable. Si es un escaneo, no se puede leer.</span>' },
+
+    { s:'Paso 5 · Desglose', ic:'✅', t:'Revisa los personajes',
+      d:'Dubbipt genera una <b>tarjeta por personaje</b> con sus intervenciones y páginas. Ahí asignas el <b>talento</b> y marcas los terminados.'
+       +'<span class="tut-tip">Si una tarjeta sale con el distintivo naranja «sin libreto», ese personaje no se encontró en el guion: ábrela y te dice por qué.</span>' },
+
+    { s:'Paso 6 · El libreto', ic:'📖', t:'Lee y navega',
+      d:'Al abrir un personaje ves sus parlamentos en cajas, con <b>timecode</b> y nombre. En la barra de arriba cambias entre <b>solo este personaje</b> y el <b>libreto completo</b>, saltas a una página o buscas una palabra.' },
+
+    { s:'Paso 7 · Herramientas', ic:'⚙️', t:'El engranaje',
+      d:'Toca una caja para elegirla y abre el <b>engranaje</b> de la barra: Completar, Editar, Pausa, Acento, Limpiar, Ajustar, Dividir y Unir.'
+       +'<span class="tut-tip">El menú dice siempre sobre qué caja vas a actuar.</span>' },
+
+    { s:'Paso 8 · El lápiz', ic:'🖌️', t:'Marca a mano',
+      d:'Con el <b>pincel</b> escribes encima del libreto. Con los gestos activados:<br>'
+       +'· una marca <b>encima de una palabra</b> la acentúa (sale grande y en ámbar),<br>'
+       +'· una <b>raya diagonal</b> pone una pausa,<br>'
+       +'· una <b>flecha →</b> es más rápido y <b>←</b> más lento.'
+       +'<span class="tut-tip">Con el pincel activo, desplaza con DOS dedos.</span>' },
+
+    { s:'Paso 9 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
+      d:'Con el mismo espacio de trabajo, los equipos se emparejan solos. El <b>director</b> manda el desplazamiento y el tamaño; el <b>actor</b> sigue. Lo que marca cualquiera se ve en todas las pantallas.' },
+
+    { s:'Paso 10 · Tu equipo', ic:'👥', t:'Quién está conectado',
+      d:'El chip <b>👥</b> de la barra dice cuántas personas hay conectadas ahora. Al pulsarlo ves quiénes están en tu espacio y con qué dispositivo.' },
+
+    { s:'Listo', ic:'🚀', t:'Ya puedes empezar',
+      d:'Eso es todo lo esencial. Puedes volver a ver este tutorial cuando quieras en <b>⚙ → Ayuda y documentación</b>.' }
   ];
   let idx=0;
   const ov=document.createElement('div'); ov.id='tutOv'; document.body.appendChild(ov);
@@ -5575,6 +5621,7 @@ function showTutorial(onDone){
     const s=slides[idx], last=idx===slides.length-1;
     ov.innerHTML='<div class="tut-card">'
       +'<button class="tut-skip" id="tutSkip">Saltar</button>'
+      +'<div class="tut-step">'+(s.s||'')+'</div>'
       +'<div class="tut-ic">'+s.ic+'</div>'
       +'<div class="tut-t">'+s.t+'</div>'
       +'<div class="tut-d">'+s.d+'</div>'
