@@ -1628,7 +1628,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.30.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.31.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -7060,6 +7060,16 @@ body.light .gmenu{ background:#fff; border-color:#e2ddf2; }
 body.light .gm-b{ background:#f7f6fc; border-color:#e2ddf2; color:#2a2540; }
 /* la tablet del ACTOR solo tiene el pincel */
 body.is-talent #lGear, body.is-talent .gmenu{ display:none !important; }
+
+/* ─── Maqueta FIJA: la caja no responde al ancho del aparato ───────────
+   Con el libreto compuesto a un ancho de referencia y escalado, las reglas
+   responsivas de abajo volverian a diferenciar la maqueta entre equipos: se
+   midio 16px de letra en el escritorio y 15px en la tablet, y con eso el texto
+   rompe renglon en otro sitio y los trazos del pincel descuadran. Dentro del
+   area escalada mandan siempre los valores de escritorio. */
+body.fixedlay #lBlocks .blk{ padding:11px 20px !important; }
+body.fixedlay #lBlocks .blk .tx{ font-size:16px !important; }
+body.fixedlay #lBlocks .blk .bhead{ font-size:12px !important; }
 `;
 const LIB_CSS = `
 *{margin:0;padding:0;box-sizing:border-box}
@@ -7919,6 +7929,8 @@ function buildLibretoDoc(pc){
   }
   libSyncHeadH();
   try{ pop2.win.addEventListener('resize', libSyncHeadH); }catch(e){}
+  // el zoom se recalcula al cambiar el tamaño de la ventana
+  try{ pop2.win.addEventListener('resize', ()=>{ try{ libApplyZoom(); }catch(e){} }); }catch(e){}
   setTimeout(libSyncHeadH, 60); setTimeout(libSyncHeadH, 300);
   // ── Flecha: oculta/muestra la barra de herramientas (reemplaza «expandir») ──
   { const hb = d.getElementById('lHide');
@@ -7968,8 +7980,8 @@ function buildLibretoDoc(pc){
   pop2.mineFs = pop2.mineFs || 19;
   const setMineFs = ()=> d.documentElement.style.setProperty('--minefs', pop2.mineFs+'px');
   setMineFs();
-  d.getElementById('lFontUp').addEventListener('click', ()=>{ pop2.mineFs=Math.min(34,pop2.mineFs+2); setMineFs(); if(typeof syncSendTool==='function') syncSendTool('font', pop2.mineFs); setTimeout(()=>{ try{ libDrawRenderAll(); }catch(e){} }, 40); });
-  d.getElementById('lFontDn').addEventListener('click', ()=>{ pop2.mineFs=Math.max(13,pop2.mineFs-2); setMineFs(); if(typeof syncSendTool==='function') syncSendTool('font', pop2.mineFs); setTimeout(()=>{ try{ libDrawRenderAll(); }catch(e){} }, 40); });
+  d.getElementById('lFontUp').addEventListener('click', ()=>{ pop2.mineFs=Math.min(34,pop2.mineFs+2); setMineFs(); if(typeof syncSendTool==='function') syncSendTool('font', pop2.mineFs); setTimeout(()=>{ try{ libApplyZoom(); libDrawRenderAll(); }catch(e){} }, 40); });
+  d.getElementById('lFontDn').addEventListener('click', ()=>{ pop2.mineFs=Math.max(13,pop2.mineFs-2); setMineFs(); if(typeof syncSendTool==='function') syncSendTool('font', pop2.mineFs); setTimeout(()=>{ try{ libApplyZoom(); libDrawRenderAll(); }catch(e){} }, 40); });
   d.getElementById('lScope').addEventListener('click', ()=>{
     pop2.scopeAll = !pop2.scopeAll;
     pop2.els.scope.innerHTML = pop2.scopeAll ? LIB_ICON.scopeAll : LIB_ICON.scopeOne;
@@ -7985,9 +7997,10 @@ function buildLibretoDoc(pc){
     b.addEventListener('click', ()=>{
       pop2.boxw = b.dataset.w;
       d.documentElement.style.setProperty('--boxw', pop2.boxw==='full' ? '96%' : pop2.boxw+'px');
+      try{ libApplyZoom(); }catch(e){}
       markWidthBtn();
       if(typeof syncSendTool==='function') syncSendTool('boxw', pop2.boxw);
-      setTimeout(()=>{ try{ libDrawRenderAll(); }catch(e){} }, 40);
+      setTimeout(()=>{ try{ libApplyZoom(); libDrawRenderAll(); }catch(e){} }, 40);
     });
   });
   // atajos de teclado: ↑/↓ salta entre páginas resaltadas del riel, 1–4 cambia el ancho de columna
@@ -8108,9 +8121,9 @@ function libViewPos(){
   if(!w || !els || !els.length || !pop2.blockMap) return null;
   const refY = w.scrollTop + w.clientHeight*0.42;   // referencia = LÍNEA DE LECTURA, no el borde superior
   let lo=0, hi=els.length-1, idx=0;
-  while(lo<=hi){ const mid=(lo+hi)>>1; if(els[mid].offsetTop<=refY){ idx=mid; lo=mid+1; } else hi=mid-1; }
+  while(lo<=hi){ const mid=(lo+hi)>>1; if(oTop(els[mid])<=refY){ idx=mid; lo=mid+1; } else hi=mid-1; }
   const el = els[idx];
-  const f = Math.max(0, Math.min(1, (refY - el.offsetTop) / Math.max(1, el.offsetHeight)));
+  const f = Math.max(0, Math.min(1, (refY - oTop(el)) / Math.max(1, oH(el))));
   return { si: pop2.blockMap[idx], f: Math.round(f*1000)/1000 };
 }
 // emisor unificado: solo la tablet, y solo si hubo interacción real del usuario
@@ -9033,6 +9046,7 @@ function renderLibretoBlocks(){
      (un capítulo largo = miles de .blk de golpe → tirones en la tablet).
      Ahora: primeras 120 cajas al instante y el resto por tandas en reposo,
      enlazando los listeners por tanda. Un render nuevo cancela el anterior. */
+  try{ libApplyZoom(); }catch(e){}
   pop2.els.blocks.innerHTML = '';
   // boton "Copiar diagnostico": por delegacion, una sola vez por documento.
   // Ademas del portapapeles deja el texto a la vista, porque el permiso de
@@ -9288,10 +9302,10 @@ function centerBlock(vi, smooth){
   const wrap = pop2.els.wrap;
   // si la caja ya se ve cómoda (ni pegada arriba ni cortada abajo), no mover nada:
   // en la primera página esto evita el tira-y-afloja del centrado
-  const rel = el.offsetTop - wrap.scrollTop;
-  const comoda = rel >= wrap.clientHeight*0.10 && (rel + el.offsetHeight) <= wrap.clientHeight*0.90;
+  const rel = oTop(el) - wrap.scrollTop;
+  const comoda = rel >= wrap.clientHeight*0.10 && (rel + oH(el)) <= wrap.clientHeight*0.90;
   if(comoda && smooth) return;
-  const target = Math.max(0, Math.min(libMaxTop(), el.offsetTop - wrap.clientHeight*0.42 + el.offsetHeight/2));
+  const target = Math.max(0, Math.min(libMaxTop(), oTop(el) - wrap.clientHeight*0.42 + oH(el)/2));
   if(!isFinite(target)) return;
   if(smooth) libAnimScroll(target);
   else wrap.scrollTo({ top: target, behavior:'auto' });
@@ -9331,7 +9345,7 @@ function libAnimScroll(top){
 function libCenterTo(el){
   if(!el || !pop2.els) return;
   const wrap = pop2.els.wrap;
-  const target = Math.max(0, Math.min(libMaxTop(), el.offsetTop - wrap.clientHeight*0.42 + el.offsetHeight/2));
+  const target = Math.max(0, Math.min(libMaxTop(), oTop(el) - wrap.clientHeight*0.42 + oH(el)/2));
   if(isFinite(target)) libAnimScroll(target);
 }
 function gotoLibretoPage(pg, fromRemote){
@@ -9351,7 +9365,7 @@ function gotoLibretoPage(pg, fromRemote){
   }
   if(!el) { markChipCur(pg); return; }   // esa página no existe en esta vista: QUEDARSE donde está
   const wrap = pop2.els.wrap;
-  const top = Math.max(0, Math.min(libMaxTop(), el.offsetTop - wrap.clientHeight*0.25));
+  const top = Math.max(0, Math.min(libMaxTop(), oTop(el) - wrap.clientHeight*0.25));
   if(!isFinite(top)) return;
   libAnimScroll(top);
   if(!fromRemote){
@@ -10707,6 +10721,78 @@ function wireTrackpadGestures(pad){
 }
 
 /* ---- ESCRITORIO: recibir los gestos del trackpad ---- */
+/* ═══ MAQUETA FIJA + ZOOM (opcion B) ═══════════════════════════════════
+   El libreto se compone SIEMPRE al mismo ancho de referencia y luego se encoge
+   o agranda para caber en la pantalla. Asi los tres equipos tienen la MISMA
+   maqueta -mismos cortes de renglon, mismas alturas de caja- y un trazo del
+   pincel, que se guarda en porcentaje de su caja, cae en el mismo sitio en
+   todos. Antes `.blk` usaba max-width: una tablet estrecha encogia la caja, el
+   texto rompia en otro sitio y el porcentaje apuntaba a otra palabra.
+   El zoom por dispositivo puede ser distinto sin romper nada: al ser uniforme
+   conserva las proporciones de cada caja, que es lo que usan los trazos.
+
+   CUIDADO: con `zoom`, scrollTop / clientHeight / scrollHeight YA vienen
+   escalados, pero offsetTop / offsetHeight NO (siguen en unidades sin escalar).
+   Por eso todo el motor de desplazamiento pasa por oTop() y oH(). */
+function libZoom(){ const k = (typeof pop2!=='undefined') && pop2._zoom; return (k && isFinite(k) && k>0) ? k : 1; }
+/* offsetTop de una caja va medido desde #lBlocksBox (que es position:relative),
+   asi que hay que sumarle donde empieza ESE envoltorio dentro del desplazador:
+   si no, se pierde el espaciador de arriba y todo queda corrido. El envoltorio
+   no esta escalado, por eso su offset entra sin multiplicar. */
+function oTop(el){
+  let base = 0;
+  try{ const box = pop2.doc && pop2.doc.getElementById('lBlocksBox'); if(box) base = box.offsetTop; }catch(e){}
+  return base + el.offsetTop * libZoom();
+}
+function oH(el){ return el.offsetHeight * libZoom(); }
+// ancho de composicion: la columna elegida + margen. Como el ancho de columna lo
+// fija el director para todos, este valor es identico en los tres equipos.
+function libRefWidth(){
+  const bw = (typeof pop2!=='undefined' && pop2.boxw) || '760';
+  const n = (bw==='full') ? 1040 : (parseInt(bw,10) || 760);
+  return n + 60;
+}
+function libApplyZoom(){
+  try{
+    const w = pop2.els && pop2.els.wrap, b = pop2.els && pop2.els.blocks;
+    if(!w || !b || !pop2.doc) return;
+    const ref = libRefWidth();
+    // Envoltorio que ocupa el sitio REAL. Se usa transform y no zoom porque
+    // `zoom` REHACE la maqueta al tamaño reducido y el texto rompe renglon en
+    // otro sitio -medido: 6.12 frente a 6.66 de proporcion en dos pantallas-.
+    // transform compone UNA vez al ancho de referencia, igual en todos los
+    // equipos, y solo escala el resultado ya pintado. Como no afecta a la
+    // maqueta, el envoltorio lleva a mano el tamaño que ocupa en pantalla.
+    let outer = b.parentNode;
+    if(!outer || outer.id !== 'lBlocksBox'){
+      outer = pop2.doc.createElement('div'); outer.id = 'lBlocksBox';
+      b.parentNode.insertBefore(outer, b); outer.appendChild(b);
+    }
+    b.style.width = ref + 'px';
+    b.style.transformOrigin = 'top left';
+    const cs = pop2.win.getComputedStyle(w);
+    const pad = (parseFloat(cs.paddingLeft)||0) + (parseFloat(cs.paddingRight)||0);
+    const disp = Math.max(140, w.clientWidth - pad);
+    let k = Math.max(0.35, Math.min(1.25, disp / ref));
+    k = Math.round(k*10000)/10000;
+    const cambia = (pop2._zoom !== k);
+    const antes = cambia ? (w.scrollTop / Math.max(0.0001, (pop2._zoom||1))) : 0;
+    pop2._zoom = k;
+    try{ pop2.doc.body.classList.add('fixedlay'); }catch(e){}
+    b.style.transform = 'scale(' + k + ')';
+    outer.style.cssText = 'position:relative;margin:0 auto;width:' + Math.round(ref*k) + 'px;height:'
+      + Math.round(b.offsetHeight * k) + 'px';
+    if(cambia){ try{ w.scrollTop = antes * k; }catch(e){} }
+    // el alto del envoltorio depende del contenido: mantenerlo al dia
+    if(!b._ro && pop2.win.ResizeObserver){
+      b._ro = new pop2.win.ResizeObserver(()=>{ try{
+        outer.style.height = Math.round(b.offsetHeight * (pop2._zoom||1)) + 'px';
+      }catch(e){} });
+      b._ro.observe(b);
+    }
+    if(cambia) setTimeout(()=>{ try{ libDrawRenderAll(); }catch(e){} }, 40);
+  }catch(e){ console.warn('zoom del libreto', e); }
+}
 function libMaxTop(){ const w=pop2.els&&pop2.els.wrap; return w? Math.max(0, w.scrollHeight-w.clientHeight):0; }
 function libApplyScroll(dy){
   if(!pop2.els||!pop2.els.wrap) return;
@@ -10761,7 +10847,7 @@ function libNearestVi(){
   let best=-1, bd=Infinity;
   for(let i=0;i<pop2.blockEls.length;i++){
     const el = pop2.blockEls[i];
-    const c = el.offsetTop + el.offsetHeight/2;
+    const c = oTop(el) + oH(el)/2;
     const d = Math.abs(c-mid);
     if(d<bd){ bd=d; best=i; }
   }
@@ -10861,10 +10947,10 @@ function resolveTargetPx(p){
       vi = best;
     }
     const el = vi>=0 ? pop2.blockEls[vi] : null;
-    if(el) return clamp(el.offsetTop + (p.f||0) * el.offsetHeight - readline);
+    if(el) return clamp(oTop(el) + (p.f||0) * oH(el) - readline);
     return null;
   }
-  if(p.b!=null && pop2.blockEls[p.b]) return clamp(pop2.blockEls[p.b].offsetTop + (p.f||0) * pop2.blockEls[p.b].offsetHeight - readline);
+  if(p.b!=null && pop2.blockEls[p.b]) return clamp(oTop(pop2.blockEls[p.b]) + (p.f||0) * oH(pop2.blockEls[p.b]) - readline);
   if(p.r!=null){ return p.r * Math.max(1, w.scrollHeight - w.clientHeight); }
   return null;
 }
@@ -11218,13 +11304,13 @@ function onRemoteTool(p){
   if(p.tool==='font' && p.value){
     setLibLayout(null, +p.value);
     pop2.mineFs = +p.value; d.documentElement.style.setProperty('--minefs', pop2.mineFs+'px');
-    setTimeout(()=>{ try{ if(typeof libDrawRenderAll==='function') libDrawRenderAll(); }catch(e){} }, 45);
+    setTimeout(()=>{ try{ if(typeof libApplyZoom==='function') libApplyZoom(); if(typeof libDrawRenderAll==='function') libDrawRenderAll(); }catch(e){} }, 45);
   }
   if(p.tool==='boxw' && p.value){
     setLibLayout(p.value, null);
     pop2.boxw = p.value; d.documentElement.style.setProperty('--boxw', p.value==='full'?'96%':p.value+'px');
     try{ if(typeof markWidthBtn==='function') markWidthBtn(); }catch(e){}
-    setTimeout(()=>{ try{ if(typeof libDrawRenderAll==='function') libDrawRenderAll(); }catch(e){} }, 45);
+    setTimeout(()=>{ try{ if(typeof libApplyZoom==='function') libApplyZoom(); if(typeof libDrawRenderAll==='function') libDrawRenderAll(); }catch(e){} }, 45);
   }
 }
 
