@@ -1628,7 +1628,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.33.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.34.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -6890,29 +6890,45 @@ body.is-talent.waitdir .dtab{ visibility:hidden !important; }
 }
 .wd-s{ font-family:'Inter',sans-serif; font-size:14px; line-height:1.6; color:#8b9099; }
 
-/* ─── Tablet ACTOR: SOLO el pincel ─── */
-/* El actor no navega ni edita: el director manda la posición y el actor solo
-   marca encima con el pincel. Se oculta todo lo demás de la barra superior… */
+/* ─── Tablet ACTOR ─── */
+/* Dos modos. AJUSTADO (por defecto): el director manda la posicion y el actor
+   solo marca con el pincel. LIBRE: el actor se mueve por todo el libreto a su
+   aire, sin arrastrar a nadie; sus MARCAS si siguen viajando a las otras
+   pantallas, que es lo util de poder anotar por delante. */
 body.is-talent #lVid, body.is-talent #lFind, body.is-talent #lPron, body.is-talent #lTpad,
-body.is-talent #lFontDn, body.is-talent #lFontUp, body.is-talent #lCharSel, body.is-talent #lScope,
-body.is-talent #lTablet, body.is-talent .lh .goto,
-/* …la barra de anchos, el riel de páginas y el botón de página grabada… */
-body.is-talent .lbar, body.is-talent .lchips, body.is-talent .lrec,
-body.is-talent #dtabL,
-/* …y las herramientas de marcación en línea (pausa, acento, dividir, unir…). */
+body.is-talent #lFontDn, body.is-talent #lFontUp, body.is-talent #lCharSel,
+body.is-talent #lTablet,
+body.is-talent .lbar, body.is-talent .lrec,
 body.is-talent .mtools{ display:none !important; }
-/* Del cajón de herramientas el actor conserva SOLO el Pincel. */
 body.is-talent .ltools > *{ display:none !important; }
 body.is-talent .ltools > #tHide,
 body.is-talent .ltools > #tDraw{ display:block !important; }
 
-/* El scroll lo mueve el DIRECTOR: en el actor el libreto no se desplaza solo
-   con el dedo — sigue la posición que llega por sincronía (scrollTop remoto
-   sigue funcionando con overflow:hidden). */
-body.is-talent .lwrap{
+/* Solo en AJUSTADO se esconde lo de navegar: en LIBRE hacen falta el riel de
+   paginas, el «ir a pagina» y el alcance para poder recorrer el guion entero. */
+body.is-talent:not(.talent-free) .lh .goto,
+body.is-talent:not(.talent-free) .lchips,
+body.is-talent:not(.talent-free) #lScope,
+body.is-talent:not(.talent-free) #dtabL{ display:none !important; }
+
+/* AJUSTADO: el dedo no desplaza, el libreto sigue la posicion que llega por
+   sincronia (scrollTop remoto funciona igual con overflow:hidden). */
+body.is-talent:not(.talent-free) .lwrap{
   overflow:hidden !important;
   touch-action:none !important;
   overscroll-behavior:none !important;
+}
+/* LIBRE: se desplaza como cualquier libreto. */
+body.is-talent.talent-free .lwrap{
+  overflow-y:auto !important;
+  touch-action:pan-y !important;
+  overscroll-behavior:contain !important;
+}
+/* boton para cambiar de modo (solo en la tablet del actor) */
+#lFree{ display:none; }
+body.is-talent #lFree{ display:inline-flex !important; align-items:center; gap:5px; }
+body.is-talent.talent-free #lFree{
+  background:#F59E0B !important; color:#1a1200 !important; border-color:#F59E0B !important; font-weight:700;
 }
 body.light .comp-card{ background:#fff; border-color:#e2ddf2; }
 body.light .comp-orig{ background:#f3f1fb; color:#2a2540; border-color:#e2ddf2; }
@@ -7705,6 +7721,7 @@ function buildLibretoDoc(pc){
       <button id="lFind" title="Buscar en el libreto" aria-label="Buscar en el libreto">${LIB_ICON.search}</button>
       <button id="lPron" title="Pronunciaciones del libreto" aria-label="Ver pronunciaciones del libreto">${LIB_ICON.speak}</button>
       <button id="lDraw" title="Marcado libre (pincel)" aria-label="Marcado libre: dibujar sobre el libreto">${LIB_ICON.brush}</button>
+      <button id="lFree" title="Cambiar entre seguir al director y moverte libre" aria-pressed="false">🔒 Ajustado</button>
       <button id="lGear" title="Herramientas de la caja seleccionada" aria-label="Herramientas de la caja seleccionada" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.08A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.08a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
       <span class="conn no" id="lConn2" style="display:none" role="status" aria-live="polite"></span>
       <span class="live" id="lLive" role="status" aria-live="polite"></span>
@@ -7834,6 +7851,7 @@ function buildLibretoDoc(pc){
   d.body.classList.toggle('deskchips', !roleTab);      // escritorio/espejo: páginas a la derecha
   d.body.classList.toggle('is-talent', (typeof isTalent==='function' && isTalent()));   // tablet actor: herramientas limitadas
   try{ updateTalentGate(); }catch(e){}   // …y en espera hasta que el director empiece
+  try{ applyTalentFree(); }catch(e){}    // …y en el modo que tuviera elegido
   // Tamaño compartido: el director lo anuncia; el resto lo pide al abrir.
   try{
     if(sync.role==='tablet'){ syncSendTool('boxw', pop2.boxw); syncSendTool('font', pop2.mineFs); }
@@ -7978,6 +7996,8 @@ function buildLibretoDoc(pc){
       });
     }
   }
+  { const fb = d.getElementById('lFree');
+    if(fb) fb.addEventListener('click', (e)=>{ e.stopPropagation(); setTalentFree(!talentFree()); }); }
   d.getElementById('lBack').addEventListener('click', ()=>{
     // el director deja el libreto → la tablet del actor vuelve a «en espera»
     try{ if(typeof syncSendDir==='function') syncSendDir(false); }catch(e){}
@@ -8542,9 +8562,12 @@ function libDrawSetup(d){
     ptrs.set(e.pointerId, { y:e.clientY });
     if(ptrs.size >= 2){                 // segundo dedo → esto era un desplazamiento
       abortStroke();
-      // en la tablet del ACTOR el desplazamiento lo manda el director: el
-      // segundo dedo solo sirve para cancelar el trazo, no para bajar
-      if(!(typeof isTalent==='function' && isTalent())){ panning = true; panY = midY(); }
+      // En la tablet del ACTOR el desplazamiento lo manda el director, asi que
+      // el segundo dedo solo cancela el trazo… salvo en MODO LIBRE, donde el
+      // actor se mueve por su cuenta y sí debe poder bajar mientras dibuja.
+      const soyActorAjustado = (typeof isTalent==='function' && isTalent())
+                            && !(typeof talentFree==='function' && talentFree());
+      if(!soyActorAjustado){ panning = true; panY = midY(); }
       return;
     }
     const blk = e.target.closest && e.target.closest('.blk'); if(!blk) return;
@@ -10136,6 +10159,41 @@ try{
     }
   });
 }catch(e){}
+/* ═══ TABLET DEL ACTOR · MODO LIBRE ════════════════════════════════════
+   AJUSTADO: sigue al director, no se desplaza solo.
+   LIBRE: se mueve por todo el guion a su aire y NO arrastra a nadie -no emite
+   posicion (ya estaba bloqueado para el actor) y ademas deja de SEGUIR la que
+   llega-. Las MARCAS siguen viajando en los dos modos: es lo que permite al
+   actor anotar por delante y que el director lo vea. */
+function talentFree(){
+  if(!(typeof isTalent==='function' && isTalent())) return false;
+  try{ return localStorage.getItem('ddl_talent_free') === '1'; }catch(e){ return false; }
+}
+function setTalentFree(on){
+  try{ localStorage.setItem('ddl_talent_free', on ? '1' : '0'); }catch(e){}
+  applyTalentFree();
+}
+function applyTalentFree(){
+  const libre = talentFree();
+  try{
+    const d = pop2 && pop2.doc; if(!d || !d.body) return;
+    d.body.classList.toggle('talent-free', libre);
+    const b = d.getElementById('lFree');
+    if(b){
+      b.textContent = libre ? '🔓 Libre' : '🔒 Ajustado';
+      b.setAttribute('aria-pressed', libre ? 'true' : 'false');
+      b.title = libre
+        ? 'Modo libre: te mueves por todo el guion sin arrastrar al director. Tus marcas sí se ven en las otras pantallas.'
+        : 'Modo ajustado: sigues la posición del director.';
+    }
+    // en libre se ve el guion entero, no solo los parlamentos del personaje
+    if(libre && !pop2.scopeAll){
+      pop2.scopeAll = true;
+      try{ const sc = pop2.els && pop2.els.scope; if(sc) sc.innerHTML = LIB_ICON.scopeAll; }catch(e){}
+      try{ renderLibretoBlocks(); }catch(e){}
+    }
+  }catch(e){}
+}
 function isTablet(){ return sync.isOn && (sync.role==='tablet' || sync.role==='talent'); }
 function isTalent(){ return DEVROLE==='talent'; }
 function isMirror(){ return sync.isOn && sync.role==='pc'; }
@@ -10520,6 +10578,13 @@ function onRemoteOpen(p){
   }
   sync._wantOpen = null;
   const sameEp = (pop2._epId!=null) && (typeof currentEp!=='undefined' && currentEp) && pop2._epId===currentEp.id;
+  // Actor en LIBRE con el libreto ya abierto: el personaje que elige el director
+  // solo cambia el RESALTADO. Reconstruir aquí le devolvería el scroll al
+  // principio y le quitaría lo que tiene de libre.
+  if(typeof talentFree==='function' && talentFree() && sameEp && pop2.win && !pop2.win.closed && pop2.doc){
+    try{ pop2.hl = key; renderLibretoBlocks(); renderLibretoChips(); }catch(e){}
+    return;
+  }
   if(!p.force && pop2.win && !pop2.win.closed && pop2.key === key && sameEp && pop2.doc){
     try{ if(pop2.type==='inline'){ const h=document.getElementById('libInline'); if(h && h.style.display==='none'){ h.style.display='block'; updateBackBtn(); ddlOvSync(); } } }catch(e){}
     hideOpenLibretoPrompt();
@@ -10990,6 +11055,7 @@ function remoteGuard(ms){
   pop2._navAt = performance.now();
 }
 function onRemotePos(p){
+  if(typeof talentFree==='function' && talentFree()) return;   // actor en libre: no le mueven la pagina
   if(!p || p.from===sync.meId) return;
   if(typeof TP!=='undefined' && TP.on){ if(p.page) markChipCur(p.page); return; }   // trackpad: solo el chip
   if(p.page!=null && pop2 && pop2.doc){
@@ -11030,6 +11096,7 @@ function resolveTargetPx(p){
   return null;
 }
 function onRemoteScroll(p){
+  if(typeof talentFree==='function' && talentFree()) return;   // actor en libre: se mueve solo
   if(typeof TP!=='undefined' && TP.on) return;   // modo trackpad: no soy libreto
   if(sync._lastNavAt && (performance.now() - sync._lastNavAt) < 8000) return;   // el trackpad manda: pausar el motor de posición
   if(!p || p.from===sync.meId) return;
