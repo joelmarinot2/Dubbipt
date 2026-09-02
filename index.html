@@ -1621,7 +1621,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.29.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.29.1-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -2275,18 +2275,80 @@ async function authInit(){
    la sesion de recuperacion y la app dejaba entrar sin mas. La contrasena nunca
    cambiaba, asi que en el siguiente intento el usuario volvia a quedarse fuera.
    Aqui se detecta ese regreso y se pide la contrasena nueva. */
+/* La direccion se lee UNA VEZ al arrancar, antes de que la libreria de Supabase
+   la limpie: cuando el enlace trae el motivo del fallo (caducado, ya usado), ese
+   dato desaparecia antes de que pudieramos mostrarlo. */
+const RECOV_URL0 = (function(){ try{
+  const out={}; const leer=(t)=>{ try{ new URLSearchParams(String(t||'').replace(/^[#?]/,'')).forEach((v,k)=>{ if(!(k in out)) out[k]=v; }); }catch(e){} };
+  leer(location.hash); leer(location.search); return out;
+}catch(e){ return {}; } })();
 function esRegresoDeRecuperacion(){
   try{
     const h = String(location.hash || '');
     const q = String(location.search || '');
-    return /type=recovery/.test(h) || /type=recovery/.test(q);
+    return /type=recovery/.test(h) || /type=recovery/.test(q)
+        || RECOV_URL0.type==='recovery' || !!RECOV_URL0.error_code || !!RECOV_URL0.error;
   }catch(e){ return false; }
 }
 function limpiarUrlRecuperacion(){
   try{ history.replaceState(null, '', location.pathname + location.search.replace(/[?&]type=recovery[^&]*/,'')); }catch(e){}
 }
-function showNewPasswordScreen(){
+/* Lo que el enlace del correo trae en la propia direccion: el token, o el
+   motivo por el que NO vale (caducado, ya usado...). Supabase lo pone ahi y
+   antes se ignoraba, asi que un enlace muerto no se distinguia de uno bueno. */
+function recoveryUrlParams(){
+  const out = {};
+  try{
+    const leer = (t)=>{ new URLSearchParams(String(t||'').replace(/^[#?]/,'')).forEach((v,k)=>{ if(!(k in out)) out[k]=v; }); };
+    leer(location.hash); leer(location.search);
+  }catch(e){}
+  return out;
+}
+// tarjeta informativa cuando el enlace no sirve
+function showRecoveryProblem(titulo, cuerpo){
+  const old = document.getElementById('pwdOv'); if(old) old.remove();
+  const ov = document.createElement('div'); ov.id='pwdOv'; ov.className='ddlm-ov';
+  ov.innerHTML = '<div class="ddlm-card" role="dialog" aria-modal="true">'
+    + '<div class="ddlm-kicker">Restablecer contraseña</div>'
+    + '<h2>' + esc(titulo) + '</h2>'
+    + '<p style="font-size:13px;color:#9CA3AF;line-height:1.65;margin:0 0 16px">' + cuerpo + '</p>'
+    + '<div class="ddlm-btns"><button class="ddlm-go" id="pwdBack">Volver al acceso</button></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  ov.querySelector('#pwdBack').onclick = ()=>{ limpiarUrlRecuperacion(); try{ location.replace(location.pathname); }catch(e){ ov.remove(); } };
+}
+async function showNewPasswordScreen(){
   if(document.getElementById('pwdOv')) return;
+  // lo capturado al arrancar manda: la libreria ya pudo haber limpiado la direccion
+  const pr = Object.assign({}, recoveryUrlParams(), RECOV_URL0);
+  // 1) el enlace ya viene con un error dentro
+  if(pr.error || pr.error_code){
+    const d = (pr.error_description || '').replace(/\+/g,' ');
+    const caducado = /expired|otp_expired/i.test(pr.error_code + ' ' + d);
+    showRecoveryProblem(caducado ? 'El enlace ya caducó' : 'El enlace no es válido',
+      (caducado
+        ? 'Los enlaces para restablecer la contraseña duran poco y solo sirven una vez. '
+        : '')
+      + 'Pide uno nuevo desde «¿Olvidaste tu contraseña?».'
+      + (d ? '<br><br><small style="color:#6b7280">Detalle: ' + esc(d) + '</small>' : ''));
+    return;
+  }
+  // 2) para cambiar la contraseña HACE FALTA sesión. Antes se mostraba el
+  //    formulario sin comprobarlo y al guardar salía «Auth session missing».
+  let hay = false;
+  try{ const { data } = await sb.auth.getSession(); hay = !!(data && data.session); }catch(e){}
+  if(!hay && pr.code){
+    try{ const r = await sb.auth.exchangeCodeForSession(pr.code); hay = !!(r && r.data && r.data.session); }
+    catch(e){ console.error('[acceso] no se pudo canjear el enlace', e); }
+  }
+  if(!hay){
+    showRecoveryProblem('Este enlace no se puede usar aquí',
+      'El enlace solo funciona en el <b>mismo navegador y dispositivo</b> desde donde lo pediste, y una sola vez. '
+      + 'Si lo abriste en otro sitio (o desde otra aplicación de correo), pide uno nuevo desde ese mismo navegador.'
+      + '<br><br>Si tienes la sesión abierta en algún dispositivo, es más rápido cambiarla desde '
+      + '<b>⚙ → Perfil de la cuenta → Cambiar contraseña</b>, que no depende del correo.');
+    return;
+  }
   const ov = document.createElement('div');
   ov.id = 'pwdOv'; ov.className = 'ddlm-ov';
   ov.innerHTML =
@@ -2370,6 +2432,8 @@ function authErrMsg(error, sinSesion){
     return { txt:'Demasiados intentos seguidos. Espera unos minutos y vuelve a probar.' };
   if(m.includes('failed to fetch') || m.includes('networkerror') || m.includes('network request failed') || m.includes('load failed'))
     return { txt:'No se pudo conectar con el servidor. Revisa la conexión de este dispositivo (o si la red bloquea el acceso).' };
+  if(m.includes('auth session missing') || m.includes('session missing'))
+    return { txt:'No hay sesión activa. El enlace del correo solo vale en el mismo navegador donde lo pediste y una sola vez: pide uno nuevo.' };
   if(m.includes('user not found')) return { txt:'No hay ninguna cuenta con ese correo.' };
   if(m.includes('captcha')) return { txt:'Verificación de seguridad pendiente. Vuelve a intentarlo.' };
   if(m.includes('signups not allowed') || m.includes('signup is disabled'))
