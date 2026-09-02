@@ -1621,7 +1621,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.27.1-nube · 01-sep-2026';
+const APP_VERSION = 'v10.28.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -2102,6 +2102,21 @@ async function reAuth(){
    bloqueada en el login. Los cambios se guardan localmente y se suben al volver
    la sesión normal. */
 window.OFFLINE = false;
+/* Red de seguridad: mientras la pantalla de acceso está visible, cualquier
+   error que nadie capture se muestra ahí. Sin esto, un fallo inesperado deja la
+   pantalla muda y parece que el botón no funciona. */
+try{
+  window.addEventListener('unhandledrejection', (ev)=>{
+    try{
+      if(!document.body.classList.contains('locked')) return;
+      const err = document.getElementById('gErr'); if(!err || err.textContent) return;
+      const r = (typeof authErrMsg==='function') ? authErrMsg(ev.reason) : null;
+      err.style.color = '#F472B6';
+      err.textContent = r ? r.txt : ('Error inesperado: ' + ((ev.reason && ev.reason.message) || ev.reason));
+      console.error('[acceso] error no capturado', ev.reason);
+    }catch(e){}
+  });
+}catch(e){}
 function showOfflineGate(msg){
   const form = document.getElementById('gform');
   if(!form || document.getElementById('btnOffline')) return;
@@ -2189,6 +2204,13 @@ async function authInit(){
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ shake(); err.textContent='Correo no válido'; return; }
     if(pass.length < 8){ shake(); err.textContent='La contraseña debe tener al menos 8 caracteres'; return; }
     if(mode==='signup' && !full){ shake(); err.textContent='Escribe tu nombre'; return; }
+    if(!sb || !sb.auth){
+      console.error('[acceso] no hay cliente de Supabase');
+      shake(); err.style.color='#F472B6';
+      err.textContent = 'Este dispositivo no logró conectar con el servidor. Recarga la página; si sigue igual, la red puede estar bloqueando el acceso.';
+      try{ showOfflineGate(); }catch(e){}
+      return;
+    }
     const btn=gSub, old=btn.textContent; btn.disabled=true; btn.textContent = mode==='signup'?'Creando…':'Entrando…';
     try{
       if(mode==='signup'){
@@ -2215,6 +2237,14 @@ async function authInit(){
         }
         sbUser=data.user; authUnlock(); renderLibrary(); postLogin();
       }
+    }catch(e){
+      // ANTES este try solo tenia finally: si algo lanzaba (cliente sin
+      // preparar, fallo de red que revienta en vez de devolver error...), la
+      // excepcion se perdia, el boton volvia a "Entrar" y no se veia NADA.
+      // De ahi el "oprimo entrar y no pasa nada".
+      console.error('[acceso] excepción al entrar', e);
+      shake(); err.style.color = '#F472B6';
+      err.textContent = authErrMsg(e).txt;
     } finally { btn.disabled=false; btn.textContent=old; }
   });
   document.getElementById('gUser').focus();
@@ -2229,6 +2259,21 @@ async function authInit(){
     // reintentar la sesión normal en segundo plano por si fue un tropiezo puntual
     setTimeout(()=>{ if(!sbUser && !window.OFFLINE) authInit(); }, 8000);
   }
+}
+/* La sacudida de la tarjeta al fallar el acceso.
+   Se llamaba en las SIETE rutas de error de la pantalla de acceso pero no
+   estaba definida en ninguna parte: cada una lanzaba ReferenceError ANTES de
+   escribir el mensaje, asi que no se veia nada. Literalmente "oprimo Entrar y
+   no pasa nada", incluso con un correo mal escrito o una contrasena corta.
+   El CSS de la animacion (#gate.shake .gcard) si existia desde siempre. */
+function shake(){
+  try{
+    const el = document.getElementById('gate'); if(!el) return;
+    el.classList.remove('shake');
+    void el.offsetWidth;                 // reiniciar la animacion
+    el.classList.add('shake');
+    setTimeout(()=>{ try{ el.classList.remove('shake'); }catch(e){} }, 450);
+  }catch(e){}
 }
 /* Por que fallo el acceso, de verdad.
    Antes CUALQUIER error de inicio de sesion se mostraba como "Correo o
