@@ -1621,7 +1621,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.26.2-nube · 01-sep-2026';
+const APP_VERSION = 'v10.27.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -6626,7 +6626,8 @@ body.light .comp-orig{ background:#f3f1fb; color:#2a2540; border-color:#e2ddf2; 
 
 /* herramientas de marcación (tablet) inline */
 .blk .mtools{ grid-column:2; grid-row:3; display:none; gap:5px; margin-top:6px; flex-wrap:wrap; }
-.blk.active .mtools, body.tablet .blk .mtools{ display:flex; }
+/* las herramientas de caja se mudaron al engranaje de la barra superior */
+.blk .mtools{ display:none !important; }
 
 /* ─── Barra inferior de anchos ─── */
 .lbar{
@@ -6748,6 +6749,35 @@ body.toolhidden .ltoolhide{ top:0; border-top:1px solid #1c1e22; }
 .ld-copy:disabled{ opacity:.6; cursor:default; }
 .ld-msg{ margin-top:10px; font-family:'Inter',sans-serif; font-size:12.5px; color:#4ADE80; }
 .ld-msg.err{ color:#F472B6; }
+
+/* ═══ Menú del engranaje: herramientas de la caja seleccionada ═══ */
+#lGear.on{ background:#22C55E !important; color:#06210f !important; border-color:#22C55E !important; }
+.gmenu{
+  display:none; position:absolute; top:calc(var(--lhH, 52px) + 8px); right:12px; z-index:70;
+  width:min(320px,92vw); background:#111316; border:1px solid #23262b; border-radius:14px;
+  padding:12px; box-shadow:0 18px 50px rgba(0,0,0,.55); font-family:'Inter',sans-serif;
+}
+.gmenu.open{ display:block; }
+.gm-head{ font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#6b7280; margin-bottom:10px; }
+.gm-head b{ display:block; text-transform:none; letter-spacing:0; font-size:13px; color:#f2f3f5; margin-top:3px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.gm-grid{ display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+.gm-b{
+  background:#0f1215; border:1px solid #23262b; border-radius:10px; padding:10px 8px;
+  color:#c7c9cd; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600;
+  cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px;
+}
+.gm-b:hover:not(:disabled){ border-color:#4ADE80; color:#f2f3f5; }
+.gm-b:disabled{ opacity:.35; cursor:default; }
+.gm-b.on{ background:#F59E0B; color:#1a1200; border-color:transparent; font-weight:700; }
+.gm-b.done{ grid-column:1 / -1; background:rgba(34,197,94,.10); border-color:rgba(34,197,94,.4); color:#4ADE80; }
+.gm-b.done.on{ background:#22C55E; color:#06210f; }
+.gm-b svg{ width:15px; height:15px; }
+.gm-hint{ margin-top:10px; font-size:11.5px; color:#6b7280; line-height:1.5; }
+body.light .gmenu{ background:#fff; border-color:#e2ddf2; }
+body.light .gm-b{ background:#f7f6fc; border-color:#e2ddf2; color:#2a2540; }
+/* la tablet del ACTOR solo tiene el pincel */
+body.is-talent #lGear, body.is-talent .gmenu{ display:none !important; }
 `;
 const LIB_CSS = `
 *{margin:0;padding:0;box-sizing:border-box}
@@ -7318,6 +7348,7 @@ function buildLibretoDoc(pc){
       <button id="lFind" title="Buscar en el libreto" aria-label="Buscar en el libreto">${LIB_ICON.search}</button>
       <button id="lPron" title="Pronunciaciones del libreto" aria-label="Ver pronunciaciones del libreto">${LIB_ICON.speak}</button>
       <button id="lDraw" title="Marcado libre (pincel)" aria-label="Marcado libre: dibujar sobre el libreto">${LIB_ICON.brush}</button>
+      <button id="lGear" title="Herramientas de la caja seleccionada" aria-label="Herramientas de la caja seleccionada" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.08A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v.08a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
       <span class="conn no" id="lConn2" style="display:none" role="status" aria-live="polite"></span>
       <span class="live" id="lLive" role="status" aria-live="polite"></span>
     </div>
@@ -7390,6 +7421,21 @@ function buildLibretoDoc(pc){
       <button class="lp-btn on" id="lpGest" title="Reconocer gestos: marca ENCIMA de una palabra = acento, raya diagonal = pausa, flecha → = más rápido, flecha ← = más lento">Gestos ✓</button>
       <button class="lp-btn" id="lpClear" title="Limpiar todo el marcado del libreto">Limpiar</button>
       <span class="lp-hint">2 dedos para desplazar</span><button class="lp-btn lp-done" id="lpDone" title="Salir del pincel">Listo</button>
+    </div>
+    <div class="gmenu" id="lGearMenu" role="menu" aria-label="Herramientas de la caja">
+      <div class="gm-head">Caja seleccionada <b id="gmWho">ninguna</b></div>
+      <div class="gm-grid">
+        <button class="gm-b done" data-act="done">✓ Completar</button>
+        <button class="gm-b edit">${LIB_ICON.edit} Editar</button>
+        <button class="gm-b" data-act="pause">/ Pausa</button>
+        <button class="gm-b" data-act="unpause" title="Borrar pausas una a una: toca la / que quieres quitar">✕ Pausa</button>
+        <button class="gm-b" data-act="accent">á Acento</button>
+        <button class="gm-b" data-act="clear">Limpiar</button>
+        <button class="gm-b" data-act="compress">${LIB_ICON.sliders} Ajustar</button>
+        <button class="gm-b" data-act="split">⊟ Dividir</button>
+        <button class="gm-b" data-act="merge">⊞ Unir</button>
+      </div>
+      <div class="gm-hint" id="gmHint">Toca una caja del libreto para elegirla.</div>
     </div>
     <div class="waitdir-ov" id="lWaitDir" role="status" aria-live="polite">
       <div class="wd-card">
@@ -7544,6 +7590,32 @@ function buildLibretoDoc(pc){
       try{ if(typeof syncSendHl==='function') syncSendHl(pop2.key); }catch(e){}   // avisar al otro dispositivo
       try{ pop2._interact = performance.now(); const f = pop2.doc.querySelector('.blk.mine'); if(f) libCenterTo(f); }catch(e){}
     });
+  }
+  // ── engranaje: menu con las herramientas de la caja seleccionada ──
+  {
+    const g = d.getElementById('lGear');
+    const menu = d.getElementById('lGearMenu');
+    if(g && menu){
+      g.addEventListener('click', (e)=>{ e.stopPropagation(); gearToggle(); });
+      menu.addEventListener('click', (e)=>{
+        const b = e.target.closest && e.target.closest('.gm-b');
+        if(!b || b.disabled) return;
+        e.stopPropagation();
+        if(b.dataset.si == null){ return; }
+        // mismo despachador que tenian los botones dentro de cada caja
+        try{ if(typeof pop2._onToolClick === 'function') pop2._onToolClick({ currentTarget:b, stopPropagation(){} }); }catch(err){ console.error(err); }
+        const act = b.dataset.act;
+        // pausa/acento piden tocar una palabra: cerrar para dejar ver el texto
+        if(act==='pause' || act==='unpause' || act==='accent' || act==='split' || act==='merge' || act==='compress') gearToggle(false);
+        else gearSync();
+      });
+      // un toque fuera cierra el menu
+      d.addEventListener('click', (e)=>{
+        if(!menu.classList.contains('open')) return;
+        if(e.target.closest && (e.target.closest('#lGearMenu') || e.target.closest('#lGear'))) return;
+        gearToggle(false);
+      });
+    }
   }
   d.getElementById('lBack').addEventListener('click', ()=>{
     // el director deja el libreto → la tablet del actor vuelve a «en espera»
@@ -8706,6 +8778,9 @@ function renderLibretoBlocks(){
   const seq = pop2._renderSeq;
   const CHUNK = 120;
 
+  // el menu del engranaje usa EXACTAMENTE el mismo despachador que los botones
+  // que antes vivian dentro de cada caja: una sola logica, sin duplicar
+  setTimeout(()=>{ try{ pop2._onToolClick = onToolClick; }catch(e){} }, 0);
   const onBlkClick = (ev)=>{
     const el = ev.currentTarget;
     if(ev.target.closest('.mtools')) return;   // no re-centrar al usar herramientas
@@ -8858,8 +8933,9 @@ function setMarkMode(mode, si){
   pop2.doc.body.classList.toggle('marking', !!mode);
   pop2.doc.body.setAttribute('data-mode', mode||'');
   // resaltar botones activos y mostrar pista
-  pop2.doc.querySelectorAll('.mtools button[data-act]').forEach(b=>{
+  pop2.doc.querySelectorAll('.mtools button[data-act], .gmenu button[data-act]').forEach(b=>{
     const on = mode && b.dataset.act===mode && +b.dataset.si===si;
+    if(b.closest('.gmenu') && b.dataset.si==null) return;
     b.classList.toggle('on', !!on);
     if(b.dataset.act==='pause') b.textContent = on ? '✓ tocando… (/)' : '/ Pausa';
     if(b.dataset.act==='unpause') b.textContent = on ? '✓ tocando… (✕)' : '✕ Pausa';
@@ -8869,12 +8945,59 @@ function setMarkMode(mode, si){
   if(live && mode) live.textContent = mode==='pause' ? 'Toca dónde va la pausa' : mode==='unpause' ? 'Toca la / que quieres borrar' : 'Toca la palabra a acentuar';
 }
 
+/* ═══ HERRAMIENTAS DE CAJA EN EL ENGRANAJE ═════════════════════════════
+   Antes cada parlamento llevaba su propia fila de botones debajo del texto.
+   Ocupaban mucho y se repetian en cada caja. Ahora viven en un solo menu de la
+   barra superior y actuan sobre la caja SELECCIONADA. Los botones del menu
+   pasan por el mismo despachador que los de antes, asi que no hay dos logicas. */
+function gearSi(){
+  try{
+    const vi = pop2.activeBlock;
+    if(vi==null || vi<0 || !pop2.blockMap) return null;
+    const si = pop2.blockMap[vi];
+    return (si==null) ? null : si;
+  }catch(e){ return null; }
+}
+function gearSync(){
+  const d = pop2 && pop2.doc; if(!d) return;
+  const menu = d.getElementById('lGearMenu'); if(!menu) return;
+  const si = gearSi();
+  const b = (si!=null && typeof script!=='undefined') ? script[si] : null;
+  const who = d.getElementById('gmWho');
+  if(who) who.textContent = b
+    ? ((b.display || 'sin personaje') + (b.tcSec!=null ? ' · ' + fmtTC4(b.tcSec) : ''))
+    : 'ninguna';
+  const hint = d.getElementById('gmHint');
+  if(hint) hint.style.display = b ? 'none' : '';
+  menu.querySelectorAll('.gm-b').forEach(btn=>{
+    if(si==null){ btn.disabled = true; delete btn.dataset.si; return; }
+    btn.disabled = false; btn.dataset.si = si;
+  });
+  // "Completar" cambia de texto segun el estado de la caja
+  const done = menu.querySelector('.gm-b.done');
+  if(done && b){
+    const recKey = (pop2.key && charIdx[pop2.key]) ? pop2.key : '_pages';
+    const ya = recSet(recKey).has(b.page);
+    done.textContent = ya ? '↩ Quitar' : '✓ Completar';
+    done.classList.toggle('on', ya);
+  }
+}
+function gearToggle(forzar){
+  const d = pop2 && pop2.doc; if(!d) return;
+  const menu = d.getElementById('lGearMenu'); if(!menu) return;
+  const abrir = (forzar!=null) ? !!forzar : !menu.classList.contains('open');
+  menu.classList.toggle('open', abrir);
+  const g = d.getElementById('lGear');
+  if(g){ g.classList.toggle('on', abrir); g.setAttribute('aria-expanded', abrir?'true':'false'); }
+  if(abrir) gearSync();
+}
 function setActiveBlock(vi){
   if(!pop2.blockEls) return;
   const el = pop2.blockEls[vi];
   if(!el) return;                                       // no existe en esta vista: conservar el actual
   if(pop2.activeBlock>=0 && pop2.blockEls[pop2.activeBlock]) pop2.blockEls[pop2.activeBlock].classList.remove('active');
   el.classList.add('active'); pop2.activeBlock = vi;
+  try{ gearSync(); }catch(e){}
 }
 function centerBlock(vi, smooth){
   pop2._progAt = performance.now();
