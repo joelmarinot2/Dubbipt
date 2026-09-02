@@ -1620,7 +1620,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.24.1-nube · 01-sep-2026';
+const APP_VERSION = 'v10.24.2-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -3221,6 +3221,19 @@ function headerTail(after){
    Se generan esas variantes y todas apuntan al MISMO personaje.
    No se incluye el nombre de pila suelto: "ANTHONY" chocaria con cualquier
    otro Anthony del reparto. */
+/* ¿Lo que sigue al nombre dentro de la cabecera es MAS NOMBRE?
+   Lo es cuando son palabras en mayusculas o un apodo entre comillas: el
+   desglose guarda ANTHONY y el guion escribe ANTHONY "TONY" VEGA. No lo es
+   cuando hay texto en minusculas, que ya seria dialogo. Se limita a 4 palabras
+   para que una acotacion larga en mayusculas no se trague el renglon entero. */
+function headIsAllName(t){
+  const w = String(t||'')
+    .replace(/["“”‘’']/g,' ')
+    .replace(/[().,\-–—]/g,' ')
+    .split(/\s+/).filter(Boolean);
+  if(!w.length || w.length > 4) return false;
+  return w.every(x=> x === x.toUpperCase() && /[\p{L}\p{N}]/u.test(x));
+}
 function nameVariants(display){
   const out = [];
   const push = (v)=>{ v=String(v||'').trim(); if(v && out.indexOf(v)<0) out.push(v); };
@@ -3342,6 +3355,23 @@ async function scanPdf(){
           }
         }
         if(chosen){
+          // El desglose puede guardar la forma CORTA y el guion la larga:
+          // "ANTHONY" en el desglose frente a ANTHONY “TONY” VEGA en la cabecera.
+          // Si lo que sigue es MAS NOMBRE, se extiende el resaltado y se acepta;
+          // antes ese sobrante vetaba la cabecera y el personaje se quedaba sin
+          // un solo parlamento en el libreto.
+          if(!chosen.exact){
+            const ini = chosen.at + chosen.len;
+            // solo hasta el primer parentesis: la acotacion "(V.O.)" no es nombre
+            // y de ella ya se encarga headerTail
+            const sobra = line.text.slice(ini, headEnd).split(/[([{]/)[0];
+            if(sobra.trim() && headIsAllName(sobra)){
+              let fin = ini + sobra.length - 1;
+              while(fin > ini && !LETTER.test(ns[fin])) fin--;   // recortar comillas y espacios finales
+              if(LETTER.test(ns[fin])) chosen.len = fin - chosen.at + 1;
+              chosen.exact = true;
+            }
+          }
           // veto: una cabecera real es el nombre en MAYÚSCULAS seguido SOLO de
           // relleno (timecode, acotación, puntuación suelta) o de ":" + diálogo.
           // Si el nombre aparece dentro del diálogo ("¡XIAIMING!", "Hola, soy
