@@ -1621,7 +1621,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.28.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.29.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -2181,6 +2181,14 @@ async function authInit(){
     }catch(e){ gGoogle.disabled=false; err.textContent = 'No se pudo iniciar con Google.'; }
   });
   // ---- ¿Olvidaste tu contraseña? ----
+  // volver desde el enlace del correo → pedir la contraseña nueva
+  try{
+    sb.auth.onAuthStateChange((evento)=>{
+      if(evento === 'PASSWORD_RECOVERY'){ try{ showNewPasswordScreen(); }catch(e){ console.error(e); } }
+    });
+  }catch(e){ console.warn('onAuthStateChange', e); }
+  // por si el evento ya salto antes de llegar aquí: mirar la propia dirección
+  try{ if(esRegresoDeRecuperacion()) setTimeout(()=>{ try{ showNewPasswordScreen(); }catch(e){} }, 300); }catch(e){}
   const gForgot = document.getElementById('gForgot');
   if(gForgot) gForgot.addEventListener('click', async ()=>{
     const err = document.getElementById('gErr');
@@ -2260,6 +2268,75 @@ async function authInit(){
     setTimeout(()=>{ if(!sbUser && !window.OFFLINE) authInit(); }, 8000);
   }
 }
+
+/* ═══ RESTABLECER CONTRASEÑA ═══════════════════════════════════════════
+   El boton "¿Olvidaste tu contraseña?" ya enviaba el correo, pero al volver
+   desde el enlace NO habia nada que pidiera la contrasena nueva: Supabase creaba
+   la sesion de recuperacion y la app dejaba entrar sin mas. La contrasena nunca
+   cambiaba, asi que en el siguiente intento el usuario volvia a quedarse fuera.
+   Aqui se detecta ese regreso y se pide la contrasena nueva. */
+function esRegresoDeRecuperacion(){
+  try{
+    const h = String(location.hash || '');
+    const q = String(location.search || '');
+    return /type=recovery/.test(h) || /type=recovery/.test(q);
+  }catch(e){ return false; }
+}
+function limpiarUrlRecuperacion(){
+  try{ history.replaceState(null, '', location.pathname + location.search.replace(/[?&]type=recovery[^&]*/,'')); }catch(e){}
+}
+function showNewPasswordScreen(){
+  if(document.getElementById('pwdOv')) return;
+  const ov = document.createElement('div');
+  ov.id = 'pwdOv'; ov.className = 'ddlm-ov';
+  ov.innerHTML =
+    '<div class="ddlm-card" role="dialog" aria-modal="true" aria-label="Nueva contraseña">'
+    + '<div class="ddlm-kicker">Tu cuenta</div>'
+    + '<h2>Elige una contraseña nueva</h2>'
+    + '<div class="ddlm-field"><label for="pwd1">Contraseña nueva</label>'
+    +   '<input id="pwd1" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres"></div>'
+    + '<div class="ddlm-field"><label for="pwd2">Repítela</label>'
+    +   '<input id="pwd2" type="password" autocomplete="new-password" placeholder="········"></div>'
+    + '<div class="ddlm-err" id="pwdErr"></div>'
+    + '<div class="ddlm-btns"><button class="ddlm-go" id="pwdGo">Guardar contraseña</button></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  const q = (id)=> ov.querySelector('#'+id);
+  const go = async ()=>{
+    const a = q('pwd1').value, b = q('pwd2').value, e = q('pwdErr');
+    e.textContent = '';
+    if(a.length < 8){ e.textContent = 'La contraseña debe tener al menos 8 caracteres.'; q('pwd1').focus(); return; }
+    if(a !== b){ e.textContent = 'Las dos contraseñas no coinciden.'; q('pwd2').focus(); return; }
+    const btn = q('pwdGo'); btn.disabled = true; btn.textContent = 'Guardando…';
+    try{
+      const { error } = await sb.auth.updateUser({ password: a });
+      if(error) throw error;
+      limpiarUrlRecuperacion();
+      ov.remove();
+      try{ DDL_UI.toast('Contraseña actualizada. Ya puedes entrar con ella en cualquier dispositivo.'); }catch(_){}
+      // la sesion de recuperacion ya vale como sesion normal
+      try{
+        const { data } = await sb.auth.getSession();
+        if(data && data.session){ sbUser = data.session.user; authUnlock(); renderLibrary(); postLogin(); }
+      }catch(_){}
+    }catch(err){
+      console.error('[acceso] no se pudo cambiar la contraseña', err);
+      const raw = (err && (err.message || err.error_description)) || '';
+      e.textContent = /different from the old/i.test(raw)
+        ? 'La contraseña nueva tiene que ser distinta de la anterior.'
+        : /at least|too short|weak/i.test(raw)
+          ? 'La contraseña es demasiado corta o débil: usa 8 caracteres o más.'
+          : (typeof authErrMsg==='function'
+              ? authErrMsg(err).txt.replace('No se pudo entrar.', 'No se pudo guardar la contraseña.')
+              : 'No se pudo guardar la contraseña.');
+      btn.disabled = false; btn.textContent = 'Guardar contraseña';
+    }
+  };
+  q('pwdGo').onclick = go;
+  ov.querySelectorAll('input').forEach(i=> i.addEventListener('keydown', ev=>{ if(ev.key==='Enter') go(); }));
+  setTimeout(()=>{ const n = q('pwd1'); if(n) n.focus(); }, 60);
+}
+
 /* La sacudida de la tarjeta al fallar el acceso.
    Se llamaba en las SIETE rutas de error de la pantalla de acceso pero no
    estaba definida en ninguna parte: cada una lanzaba ReferenceError ANTES de
@@ -5134,6 +5211,7 @@ async function showAccountProfile(){
     +'</div>'
     +'<div class="acct-btns">'
       +'<span class="acct-msg" id="acctMsg"></span>'
+      +'<button class="acct-cancel" id="acctPwd" style="margin-right:auto">Cambiar contraseña</button>'
       +'<button class="acct-cancel" id="acctCancel">Cancelar</button>'
       +'<button class="acct-save" id="acctSave">Guardar cambios</button>'
     +'</div>'
@@ -5145,6 +5223,9 @@ async function showAccountProfile(){
   ov.addEventListener('mousedown', e=>{ if(e.target===ov) close(); });
   ov.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
   q('acctCancel').onclick = close;
+  // Cambiar la contraseña desde dentro, sin depender del correo de recuperación
+  // (el correo de Supabase tiene un límite bajo y a veces cae en spam).
+  { const pb = q('acctPwd'); if(pb) pb.onclick = ()=>{ close(); try{ showNewPasswordScreen(); }catch(e){ console.error(e); } }; }
 
   // Cambiar foto → informativo por ahora (subida de avatar es un módulo aparte)
   q('acctPhoto').onclick = ()=>{ if(typeof DDL_UI!=='undefined') DDL_UI.toast('La subida de foto de perfil llegará pronto'); };
