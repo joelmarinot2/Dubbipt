@@ -993,20 +993,6 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .ddlm-go:disabled{ opacity:.6; cursor:default; }
 .ddlm-fmt{ margin-right:auto; background:transparent; color:#8ab6ff; border:1px solid #2a3550; border-radius:9px; padding:9px 12px; font-family:'Inter',sans-serif; font-weight:600; font-size:13px; cursor:pointer; }
 .ddlm-fmt:hover{ border-color:#4d7cff; color:#a9c8ff; }
-/* diagnóstico de libreto vacío */
-.ldiag{ max-width:min(760px,92%); margin:26px auto; background:#15181c; border:1px solid #2a2f36;
-  border-left:3px solid #F59E0B; border-radius:12px; padding:18px 20px; font-family:'Inter',sans-serif; }
-.ldiag > b:first-child{ display:block; font-size:15px; color:#f2f3f5; margin-bottom:8px; }
-.ldiag p b{ color:#f2f3f5; }
-.ldiag p{ font-size:13px; color:#9CA3AF; line-height:1.6; margin:0 0 14px; }
-.ldiag code{ font-family:'JetBrains Mono',monospace; font-size:12.5px; color:#FBBF24; background:rgba(251,191,36,.1); padding:1px 6px; border-radius:5px; }
-.ld-sec{ font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#6b7280; margin-bottom:12px; }
-.ld-sec ul{ margin:6px 0 0; padding-left:18px; text-transform:none; letter-spacing:0; }
-.ld-sec li{ font-family:'JetBrains Mono',monospace; font-size:12px; color:#c7c9cd; line-height:1.7; word-break:break-word; }
-.ld-sec li.no{ color:#6b7280; font-family:'Inter',sans-serif; }
-.ld-copy{ background:#22C55E; border:none; color:#06210f; font-family:'Inter',sans-serif; font-weight:700;
-  font-size:13px; padding:9px 16px; border-radius:9px; cursor:pointer; }
-.ld-copy:hover{ filter:brightness(1.07); }
 
 /* ===== Cuentas y accesos ===== */
 .acc2card{ width:min(560px,96vw); }
@@ -1635,7 +1621,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.26.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.26.1-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -6744,6 +6730,24 @@ body.toolhidden .ltoolhide{ top:0; border-top:1px solid #1c1e22; }
   #lFontDn,#lFontUp,#lVid{ display:none !important; }
   .lh .goto{ display:none !important; }
 }
+
+/* diagnóstico de libreto vacío */
+.ldiag{ max-width:min(760px,92%); margin:26px auto; background:#15181c; border:1px solid #2a2f36;
+  border-left:3px solid #F59E0B; border-radius:12px; padding:18px 20px; font-family:'Inter',sans-serif; }
+.ldiag > b:first-child{ display:block; font-size:15px; color:#f2f3f5; margin-bottom:8px; }
+.ldiag p b{ color:#f2f3f5; }
+.ldiag p{ font-size:13px; color:#9CA3AF; line-height:1.6; margin:0 0 14px; }
+.ldiag code{ font-family:'JetBrains Mono',monospace; font-size:12.5px; color:#FBBF24; background:rgba(251,191,36,.1); padding:1px 6px; border-radius:5px; }
+.ld-sec{ font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#6b7280; margin-bottom:12px; }
+.ld-sec ul{ margin:6px 0 0; padding-left:18px; text-transform:none; letter-spacing:0; }
+.ld-sec li{ font-family:'JetBrains Mono',monospace; font-size:12px; color:#c7c9cd; line-height:1.7; word-break:break-word; }
+.ld-sec li.no{ color:#6b7280; font-family:'Inter',sans-serif; }
+.ld-copy{ background:#22C55E; border:none; color:#06210f; font-family:'Inter',sans-serif; font-weight:700;
+  font-size:13px; padding:9px 16px; border-radius:9px; cursor:pointer; }
+.ld-copy:hover{ filter:brightness(1.07); }
+.ld-copy:disabled{ opacity:.6; cursor:default; }
+.ld-msg{ margin-top:10px; font-family:'Inter',sans-serif; font-size:12.5px; color:#4ADE80; }
+.ld-msg.err{ color:#F472B6; }
 `;
 const LIB_CSS = `
 *{margin:0;padding:0;box-sizing:border-box}
@@ -8470,19 +8474,34 @@ function libTextModal(){
    version que no sabia leer cierto nombre, ese personaje se queda sin
    parlamentos para siempre aunque la app ya sepa leerlo. Esto lo rehace. */
 async function reanalizarGuion(btn){
-  const say = (m, err)=>{ try{ DDL_UI.toast(m, err?{kind:'err'}:undefined); }catch(e){ libMsg(m); } };
+  // El aviso se escribe DENTRO del panel del libreto: un toast va a la ventana
+  // principal, que queda tapada por el libreto y no se ve. Por eso parecia que
+  // el boton no hacia nada.
+  const say = (m, err)=>{
+    try{
+      const d = pop2 && pop2.doc; if(!d) throw 0;
+      let el = d.getElementById('lDiagMsg');
+      if(!el && btn && btn.parentNode){
+        el = d.createElement('div'); el.id='lDiagMsg';
+        btn.parentNode.insertBefore(el, btn.nextSibling);
+      }
+      if(el){ el.className = 'ld-msg' + (err?' err':''); el.textContent = m; }
+    }catch(e){}
+    try{ DDL_UI.toast(m, err?{kind:'err'}:undefined); }catch(e){}
+  };
   try{
     if(!sb || typeof currentEp==='undefined' || !currentEp){ say('Abre un capítulo primero', true); return; }
     const ep = ((typeof LDB!=='undefined' && LDB.epsAll)||[]).find(e=> e.id===currentEp.id) || currentEp;
     if(!ep.pdf_path){ say('Este capítulo no tiene el PDF guardado en la nube: vuelve a subirlo', true); return; }
     if(btn){ btn.disabled = true; btn.textContent = 'Analizando…'; }
+    say('Descargando el PDF del capítulo…');
     const r = await sb.storage.from('libretos').download(ep.pdf_path);
     if(!r || !r.data) throw new Error('no se pudo descargar el PDF');
     await loadPdfBuf(await r.data.arrayBuffer(), ep.pdf_name || 'libreto.pdf');
     try{ if(typeof epDataUpsert==='function') await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ console.warn('guardar', e); }
     try{ if(typeof refreshOpenLibretoForEpisode==='function') refreshOpenLibretoForEpisode();
          else if(typeof renderLibretoBlocks==='function') renderLibretoBlocks(); }catch(e){}
-    say('Guion analizado de nuevo');
+    say('Guion analizado de nuevo. Cierra y vuelve a abrir el personaje.');
   }catch(e){
     console.error(e);
     say('No se pudo volver a analizar: ' + ((e && e.message) || e), true);
