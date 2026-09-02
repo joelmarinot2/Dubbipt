@@ -1628,7 +1628,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.31.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.31.1-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -7069,6 +7069,10 @@ body.is-talent #lGear, body.is-talent .gmenu{ display:none !important; }
    area escalada mandan siempre los valores de escritorio. */
 body.fixedlay #lBlocks .blk{ padding:11px 20px !important; }
 body.fixedlay #lBlocks .blk .tx{ font-size:16px !important; }
+/* …pero el parlamento del personaje abierto SIGUE el ajuste de letra (A− / A+).
+   La regla de arriba lleva un id y ganaba por especificidad a .blk.mine .tx:
+   por eso al agrandar solo crecia el timecode. */
+body.fixedlay #lBlocks .blk.mine .tx{ font-size:var(--minefs,17px) !important; }
 body.fixedlay #lBlocks .blk .bhead{ font-size:12px !important; }
 `;
 const LIB_CSS = `
