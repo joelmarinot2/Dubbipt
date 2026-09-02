@@ -1620,7 +1620,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.24.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.24.1-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -3214,11 +3214,52 @@ function headerTail(after){
   return s.trim();
 }
 
+/* Un nombre del desglose puede aparecer en el libreto en forma corta.
+   El caso tipico es el APODO ENTRE COMILLAS: el desglose dice
+   ANTHONY "TONY" VEGA y las cabeceras del guion dicen TONY, TONY VEGA o
+   ANTHONY VEGA. Antes solo casaba la forma exacta y el personaje no aparecia.
+   Se generan esas variantes y todas apuntan al MISMO personaje.
+   No se incluye el nombre de pila suelto: "ANTHONY" chocaria con cualquier
+   otro Anthony del reparto. */
+function nameVariants(display){
+  const out = [];
+  const push = (v)=>{ v=String(v||'').trim(); if(v && out.indexOf(v)<0) out.push(v); };
+  const raw = String(display||'').trim();
+  push(raw);
+  const m = raw.match(/["“”‘’']\s*([^"“”‘’']+?)\s*["“”‘’']/);
+  if(m && m[1]){
+    const apodo = m[1].trim();
+    const sinApodo = (raw.slice(0, m.index) + ' ' + raw.slice(m.index + m[0].length)).replace(/\s+/g,' ').trim();
+    const partes = sinApodo.split(/\s+/).filter(Boolean);
+    push(apodo);                                                  // TONY
+    push(sinApodo);                                               // ANTHONY VEGA
+    if(partes.length > 1) push(apodo + ' ' + partes.slice(1).join(' '));   // TONY VEGA
+  }
+  return out;
+}
 async function scanPdf(){
   occByChar = {}; pageData = {}; charMarks = {}; tcIndex = [];
   const _src = (window._charsRaw && window._charsRaw.length) ? window._charsRaw : chars;
-  const wanted = _src.map(c=>c.key).filter(k=>k.length>=2)
-    .sort((a,b)=>b.length-a.length);   // nombres largos primero (incluye nombres fusionados)
+  // cada entrada es {ks, key}: ks es lo que se compara contra el renglon y key
+  // el personaje al que pertenece, para que las variantes (apodo, nombre sin
+  // apodo...) sumen todas al mismo personaje del desglose.
+  const wanted = [];
+  { const vistos = new Set();
+    for(const c of _src){
+      const variantes = nameVariants(c.display || c.key);
+      variantes.forEach((v, idx)=>{
+        const ks = latFold(norm(v)).replace(/[^A-Z0-9]/g,'');
+        // la forma completa admite 2 letras; las derivadas exigen 3, para que un
+        // apodo corto no se enganche a cualquier palabra del guion
+        if(ks.length < (idx===0 ? 2 : 3)) return;
+        const clave = ks + '|' + c.key;
+        if(vistos.has(clave)) return;
+        vistos.add(clave);
+        wanted.push({ ks, key:c.key });
+      });
+    }
+    wanted.sort((a,b)=> b.ks.length - a.ks.length);   // los mas largos primero
+  }
   // pre-cargar el texto de todas las páginas EN PARALELO (lotes de 10):
   // en tablet esto reduce mucho el tiempo frente a leerlas una por una
   const _contents = new Array(numPages+1);
@@ -3291,12 +3332,11 @@ async function scanPdf(){
         for(let i=scanFrom;i<headEnd;i++){ if(LETTER.test(ns[i]) && !isIgnorable(ns[i])){ hs+=ns[i]; hmap.push(i); } }
         if(hs.length < 2) return;
         let chosen=null;
-        for(const key of wanted){
-          const ks = latFold(key).replace(/[^A-Z0-9]/g,'');  // Ł->L, y fuera apostrofos, puntos y espacios: OBRIEN, DRKIM, MSCISLAWSKI
-          if(ks.length < 2) continue;
+        for(const w of wanted){
+          const ks = w.ks;
           if(hs.startsWith(ks)){
             const a0 = hmap[0], a1 = hmap[ks.length-1];
-            const cand = { key, at:a0, len:a1-a0+1, exact:(hs.length === ks.length) };
+            const cand = { key:w.key, at:a0, len:a1-a0+1, exact:(hs.length === ks.length) };
             if(cand.exact){ chosen=cand; break; }
             if(!chosen){ chosen=cand; }
           }
@@ -3398,7 +3438,7 @@ async function scanPdf(){
   window._scanMissingWhy = {};
   try{
     for(const c of missingChars){
-      const ks = latFold(c.key).replace(/[^A-Z0-9]/g,'');
+      const ks = latFold(norm(c.display || c.key)).replace(/[^A-Z0-9]/g,'');
       if(ks.length < 2) continue;
       let hit = null;
       for(let pp=1; pp<=numPages && !hit; pp++){
