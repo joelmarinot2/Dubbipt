@@ -1628,7 +1628,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.34.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.35.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -5524,11 +5524,20 @@ function newEpisodeModal(){
   setTimeout(()=>{ const n=q('neName'); if(n) n.focus(); },60);
 }
 /* Colores del libreto: caja del personaje abierto y fondo.
-   Sustituye a toggleLibColorPanel() y libretoColors(), que estaban en el
-   archivo pero NO se llamaban desde ningun sitio y usaban una variable (--hl)
-   que ninguna regla leia. Se guardan por dispositivo, como el modo claro. */
-const LIB_BOXC_DEF = '#5B8DEF';
-const LIB_BG_DEF   = '#0b0c0e';
+   Paletas fijas en vez de un selector libre: PASTEL para la caja (nada de
+   verdes, que es el color de "Completado") y OSCUROS para el fondo, que es un
+   libreto para leer en sala a oscuras. Queda el selector libre como extra.
+   Se guardan por dispositivo, como el modo claro. */
+const LIB_BOXC_DEF = '#A8C7FA';
+const LIB_BG_DEF   = '#0B0C0E';
+const LIB_PASTEL = [
+  ['#A8C7FA','Azul'], ['#C4B5FD','Lavanda'], ['#F5B8CE','Rosa'],
+  ['#FBCFA0','Durazno'], ['#F3DFA2','Arena'], ['#A5E4F0','Celeste']
+];
+const LIB_OSCUROS = [
+  ['#0B0C0E','Negro'], ['#111418','Carbón'], ['#0E1220','Noche'],
+  ['#15101E','Ciruela'], ['#101614','Pizarra'], ['#181310','Sepia']
+];
 function libColorsGet(){
   let c = LIB_BOXC_DEF, b = LIB_BG_DEF;
   try{ c = localStorage.getItem('ddl_boxc') || c; b = localStorage.getItem('ddl_libbg') || b; }catch(e){}
@@ -5545,13 +5554,23 @@ function libColorsPanel(){
   const d = pop2 && pop2.doc; if(!d) return;
   const old = d.getElementById('lColPanel'); if(old){ old.remove(); return; }
   const cur = libColorsGet();
+  const igual = (a,b)=> String(a||'').toLowerCase() === String(b||'').toLowerCase();
+  const fila = (lista, sel, clase)=> lista.map(([hex,nom])=>
+      '<button class="lc-sw'+(igual(hex,sel)?' on':'')+'" data-c="'+hex+'" data-k="'+clase+'" '
+      + 'title="'+nom+'" aria-label="'+nom+'" style="background:'+hex+'"></button>').join('');
   const p = d.createElement('div'); p.id='lColPanel'; p.className='lcol';
-  p.innerHTML = '<h4>Colores del libreto</h4>'
-    + '<label>Caja del personaje <input type="color" id="lcBox" value="'+cur.boxc+'"></label>'
-    + '<label>Fondo <input type="color" id="lcBg" value="'+cur.bg+'"></label>'
-    + '<div class="lcol-btns"><button class="lc-reset" id="lcReset">Restablecer</button>'
-    + '<button class="lc-ok" id="lcOk">Listo</button></div>';
-  // colgado del engranaje
+  p.innerHTML =
+      '<div class="lc-head">Colores del libreto</div>'
+    + '<div class="lc-sec">Caja del personaje</div>'
+    + '<div class="lc-row" id="lcBoxRow">' + fila(LIB_PASTEL, cur.boxc, 'box') + '</div>'
+    + '<div class="lc-sec">Fondo</div>'
+    + '<div class="lc-row" id="lcBgRow">' + fila(LIB_OSCUROS, cur.bg, 'bg') + '</div>'
+    + '<div class="lc-custom">'
+    +   '<label>Caja a medida <input type="color" id="lcBox" value="'+cur.boxc+'"></label>'
+    +   '<label>Fondo a medida <input type="color" id="lcBg" value="'+cur.bg+'"></label>'
+    + '</div>'
+    + '<div class="lc-btns"><button class="lc-reset" id="lcReset">Restablecer</button>'
+    +   '<button class="lc-ok" id="lcOk">Listo</button></div>';
   const g = d.getElementById('lGear');
   d.body.appendChild(p);
   try{
@@ -5559,18 +5578,21 @@ function libColorsPanel(){
     p.style.top = (r.bottom + 8) + 'px';
     p.style.right = Math.max(12, d.documentElement.clientWidth - r.right) + 'px';
   }catch(e){ p.style.top='70px'; p.style.right='16px'; }
-  const guardar = ()=>{
-    const c = p.querySelector('#lcBox').value, b = p.querySelector('#lcBg').value;
+  const guardar = (c, b)=>{
     libColorsApply(c, b);
     try{ localStorage.setItem('ddl_boxc', c); localStorage.setItem('ddl_libbg', b); }catch(e){}
+    p.querySelector('#lcBox').value = c; p.querySelector('#lcBg').value = b;
+    p.querySelectorAll('.lc-sw').forEach(s=>
+      s.classList.toggle('on', igual(s.dataset.c, s.dataset.k==='box' ? c : b)));
   };
-  p.querySelector('#lcBox').addEventListener('input', guardar);
-  p.querySelector('#lcBg').addEventListener('input', guardar);
-  p.querySelector('#lcReset').onclick = ()=>{
-    p.querySelector('#lcBox').value = LIB_BOXC_DEF;
-    p.querySelector('#lcBg').value  = LIB_BG_DEF;
-    guardar();
-  };
+  const leer = ()=> [p.querySelector('#lcBox').value, p.querySelector('#lcBg').value];
+  p.querySelectorAll('.lc-sw').forEach(sw=> sw.onclick = ()=>{
+    const [c,b] = leer();
+    if(sw.dataset.k === 'box') guardar(sw.dataset.c, b); else guardar(c, sw.dataset.c);
+  });
+  p.querySelector('#lcBox').addEventListener('input', ()=>{ const [c,b]=leer(); guardar(c,b); });
+  p.querySelector('#lcBg').addEventListener('input',  ()=>{ const [c,b]=leer(); guardar(c,b); });
+  p.querySelector('#lcReset').onclick = ()=> guardar(LIB_BOXC_DEF, LIB_BG_DEF);
   p.querySelector('#lcOk').onclick = ()=> p.remove();
 }
 
@@ -7118,7 +7140,8 @@ body #lBlocks .blk.mine:not(.rec) .tc{
   background:color-mix(in srgb, var(--boxc,#5B8DEF) 20%, #0c0e11) !important;
   border-color:color-mix(in srgb, var(--boxc,#5B8DEF) 45%, transparent) !important;
 }
-body #lBlocks .blk.mine:not(.rec) .who{ color:var(--boxc,#5B8DEF) !important; }
+body #lBlocks .blk.mine:not(.rec) .who{ color:var(--boxc,#A8C7FA) !important; }
+body.light #lBlocks .blk.mine:not(.rec) .who{ color:color-mix(in srgb, var(--boxc,#A8C7FA) 55%, #14121f) !important; }
 body.dark #lBlocks .blk.mine:not(.rec).active{
   background:color-mix(in srgb, var(--boxc,#5B8DEF) 28%, var(--libbg,#0c0e11)) !important;
 }
@@ -7127,7 +7150,8 @@ body.light #lBlocks .blk.mine:not(.rec){
   border-color:var(--boxc,#5B8DEF) !important;
 }
 body.light #lBlocks .blk.mine:not(.rec) .tc{
-  color:var(--boxc,#2E5FD0) !important;
+  /* un pastel puro sobre blanco no se lee: se oscurece solo para el texto */
+  color:color-mix(in srgb, var(--boxc,#A8C7FA) 55%, #14121f) !important;
   background:color-mix(in srgb, var(--boxc,#5B8DEF) 20%, #ffffff) !important;
 }
 body.light #lBlocks .blk.mine:not(.rec).active{
@@ -7136,20 +7160,31 @@ body.light #lBlocks .blk.mine:not(.rec).active{
 /* el fondo del libreto */
 body.dark{ background:var(--libbg,#0b0c0e) !important; }
 
-/* panel de colores */
-.lcol{ position:absolute; z-index:75; width:min(280px,92vw); background:#111316; border:1px solid #23262b;
+/* panel de colores · mismo lenguaje que el menú del engranaje */
+.lcol{ position:absolute; z-index:75; width:min(300px,92vw); background:#111316; border:1px solid #23262b;
   border-radius:14px; padding:14px; box-shadow:0 18px 50px rgba(0,0,0,.55); font-family:'Inter',sans-serif; }
-.lcol h4{ font-size:13px; font-weight:700; color:#f2f3f5; margin:0 0 12px; }
-.lcol label{ display:flex; align-items:center; justify-content:space-between; gap:12px;
-  font-size:12.5px; color:#c7c9cd; margin-bottom:10px; }
-.lcol input[type=color]{ width:52px; height:32px; border:1px solid #2c3036; border-radius:8px;
+.lc-head{ font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#6b7280; font-weight:700; margin-bottom:12px; }
+.lc-sec{ font-size:12px; color:#c7c9cd; font-weight:600; margin:0 0 7px; }
+.lc-row{ display:flex; gap:7px; flex-wrap:wrap; margin-bottom:14px; }
+.lc-sw{ width:34px; height:34px; border-radius:9px; border:2px solid #23262b; cursor:pointer; padding:0;
+  transition:border-color .12s, transform .12s; }
+.lc-sw:hover{ transform:translateY(-1px); border-color:#3a3f46; }
+.lc-sw.on{ border-color:#f2f3f5; box-shadow:0 0 0 2px rgba(255,255,255,.14); }
+.lc-custom{ display:flex; flex-direction:column; gap:7px; padding-top:12px; border-top:1px solid #1c1e22; margin-bottom:12px; }
+.lc-custom label{ display:flex; align-items:center; justify-content:space-between; gap:10px;
+  font-size:12px; color:#8b9099; }
+.lc-custom input[type=color]{ width:46px; height:28px; border:1px solid #2c3036; border-radius:7px;
   background:#0f1215; cursor:pointer; padding:2px; }
-.lcol .lcol-btns{ display:flex; gap:8px; margin-top:6px; }
-.lcol button{ flex:1; border-radius:9px; padding:9px; font-family:'Inter',sans-serif; font-size:12.5px;
+.lc-btns{ display:flex; gap:8px; }
+.lc-btns button{ flex:1; border-radius:10px; padding:9px; font-family:'Inter',sans-serif; font-size:12.5px;
   font-weight:600; cursor:pointer; }
-.lcol .lc-reset{ background:transparent; border:1px solid #3a3f46; color:#c7c9cd; }
-.lcol .lc-reset:hover{ border-color:#4ADE80; color:#f2f3f5; }
-.lcol .lc-ok{ background:#22C55E; border:none; color:#06210f; font-weight:700; }
+.lc-reset{ background:#0f1215; border:1px solid #23262b; color:#c7c9cd; }
+.lc-reset:hover{ border-color:#4ADE80; color:#f2f3f5; }
+.lc-ok{ background:#22C55E; border:none; color:#06210f; font-weight:700; }
+.lc-ok:hover{ filter:brightness(1.06); }
+body.light .lcol{ background:#fff; border-color:#e2ddf2; }
+body.light .lc-sec{ color:#2a2540; }
+body.light .lc-reset{ background:#f7f6fc; border-color:#e2ddf2; color:#2a2540; }
 `;
 const LIB_CSS = `
 *{margin:0;padding:0;box-sizing:border-box}
