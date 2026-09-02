@@ -996,7 +996,8 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 /* diagnóstico de libreto vacío */
 .ldiag{ max-width:min(760px,92%); margin:26px auto; background:#15181c; border:1px solid #2a2f36;
   border-left:3px solid #F59E0B; border-radius:12px; padding:18px 20px; font-family:'Inter',sans-serif; }
-.ldiag b{ display:block; font-size:15px; color:#f2f3f5; margin-bottom:8px; }
+.ldiag > b:first-child{ display:block; font-size:15px; color:#f2f3f5; margin-bottom:8px; }
+.ldiag p b{ color:#f2f3f5; }
 .ldiag p{ font-size:13px; color:#9CA3AF; line-height:1.6; margin:0 0 14px; }
 .ldiag code{ font-family:'JetBrains Mono',monospace; font-size:12.5px; color:#FBBF24; background:rgba(251,191,36,.1); padding:1px 6px; border-radius:5px; }
 .ld-sec{ font-size:11px; text-transform:uppercase; letter-spacing:.6px; color:#6b7280; margin-bottom:12px; }
@@ -1634,7 +1635,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.25.2-nube · 01-sep-2026';
+const APP_VERSION = 'v10.26.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -8463,6 +8464,32 @@ function libTextModal(){
     close();
   };
 }
+/* Vuelve a analizar el guion desde el PDF guardado en la nube.
+   Hace falta porque el libreto se GUARDA ya procesado: al abrir el capitulo se
+   usa esa copia y no se vuelve a leer el PDF. Si el capitulo se proceso con una
+   version que no sabia leer cierto nombre, ese personaje se queda sin
+   parlamentos para siempre aunque la app ya sepa leerlo. Esto lo rehace. */
+async function reanalizarGuion(btn){
+  const say = (m, err)=>{ try{ DDL_UI.toast(m, err?{kind:'err'}:undefined); }catch(e){ libMsg(m); } };
+  try{
+    if(!sb || typeof currentEp==='undefined' || !currentEp){ say('Abre un capítulo primero', true); return; }
+    const ep = ((typeof LDB!=='undefined' && LDB.epsAll)||[]).find(e=> e.id===currentEp.id) || currentEp;
+    if(!ep.pdf_path){ say('Este capítulo no tiene el PDF guardado en la nube: vuelve a subirlo', true); return; }
+    if(btn){ btn.disabled = true; btn.textContent = 'Analizando…'; }
+    const r = await sb.storage.from('libretos').download(ep.pdf_path);
+    if(!r || !r.data) throw new Error('no se pudo descargar el PDF');
+    await loadPdfBuf(await r.data.arrayBuffer(), ep.pdf_name || 'libreto.pdf');
+    try{ if(typeof epDataUpsert==='function') await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ console.warn('guardar', e); }
+    try{ if(typeof refreshOpenLibretoForEpisode==='function') refreshOpenLibretoForEpisode();
+         else if(typeof renderLibretoBlocks==='function') renderLibretoBlocks(); }catch(e){}
+    say('Guion analizado de nuevo');
+  }catch(e){
+    console.error(e);
+    say('No se pudo volver a analizar: ' + ((e && e.message) || e), true);
+    if(btn){ btn.disabled = false; btn.textContent = 'Volver a analizar el guion'; }
+  }
+}
+
 /* Diagnóstico cuando el libreto de un personaje sale VACÍO.
    En vez de una pantalla en blanco, se dice con qué nombre quedó registrado en
    el desglose, con qué nombres quedaron marcados los parlamentos, y qué
@@ -8517,9 +8544,26 @@ function libDiagData(key){
 function libDiagHtml(key){
   const d = libDiagData(key);
   const li = (a)=> a.length ? a.map(x=>'<li>'+esc(String(x))+'</li>').join('') : '<li class="no">(ninguno)</li>';
+  // Sin páginas en memoria el libreto NO viene del PDF, sino de la copia ya
+  // procesada que se guardó del capítulo. Decirlo cambia la accion a tomar.
+  const deCopia = !(typeof pageData!=='undefined' && pageData && Object.keys(pageData).length);
+  const sinParlamentos = Object.keys(charIdx||{}).filter(k=>{
+    const f=(x)=>String(x||'').replace(/[^A-Z0-9]/g,'');
+    return !(script||[]).some(b=> b.key && f(b.key)===f(k));
+  });
   return '<div class="ldiag" id="lDiag">'
     + '<b>Este personaje no tiene parlamentos en el libreto</b>'
     + '<p>El desglose lo registró como <code>'+esc(d.desglose)+'</code>, pero ningún parlamento quedó marcado con ese nombre.</p>'
+    + (deCopia
+        ? '<p><b>El libreto que ves viene de la copia guardada del capítulo</b>, no de leer el PDF. '
+          + 'Si se procesó con una versión anterior de Dubbipt, los personajes que aquella no sabía leer '
+          + 'siguen sin parlamentos. Vuelve a analizarlo:</p>'
+          + '<button class="ld-copy" id="lDiagRe" style="margin-bottom:14px">Volver a analizar el guion</button>'
+        : '')
+    + (sinParlamentos.length>1
+        ? '<div class="ld-sec">Otros personajes del desglose tampoco tienen parlamentos<ul>'
+          + li(sinParlamentos.filter(k=>k!==key).slice(0,10)) + '</ul></div>'
+        : '')
     + '<div class="ld-sec">Renglones del PDF donde aparece ese nombre<ul>'+li(d.renglonesDelPdf)+'</ul></div>'
     + '<div class="ld-sec">Cabeceras suyas reconocidas en el PDF: <b style="color:#FBBF24">'+d.marcasDetectadasParaEl+'</b></div>'
     + '<div class="ld-sec">Nombres con los que SÍ hay parlamentos<ul>'+li(d.clavesDeParlamentos.slice(0,12))+'</ul></div>'
@@ -8599,6 +8643,8 @@ function renderLibretoBlocks(){
   if(!pop2.els.blocks._diagWired){
     pop2.els.blocks._diagWired = true;
     pop2.els.blocks.addEventListener('click', (ev)=>{
+      const re = ev.target.closest && ev.target.closest('#lDiagRe');
+      if(re){ ev.stopPropagation(); try{ reanalizarGuion(re); }catch(e){ console.error(e); } return; }
       const b = ev.target.closest && ev.target.closest('#lDiagCopy'); if(!b) return;
       ev.stopPropagation();
       let txt = '';
