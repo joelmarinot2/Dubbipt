@@ -55,8 +55,41 @@ select tablename, policyname, cmd, coalesce(qual, with_check) as condicion
 Desde fuera (sin sesión, solo con la anon key): las tablas devuelven `[]`, los RPC
 devuelven `401`, y `dubbipt.vercel.app/esquema-original-v11.sql` devuelve `404`.
 
-## Pendiente (fuera de los 8 pasos)
+## Paso 9 · Canales de Realtime privados (revisión del 05-sep-2026)
 
-Del informe completo quedan sin corregir: canales Realtime sin `private:true` ni
-validación de payload (S9), bucket `portadas` listable sin sesión (S12), y los
-bugs B6–B32 (offline, parser DOCX, service worker que recarga tablets, etc.).
+De la revisión salieron tres cosas del bloque S9. Dos ya están hechas en la app:
+
+| Hallazgo | Estado |
+|---|---|
+| El contador de conectados publicaba nombre, espacio y dispositivo en un canal de nombre fijo (`ddl:online`), legible por cualquier cuenta | Corregido en **v10.36.0**: ese canal ya no lleva ningún dato, solo cuenta. Los nombres van por `ddl:online:<espacio>` |
+| Los mensajes del canal se aplicaban sin validar (marcas, fusiones, páginas grabadas) | Corregido en **v10.36.0** |
+| Los canales siguen siendo **públicos**: quien conozca el tema puede unirse | **Pendiente** — este paso |
+
+Y aparte, el esquema base reintroducía la auto-promoción a admin al reejecutarlo
+(el trigger leía el rol de `raw_user_meta_data`); corregido en
+`esquema-v11-auth.sql` para que coincida con `sql/seguridad-02-rol-admin.sql`.
+
+### Cómo aplicar el paso 9
+
+**El orden importa.** Al revés, la sincronía se corta en seco.
+
+1. Ejecutar `sql/seguridad-09-canales-privados.sql` en **Supabase → SQL Editor**.
+   No rompe nada por sí solo: las políticas solo actúan sobre canales marcados
+   como privados, y la app todavía no los marca.
+2. Poner `RT_PRIVATE = true` en `index.html` y desplegar.
+3. Comprobar en sala: chip «Sincronizado», el desplazamiento del director mueve
+   al escritorio, y una marca del actor llega a los dos.
+
+Para deshacer basta volver a `RT_PRIVATE = false` y desplegar: los canales
+públicos siguen funcionando aunque las políticas estén puestas.
+
+## Pendiente
+
+- `ddl:library` sigue siendo un canal **global**: transporta ids de programa y
+  capítulo a todas las cuentas. Sin RLS esos ids no sirven de nada, pero
+  conviene pasarlo a `ddl:library:<espacio>` y tratarlo como los demás.
+- CSP con `script-src 'unsafe-inline'`: la app es un único `<script>` en línea,
+  así que la CSP no puede frenar código inyectado. Riesgo aceptado; para
+  cerrarlo habría que sacar el script a un archivo aparte y usar nonce o hash.
+- Bucket `portadas` listable sin sesión (S12).
+- Bugs B6–B32 (offline, parser DOCX, service worker que recarga tablets, etc.).

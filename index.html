@@ -6373,7 +6373,7 @@ function libRealtimeStart(){
   if(!sb || !sbUser || LIBRT.busy || LIBRT.on) return;
   LIBRT.busy = true;
   if(LIBRT.ch){ try{ sb.removeChannel(LIBRT.ch); }catch(e){} LIBRT.ch = null; }
-  const ch = sb.channel('ddl:library', { config:{ broadcast:{ self:false } } });
+  const ch = sb.channel('ddl:library', rtCfg({ broadcast:{ self:false } }));
   LIBRT.ch = ch;
   ch.on('broadcast', { event:'lib' }, ({payload})=> onLibPing(payload))
     .subscribe((st)=>{
@@ -9868,6 +9868,17 @@ window._pop2 = pop2;
    de programa/capítulo. La tablet controla; navegación y scroll son
    bidireccionales y en tiempo real.
    ================================================================ */
+/* Canales de Realtime privados (seguridad S9).
+   Se queda en false hasta que sql/seguridad-09-canales-privados.sql este
+   ejecutado en Supabase: marcar los canales como privados SIN esas politicas
+   corta la sincronia en seco. Cuando el SQL este puesto, se pone en true y se
+   despliega; para deshacer, se vuelve a false. */
+const RT_PRIVATE = false;
+function rtCfg(extra){
+  const c = Object.assign({}, extra || {});
+  if(RT_PRIVATE) c.private = true;
+  return { config: c };
+}
 const sync = { channel:null, room:null, isOn:false, role:null, marks:{},
                _saveTmr:null, meId:Math.random().toString(36).slice(2,8), peers:0 };
 
@@ -10030,7 +10041,7 @@ async function syncConnect(role){
   if(sync.channel){ try{ sb.removeChannel(sync.channel); }catch(e){} sync.channel = null; }
   sync.room = 'ws:' + ((WORKSPACE && WORKSPACE.id) ? WORKSPACE.id : 'x');
   const role0 = sync.role;
-  const ch = sb.channel(sync.room, { config:{ broadcast:{ self:false, ack:false }, presence:{ key:sync.meId } } });
+  const ch = sb.channel(sync.room, rtCfg({ broadcast:{ self:false, ack:false }, presence:{ key:sync.meId } }));
   sync.channel = ch;
   ch
     .on('broadcast', { event:'ep'     }, ({payload})=> onRemoteEp(payload))
@@ -10266,7 +10277,7 @@ function onlineConnect(){
   // 1) canal global: solo cuenta cabezas, sin publicar NADA
   if(!online.chG){
     try{
-      const g = sb.channel('ddl:online', { config:{ presence:{ key: sbUser.id } } });
+      const g = sb.channel('ddl:online', rtCfg({ presence:{ key: sbUser.id } }));
       online.chG = g;
       ['sync','join','leave'].forEach(ev=> g.on('presence', { event:ev }, ()=> onlineRefresh()));
       g.subscribe(async (st)=>{
@@ -10287,7 +10298,7 @@ function onlineJoinWs(){
   online.chW = null; online.wsId = wsId; online.people = [];
   if(!sb || !sbUser || !wsId){ onlineRefresh(); return; }
   try{
-    const w = sb.channel('ddl:online:' + wsId, { config:{ presence:{ key: sbUser.id } } });
+    const w = sb.channel('ddl:online:' + wsId, rtCfg({ presence:{ key: sbUser.id } }));
     online.chW = w;
     ['sync','join','leave'].forEach(ev=> w.on('presence', { event:ev }, ()=> onlineRefresh()));
     w.subscribe(async (st)=>{
