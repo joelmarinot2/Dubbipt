@@ -1631,7 +1631,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.43.0-nube';
+const APP_VER_NUM = 'v10.44.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5659,6 +5659,7 @@ function showTutorial(onDone){
        +'· <b>🎤 Karaoke</b> enciende el parlamento <b>palabra por palabra</b> dentro del libreto: en ámbar la que suena, apagadas las ya dichas.<br>'
        +'· <b>🪟 Ventana</b> saca los parlamentos <b>aparte</b>, en grande, con el fondo regulable hasta dejar solo el texto. Si el navegador lo permite, la ventana queda <b>por encima</b> de los demás programas.<br>'
        +'· <b>🎙 Diálogos</b> carga la pista de voz limpia: el karaoke se guía por ella en vez de por el audio del vídeo, que suele traer música encima. Si no la cargas, se saca del propio vídeo.'
+       +'· <b>✨ IA</b> afina las marcas <b>reconociendo la voz</b>. Tarda, así que va bloque a bloque de fondo; lo que aún no ha procesado sigue con el marcado normal. El audio <b>no sale de tu equipo</b>.'
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
@@ -12033,6 +12034,8 @@ function studioEnsureStrip(){
     +'<button id="stKar" class="st-btn ghost" title="Enciende el parlamento palabra por palabra al ritmo del audio">🎤 Karaoke</button>'
     +'<button id="stKarWin" class="st-btn ghost" title="Abre los parlamentos en una ventana aparte, con fondo regulable">🪟 Ventana</button>'
     +'<button id="stDlg" class="st-btn ghost" title="Carga la pista de dialogos limpia: el karaoke se guiara por ella">🎙 Diálogos</button>'
+    +'<button id="stIa" class="st-btn ghost" title="Afina las marcas reconociendo la voz. El audio no sale de este equipo">✨ IA</button>'
+    +'<select id="stIaLang" class="st-btn ghost" style="padding:6px 8px" title="Idioma de los diálogos"><option value="spanish">español</option><option value="english">inglés</option><option value="portuguese">portugués</option><option value="french">francés</option><option value="italian">italiano</option><option value="german">alemán</option><option value="polish">polaco</option></select>'
     +'<input type="file" id="stDlgIn" accept=".wav,.mp3,.m4a,.aac,.ogg,.oga,.opus,.flac,audio/*" style="display:none">'
     +'<span id="stDlgName" class="st-name"></span>'
     +'<span id="stName" class="st-name"></span>'
@@ -12165,7 +12168,11 @@ function studioWireStrip(){
   $('stHide').onclick = ()=> studioToggleStrip();
   $('stCfg').onclick = ()=>{ const r=$('stCfgRow'); r.style.display = r.style.display==='none'?'flex':'none'; };
   $('stMin').oninput = ()=> $('stMinV').textContent = $('stMin').value;
-  $('stOff').oninput = ()=>{ $('stOffV').textContent = ((+$('stOff').value||0)/10).toFixed(1); studio.cur=-1; studioTick(); };
+  $('stOff').oninput = ()=>{ $('stOffV').textContent = ((+$('stOff').value||0)/10).toFixed(1); studio.cur=-1;
+    // las marcas de la IA se calcularon con el desfase anterior: caducan
+    karIa.marcas.clear(); karIa.cola.length=0; karIa.hechos=0; kar.cache.clear();
+    if(karIa.on) karIaPedir(studio.cur);
+    studioTick(); };
   { const k = $('stKar');
     if(k) k.onclick = ()=>{ karSet(!kar.on); k.classList.toggle('on', kar.on); k.classList.toggle('ghost', !kar.on); }; }
   { const v = $('stKarWin');
@@ -12176,6 +12183,11 @@ function studioWireStrip(){
         const el = studioEl();
         if(el) karPintar(el.currentTime + studioTc0() + studioFine()); }
     }; }
+  { const a = $('stIa');
+    if(a) a.onclick = ()=> karIaSet(!karIa.on);
+    const sl = $('stIaLang');
+    if(sl) sl.onchange = ()=>{ karIa.idioma = sl.value; karIa.marcas.clear(); karIa.cola.length=0;
+                               kar.cache.clear(); if(karIa.on) karIaPedir(studio.cur); }; }
   { const d = $('stDlg'), i = $('stDlgIn');
     if(d && i){ d.onclick = ()=> i.click();
                 i.onchange = ()=>{ if(i.files && i.files[0]) karAudioDialogos(i.files[0]); i.value=''; }; } }
@@ -12504,19 +12516,62 @@ function karEnv(a, b){
   }
   return db;
 }
-/** Picos de energía = núcleos silábicos. Devuelve índices de trama. */
-function karNucleos(db){
+/** Percentil de un Float32Array, sin tocar el original. */
+function karPercentil(a, p){
+  if(!a.length) return 0;
+  const c = Float32Array.from(a); c.sort();
+  return c[Math.min(c.length-1, Math.max(0, Math.round(p*(c.length-1))))];
+}
+
+/** Tramos con VOZ dentro de la envolvente. Devuelve pares de índices de trama.
+
+    Es la corrección importante del marcado: la ventana de un bloque va de un
+    timecode al siguiente, y ahí dentro casi siempre sobra silencio por delante
+    y por detrás. Repartir las palabras por TODA la ventana corría el texto
+    varias décimas —hasta segundos si la ventana era holgada—. Ahora se busca
+    dónde suena la voz y solo se reparte por ahí.
+
+    El umbral no es fijo: sale de la propia grabación. Se toma un percentil bajo
+    como suelo de ruido y se exige que la voz lo supere por un margen, con
+    histéresis para que cueste más entrar que salir. Así un fondo constante
+    —sala, música colada— sube el suelo y no dispara nada. */
+function karTramos(db){
   const n = db.length;
+  if(n < 8) return [];
+  const suelo = karPercentil(db, 0.15);
+  const techo = karPercentil(db, 0.95);
+  if((techo - suelo) < 5) return [];        // todo plano: no hay nada que recortar
+  const alto = suelo + 9, bajo = suelo + 5.4;
+  const minPausa = 14;                      // 140 ms
+  const minVoz   = 8;                       // 80 ms
+  const out = [];
+  let dentro = false, ini = 0;
+  for(let i=0;i<n;i++){
+    if(!dentro && db[i] >= alto){ dentro = true; ini = i; }
+    else if(dentro && db[i] < bajo){
+      let j = i; while(j < n && db[j] < bajo) j++;
+      if((j - i) >= minPausa || j >= n){ out.push([ini, i]); dentro = false; }
+      i = j - 1;
+    }
+  }
+  if(dentro) out.push([ini, n]);
+  return out.filter(t => (t[1]-t[0]) >= minVoz);
+}
+
+/** Núcleos silábicos (picos de energía) dentro de [a,b) de la envolvente. */
+function karNucleos(db, a, b, prom0){
+  const i0 = (a == null) ? 0 : Math.max(0, a);
+  const i1 = (b == null) ? db.length : Math.min(db.length, b);
+  const n = i1 - i0;
   if(n < 5) return [];
   const su = new Float32Array(n);
   for(let i=0;i<n;i++){
-    let a=0,c=0; for(let k=-1;k<=1;k++){ const j=i+k; if(j>=0&&j<n){ a+=db[j]; c++; } }
-    su[i]=a/c;
+    let s=0,c=0; for(let k=-1;k<=1;k++){ const j=i+k; if(j>=0&&j<n){ s+=db[i0+j]; c++; } }
+    su[i]=s/c;
   }
   const picos = [];
   for(let i=1;i<n-1;i++) if(su[i]>=su[i-1] && su[i]>su[i+1]) picos.push(i);
-  const sep = 8;            // 80 ms: no hay sílabas más cortas
-  const prom = 2.5;         // dB de valle exigidos entre dos picos
+  const sep = 8, prom = (prom0 == null ? 2.5 : prom0);
   const fin = [];
   for(const p of picos){
     if(!fin.length){ fin.push(p); continue; }
@@ -12527,43 +12582,119 @@ function karNucleos(db){
       if(su[p] > su[q]) fin[fin.length-1] = p;
     } else fin.push(p);
   }
-  return fin;
+  return fin.map(i => i0 + i);
 }
-/** Reparte `sil` (sílabas por palabra) en [t0,t1] siguiendo los núcleos. */
-function karRepartir(sil, t0, t1, db){
-  const total = sil.reduce((a,b)=>a+b,0) || sil.length;
-  const dur = Math.max(0.001, t1 - t0);
-  const nuc = db ? karNucleos(db) : [];
+
+/** Núcleos AFINADOS con la ayuda del texto.
+
+    Aquí está la parte lista del asunto: ya sabemos cuántas sílabas se dicen en
+    este tramo, porque tenemos el texto. Un umbral fijo se equivoca en los dos
+    sentidos —parte una vocal larga en dos, o se traga una sílaba floja—, y en
+    voz real eso pasa constantemente. Así que se prueban varios umbrales y se
+    queda el que produce un número de crestas más parecido al que el texto dice
+    que debe haber. Es barato: la envolvente ya está calculada y solo se
+    recorre unas pocas veces.
+
+    Empatando, gana el umbral más exigente: es preferible quedarse corto de
+    crestas —y caer en el reparto proporcional, que es suave— que inventarse
+    crestas de ruido y clavar una palabra donde no toca. */
+function karNucleosTexto(db, a, b, esperadas){
+  const escala = [3.6, 3.0, 2.5, 2.0, 1.6, 1.3, 1.0];
+  let mejor = null, dMejor = Infinity;
+  for(const p of escala){
+    const n = karNucleos(db, a, b, p);
+    const d = Math.abs(n.length - esperadas);
+    if(d < dMejor){ dMejor = d; mejor = n; if(d === 0) break; }
+  }
+  return mejor || [];
+}
+
+/** Coloca `sil` palabras dentro de UN tramo de voz [a,b) (índices de trama). */
+function karEnTramo(sil, a, b, db, t0){
+  const T = (i) => t0 + i * 0.010;
+  const total = sil.reduce((x,y)=>x+y,0) || sil.length;
+  const ta = T(a), tb = T(b);
   const out = [];
+  const nuc = karNucleosTexto(db, a, b, total);
   if(nuc.length >= sil.length && sil.length > 1){
-    // hay picos de sobra: se corta en el VALLE entre el último pico de una
-    // palabra y el primero de la siguiente
-    const cortes = [t0];
-    let acum = 0, prev = t0;
+    const cortes = [ta];
+    let acum = 0, prev = ta;
     for(let k=0;k<sil.length-1;k++){
       acum += sil[k];
       let ni = Math.round(acum * nuc.length / total);
       ni = Math.min(nuc.length-1, Math.max(1, ni));
       let mejor = nuc[ni-1], vmin = Infinity;
       for(let i=nuc[ni-1]; i<=nuc[ni]; i++) if(db[i] < vmin){ vmin = db[i]; mejor = i; }
-      let t = t0 + mejor * 0.010;
+      let t = T(mejor);
       if(t <= prev) t = prev + 0.010;
-      if(t >= t1)   t = Math.max(prev + 0.005, t1 - 0.010);
+      if(t >= tb)   t = Math.max(prev + 0.005, tb - 0.010);
       cortes.push(t); prev = t;
     }
-    cortes.push(t1);
+    cortes.push(tb);
     for(let k=0;k<sil.length;k++) out.push({ t0:cortes[k], t1:cortes[k+1] });
   }else{
-    // sin audio fiable: proporcional a las sílabas
-    let c = t0;
-    for(let k=0;k<sil.length;k++){
-      const p = dur * (sil[k]/total);
-      out.push({ t0:c, t1:c+p }); c += p;
-    }
-    if(out.length) out[out.length-1].t1 = t1;
+    let c = ta;
+    for(let k=0;k<sil.length;k++){ const p = (tb-ta)*(sil[k]/total); out.push({ t0:c, t1:c+p }); c += p; }
+    if(out.length) out[out.length-1].t1 = tb;
   }
   return out;
 }
+
+/** Reparte las palabras en [t0,t1]: primero entre los TRAMOS DE VOZ, y dentro
+    de cada tramo siguiendo los núcleos silábicos. Sin audio, por sílabas. */
+function karRepartir(sil, t0, t1, db){
+  const total = sil.reduce((a,b)=>a+b,0) || sil.length;
+  const proporcional = () => {
+    const out = []; let c = t0;
+    for(let k=0;k<sil.length;k++){ const p = (t1-t0)*(sil[k]/total); out.push({ t0:c, t1:c+p }); c += p; }
+    if(out.length) out[out.length-1].t1 = t1;
+    return out;
+  };
+  if(!db || sil.length === 0) return proporcional();
+
+  const tramos = karTramos(db);
+  if(!tramos.length) return proporcional();
+  if(tramos.length === 1) return karEnTramo(sil, tramos[0][0], tramos[0][1], db, t0);
+
+  // Reparto entre tramos. La cuota se RECALCULA con lo que queda de texto y de
+  // voz, para que un desvío en un tramo no se arrastre hasta el final; y el
+  // corte se elige por cercanía a la cuota, no por "el primero que la supere".
+  const out = [];
+  let idx = 0;
+  let silQuedan = total;
+  let durQuedan = tramos.reduce((a,t)=>a+(t[1]-t[0]),0);
+  for(let i=0;i<tramos.length && idx<sil.length;i++){
+    const [a,b] = tramos[i];
+    const quedan = tramos.length - i;
+    let n;
+    if(quedan === 1){ n = sil.length - idx; }
+    else{
+      const cuota = durQuedan > 0 ? silQuedan * ((b-a)/durQuedan) : 0;
+      const tope = Math.max(1, sil.length - idx - (quedan - 1));
+      let acum = 0, mejor = 1, dMejor = Infinity;
+      for(let k=1;k<=tope;k++){
+        acum += sil[idx+k-1];
+        const d = Math.abs(acum - cuota);
+        if(d < dMejor){ dMejor = d; mejor = k; }
+        if(acum >= cuota) break;
+      }
+      n = mejor;
+    }
+    const trozo = sil.slice(idx, idx+n);
+    out.push(...karEnTramo(trozo, a, b, db, t0));
+    idx += n;
+    silQuedan -= trozo.reduce((x,y)=>x+y,0);
+    durQuedan -= (b-a);
+  }
+  // Si sobraron palabras, se pegan al final del ultimo tramo de voz.
+  if(idx < sil.length){
+    const fin = t0 + tramos[tramos.length-1][1]*0.010;
+    let c = fin;
+    for(let k=idx;k<sil.length;k++){ out.push({ t0:c, t1:c+0.001 }); c += 0.001; }
+  }
+  return out;
+}
+
 /** Sílabas del texto de un bloque, para repartir ventanas compartidas. */
 function karLargoBloque(i){
   const txt = (script[i] && script[i].lines ? script[i].lines.join(' ') : '');
@@ -12599,7 +12730,9 @@ function karVentana(si){
 }
 /** Tiempos de cada palabra del bloque, en timecode de libreto. Con memoria. */
 function karBloque(si){
-  const clave = si + '|' + studioTc0() + '|' + studioFine() + '|' + (studio.pcm ? studio.pcm.length : 0);
+  const ia = (karIa.on && karIa.marcas.get(si)) || null;
+  const clave = si + '|' + studioTc0() + '|' + studioFine() + '|' + (studio.pcm ? studio.pcm.length : 0)
+              + '|' + (ia ? 'ia' : '-');
   if(kar.cache.has(clave)) return kar.cache.get(clave);
   let r = null;
   try{
@@ -12614,7 +12747,10 @@ function karBloque(si){
         // Solo se guardan los TIEMPOS. Guardar los <span> seria una trampa: si el
         // libreto se vuelve a pintar, esos nodos quedan huerfanos y el karaoke
         // encenderia palabras que ya no estan en pantalla.
-        r = { tr: karRepartir(sil, ven[0], ven[1], db), n: wds.length, senal: !!db };
+        // Si la IA ya reconocio este bloque y trae una marca por palabra, manda
+        // ella; si no, el motor de energia.
+        const tr = (ia && ia.length === wds.length) ? ia : karRepartir(sil, ven[0], ven[1], db);
+        r = { tr: tr, n: wds.length, senal: !!db, ia: !!(ia && ia.length === wds.length) };
       }
     }
   }catch(e){}
@@ -12622,6 +12758,219 @@ function karBloque(si){
   kar.cache.set(clave, r);
   return r;
 }
+/* ═══ AFINADO CON IA ═══ reconocimiento de voz para clavar las marcas.
+
+   El motor de energía coloca muy bien las pausas, pero dentro de una frase
+   seguida solo puede repartir por sílabas: no sabe DÓNDE acaba una palabra.
+   Un reconocedor de voz sí lo sabe, porque oye lo que se dice.
+
+   Cómo funciona aquí:
+   · Se usa Whisper (modelo «tiny») corriendo DENTRO del navegador. El audio no
+     sale de este equipo en ningún momento; lo único que se descarga es el
+     modelo, y solo la primera vez.
+   · No se transcribe el capítulo entero: se procesa bloque a bloque, y solo
+     los que hacen falta, con los siguientes preparándose de fondo.
+   · Whisper oye SUS palabras, que no siempre son las del libreto. Por eso su
+     transcripción se casa con el texto real; donde coinciden se toma la marca
+     de Whisper, y donde no, se interpola entre las que sí coincidieron.
+   · Si algo falla —sin red, modelo no disponible, bloque que no reconoce— se
+     sigue con el motor de energía. Nunca se queda sin marcar.
+
+   El modelo «tiny» es el pequeño: rápido y suficiente para situar palabras,
+   pero se equivoca de vez en cuando transcribiendo. No importa demasiado: no
+   usamos su texto, solo sus tiempos, y las palabras que no casan se rellenan
+   por interpolación. */
+
+const karIa = {
+  on:false, lib:null, pipe:null, cargando:false, error:null,
+  pcm:null, sr:16000, base:0,          // base = segundo de video del pcm[0]
+  marcas:new Map(),                    // si -> [{t0,t1}] en timecode de libreto
+  cola:[], trabajando:false, idioma:'spanish', hechos:0, fallos:0
+};
+
+const KARIA_LIB = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2/dist/transformers.min.js';
+const KARIA_MODELO = 'Xenova/whisper-tiny';
+
+/** Quita tildes, signos y mayusculas: para comparar palabras, no para mostrar. */
+function karNorm(t){
+  return (t||'').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/[^a-z0-9ñ]/g,'');
+}
+
+/** Descarga el modelo y prepara el audio a 16 kHz. Solo la primera vez. */
+async function karIaPreparar(){
+  if(karIa.pipe && karIa.pcm) return true;
+  if(karIa.cargando) return false;
+  karIa.cargando = true; karIa.error = null;
+  try{
+    if(!karIa.pipe){
+      stMsg('⏳ Descargando el modelo de voz (solo la primera vez)…');
+      const t = karIa.lib || (karIa.lib = await import(KARIA_LIB));
+      t.env.allowLocalModels = false;
+      karIa.pipe = await t.pipeline('automatic-speech-recognition', KARIA_MODELO);
+    }
+    if(!karIa.pcm){
+      stMsg('⏳ Preparando el audio para el reconocimiento…');
+      const fuente = studio.dlgUrl || studio.url;
+      if(!fuente) throw new Error('no hay audio cargado');
+      const ab = await (await fetch(fuente)).arrayBuffer();
+      const AC = window.AudioContext || window.webkitAudioContext;
+      const ac = new AC();
+      let buf;
+      try{ buf = await ac.decodeAudioData(ab.slice(0)); } finally { try{ ac.close(); }catch(e){} }
+      // Whisper quiere mono a 16 kHz: se remuestrea de una vez, sin trocear
+      const off = new OfflineAudioContext(1, Math.ceil(buf.duration*16000), 16000);
+      const src = off.createBufferSource(); src.buffer = buf; src.connect(off.destination); src.start();
+      karIa.pcm = (await off.startRendering()).getChannelData(0);
+      karIa.sr = 16000; karIa.base = 0;
+    }
+    karIa.cargando = false;
+    return true;
+  }catch(e){
+    karIa.cargando = false;
+    karIa.error = e.message || String(e);
+    stMsg('⚠️ No se pudo preparar la IA: ' + karIa.error + ' — se sigue con el motor de energía');
+    return false;
+  }
+}
+
+/** Casa las palabras del libreto con las que oyó Whisper.
+    Se busca la subsecuencia común más larga sobre las palabras normalizadas,
+    y esas coincidencias hacen de anclas. Lo que queda en medio se reparte
+    entre ancla y ancla, por sílabas. */
+function karCasar(palabras, oidas, t0, t1){
+  const A = palabras.map(karNorm), B = oidas.map(o => karNorm(o.t));
+  const n = A.length, m = B.length;
+  if(!n) return null;
+  if(!m) return null;
+  // subsecuencia común más larga (n y m son pequeños: un bloque de libreto)
+  const L = Array.from({length:n+1}, ()=> new Int32Array(m+1));
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--)
+    L[i][j] = (A[i] && A[i] === B[j]) ? L[i+1][j+1]+1 : Math.max(L[i+1][j], L[i][j+1]);
+  const anclas = [];
+  { let i=0, j=0;
+    while(i<n && j<m){
+      if(A[i] && A[i] === B[j]){ anclas.push([i, j]); i++; j++; }
+      else if(L[i+1][j] >= L[i][j+1]) i++; else j++;
+    } }
+  if(anclas.length < Math.max(2, Math.ceil(n*0.34))) return null;   // se entendió poco: no fiarse
+
+  const sil = palabras.map(karSilabas);
+  const res = new Array(n).fill(null);
+  for(const [i, j] of anclas) res[i] = { t0: oidas[j].t0, t1: oidas[j].t1 };
+
+  // rellenar los huecos entre anclas, y las puntas
+  const rellenar = (a, b, ta, tb) => {           // palabras (a,b) exclusivas
+    let tot = 0; for(let k=a+1;k<b;k++) tot += sil[k];
+    if(tot <= 0) return;
+    let c = ta;
+    for(let k=a+1;k<b;k++){
+      const p = (tb-ta)*(sil[k]/tot);
+      res[k] = { t0:c, t1:c+p }; c += p;
+    }
+  };
+  const iPrim = anclas[0][0], iUlt = anclas[anclas.length-1][0];
+  rellenar(-1, iPrim, Math.max(t0, res[iPrim].t0 - (iPrim ? 0.28*iPrim : 0)), res[iPrim].t0);
+  for(let k=0;k<anclas.length-1;k++){
+    const i0 = anclas[k][0], i1 = anclas[k+1][0];
+    if(i1 > i0+1) rellenar(i0, i1, res[i0].t1, res[i1].t0);
+  }
+  rellenar(iUlt, n, res[iUlt].t1, Math.min(t1, res[iUlt].t1 + 0.28*(n-1-iUlt) + 0.05));
+  // por si alguna punta quedó sin nada
+  for(let k=0;k<n;k++) if(!res[k]) res[k] = { t0: t0 + (t1-t0)*k/n, t1: t0 + (t1-t0)*(k+1)/n };
+  // monótono
+  for(let k=1;k<n;k++) if(res[k].t0 < res[k-1].t0) res[k].t0 = res[k-1].t0;
+  return res;
+}
+
+/** Reconoce el audio de UN bloque y guarda sus marcas. */
+async function karIaBloque(si){
+  if(karIa.marcas.has(si)) return true;
+  const ven = karVentana(si);
+  if(!ven) return false;
+  const pal = karPalabrasBloque(si);
+  if(!pal || !pal.length) return false;
+
+  // un poco de margen a los lados: Whisper necesita contexto para no cortar
+  const a = Math.max(0, karVid(ven[0]) - 0.35);
+  const b = Math.min((karIa.pcm.length/karIa.sr), karVid(ven[1]) + 0.35);
+  if(!(b > a + 0.25)){ karIa.marcas.set(si, null); return false; }
+  const i0 = Math.round(a*karIa.sr), i1 = Math.round(b*karIa.sr);
+  const trozo = karIa.pcm.slice(i0, i1);
+  try{
+    const out = await karIa.pipe(trozo, { return_timestamps:'word', language:karIa.idioma, task:'transcribe' });
+    const oidas = (out.chunks||[])
+      .filter(c => c.timestamp && c.timestamp[0] != null)
+      .map(c => ({ t: c.text,
+                   t0: a + c.timestamp[0] + studioTc0() + studioFine(),
+                   t1: a + (c.timestamp[1] != null ? c.timestamp[1] : c.timestamp[0]+0.2) + studioTc0() + studioFine() }));
+    const r = karCasar(pal, oidas, ven[0], ven[1]);
+    karIa.marcas.set(si, r);
+    if(r) karIa.hechos++; else karIa.fallos++;
+    kar.cache.clear();                    // que se vuelva a montar con las marcas nuevas
+    return !!r;
+  }catch(e){
+    karIa.marcas.set(si, null); karIa.fallos++;
+    return false;
+  }
+}
+
+/** Cola: se procesa el bloque en curso y los siguientes, de fondo. */
+function karIaPedir(si){
+  if(!karIa.on || si == null || si < 0) return;
+  // Horizonte largo a proposito: reconocer va a ~0,5x el tiempo real, asi que
+  // en vivo no adelanta. Pero en cuanto se para o se repite -y doblando se
+  // repite constantemente- la cola se pone al dia y ya queda afinado.
+  for(let k=0;k<10;k++){
+    const i = si + k;
+    if(i < script.length && !karIa.marcas.has(i) && karIa.cola.indexOf(i) < 0) karIa.cola.push(i);
+  }
+  karIaTrabajar();
+}
+async function karIaTrabajar(){
+  if(karIa.trabajando || !karIa.on || !karIa.cola.length) return;
+  if(!karIa.pipe || !karIa.pcm){ if(!(await karIaPreparar())) return; }
+  karIa.trabajando = true;
+  while(karIa.on && karIa.cola.length){
+    const si = karIa.cola.shift();
+    await karIaBloque(si);
+    try{ const b = $('stIa');
+         if(b) b.textContent = '✨ IA ' + karIa.hechos + (karIa.cola.length ? '…' : ''); }catch(e){}
+    await new Promise(r => setTimeout(r, 0));    // soltar el hilo entre bloques
+  }
+  karIa.trabajando = false;
+}
+
+/** Palabras visibles de un bloque, tal como se leen en el libreto. */
+function karPalabrasBloque(si){
+  try{
+    const blk = pop2.doc && pop2.doc.querySelector('.blk[data-si="'+si+'"] .tx');
+    if(blk){
+      const w = Array.prototype.slice.call(blk.querySelectorAll('.wd')).map(x => x.textContent||'');
+      if(w.length) return w;
+    }
+  }catch(e){}
+  const b = script[si];
+  return (b && b.lines) ? b.lines.join(' ').split(/\s+/).filter(Boolean) : [];
+}
+
+async function karIaSet(v){
+  karIa.on = !!v;
+  const b = $('stIa');
+  if(b){ b.classList.toggle('on', karIa.on); b.classList.toggle('ghost', !karIa.on); }
+  if(!karIa.on){
+    karIa.cola.length = 0;
+    stMsg('IA apagada — el marcado vuelve al motor de energía');
+    return;
+  }
+  const sel = $('stIaLang'); if(sel) karIa.idioma = sel.value || 'spanish';
+  if(!(await karIaPreparar())){ karIa.on = false; if(b){ b.classList.remove('on'); b.classList.add('ghost'); } return; }
+  stMsg('✨ IA lista — se irá afinando bloque a bloque conforme avance la reproducción');
+  karIa.marcas.clear(); kar.cache.clear();
+  karIaPedir(studio.cur >= 0 ? studio.cur : 0);
+}
+
 /** Pinta el estado del karaoke para el timecode `t`. */
 /** ¿Hay algo a lo que pintar? El libreto, la ventana aparte, o los dos. */
 function karActivo(){ return kar.on || karWinAbierta(); }
@@ -12635,6 +12984,7 @@ function karPintar(t){
     while(hechas < b.tr.length && t >= b.tr[hechas].t1) hechas++;
     act = (hechas < b.tr.length && t >= b.tr[hechas].t0) ? hechas : -1;
   }
+  if(karIa.on && si >= 0 && !karIa.marcas.has(si)) karIaPedir(si);
   if(kar.on) karPintarLibreto(si, b, hechas, act);
   if(karWinAbierta()) karWinPintar(si, b ? b.tr : null, hechas, act, t);
 }
