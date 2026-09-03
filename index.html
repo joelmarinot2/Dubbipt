@@ -1628,7 +1628,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.38.1-nube · 01-sep-2026';
+const APP_VERSION = 'v10.39.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -6913,6 +6913,27 @@ body.is-talent.waitdir .dtab{ visibility:hidden !important; }
 }
 .wd-s{ font-family:'Inter',sans-serif; font-size:14px; line-height:1.6; color:#8b9099; }
 
+/* ─── Sin sitio reservado para lo que ya no esta ──────────────────────
+   .lwrap reserva 104px a la izquierda (riel de paginas) y 174 a la derecha
+   (cajon de herramientas). El cajon se retiro de las tablets en v10.38.0 y el
+   riel se oculta en el escritorio emparejado, asi que esos huecos quedaban en
+   azul y estrujaban el texto: medido, la caja usaba solo el 55% del ancho. */
+body.is-tablet.haschips .lwrap{ padding-right:14px !important; }
+body.is-talent:not(.talent-free).haschips .lwrap{ padding-left:14px !important; }
+body.pc-pareja.haschips  .lwrap{ padding-left:14px !important; }
+body.pc-pareja.deskchips .lwrap{ padding-right:14px !important; }
+
+/* ─── Menos fondo vacio ───────────────────────────────────────────────
+   El espaciador de arriba media 40vh: casi media pantalla en azul antes del
+   primer parlamento. Se deja lo justo para que la primera caja pueda subir un
+   poco; el de ABAJO se conserva grande, porque es lo que permite llevar el
+   ultimo parlamento a la linea de lectura. */
+.lwrap > .lspacer:first-child{ height:10vh !important; }
+.lwrap > .lspacer:last-child{ height:46vh !important; }
+/* las cajas, mas juntas y aprovechando el ancho */
+#lBlocks .blk{ margin-bottom:6px !important; }
+#lBlocks .pgsep{ margin:12px auto 8px !important; }
+
 /* ─── Escritorio emparejado: sin riel de paginas ──────────────────────
    Cuando el escritorio va con la tablet del director, quien navega es la
    tablet: el riel solo ocupa sitio de lectura en la pantalla grande. Si el
@@ -7261,7 +7282,7 @@ body{background:var(--bg);color:var(--ink)}
 .lh .goto input{width:52px;background:var(--bg);border:1px solid var(--card-b);color:var(--ink);
   border-radius:7px;padding:5px 7px;font-size:12px;font-family:ui-monospace,monospace;text-align:center}
 .lh .live{font-family:ui-monospace,monospace;font-size:13px;color:var(--tcc);min-width:80px;text-align:right;font-weight:600}
-.lwrap{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:20px 18px 60px;scroll-behavior:auto}
+.lwrap{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:10px 6px 40px;scroll-behavior:auto}
 .lwrap.tp{scroll-behavior:smooth}
 .lspacer{height:40vh}
 /* separador de página */
@@ -8154,7 +8175,7 @@ function buildLibretoDoc(pc){
       if(L.boxw){ pop2.boxw = L.boxw; d.documentElement.style.setProperty('--boxw', L.boxw==='full'?'96%':L.boxw+'px'); }
     }
   }catch(e){}
-  pop2.mineFs = pop2.mineFs || 19;
+  pop2.mineFs = pop2.mineFs || 26;   // por defecto mas grande: se lee desde el atril
   const setMineFs = ()=> d.documentElement.style.setProperty('--minefs', pop2.mineFs+'px');
   setMineFs();
   d.getElementById('lFontUp').addEventListener('click', ()=>{ pop2.mineFs=libFsUp(pop2.mineFs); setMineFs(); if(typeof syncSendTool==='function') syncSendTool('font', pop2.mineFs); setTimeout(()=>{ try{ libApplyZoom(); libDrawRenderAll(); }catch(e){} }, 40); });
@@ -9275,6 +9296,7 @@ function renderLibretoBlocks(){
      Ahora: primeras 120 cajas al instante y el resto por tandas en reposo,
      enlazando los listeners por tanda. Un render nuevo cancela el anterior. */
   try{ libApplyZoom(); }catch(e){}
+  try{ pop2.win.requestAnimationFrame(()=>{ try{ libApplyZoom(); }catch(e){} }); }catch(e){}   // …y otra vez cuando la maqueta ya asentó
   pop2.els.blocks.innerHTML = '';
   // boton "Copiar diagnostico": por delegacion, una sola vez por documento.
   // Ademas del portapapeles deja el texto a la vista, porque el permiso de
@@ -11078,7 +11100,7 @@ function oH(el){ return el.offsetHeight * libZoom(); }
 function libRefWidth(){
   const bw = (typeof pop2!=='undefined' && pop2.boxw) || '760';
   const n = (bw==='full') ? 1040 : (parseInt(bw,10) || 760);
-  return n + 60;
+  return n + 16;   // apenas un respiro a los lados: antes sobraba fondo azul
 }
 function libApplyZoom(){
   try{
