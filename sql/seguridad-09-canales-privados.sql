@@ -80,7 +80,12 @@ grant  execute on function public.rt_dubbipt_ok() to authenticated;
 -- En los canales privados, Realtime consulta esta tabla:
 --   SELECT  -> puede ESCUCHAR el tema
 --   INSERT  -> puede ENVIAR (broadcast y presencia)
-alter table realtime.messages enable row level security;
+--
+-- OJO: NO se hace "alter table realtime.messages enable row level security".
+-- Esa tabla pertenece a supabase_realtime_admin, no al usuario del editor SQL,
+-- y el intento falla con:  42501: must be owner of table messages
+-- No hace falta: Supabase ya la crea con RLS activado. Se comprueba abajo.
+-- Por lo mismo tampoco se hace GRANT sobre ella: los permisos ya estan puestos.
 
 drop policy if exists dubbipt_rt_leer   on realtime.messages;
 drop policy if exists dubbipt_rt_enviar on realtime.messages;
@@ -93,20 +98,23 @@ create policy dubbipt_rt_enviar on realtime.messages
   for insert to authenticated
   with check ( public.rt_dubbipt_ok() );
 
-grant select, insert on realtime.messages to authenticated;
-
 -- ── COMPROBAR ───────────────────────────────────────────────────────
--- a) Las dos politicas existen y ninguna dice "true" a secas:
+-- a) RLS esta activado en realtime.messages (debe devolver true):
+--      select c.relrowsecurity
+--        from pg_class c join pg_namespace n on n.oid = c.relnamespace
+--       where n.nspname = 'realtime' and c.relname = 'messages';
+--
+-- b) Las dos politicas existen y ninguna dice "true" a secas:
 --      select policyname, cmd, coalesce(qual, with_check) as condicion
 --        from pg_policies
 --       where schemaname = 'realtime' and tablename = 'messages';
 --
--- b) Con sesion iniciada, sobre un espacio PROPIO devuelve true y sobre uno
+-- c) Con sesion iniciada, sobre un espacio PROPIO devuelve true y sobre uno
 --    ajeno false:
 --      select public.rt_ws_ok('<uuid-de-un-espacio-tuyo>');   -- true
 --      select public.rt_ws_ok('no-soy-un-uuid');              -- false
 --
--- c) Tras activar RT_PRIVATE en la app: abrir la tablet y el escritorio y
+-- d) Tras activar RT_PRIVATE en la app: abrir la tablet y el escritorio y
 --    confirmar que el chip dice "Sincronizado", que el desplazamiento del
 --    director mueve al escritorio y que una marca del actor llega a los dos.
 --
