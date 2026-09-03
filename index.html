@@ -1631,7 +1631,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.42.1-nube';
+const APP_VER_NUM = 'v10.43.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5655,8 +5655,11 @@ function showTutorial(onDone){
        +'<span class="tut-tip">Con el pincel activo, desplaza con DOS dedos.</span>' },
 
     { s:'Paso 9 · Karaoke', ic:'🎤', t:'El libreto sigue al audio',
-      d:'En el <b>Video Estudio</b>, pulsa el botón <b>🎤 Karaoke</b> de la barra. Al reproducir, el parlamento se enciende <b>palabra por palabra</b> al ritmo del audio: en ámbar la que suena, apagadas las ya dichas.'
-       +'<span class="tut-tip">Va más fino cuando la onda ya está analizada. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
+      d:'En el <b>Video Estudio</b>, tres botones:<br>'
+       +'· <b>🎤 Karaoke</b> enciende el parlamento <b>palabra por palabra</b> dentro del libreto: en ámbar la que suena, apagadas las ya dichas.<br>'
+       +'· <b>🪟 Ventana</b> saca los parlamentos <b>aparte</b>, en grande, con el fondo regulable hasta dejar solo el texto. Si el navegador lo permite, la ventana queda <b>por encima</b> de los demás programas.<br>'
+       +'· <b>🎙 Diálogos</b> carga la pista de voz limpia: el karaoke se guía por ella en vez de por el audio del vídeo, que suele traer música encima. Si no la cargas, se saca del propio vídeo.'
+       +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
       d:'Con el mismo espacio de trabajo, los equipos se emparejan solos. El <b>director</b> manda el desplazamiento y el tamaño; el <b>actor</b> sigue. Lo que marca cualquiera se ve en todas las pantallas.' },
@@ -12028,6 +12031,10 @@ function studioEnsureStrip(){
     +'<button id="stCloud" class="st-btn ghost" style="display:none">⬇ nube</button>'
     +'<input type="file" id="stInput" accept=".mp4,.mov,.m4v,.webm,.ogv,.mkv,.avi,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,video/*,audio/*" style="display:none">'
     +'<button id="stKar" class="st-btn ghost" title="Enciende el parlamento palabra por palabra al ritmo del audio">🎤 Karaoke</button>'
+    +'<button id="stKarWin" class="st-btn ghost" title="Abre los parlamentos en una ventana aparte, con fondo regulable">🪟 Ventana</button>'
+    +'<button id="stDlg" class="st-btn ghost" title="Carga la pista de dialogos limpia: el karaoke se guiara por ella">🎙 Diálogos</button>'
+    +'<input type="file" id="stDlgIn" accept=".wav,.mp3,.m4a,.aac,.ogg,.oga,.opus,.flac,audio/*" style="display:none">'
+    +'<span id="stDlgName" class="st-name"></span>'
     +'<span id="stName" class="st-name"></span>'
     +'<span id="stMsg" class="st-msg"></span>'
     +'<button id="stScan" class="st-btn" style="display:none" title="Recorre el video en silencio para construir la onda desde su propio audio">📈 Onda del video</button>'
@@ -12161,6 +12168,17 @@ function studioWireStrip(){
   $('stOff').oninput = ()=>{ $('stOffV').textContent = ((+$('stOff').value||0)/10).toFixed(1); studio.cur=-1; studioTick(); };
   { const k = $('stKar');
     if(k) k.onclick = ()=>{ karSet(!kar.on); k.classList.toggle('on', kar.on); k.classList.toggle('ghost', !kar.on); }; }
+  { const v = $('stKarWin');
+    if(v) v.onclick = async ()=>{
+      if(karWinAbierta()){ karWinCerrar(); return; }
+      const ok = await karWinAbrir();
+      if(ok){ v.classList.add('on'); v.classList.remove('ghost'); karArrancar();
+        const el = studioEl();
+        if(el) karPintar(el.currentTime + studioTc0() + studioFine()); }
+    }; }
+  { const d = $('stDlg'), i = $('stDlgIn');
+    if(d && i){ d.onclick = ()=> i.click();
+                i.onchange = ()=>{ if(i.files && i.files[0]) karAudioDialogos(i.files[0]); i.value=''; }; } }
   $('stCps').onchange = (e)=>{ window._stCps = e.target.checked; try{ renderLibretoBlocks(); }catch(e){} };
   $('stTc0').onchange = (e)=>{
     const v = studioParseTC(e.target.value);
@@ -12605,16 +12623,29 @@ function karBloque(si){
   return r;
 }
 /** Pinta el estado del karaoke para el timecode `t`. */
+/** ¿Hay algo a lo que pintar? El libreto, la ventana aparte, o los dos. */
+function karActivo(){ return kar.on || karWinAbierta(); }
+
+/** Calcula el estado en `t` UNA vez y se lo pasa a cada destino. */
 function karPintar(t){
-  if(!kar.on) return;
   const si = studio.cur;
+  const b = (si >= 0) ? karBloque(si) : null;
+  let hechas = 0, act = -1;
+  if(b){
+    while(hechas < b.tr.length && t >= b.tr[hechas].t1) hechas++;
+    act = (hechas < b.tr.length && t >= b.tr[hechas].t0) ? hechas : -1;
+  }
+  if(kar.on) karPintarLibreto(si, b, hechas, act);
+  if(karWinAbierta()) karWinPintar(si, b ? b.tr : null, hechas, act, t);
+}
+
+/** Enciende las palabras dentro del libreto. */
+function karPintarLibreto(si, b, hechas, act){
   if(si !== kar.cur){                     // cambio de bloque: limpiar el anterior
     karLimpiar();
     kar.cur = si; kar.hechas = -1; kar.wds = null;
   }
-  if(si < 0) return;
-  const b = karBloque(si);
-  if(!b) return;
+  if(si < 0 || !b) return;
   if(!kar.wds || !kar.wds.length || !kar.wds[0].isConnected){
     try{
       const blk = pop2.doc && pop2.doc.querySelector('.blk[data-si="'+si+'"] .tx');
@@ -12624,15 +12655,312 @@ function karPintar(t){
   }
   const wds = kar.wds;
   if(!wds || wds.length !== b.n) return;  // el libreto cambio: mejor no pintar nada
-  let hechas = 0;
-  while(hechas < b.tr.length && t >= b.tr[hechas].t1) hechas++;
-  const act = (hechas < b.tr.length && t >= b.tr[hechas].t0) ? hechas : -1;
   if(hechas !== kar.hechas){
     for(let i=0;i<wds.length;i++) wds[i].classList.toggle('kdone', i < hechas);
     kar.hechas = hechas;
   }
   for(let i=0;i<wds.length;i++) wds[i].classList.toggle('know', i === act);
 }
+/* ═══ VENTANA DE KARAOKE ═══ los parlamentos en una ventana aparte.
+
+   Se pide primero una ventana de «Picture-in-Picture de documento»: esa SÍ
+   flota por encima de las demás aplicaciones, que es lo que hace falta cuando
+   se está grabando con otro programa delante. Si el navegador no la tiene, se
+   abre una ventana normal.
+
+   Lo que NO puede hacer una ventana de navegador es ser transparente hacia el
+   escritorio: eso solo lo consigue una aplicación de escritorio. El «modo
+   transparente» de aquí baja el fondo hasta dejar prácticamente solo el texto
+   sobre negro, que es lo más cerca que se llega desde el navegador. */
+
+const karWin = { win:null, doc:null, pip:false, panel:false, els:null,
+                 op:78, tam:44, cur:-1, hechas:-1, wds:null };
+
+const KARWIN_CSS = `
+*{margin:0;padding:0;box-sizing:border-box}
+html{background:#000}
+body{
+  height:100vh; overflow:hidden; cursor:default;
+  background:rgba(9,10,13,var(--kop,.78));
+  color:#e9edf6; font-family:'Inter',system-ui,-apple-system,Segoe UI,sans-serif;
+  display:flex; flex-direction:column;
+  -webkit-user-select:none; user-select:none;
+}
+#kbar{
+  flex:0 0 auto; display:flex; align-items:center; gap:10px;
+  padding:6px 10px; font-size:12px; color:#9aa3b5;
+  background:rgba(0,0,0,.35); border-bottom:1px solid rgba(255,255,255,.07);
+  opacity:.25; transition:opacity .15s;
+}
+#kbar:hover{ opacity:1; }
+#kbar label{ display:flex; align-items:center; gap:5px; white-space:nowrap; }
+#kbar input[type=range]{ width:78px; accent-color:#FCD34D; }
+#kwho{ color:var(--pc,#4ADE80); font-weight:800; letter-spacing:.4px;
+       text-transform:uppercase; margin-right:auto; font-size:12.5px; }
+#ktc{ font-family:'JetBrains Mono',monospace; font-weight:700; color:#c2c7d0; }
+#kstage{
+  flex:1 1 auto; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:.42em;
+  padding:8px 22px; text-align:center; overflow:hidden;
+}
+.kline{ line-height:1.28; font-weight:700; white-space:normal; }
+#kprev, #knext{ font-size:.52em; opacity:.36; }
+#ktxt{ font-size:1em; }
+/* contorno, para que se lea sobre cualquier imagen */
+#kstage{ text-shadow:0 0 6px rgba(0,0,0,.9), 0 2px 0 rgba(0,0,0,.8),
+                     0 -2px 0 rgba(0,0,0,.8), 2px 0 0 rgba(0,0,0,.8),
+                     -2px 0 0 rgba(0,0,0,.8); }
+.kw{ border-radius:5px; padding:0 2px; }
+.kw.kdone{ color:#7b8494; }
+.kw.know{ color:#111318; background:#FCD34D; box-shadow:0 0 0 1px rgba(252,211,77,.55); }
+#kvacio{ font-size:.42em; opacity:.4; font-weight:600; }
+`;
+
+function karWinAbierta(){
+  try{ return !!(karWin.win && !karWin.win.closed && karWin.doc); }catch(e){ return false; }
+}
+
+/** Monta el documento de la ventana (sirve para PiP y para ventana normal). */
+function karWinMontar(win){
+  const d = win.document;
+  d.head.innerHTML = '<meta charset="utf-8"><title>Karaoke</title>';
+  const st = d.createElement('style'); st.textContent = KARWIN_CSS; d.head.appendChild(st);
+  d.body.innerHTML =
+      '<div id="kbar">'
+    +   '<span id="kwho"></span>'
+    +   '<span id="ktc">--:--:--:--</span>'
+    +   '<label title="Baja el fondo hasta dejar solo el texto">fondo '
+    +     '<input id="kop" type="range" min="0" max="100" value="' + karWin.op + '"></label>'
+    +   '<label title="Tamaño de la letra">letra '
+    +     '<input id="ksz" type="range" min="20" max="96" value="' + karWin.tam + '"></label>'
+    + '</div>'
+    + '<div id="kstage">'
+    +   '<div id="kprev" class="kline"></div>'
+    +   '<div id="ktxt" class="kline"></div>'
+    +   '<div id="knext" class="kline"></div>'
+    +   '<div id="kvacio">Dale al play en el Video Estudio</div>'
+    + '</div>';
+
+  karWin.win = win; karWin.doc = d;
+  karWin.els = { who:d.getElementById('kwho'), tc:d.getElementById('ktc'),
+                 prev:d.getElementById('kprev'), txt:d.getElementById('ktxt'),
+                 next:d.getElementById('knext'), vacio:d.getElementById('kvacio'),
+                 stage:d.getElementById('kstage') };
+  karWin.cur = -1; karWin.hechas = -1; karWin.wds = null;
+
+  const pon = () => {
+    d.documentElement.style.setProperty('--kop', (karWin.op/100).toFixed(2));
+    karWin.els.stage.style.fontSize = karWin.tam + 'px';
+  };
+  d.getElementById('kop').oninput = (e)=>{ karWin.op = +e.target.value; pon(); karWinGuardar(); };
+  d.getElementById('ksz').oninput = (e)=>{ karWin.tam = +e.target.value; pon(); karWinGuardar(); };
+  pon();
+
+  win.addEventListener('pagehide', karWinCerrada);
+  win.addEventListener('unload', karWinCerrada);
+}
+
+function karWinCerrada(){
+  karWin.win = null; karWin.doc = null; karWin.els = null; karWin.wds = null;
+  const b = $('stKarWin');
+  if(b){ b.classList.remove('on'); b.classList.add('ghost'); }
+}
+function karWinGuardar(){
+  try{ localStorage.setItem('ddl_karwin', JSON.stringify({ op:karWin.op, tam:karWin.tam })); }catch(e){}
+}
+function karWinCargar(){
+  try{ const j = JSON.parse(localStorage.getItem('ddl_karwin')||'null');
+       if(j){ if(j.op!=null) karWin.op=+j.op; if(j.tam!=null) karWin.tam=+j.tam; } }catch(e){}
+}
+
+/* Tercer camino: un panel flotante DENTRO de la propia página, que se arrastra
+   con el ratón. No flota sobre otras aplicaciones, pero aquí la transparencia
+   es de verdad: se pone encima del vídeo del estudio y se ve la imagen detrás.
+   Es la red de seguridad para cuando el navegador no da PiP y además bloquea
+   las ventanas emergentes: sin esto, la función se quedaría muerta. */
+function karWinPanel(){
+  let host = document.getElementById('karPanel');
+  if(!host){
+    host = document.createElement('div');
+    host.id = 'karPanel';
+    host.style.cssText = 'position:fixed;left:50%;bottom:40px;transform:translateX(-50%);'
+      + 'width:min(880px,92vw);height:210px;z-index:2147483000;border-radius:12px;overflow:hidden;'
+      + 'box-shadow:0 18px 50px rgba(0,0,0,.6);border:1px solid #2b2358;resize:both;min-width:320px;min-height:120px';
+    host.innerHTML =
+        '<div id="karDrag" title="Arrastra para mover" style="height:16px;cursor:move;'
+      +   'background:#191238;display:flex;align-items:center;justify-content:center;gap:10px">'
+      +   '<span style="width:34px;height:3px;border-radius:2px;background:#4b4380"></span>'
+      +   '<button id="karX" title="Cerrar" style="position:absolute;right:6px;top:0;height:16px;'
+      +     'border:0;background:none;color:#9a93c8;cursor:pointer;font-size:12px;line-height:16px">&times;</button>'
+      + '</div>'
+      + '<iframe id="karFrame" style="width:100%;height:calc(100% - 16px);border:0;display:block"></iframe>';
+    document.body.appendChild(host);
+
+    // arrastre: se guarda la esquina, no el centro, para que no salte al agarrarlo
+    const asa = host.querySelector('#karDrag');
+    let dx = 0, dy = 0, arr = false;
+    asa.addEventListener('pointerdown', (e)=>{
+      const r = host.getBoundingClientRect();
+      host.style.transform = 'none';
+      host.style.left = r.left + 'px'; host.style.top = r.top + 'px'; host.style.bottom = 'auto';
+      dx = e.clientX - r.left; dy = e.clientY - r.top; arr = true;
+      asa.setPointerCapture(e.pointerId);
+    });
+    asa.addEventListener('pointermove', (e)=>{
+      if(!arr) return;
+      host.style.left = Math.max(0, Math.min(innerWidth  - 60, e.clientX - dx)) + 'px';
+      host.style.top  = Math.max(0, Math.min(innerHeight - 40, e.clientY - dy)) + 'px';
+    });
+    asa.addEventListener('pointerup', ()=>{ arr = false; });
+    host.querySelector('#karX').onclick = karWinCerrar;
+  }
+  host.style.display = 'block';
+  const fr = host.querySelector('#karFrame');
+  const d = fr.contentDocument;
+  d.open(); d.write('<!doctype html><html><head></head><body></body></html>'); d.close();
+  karWin.pip = false; karWin.panel = true;
+  karWinMontar(fr.contentWindow);
+  return true;
+}
+
+/** Abre la ventana. Debe llamarse desde un clic: las dos vias lo exigen. */
+async function karWinAbrir(){
+  if(karWinAbierta()){ try{ karWin.win.focus(); }catch(e){} return true; }
+  karWinCargar();
+  // 1) PiP de documento: flota por encima de todo lo demas
+  try{
+    if(window.documentPictureInPicture && documentPictureInPicture.requestWindow){
+      const w = await documentPictureInPicture.requestWindow({ width:900, height:230 });
+      karWin.pip = true;
+      karWinMontar(w);
+      stMsg('🎤 Ventana de karaoke abierta — flota por encima de las demás ventanas');
+      return true;
+    }
+  }catch(e){ console.warn('PiP', e); }
+  // 2) ventana normal
+  try{
+    const w = window.open('', 'ddl_karaoke', 'width=920,height=260,menubar=no,toolbar=no,location=no,status=no');
+    if(!w) throw new Error('el navegador bloqueó la ventana emergente');
+    karWin.pip = false;
+    karWinMontar(w);
+    stMsg('🎤 Ventana de karaoke abierta — este navegador no puede dejarla siempre encima; ponla en el otro monitor');
+    return true;
+  }catch(e){
+    // 3) panel dentro de la propia pagina: nunca deja la funcion muerta
+    try{
+      karWinPanel();
+      stMsg('⚠️ El navegador bloqueó la ventana emergente, así que va como panel flotante dentro de la página — arrástralo sobre el vídeo');
+      return true;
+    }catch(e2){
+      stMsg('⚠️ No se pudo abrir el karaoke: ' + (e2.message||e2));
+      return false;
+    }
+  }
+}
+function karWinCerrar(){
+  try{ if(karWin.panel){ const h = document.getElementById('karPanel'); if(h) h.style.display = 'none'; }
+       else if(karWin.win && !karWin.win.closed) karWin.win.close(); }catch(e){}
+  karWin.panel = false;
+  karWinCerrada();
+}
+
+/** Texto plano de un bloque, para las lineas de antes y despues. */
+function karTextoBloque(si){
+  const b = script[si];
+  if(!b || !b.lines) return '';
+  return b.lines.join(' ');
+}
+
+/** Pinta la ventana con el estado ya calculado por karPintar(). */
+function karWinPintar(si, tr, hechas, act, t){
+  if(!karWinAbierta() || !karWin.els) return;
+  const e = karWin.els;
+  if(si !== karWin.cur){
+    karWin.cur = si; karWin.hechas = -1; karWin.wds = null;
+    if(si < 0){
+      e.txt.textContent = ''; e.prev.textContent = ''; e.next.textContent = '';
+      e.who.textContent = ''; e.vacio.style.display = '';
+      return;
+    }
+    e.vacio.style.display = 'none';
+    const b = script[si];
+    e.who.textContent = (b && b.display) || (b && b.who) || '';
+    try{
+      const c = b && b.key ? charIdx[b.key] : null;
+      e.who.style.setProperty('--pc', (c && c.color) || '#4ADE80');
+    }catch(x){}
+    // las palabras se copian del libreto para que salgan EXACTAMENTE igual
+    let wds = null;
+    try{
+      const blk = pop2.doc && pop2.doc.querySelector('.blk[data-si="'+si+'"] .tx');
+      if(blk) wds = Array.prototype.slice.call(blk.querySelectorAll('.wd'));
+    }catch(x){}
+    e.txt.innerHTML = '';
+    if(wds && wds.length){
+      wds.forEach((w, i) => {
+        const sp = karWin.doc.createElement('span');
+        sp.className = 'kw'; sp.textContent = w.textContent;
+        e.txt.appendChild(sp);
+        e.txt.appendChild(karWin.doc.createTextNode(' '));
+      });
+    }else{
+      e.txt.textContent = karTextoBloque(si);
+    }
+    karWin.wds = Array.prototype.slice.call(e.txt.querySelectorAll('.kw'));
+    e.prev.textContent = si > 0 ? karTextoBloque(si-1) : '';
+    e.next.textContent = (si+1 < script.length) ? karTextoBloque(si+1) : '';
+  }
+  if(si < 0) return;
+  const wds = karWin.wds;
+  if(wds && wds.length && tr && tr.length === wds.length){
+    if(hechas !== karWin.hechas){
+      for(let i=0;i<wds.length;i++) wds[i].classList.toggle('kdone', i < hechas);
+      karWin.hechas = hechas;
+    }
+    for(let i=0;i<wds.length;i++) wds[i].classList.toggle('know', i === act);
+  }
+  if(e.tc && typeof stFmtTC === 'function') e.tc.textContent = stFmtTC(t);
+}
+
+/* ═══ AUDIO DE DIÁLOGOS ═══
+   El karaoke se guía por la energía del audio. Por defecto usa la pista que
+   trae el vídeo, pero ahí suele haber música y efectos encima, y eso emborrona
+   las pausas. Si existe la pista de diálogos limpia, se carga aquí: sustituye
+   SOLO al análisis, el vídeo se sigue viendo y oyendo igual.
+   Se da por hecho que empieza en el mismo punto que el vídeo; si no, se corrige
+   con «TC inicio» o con el «ajuste» fino. */
+async function karAudioDialogos(file){
+  if(!file) return;
+  stMsg('⏳ Analizando la pista de diálogos…');
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ac = new AC();
+    let buf;
+    try{
+      const ab = await file.arrayBuffer();
+      buf = await new Promise((res, rej)=>{
+        let hecho = false;
+        const p = ac.decodeAudioData(ab.slice(0), b=>{ hecho=true; res(b); }, e=>{ if(!hecho) rej(e||new Error('no se pudo descodificar')); });
+        if(p && p.then) p.then(b=>{ if(!hecho){ hecho=true; res(b); } }).catch(e=>{ if(!hecho) rej(e); });
+      });
+    } finally { try{ ac.close(); }catch(e){} }
+
+    studioSetPcm(buf);
+    studio.pcmSrc = 'dialogos';
+    kar.cache.clear(); kar.cur = -1; kar.wds = null;
+    try{ stDrawWave(); }catch(e){}
+    const n = $('stDlgName');
+    if(n) n.textContent = file.name;
+    const el = studioEl();
+    const dv = (el && el.duration) ? el.duration : 0;
+    const dif = dv ? Math.abs(dv - studio.dur) : 0;
+    stMsg('✅ Diálogos cargados ('+ (studio.dur/60).toFixed(1) +' min) — el karaoke ya se guía por esta pista'
+      + (dif > 1.5 ? ' · ⚠️ dura '+dif.toFixed(1)+' s distinto que el vídeo: revisa que empiecen en el mismo punto' : ''));
+  }catch(e){
+    stMsg('⚠️ No se pudo leer la pista de diálogos: ' + (e.message||e));
+  }
+}
+
 function karLimpiar(){
   try{
     const doc = pop2.doc; if(!doc) return;
@@ -12646,7 +12974,7 @@ function karLimpiar(){
    el encendido acompañe a la voz. Mientras suena, se repinta por fotograma. */
 function karLoop(){
   kar.raf = 0;
-  if(!kar.on) return;
+  if(!karActivo()) return;
   const el = studioEl();
   if(el && !el.paused && !el.ended){
     const t = el.currentTime + studioTc0() + studioFine();
@@ -12655,7 +12983,7 @@ function karLoop(){
     kar.raf = requestAnimationFrame(karLoop);
   }
 }
-function karArrancar(){ if(kar.on && !kar.raf) kar.raf = requestAnimationFrame(karLoop); }
+function karArrancar(){ if(karActivo() && !kar.raf) kar.raf = requestAnimationFrame(karLoop); }
 function karSet(v){
   kar.on = !!v;
   if(!kar.on){
@@ -12733,6 +13061,26 @@ function studioAttach(blob, name, offerCloud){
   }
   studioDecode(blob);
 }
+/* Construye la onda reducida a partir de un AudioBuffer ya descodificado.
+   Se saco de studioDecode() para poder alimentarla tambien con un audio de
+   dialogos aparte, sin tocar el video que se esta viendo. */
+function studioSetPcm(buf){
+  const sr0 = buf.sampleRate, ch = buf.numberOfChannels, len = buf.length;
+  const chans = []; for(let c=0;c<ch;c++) chans.push(buf.getChannelData(c));
+  const step = Math.max(1, Math.round(sr0 / studio.sr));
+  studio.pcmSr = sr0 / step;      // frecuencia REAL de la onda reducida (no la deseada)
+  const n = Math.floor(len/step);
+  const pcm = new Float32Array(n);
+  for(let i=0;i<n;i++){ const o=i*step; let s2=0; for(let c=0;c<ch;c++) s2+=chans[c][o]; pcm[i]=s2/ch; }
+  studio.pcm = pcm; studio.dur = len/sr0;
+  const nb = Math.min(2400, Math.max(600, Math.floor(studio.dur*4)));
+  const pk = new Float32Array(nb);
+  const w = n/nb;
+  for(let i=0;i<nb;i++){ let mx=0; const o=Math.floor(i*w), e2=Math.min(n, o+Math.ceil(w));
+    for(let j=o;j<e2;j++){ const v=Math.abs(pcm[j]); if(v>mx) mx=v; } pk[i]=mx; }
+  studio.peaks = pk;
+  try{ stBuildPyramid(); }catch(e){ console.warn('piramide', e); }
+}
 async function studioDecode(blob){
   stMsg('⏳ Analizando la onda del audio del video… (los archivos largos tardan un poco)');
   // Decodifica la pista de audio EMBEBIDA en el archivo (video o audio) con la Web
@@ -12775,21 +13123,7 @@ async function studioDecode(blob){
     return;
   }
   try{
-    const sr0 = buf.sampleRate, ch = buf.numberOfChannels, len = buf.length;
-    const chans = []; for(let c=0;c<ch;c++) chans.push(buf.getChannelData(c));
-    const step = Math.max(1, Math.round(sr0 / studio.sr));
-    studio.pcmSr = sr0 / step;      // frecuencia REAL de la onda reducida (no la deseada)
-    const n = Math.floor(len/step);
-    const pcm = new Float32Array(n);
-    for(let i=0;i<n;i++){ const o=i*step; let s2=0; for(let c=0;c<ch;c++) s2+=chans[c][o]; pcm[i]=s2/ch; }
-    studio.pcm = pcm; studio.dur = len/sr0;
-    const nb = Math.min(2400, Math.max(600, Math.floor(studio.dur*4)));
-    const pk = new Float32Array(nb);
-    const w = n/nb;
-    for(let i=0;i<nb;i++){ let mx=0; const o=Math.floor(i*w), e2=Math.min(n, o+Math.ceil(w));
-      for(let j=o;j<e2;j++){ const v=Math.abs(pcm[j]); if(v>mx) mx=v; } pk[i]=mx; }
-    studio.peaks = pk;
-    try{ stBuildPyramid(); }catch(e){ console.warn('pirámide', e); }
+    studioSetPcm(buf);
     { const sc=$('stScan'), sx=$('stScanX'); if(sc) sc.style.display='none'; if(sx) sx.style.display='none'; }
     stMsg('✅ Onda lista — reproduce y el libreto sigue el audio. «⚡ Marcar pausas» cuando quieras.');
     stDrawWave();
