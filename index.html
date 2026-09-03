@@ -1631,7 +1631,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.41.0-nube';
+const APP_VER_NUM = 'v10.42.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5654,10 +5654,14 @@ function showTutorial(onDone){
        +'· una <b>flecha →</b> es más rápido y <b>←</b> más lento.'
        +'<span class="tut-tip">Con el pincel activo, desplaza con DOS dedos.</span>' },
 
-    { s:'Paso 9 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
+    { s:'Paso 9 · Karaoke', ic:'🎤', t:'El libreto sigue al audio',
+      d:'En el <b>Video Estudio</b>, marca la casilla <b>karaoke</b> (está en ⚙ ajustes). Al reproducir, el parlamento se enciende <b>palabra por palabra</b> al ritmo del audio: en ámbar la que suena, apagadas las ya dichas.'
+       +'<span class="tut-tip">Va más fino cuando la onda ya está analizada. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
+
+    { s:'Paso 10 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
       d:'Con el mismo espacio de trabajo, los equipos se emparejan solos. El <b>director</b> manda el desplazamiento y el tamaño; el <b>actor</b> sigue. Lo que marca cualquiera se ve en todas las pantallas.' },
 
-    { s:'Paso 10 · Tu equipo', ic:'👥', t:'Quién está conectado',
+    { s:'Paso 11 · Tu equipo', ic:'👥', t:'Quién está conectado',
       d:'El chip <b>👥</b> de la barra dice cuántas personas hay conectadas ahora. Al pulsarlo ves quiénes están en tu espacio y con qué dispositivo.' },
 
     { s:'Listo', ic:'🚀', t:'Ya puedes empezar',
@@ -7268,6 +7272,22 @@ body.dark{ background:var(--libbg,#0b0c0e) !important; }
 body.light .lcol{ background:#fff; border-color:#e2ddf2; }
 body.light .lc-sec{ color:#2a2540; }
 body.light .lc-reset{ background:#f7f6fc; border-color:#e2ddf2; color:#2a2540; }
+
+/* ═══ Karaoke ═══ enciende el parlamento al ritmo del audio.
+   Nada de verde: ese color ya significa "completado" en las cajas y se
+   confundiria. La palabra que suena va en ambar sobre un realce tenue, y lo
+   ya dicho se apaga sin llegar a desaparecer, que aun tiene que leerse. */
+.blk .tx .wd.kdone:not(.acc):not(.prn):not(.pr):not(.cue){ color:#7b8494 !important; }
+.blk .tx .wd.know{
+  color:#111318 !important; background:#FCD34D !important;
+  border-radius:5px !important; padding:0 3px !important;
+  box-shadow:0 0 0 1px rgba(252,211,77,.55) !important;
+}
+body.light .blk .tx .wd.kdone:not(.acc):not(.prn):not(.pr):not(.cue){ color:#9a95ad !important; }
+body.light .blk .tx .wd.know{ color:#2a2540 !important; background:#FDE68A !important; }
+/* El acento y la pronunciacion mandan sobre el karaoke: son marcas de trabajo
+   del actor y no se pueden perder de vista porque pase el encendido por encima. */
+.blk .tx .wd.acc.kdone, .blk .tx .wd.prn.kdone, .blk .tx .wd.pr.kdone{ opacity:.62 !important; }
 `;
 const LIB_CSS = `
 *{margin:0;padding:0;box-sizing:border-box}
@@ -12027,6 +12047,7 @@ function studioEnsureStrip(){
     +'<button id="stAuto" class="st-btn">⚡ Marcar pausas</button>'
     +'<button id="stClear" class="st-btn ghost" title="Quitar todas las marcas de pausa">🧹</button>'
     +'<label class="st-chk"><input type="checkbox" id="stFollow" checked> seguir</label>'
+    +'<label class="st-chk" title="Enciende el parlamento palabra por palabra al ritmo del audio"><input type="checkbox" id="stKar"> karaoke</label>'
     +'<label class="st-chk" title="Ver ritmo (caracteres/segundo) de cada línea"><input type="checkbox" id="stCps"> ritmo c/s</label>'
     +'<span style="opacity:.55;flex-basis:100%">tecla <b>P</b> = pausa al vuelo · clic en el ⏱ de una línea = saltar el video ahí</span>';
 
@@ -12138,6 +12159,7 @@ function studioWireStrip(){
   $('stCfg').onclick = ()=>{ const r=$('stCfgRow'); r.style.display = r.style.display==='none'?'flex':'none'; };
   $('stMin').oninput = ()=> $('stMinV').textContent = $('stMin').value;
   $('stOff').oninput = ()=>{ $('stOffV').textContent = ((+$('stOff').value||0)/10).toFixed(1); studio.cur=-1; studioTick(); };
+  { const k = $('stKar'); if(k) k.onchange = ()=> karSet(k.checked); }
   $('stCps').onchange = (e)=>{ window._stCps = e.target.checked; try{ renderLibretoBlocks(); }catch(e){} };
   $('stTc0').onchange = (e)=>{
     const v = studioParseTC(e.target.value);
@@ -12239,6 +12261,9 @@ function studioWireStrip(){
   for(const id of ['stVideo','stAudio']){
     const el = $(id);
     el.addEventListener('timeupdate', studioTick);
+    // el karaoke necesita su propio bucle por fotograma mientras suena
+    el.addEventListener('play', karArrancar);
+    el.addEventListener('seeked', function(){ if(kar.on) karPintar(el.currentTime + studioTc0() + studioFine()); });
     // si no hubo decodificación completa, tomar el audio del propio reproductor
     el.addEventListener('play', ()=>{ if(!studio.pcm){ studioLiveTap(); studioPassiveLoop(); } });
     el.addEventListener('play',  ()=>{ const b=$('tpPlay'); if(b) b.textContent='⏸'; });
@@ -12421,6 +12446,231 @@ function studioTick(){
     if(tc) tc.textContent = '⏱ '+stFmtTC(t);
   }catch(e){}
   stDrawWave();
+}
+/* ═══ KARAOKE ═══ enciende el parlamento palabra por palabra al ritmo del audio.
+   Se apoya en lo que ya hay: cada bloque trae su timecode (tcEff) y el audio ya
+   viene decodificado en studio.pcm para dibujar la onda. Dentro de la ventana de
+   cada bloque, las palabras se colocan siguiendo los PICOS de energía —los
+   núcleos silábicos—, que es lo que marca el ritmo real de quien habla. Sin
+   audio decodificado se reparte por sílabas, que ya sirve porque los bloques
+   son cortos.
+   El cálculo va bloque a bloque y solo cuando hace falta: nunca se analiza el
+   capítulo entero de golpe. */
+
+const kar = { on:false, cache:new Map(), raf:0, cur:-1, hechas:-1, wds:null };
+
+/** Sílabas aproximadas: grupos de vocales. Basta para repartir. */
+function karSilabas(t){
+  const v = (t.toLowerCase().match(/[aeiouáéíóúüy]+/g) || []).length;
+  return Math.max(1, v);
+}
+/** Del timecode del libreto al tiempo del video. Igual que studioSeekSi(). */
+function karVid(tc){ return tc - studioTc0() - studioFine(); }
+
+/** Envolvente en dB del tramo [a,b] del video, una muestra cada 10 ms. */
+function karEnv(a, b){
+  const pcm = studio.pcm, sr = studio.pcmSr || studio.sr;
+  if(!pcm || !sr) return null;
+  const hop = Math.max(1, Math.round(sr * 0.010));
+  const win = Math.max(hop, Math.round(sr * 0.025));
+  const i0 = Math.max(0, Math.round(a * sr));
+  const i1 = Math.min(pcm.length, Math.round(b * sr));
+  const n = Math.floor((i1 - i0 - win) / hop) + 1;
+  if(n < 4) return null;
+  const db = new Float32Array(n);
+  for(let i=0;i<n;i++){
+    const o = i0 + i*hop; let su = 0;
+    for(let j=0;j<win;j++){ const v = pcm[o+j] || 0; su += v*v; }
+    db[i] = 20 * Math.log10(Math.sqrt(su/win) + 1e-9);
+  }
+  return db;
+}
+/** Picos de energía = núcleos silábicos. Devuelve índices de trama. */
+function karNucleos(db){
+  const n = db.length;
+  if(n < 5) return [];
+  const su = new Float32Array(n);
+  for(let i=0;i<n;i++){
+    let a=0,c=0; for(let k=-1;k<=1;k++){ const j=i+k; if(j>=0&&j<n){ a+=db[j]; c++; } }
+    su[i]=a/c;
+  }
+  const picos = [];
+  for(let i=1;i<n-1;i++) if(su[i]>=su[i-1] && su[i]>su[i+1]) picos.push(i);
+  const sep = 8;            // 80 ms: no hay sílabas más cortas
+  const prom = 2.5;         // dB de valle exigidos entre dos picos
+  const fin = [];
+  for(const p of picos){
+    if(!fin.length){ fin.push(p); continue; }
+    const q = fin[fin.length-1];
+    let valle = Infinity;
+    for(let i=q;i<=p;i++) if(su[i]<valle) valle=su[i];
+    if(p-q < sep || (Math.min(su[q],su[p]) - valle) < prom){
+      if(su[p] > su[q]) fin[fin.length-1] = p;
+    } else fin.push(p);
+  }
+  return fin;
+}
+/** Reparte `sil` (sílabas por palabra) en [t0,t1] siguiendo los núcleos. */
+function karRepartir(sil, t0, t1, db){
+  const total = sil.reduce((a,b)=>a+b,0) || sil.length;
+  const dur = Math.max(0.001, t1 - t0);
+  const nuc = db ? karNucleos(db) : [];
+  const out = [];
+  if(nuc.length >= sil.length && sil.length > 1){
+    // hay picos de sobra: se corta en el VALLE entre el último pico de una
+    // palabra y el primero de la siguiente
+    const cortes = [t0];
+    let acum = 0, prev = t0;
+    for(let k=0;k<sil.length-1;k++){
+      acum += sil[k];
+      let ni = Math.round(acum * nuc.length / total);
+      ni = Math.min(nuc.length-1, Math.max(1, ni));
+      let mejor = nuc[ni-1], vmin = Infinity;
+      for(let i=nuc[ni-1]; i<=nuc[ni]; i++) if(db[i] < vmin){ vmin = db[i]; mejor = i; }
+      let t = t0 + mejor * 0.010;
+      if(t <= prev) t = prev + 0.010;
+      if(t >= t1)   t = Math.max(prev + 0.005, t1 - 0.010);
+      cortes.push(t); prev = t;
+    }
+    cortes.push(t1);
+    for(let k=0;k<sil.length;k++) out.push({ t0:cortes[k], t1:cortes[k+1] });
+  }else{
+    // sin audio fiable: proporcional a las sílabas
+    let c = t0;
+    for(let k=0;k<sil.length;k++){
+      const p = dur * (sil[k]/total);
+      out.push({ t0:c, t1:c+p }); c += p;
+    }
+    if(out.length) out[out.length-1].t1 = t1;
+  }
+  return out;
+}
+/** Sílabas del texto de un bloque, para repartir ventanas compartidas. */
+function karLargoBloque(i){
+  const txt = (script[i] && script[i].lines ? script[i].lines.join(' ') : '');
+  return Math.max(1, (txt.match(/[aeiouáéíóúüy]+/gi) || []).length);
+}
+/** Ventana [tc0,tc1] del bloque, en timecode de libreto.
+    Varios bloques seguidos pueden compartir el mismo tcEff (la cascada lo
+    hereda cuando la línea no trae timecode propio): en ese caso se reparten
+    la ventana entre ellos, por sílabas. */
+function karVentana(si){
+  const b = script[si];
+  if(!b || b.tcEff == null) return null;
+  let i0 = si; while(i0 > 0 && script[i0-1] && script[i0-1].tcEff === b.tcEff) i0--;
+  let i1 = si; while(i1+1 < script.length && script[i1+1] && script[i1+1].tcEff === b.tcEff) i1++;
+  let fin = null;
+  for(let j=i1+1; j<script.length; j++){
+    if(script[j].tcEff != null && script[j].tcEff > b.tcEff){ fin = script[j].tcEff; break; }
+  }
+  if(fin == null){                        // último bloque: se estima el final
+    let sum = 0; for(let i=i0;i<=i1;i++) sum += karLargoBloque(i);
+    fin = b.tcEff + sum * 0.18;
+  }
+  if(i0 === i1) return [b.tcEff, fin];
+  let tot = 0; for(let i=i0;i<=i1;i++) tot += karLargoBloque(i);
+  const dur = Math.max(0.2, fin - b.tcEff);
+  let c = b.tcEff;
+  for(let i=i0;i<=i1;i++){
+    const p = dur * (karLargoBloque(i)/tot);
+    if(i === si) return [c, c+p];
+    c += p;
+  }
+  return [b.tcEff, fin];
+}
+/** Tiempos de cada palabra del bloque, en timecode de libreto. Con memoria. */
+function karBloque(si){
+  const clave = si + '|' + studioTc0() + '|' + studioFine() + '|' + (studio.pcm ? studio.pcm.length : 0);
+  if(kar.cache.has(clave)) return kar.cache.get(clave);
+  let r = null;
+  try{
+    const doc = pop2.doc;
+    const blk = doc && doc.querySelector('.blk[data-si="'+si+'"] .tx');
+    const ven = karVentana(si);
+    if(blk && ven){
+      const wds = Array.prototype.slice.call(blk.querySelectorAll('.wd'));
+      if(wds.length){
+        const sil = wds.map(w => karSilabas(w.textContent || ''));
+        const db = karEnv(karVid(ven[0]), karVid(ven[1]));
+        // Solo se guardan los TIEMPOS. Guardar los <span> seria una trampa: si el
+        // libreto se vuelve a pintar, esos nodos quedan huerfanos y el karaoke
+        // encenderia palabras que ya no estan en pantalla.
+        r = { tr: karRepartir(sil, ven[0], ven[1], db), n: wds.length, senal: !!db };
+      }
+    }
+  }catch(e){}
+  if(kar.cache.size > 200) kar.cache.clear();
+  kar.cache.set(clave, r);
+  return r;
+}
+/** Pinta el estado del karaoke para el timecode `t`. */
+function karPintar(t){
+  if(!kar.on) return;
+  const si = studio.cur;
+  if(si !== kar.cur){                     // cambio de bloque: limpiar el anterior
+    karLimpiar();
+    kar.cur = si; kar.hechas = -1; kar.wds = null;
+  }
+  if(si < 0) return;
+  const b = karBloque(si);
+  if(!b) return;
+  if(!kar.wds || !kar.wds.length || !kar.wds[0].isConnected){
+    try{
+      const blk = pop2.doc && pop2.doc.querySelector('.blk[data-si="'+si+'"] .tx');
+      kar.wds = blk ? Array.prototype.slice.call(blk.querySelectorAll('.wd')) : null;
+    }catch(e){ kar.wds = null; }
+    kar.hechas = -1;
+  }
+  const wds = kar.wds;
+  if(!wds || wds.length !== b.n) return;  // el libreto cambio: mejor no pintar nada
+  let hechas = 0;
+  while(hechas < b.tr.length && t >= b.tr[hechas].t1) hechas++;
+  const act = (hechas < b.tr.length && t >= b.tr[hechas].t0) ? hechas : -1;
+  if(hechas !== kar.hechas){
+    for(let i=0;i<wds.length;i++) wds[i].classList.toggle('kdone', i < hechas);
+    kar.hechas = hechas;
+  }
+  for(let i=0;i<wds.length;i++) wds[i].classList.toggle('know', i === act);
+}
+function karLimpiar(){
+  try{
+    const doc = pop2.doc; if(!doc) return;
+    doc.querySelectorAll('.wd.kdone, .wd.know').forEach(function(w){
+      w.classList.remove('kdone'); w.classList.remove('know');
+    });
+  }catch(e){}
+  kar.hechas = -1;
+}
+/* Bucle propio: `timeupdate` solo llega 4 veces por segundo, muy poco para que
+   el encendido acompañe a la voz. Mientras suena, se repinta por fotograma. */
+function karLoop(){
+  kar.raf = 0;
+  if(!kar.on) return;
+  const el = studioEl();
+  if(el && !el.paused && !el.ended){
+    const t = el.currentTime + studioTc0() + studioFine();
+    if(stCurBlock(t) !== studio.cur) studioTick();   // que el bloque en curso se actualice
+    karPintar(t);
+    kar.raf = requestAnimationFrame(karLoop);
+  }
+}
+function karArrancar(){ if(kar.on && !kar.raf) kar.raf = requestAnimationFrame(karLoop); }
+function karSet(v){
+  kar.on = !!v;
+  if(!kar.on){
+    if(kar.raf) cancelAnimationFrame(kar.raf);
+    kar.raf = 0; kar.cur = -1; kar.wds = null;
+    karLimpiar();
+    stMsg('Karaoke apagado');
+  }else{
+    kar.cache.clear(); kar.cur = -1; kar.wds = null;
+    karArrancar();
+    const el = studioEl();
+    if(el) karPintar(el.currentTime + studioTc0() + studioFine());
+    stMsg(studio.pcm
+      ? '🎤 Karaoke encendido — las palabras se encienden siguiendo la energía del audio'
+      : '🎤 Karaoke encendido — sin la onda analizada va repartido por sílabas; carga el video para afinarlo');
+  }
 }
 /* ——— medio: local (IndexedDB) o audio de la nube ——— */
 async function studioLoadSaved(){
