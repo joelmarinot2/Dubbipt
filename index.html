@@ -1628,7 +1628,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.37.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.38.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -2040,7 +2040,8 @@ function applyDeviceRole(){
   try{ const d=document.getElementById('devStat'); if(d){ d.textContent = DEVROLE==='talent' ? 'Tablet Actor' : (DEVROLE==='tablet' ? 'Tablet Director' : (DEVROLE==='pc' ? 'Escritorio Listo' : 'Listo')); d.classList.toggle('off', !DEVROLE); } }catch(e){}
   try{ updateWorkspaceChip(); }catch(e){}
   try{ refreshTopbar(); }catch(e){}
-  try{ if(typeof pop2!=='undefined' && pop2.doc){ pop2.doc.body.classList.toggle('is-talent', DEVROLE==='talent'); renderLibretoBlocks(); renderLibretoChips(); } }catch(e){}
+  try{ if(typeof pop2!=='undefined' && pop2.doc){ pop2.doc.body.classList.toggle('is-tablet', DEVROLE==='tablet' || DEVROLE==='talent');
+        pop2.doc.body.classList.toggle('is-talent', DEVROLE==='talent'); renderLibretoBlocks(); renderLibretoChips(); } }catch(e){}
   try{ updateTalentGate(); }catch(e){}
 }
 /* ===== Módulo 0 · relleno dinámico de la barra superior ===== */
@@ -6912,6 +6913,35 @@ body.is-talent.waitdir .dtab{ visibility:hidden !important; }
 }
 .wd-s{ font-family:'Inter',sans-serif; font-size:14px; line-height:1.6; color:#8b9099; }
 
+/* ─── Escritorio emparejado: sin riel de paginas ──────────────────────
+   Cuando el escritorio va con la tablet del director, quien navega es la
+   tablet: el riel solo ocupa sitio de lectura en la pantalla grande. Si el
+   escritorio se queda solo, vuelve a aparecer para poder moverse. */
+body.pc-pareja .lchips, body.pc-pareja #dtabL{ display:none !important; }
+
+/* ─── Cajon lateral retirado en las tablets ───────────────────────────
+   Sus herramientas viven en la barra de arriba desde v10.27.0; el cajon solo
+   quitaba sitio de lectura. El pincel pasa a un boton flotante abajo a la
+   izquierda, que es donde cae el pulgar sin tapar el texto. */
+body.is-tablet .ltools, body.is-tablet .dtab{ display:none !important; }
+
+/* ─── Pincel flotante ─── */
+#lBrushFab{
+  display:none; position:fixed; left:16px; bottom:74px; z-index:72;
+  width:58px; height:58px; border-radius:50%; border:1px solid #2c3036;
+  background:#111316; color:#c7c9cd; cursor:pointer;
+  align-items:center; justify-content:center;
+  box-shadow:0 10px 26px rgba(0,0,0,.5);
+  transition:background .12s, color .12s, transform .1s;
+}
+body.is-tablet #lBrushFab{ display:flex; }
+#lBrushFab svg{ width:24px; height:24px; }
+#lBrushFab:active{ transform:scale(.94); }
+body.drawmode #lBrushFab{ background:#22C55E; color:#06210f; border-color:#22C55E; }
+body.light #lBrushFab{ background:#fff; border-color:#e2ddf2; color:#2a2540; }
+/* con la barra del pincel abierta, subirlo para que no la tape */
+body.drawmode #lBrushFab{ bottom:118px; }
+
 /* ─── Tablet ACTOR ─── */
 /* Dos modos. AJUSTADO (por defecto): el director manda la posicion y el actor
    solo marca con el pincel. LIBRE: el actor se mueve por todo el libreto a su
@@ -6948,7 +6978,13 @@ body.is-talent.talent-free .lwrap{
 }
 /* boton para cambiar de modo (solo en la tablet del actor) */
 #lFree{ display:none; }
-body.is-talent #lFree{ display:inline-flex !important; align-items:center; gap:5px; }
+/* La barra es flex con overflow-x:auto, asi que un boton con texto se encogia
+   hasta que la etiqueta se salia por debajo. flex:0 0 auto + nowrap lo fijan. */
+body.is-talent #lFree{
+  display:inline-flex !important; align-items:center; gap:5px;
+  flex:0 0 auto !important; white-space:nowrap !important;
+}
+.lh button{ flex:0 0 auto; white-space:nowrap; }
 body.is-talent.talent-free #lFree{
   background:#F59E0B !important; color:#1a1200 !important; border-color:#F59E0B !important; font-weight:700;
 }
@@ -7831,6 +7867,7 @@ function buildLibretoDoc(pc){
       <button class="lp-btn" id="lpClear" title="Limpiar todo el marcado del libreto">Limpiar</button>
       <span class="lp-hint">2 dedos para desplazar</span><button class="lp-btn lp-done" id="lpDone" title="Salir del pincel">Listo</button>
     </div>
+    <button id="lBrushFab" title="Pincel" aria-label="Pincel">${LIB_ICON.brush}</button>
     <div class="gmenu" id="lGearMenu" role="menu" aria-label="Herramientas de la caja">
       <div class="gm-head">Caja seleccionada <b id="gmWho">ninguna</b></div>
       <div class="gm-grid">
@@ -7884,9 +7921,14 @@ function buildLibretoDoc(pc){
   const roleTab = (typeof isTablet==='function' && isTablet());
   d.body.classList.toggle('haschips', roleTab);        // tablet: páginas izq + herramientas der
   d.body.classList.toggle('deskchips', !roleTab);      // escritorio/espejo: páginas a la derecha
+  // la clase de rol tambien EN LA VENTANA DEL LIBRETO: hasta ahora is-tablet
+  // solo estaba en la ventana principal, asi que las reglas para tablet no
+  // llegaban a aplicarse dentro del libreto.
+  try{ d.body.classList.toggle('is-tablet', DEVROLE==='tablet' || DEVROLE==='talent'); }catch(e){}
   d.body.classList.toggle('is-talent', (typeof isTalent==='function' && isTalent()));   // tablet actor: herramientas limitadas
   try{ updateTalentGate(); }catch(e){}   // …y en espera hasta que el director empiece
   try{ applyTalentFree(); }catch(e){}    // …y en el modo que tuviera elegido
+  try{ applyPcPareja(); }catch(e){}      // …y sin riel de páginas si va con la tablet
   // Tamaño compartido: el director lo anuncia; el resto lo pide al abrir.
   try{
     if(sync.role==='tablet'){ syncSendTool('boxw', pop2.boxw); syncSendTool('font', pop2.mineFs); }
@@ -8412,9 +8454,26 @@ function libDrawRenderBlock(blk){
   if(strokes) for(const s of strokes){
     ctx.strokeStyle = s.c || '#22C55E'; ctx.lineWidth = (s.w||4)*dpr;
     const p = s.p || []; ctx.beginPath();
-    for(let i=0;i<p.length;i++){ const x=p[i][0]*cv.width, y=p[i][1]*cv.height; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
-    if(p.length===1){ ctx.arc(p[0][0]*cv.width, p[0][1]*cv.height, ((s.w||4)*dpr)/2, 0, 7); ctx.fillStyle=s.c||'#22C55E'; ctx.fill(); }
-    else ctx.stroke();
+    if(p.length===1){
+      ctx.arc(p[0][0]*cv.width, p[0][1]*cv.height, ((s.w||4)*dpr)/2, 0, 7);
+      ctx.fillStyle=s.c||'#22C55E'; ctx.fill();
+    } else if(p.length===2){
+      ctx.moveTo(p[0][0]*cv.width, p[0][1]*cv.height);
+      ctx.lineTo(p[1][0]*cv.width, p[1][1]*cv.height);
+      ctx.stroke();
+    } else {
+      // misma curva por puntos medios que al dibujar en vivo, para que un trazo
+      // se vea IGUAL antes y despues de guardarse
+      ctx.moveTo(p[0][0]*cv.width, p[0][1]*cv.height);
+      for(let i=1;i<p.length-1;i++){
+        const b=p[i], c=p[i+1];
+        ctx.quadraticCurveTo(b[0]*cv.width, b[1]*cv.height,
+                             (b[0]+c[0])/2*cv.width, (b[1]+c[1])/2*cv.height);
+      }
+      const u=p[p.length-1];
+      ctx.lineTo(u[0]*cv.width, u[1]*cv.height);
+      ctx.stroke();
+    }
   }
   if(gmk) for(const g of gmk){ libDrawSymbol(ctx, g, cv.width, cv.height, dpr); }
 }
@@ -8568,6 +8627,7 @@ function libDrawSetup(d){
   const setMode = (on)=>{ st.on=on; d.body.classList.toggle('drawmode', on); try{ ptrs.clear(); panning=false; }catch(e){} if(on){ if(typeof syncSendTool==='function'){ try{ syncSendTool('boxw', pop2.boxw); syncSendTool('font', pop2.mineFs); }catch(e){} } libDrawRenderAll(); } };
   const brush = d.getElementById('lDraw'); if(brush) brush.addEventListener('click', ()=> setMode(!st.on));
   const tbrush = d.getElementById('tDraw'); if(tbrush) tbrush.addEventListener('click', ()=> setMode(!st.on));
+  const fab = d.getElementById('lBrushFab'); if(fab) fab.addEventListener('click', ()=> setMode(!st.on));
   const paint = d.getElementById('lPaint');
   if(paint){
     paint.querySelectorAll('.lp-w').forEach(b=> b.addEventListener('click', ()=>{ st.width=+b.dataset.w; st.erase=false; paint.querySelectorAll('.lp-w').forEach(x=>x.classList.toggle('on',x===b)); const er=d.getElementById('lpErase'); if(er) er.classList.remove('on'); }));
@@ -8628,10 +8688,40 @@ function libDrawSetup(d){
     const pt = norm(cv,e);
     if(st.erase){ libDrawEraseAt(drawSi, curBlk, pt); return; }
     if(!cur) return;
-    cur.p.push(pt);
-    const ctx=cv.getContext('2d'), dpr=pop2.win.devicePixelRatio||1, n=cur.p.length;
+    // TODOS los puntos del gesto, no solo el ultimo. El navegador junta varias
+    // muestras del lapiz en un unico pointermove: sin esto se perdian y el
+    // trazo salia a tramos rectos, sobre todo al mover rapido.
+    let pts = [pt];
+    try{
+      if(typeof e.getCoalescedEvents === 'function'){
+        const co = e.getCoalescedEvents();
+        if(co && co.length) pts = co.map(ev=> norm(cv, ev));
+      }
+    }catch(_){}
+    const ctx=cv.getContext('2d'), dpr=pop2.win.devicePixelRatio||1;
     ctx.strokeStyle=cur.c; ctx.lineWidth=cur.w*dpr; ctx.lineCap='round'; ctx.lineJoin='round';
-    if(n>=2){ ctx.beginPath(); ctx.moveTo(cur.p[n-2][0]*cv.width, cur.p[n-2][1]*cv.height); ctx.lineTo(pt[0]*cv.width, pt[1]*cv.height); ctx.stroke(); }
+    for(const q of pts){
+      // no acumular puntos pegados: ensucian la curva y engordan el guardado
+      const u = cur.p[cur.p.length-1];
+      if(u && Math.abs(u[0]-q[0])*cv.width < 0.6 && Math.abs(u[1]-q[1])*cv.height < 0.6) continue;
+      cur.p.push(q);
+      const n = cur.p.length;
+      if(n === 2){
+        ctx.beginPath();
+        ctx.moveTo(cur.p[0][0]*cv.width, cur.p[0][1]*cv.height);
+        ctx.lineTo(cur.p[1][0]*cv.width, cur.p[1][1]*cv.height);
+        ctx.stroke();
+      } else if(n > 2){
+        // curva por los puntos medios: el trazo sale redondo en vez de a tramos
+        const a=cur.p[n-3], b=cur.p[n-2], c=cur.p[n-1];
+        const m1=[(a[0]+b[0])/2*cv.width, (a[1]+b[1])/2*cv.height];
+        const m2=[(b[0]+c[0])/2*cv.width, (b[1]+c[1])/2*cv.height];
+        ctx.beginPath();
+        ctx.moveTo(m1[0], m1[1]);
+        ctx.quadraticCurveTo(b[0]*cv.width, b[1]*cv.height, m2[0], m2[1]);
+        ctx.stroke();
+      }
+    }
   });
   const endStroke=()=>{
     if(!curBlk){ return; }
@@ -10476,7 +10566,18 @@ async function showAccounts(){
     + '<div class="acc2-foot">«En línea» es en tiempo real. La fecha es el alta de la cuenta: la plataforma no guarda un historial de entradas.</div>';
 }
 
+/* ¿Es este equipo un escritorio que ya tiene la tablet al otro lado? */
+function pcEmparejado(){
+  try{ return sync.role==='pc' && sync.isOn && (sync.peers||0) > 1; }catch(e){ return false; }
+}
+function applyPcPareja(){
+  try{
+    const d = pop2 && pop2.doc; if(!d || !d.body) return;
+    d.body.classList.toggle('pc-pareja', pcEmparejado());
+  }catch(e){}
+}
 function updateSyncUI(){
+  try{ applyPcPareja(); }catch(e){}
   const b = document.getElementById('btnSync');
   if(b){
     const en = (WORKSPACE && WORKSPACE.name) ? (WORKSPACE.name.slice(0,4)+' ') : '';
