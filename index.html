@@ -1631,7 +1631,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.45.0-nube';
+const APP_VER_NUM = 'v10.45.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -12856,16 +12856,23 @@ async function karIaPreparar(){
 /** Averigua cual es el eslabon que falla y lo dice en cristiano. */
 async function karIaDiagnostico(err){
   if(!navigator.onLine) return 'La IA necesita conexión la primera vez, para descargar el modelo. Ahora mismo no hay red. El resto del karaoke funciona sin conexión.';
+  // WebAssembly: el motor de voz corre sobre wasm, y una CSP puede prohibirlo.
+  // Era el SEGUNDO bloqueo y no se veia, porque el primero saltaba antes.
+  try{ await WebAssembly.instantiate(new Uint8Array([0,97,115,109,1,0,0,0])); }
+  catch(e){ return 'Este navegador no deja ejecutar WebAssembly, que es lo que necesita el motor de voz. Si vienes de una versión anterior de Dubbipt, recarga con Ctrl+F5: la v10.45.1 lo corrige.'; }
   const probar = async (url) => {
     try{ const r = await fetch(url, { cache:'no-store' }); return r.ok; }catch(e){ return false; }
   };
   const lib = await probar('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2/package.json');
   const mod = await probar('https://huggingface.co/Xenova/whisper-tiny/resolve/main/config.json');
-  if(!lib && !mod) return 'La red de este equipo no deja llegar ni a cdn.jsdelivr.net ni a huggingface.co. Suele ser el cortafuegos del estudio: pide que los permitan y la IA funcionará. El karaoke normal no los necesita.';
-  if(!mod) return 'Se llega a la librería pero no a huggingface.co, que es de donde baja el modelo de voz. Pide que permitan ese dominio.';
+  if(!lib && !mod) return 'No se llega ni a cdn.jsdelivr.net ni a huggingface.co. Comprueba la conexión; si hay red, es el cortafuegos de este equipo. El karaoke normal no los necesita.';
+  // Ojo: hasta la v10.45.0 el bloqueo lo causaba la CSP de la PROPIA app, no
+  // la red. Mandar al usuario a hablar con sistemas por eso seria hacerle
+  // perder el tiempo, asi que el mensaje lo dice en ese orden.
+  if(!mod) return 'No se llega a huggingface.co, de donde baja el modelo. Lo más probable es que estés en una versión anterior de Dubbipt: hasta la v10.45.0 la propia app bloqueaba ese dominio. Recarga con Ctrl+F5. Si sigue igual, entonces sí es el cortafuegos de tu red.';
   if(!lib) return 'Se llega a huggingface.co pero no a cdn.jsdelivr.net, de donde baja la librería. Pide que permitan ese dominio.';
-  return 'Los dos sitios responden, así que el fallo fue otro: ' + err
-       + '. Recarga con Ctrl+F5 — si vienes de una versión anterior, el service worker viejo se metía en medio de la descarga y esta versión lo corrige.';
+  return 'Todo responde, así que el fallo fue otro: ' + err
+       + '. Recarga con Ctrl+F5 y vuelve a probar.';
 }
 
 /** Casa las palabras del libreto con las que oyó Whisper.

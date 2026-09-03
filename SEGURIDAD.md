@@ -83,6 +83,28 @@ Y aparte, el esquema base reintroducía la auto-promoción a admin al reejecutar
 Para deshacer basta volver a `RT_PRIVATE = false` y desplegar: los canales
 públicos siguen funcionando aunque las políticas estén puestas.
 
+## Paso 10 · CSP abierta para el reconocimiento de voz (v10.45.1)
+
+El karaoke con IA corre **dentro del navegador**: el audio no sale del equipo,
+solo se descarga el modelo. Para que pueda funcionar hubo que tocar dos cosas
+de la CSP de `vercel.json`:
+
+- `script-src` += `'wasm-unsafe-eval'`. El motor de voz corre sobre
+  WebAssembly, y sin esto el navegador se niega a compilarlo. Es **mucho más
+  estrecho** que `'unsafe-eval'`: permite compilar módulos wasm y nada más; no
+  habilita ejecutar cadenas de texto como código.
+- `connect-src` += `https://huggingface.co https://*.hf.co
+  https://*.huggingface.co`. De ahí bajan los pesos del modelo; la descarga
+  redirige a `us.aws.cdn.hf.co`, por eso hace falta el comodín.
+
+Ambos solo amplían de dónde se puede **descargar**, no qué se puede ejecutar
+desde fuera: `script-src` sigue sin admitir orígenes nuevos.
+
+Antes de este cambio la función no podía funcionar en producción, y el
+síntoma engañaba: parecía un cortafuegos del estudio. Se detectó sirviendo la
+app en local **con la CSP real de `vercel.json`**, que es como hay que probar
+cualquier cosa que salga a la red. Probar sin CSP es probar otra aplicación.
+
 ## Pendiente
 
 - `ddl:library` sigue siendo un canal **global**: transporta ids de programa y
@@ -92,4 +114,8 @@ públicos siguen funcionando aunque las políticas estén puestas.
   así que la CSP no puede frenar código inyectado. Riesgo aceptado; para
   cerrarlo habría que sacar el script a un archivo aparte y usar nonce o hash.
 - Bucket `portadas` listable sin sesión (S12).
+- La librería de IA (`transformers.js`) se carga por `import()` dinámico y
+  **no lleva hash SRI**, a diferencia de las demás. Solo se descarga si el
+  usuario pulsa el botón de IA. Para cerrarlo habría que servirla desde el
+  propio dominio.
 - Bugs B6–B32 (offline, parser DOCX, service worker que recarga tablets, etc.).
