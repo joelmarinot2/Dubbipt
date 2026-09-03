@@ -1628,7 +1628,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.38.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.38.1-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -6646,7 +6646,7 @@ body.dark{ background:var(--libbg,#0b0c0e) !important; }
 }
 
 /* Botones de icono: círculos semitransparentes */
-.lh > button:not(.lbk):not(#lVid):not(#lScope){
+.lh > button:not(.lbk):not(#lVid):not(#lScope):not(#lFree){
   width:34px !important; height:34px !important;
   display:inline-grid !important; place-items:center !important;
   background:rgba(6,33,15,.22) !important; color:#06210f !important;
@@ -6980,6 +6980,17 @@ body.is-talent.talent-free .lwrap{
 #lFree{ display:none; }
 /* La barra es flex con overflow-x:auto, asi que un boton con texto se encogia
    hasta que la etiqueta se salia por debajo. flex:0 0 auto + nowrap lo fijan. */
+/* El boton Ajustado/Libre lleva TEXTO: la regla de arriba pone a todos los
+   botones de la barra en un circulo de 34px con !important, asi que la etiqueta
+   se salia por debajo. Se le da forma de pastilla, como al boton de Atras. */
+body.is-talent #lFree{
+  height:34px !important; width:auto !important; padding:0 13px !important;
+  border-radius:99px !important; border:none !important;
+  background:rgba(6,33,15,.22) !important; color:#06210f !important;
+  font-family:'Inter',sans-serif !important; font-weight:700 !important;
+  font-size:12.5px !important;
+}
+body.is-talent.talent-free #lFree{ background:#F59E0B !important; color:#1a1200 !important; }
 body.is-talent #lFree{
   display:inline-flex !important; align-items:center; gap:5px;
   flex:0 0 auto !important; white-space:nowrap !important;
@@ -9303,8 +9314,14 @@ function renderLibretoBlocks(){
       startEditBox(+el.dataset.si);
       return;
     }
-    pop2._navAt = performance.now();
     const vi = +el.dataset.vi;
+    // Marcando pausas/acentos o con el pincel puesto, tocar una palabra debe
+    // marcarla y nada mas. Antes recentraba la vista de golpe -y encima movia a
+    // los otros equipos-, asi que la caja se iba de la pantalla justo al marcar
+    // y parecia que la marca no se habia hecho.
+    const marcando = !!pop2.markMode || !!(pop2._draw && pop2._draw.on);
+    if(marcando){ setActiveBlock(vi); return; }
+    pop2._navAt = performance.now();
     centerBlock(vi, false);
     setActiveBlock(vi);
     if(typeof syncSendPos==='function'){
@@ -11216,6 +11233,10 @@ function onRemoteCtl(p){
 // ---- posición por página/bloque (bidireccional) ----
 function syncSendPos(pos){
   if(!sync.channel) return;
+  // El actor sigue, no dirige: emitir 'pos' al tocar un parlamento le movia la
+  // pagina al director y al escritorio. Faltaba este cierre, que los demas
+  // emisores (scroll, open) ya tenian desde v10.16.1.
+  if(typeof isTalent==='function' && isTalent()) return;
   syncEmit('pos', pos);
 }
 function remoteGuard(ms){
