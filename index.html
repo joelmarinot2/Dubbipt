@@ -1631,7 +1631,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.40.0-nube';
+const APP_VER_NUM = 'v10.41.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -13116,9 +13116,12 @@ function studioKeyHandler(e){
   const tag = (t.tagName||'').toUpperCase();
   if(tag==='INPUT' || tag==='TEXTAREA' || tag==='SELECT' || t.isContentEditable) return;
   if(e.key==='p' || e.key==='P'){ e.preventDefault(); studioMarkAtPlayhead(); return; }
-  // ENTER: reproducir / pausar el video (punto 4)
-  if(e.key==='Enter'){
-    if(tag==='BUTTON' || tag==='A') return;           // no robar el Enter de un botón enfocado
+  // ESPACIO o ENTER: reproducir / pausar el video.
+  // El espacio es lo que espera cualquiera que venga de un reproductor, y de
+  // hecho el propio boton ya lo anunciaba en su descripcion... pero no estaba
+  // implementado: solo respondia Enter.
+  if(e.key===' ' || e.code==='Space' || e.key==='Enter'){
+    if(tag==='BUTTON' || tag==='A') return;           // no robar la tecla de un botón enfocado
     const el = studioEl();
     if(el && el.src){ e.preventDefault(); studioPlayPause(); }
     return;
