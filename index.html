@@ -1628,7 +1628,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.36.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.37.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -9869,11 +9869,11 @@ window._pop2 = pop2;
    bidireccionales y en tiempo real.
    ================================================================ */
 /* Canales de Realtime privados (seguridad S9).
-   Se queda en false hasta que sql/seguridad-09-canales-privados.sql este
-   ejecutado en Supabase: marcar los canales como privados SIN esas politicas
-   corta la sincronia en seco. Cuando el SQL este puesto, se pone en true y se
-   despliega; para deshacer, se vuelve a false. */
-const RT_PRIVATE = false;
+   ACTIVADO el 05-sep-2026, con sql/seguridad-09-canales-privados.sql ya
+   ejecutado en Supabase. Marcar los canales como privados SIN esas politicas
+   corta la sincronia en seco: si algo falla, volver esto a false y desplegar
+   -los canales publicos siguen funcionando aunque las politicas esten puestas-. */
+const RT_PRIVATE = true;
 function rtCfg(extra){
   const c = Object.assign({}, extra || {});
   if(RT_PRIVATE) c.private = true;

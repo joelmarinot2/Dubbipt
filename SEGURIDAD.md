@@ -63,7 +63,7 @@ De la revisión salieron tres cosas del bloque S9. Dos ya están hechas en la ap
 |---|---|
 | El contador de conectados publicaba nombre, espacio y dispositivo en un canal de nombre fijo (`ddl:online`), legible por cualquier cuenta | Corregido en **v10.36.0**: ese canal ya no lleva ningún dato, solo cuenta. Los nombres van por `ddl:online:<espacio>` |
 | Los mensajes del canal se aplicaban sin validar (marcas, fusiones, páginas grabadas) | Corregido en **v10.36.0** |
-| Los canales siguen siendo **públicos**: quien conozca el tema puede unirse | **Pendiente** — este paso |
+| Los canales siguen siendo **públicos**: quien conozca el tema puede unirse | Corregido en **v10.37.0** — SQL aplicado y `RT_PRIVATE = true` |
 
 Y aparte, el esquema base reintroducía la auto-promoción a admin al reejecutarlo
 (el trigger leía el rol de `raw_user_meta_data`); corregido en
