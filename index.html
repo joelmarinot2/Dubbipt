@@ -1631,7 +1631,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.42.0-nube';
+const APP_VER_NUM = 'v10.42.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5655,7 +5655,7 @@ function showTutorial(onDone){
        +'<span class="tut-tip">Con el pincel activo, desplaza con DOS dedos.</span>' },
 
     { s:'Paso 9 · Karaoke', ic:'🎤', t:'El libreto sigue al audio',
-      d:'En el <b>Video Estudio</b>, marca la casilla <b>karaoke</b> (está en ⚙ ajustes). Al reproducir, el parlamento se enciende <b>palabra por palabra</b> al ritmo del audio: en ámbar la que suena, apagadas las ya dichas.'
+      d:'En el <b>Video Estudio</b>, pulsa el botón <b>🎤 Karaoke</b> de la barra. Al reproducir, el parlamento se enciende <b>palabra por palabra</b> al ritmo del audio: en ámbar la que suena, apagadas las ya dichas.'
        +'<span class="tut-tip">Va más fino cuando la onda ya está analizada. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
@@ -12027,6 +12027,7 @@ function studioEnsureStrip(){
     '<button id="stFile" class="st-btn">🎬 Cargar video</button>'
     +'<button id="stCloud" class="st-btn ghost" style="display:none">⬇ nube</button>'
     +'<input type="file" id="stInput" accept=".mp4,.mov,.m4v,.webm,.ogv,.mkv,.avi,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,video/*,audio/*" style="display:none">'
+    +'<button id="stKar" class="st-btn ghost" title="Enciende el parlamento palabra por palabra al ritmo del audio">🎤 Karaoke</button>'
     +'<span id="stName" class="st-name"></span>'
     +'<span id="stMsg" class="st-msg"></span>'
     +'<button id="stScan" class="st-btn" style="display:none" title="Recorre el video en silencio para construir la onda desde su propio audio">📈 Onda del video</button>'
@@ -12047,7 +12048,6 @@ function studioEnsureStrip(){
     +'<button id="stAuto" class="st-btn">⚡ Marcar pausas</button>'
     +'<button id="stClear" class="st-btn ghost" title="Quitar todas las marcas de pausa">🧹</button>'
     +'<label class="st-chk"><input type="checkbox" id="stFollow" checked> seguir</label>'
-    +'<label class="st-chk" title="Enciende el parlamento palabra por palabra al ritmo del audio"><input type="checkbox" id="stKar"> karaoke</label>'
     +'<label class="st-chk" title="Ver ritmo (caracteres/segundo) de cada línea"><input type="checkbox" id="stCps"> ritmo c/s</label>'
     +'<span style="opacity:.55;flex-basis:100%">tecla <b>P</b> = pausa al vuelo · clic en el ⏱ de una línea = saltar el video ahí</span>';
 
@@ -12159,7 +12159,8 @@ function studioWireStrip(){
   $('stCfg').onclick = ()=>{ const r=$('stCfgRow'); r.style.display = r.style.display==='none'?'flex':'none'; };
   $('stMin').oninput = ()=> $('stMinV').textContent = $('stMin').value;
   $('stOff').oninput = ()=>{ $('stOffV').textContent = ((+$('stOff').value||0)/10).toFixed(1); studio.cur=-1; studioTick(); };
-  { const k = $('stKar'); if(k) k.onchange = ()=> karSet(k.checked); }
+  { const k = $('stKar');
+    if(k) k.onclick = ()=>{ karSet(!kar.on); k.classList.toggle('on', kar.on); k.classList.toggle('ghost', !kar.on); }; }
   $('stCps').onchange = (e)=>{ window._stCps = e.target.checked; try{ renderLibretoBlocks(); }catch(e){} };
   $('stTc0').onchange = (e)=>{
     const v = studioParseTC(e.target.value);
