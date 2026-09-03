@@ -1628,7 +1628,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.35.0-nube · 01-sep-2026';
+const APP_VERSION = 'v10.36.0-nube · 01-sep-2026';
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -10234,13 +10234,18 @@ function isTalent(){ return DEVROLE==='talent'; }
 function isMirror(){ return sync.isOn && sync.role==='pc'; }
 
 
-/* ═══ QUIÉN ESTÁ CONECTADO A LA PLATAFORMA (presencia global) ═══════════
-   Canal aparte del de sincronía: aquel es por espacio de trabajo (ws:<id>) y
-   solo sirve para emparejar los dispositivos de una sesión. Este lo comparte
-   TODA la cuenta, y la clave de presencia es el id de usuario, asi que
-   Object.keys() cuenta PERSONAS y las entradas de cada clave, sus dispositivos.
-   Fuera de tu espacio de trabajo solo se publica el numero, nunca los nombres. */
-const online = { ch:null, people:[], mine:0, others:0, total:0 };
+/* ═══ PRESENCIA · DOS CANALES, A PROPOSITO ════════════════════════════
+   Antes todo iba por 'ddl:online', un canal de nombre FIJO al que cualquier
+   cuenta puede unirse: quien lo hiciera leia el nombre, el espacio de trabajo y
+   el dispositivo de TODOS los conectados, tambien de otros estudios. El panel
+   solo mostraba los del propio espacio, pero eso es cosmetico: los datos iban
+   por el cable. Ahora:
+     · 'ddl:online'          -> solo para CONTAR. Payload vacio, sin un dato.
+     · 'ddl:online:<wsId>'   -> los nombres, solo entre quienes comparten
+                                espacio de trabajo (hace falta su id, igual que
+                                para la sala de sincronia).
+   El contador global se conserva; los nombres dejan de salir del equipo. */
+const online = { chG:null, chW:null, wsId:null, people:[], mine:0, others:0, total:0 };
 function onlineName(){
   try{
     const m = (sbUser && sbUser.user_metadata) || {};
@@ -10252,59 +10257,79 @@ function onlineRoleLabel(r){
        : r==='talent' ? 'Tablet Actor'
        : r==='pc'     ? 'Escritorio' : 'Sin rol';
 }
-function onlinePayload(){
-  return { n:onlineName(),
-           ws:(WORKSPACE&&WORKSPACE.id)||null,
-           wsn:(WORKSPACE&&WORKSPACE.name)||'',
-           role: (typeof DEVROLE!=='undefined' && DEVROLE) || null };
+// lo unico que se publica en el canal del ESPACIO
+function onlineWsPayload(){
+  return { n:onlineName(), role:(typeof DEVROLE!=='undefined' && DEVROLE) || null };
 }
 function onlineConnect(){
-  if(!sb || !sbUser || online.ch || window.OFFLINE) return;
-  try{
-    const ch = sb.channel('ddl:online', { config:{ presence:{ key: sbUser.id } } });
-    online.ch = ch;
-    ch.on('presence', { event:'sync'  }, ()=> onlineRefresh())
-      .on('presence', { event:'join'  }, ()=> onlineRefresh())
-      .on('presence', { event:'leave' }, ()=> onlineRefresh())
-      .subscribe(async (st)=>{
-        if(st==='SUBSCRIBED'){
-          try{ await ch.track(onlinePayload()); }catch(e){}
-          onlineRefresh();
-        } else if(st==='CHANNEL_ERROR' || st==='TIMED_OUT' || st==='CLOSED'){
-          online.ch = null; online.people = []; online.total = 0;
-          updateOnlineChip();
-          setTimeout(onlineConnect, 4000);      // reintento suave
+  if(!sb || !sbUser || window.OFFLINE) return;
+  // 1) canal global: solo cuenta cabezas, sin publicar NADA
+  if(!online.chG){
+    try{
+      const g = sb.channel('ddl:online', { config:{ presence:{ key: sbUser.id } } });
+      online.chG = g;
+      ['sync','join','leave'].forEach(ev=> g.on('presence', { event:ev }, ()=> onlineRefresh()));
+      g.subscribe(async (st)=>{
+        if(st==='SUBSCRIBED'){ try{ await g.track({}); }catch(e){} onlineRefresh(); }
+        else if(st==='CHANNEL_ERROR' || st==='TIMED_OUT' || st==='CLOSED'){
+          online.chG=null; online.total=0; updateOnlineChip(); setTimeout(onlineConnect, 4000);
         }
       });
-  }catch(e){ console.warn('presencia global', e); }
+    }catch(e){ console.warn('presencia · contador', e); }
+  }
+  onlineJoinWs();
+}
+// 2) canal del espacio de trabajo: aqui si van los nombres
+function onlineJoinWs(){
+  const wsId = (WORKSPACE && WORKSPACE.id) || null;
+  if(online.chW && online.wsId === wsId){ try{ online.chW.track(onlineWsPayload()); }catch(e){} return; }
+  try{ if(online.chW) sb.removeChannel(online.chW); }catch(e){}
+  online.chW = null; online.wsId = wsId; online.people = [];
+  if(!sb || !sbUser || !wsId){ onlineRefresh(); return; }
+  try{
+    const w = sb.channel('ddl:online:' + wsId, { config:{ presence:{ key: sbUser.id } } });
+    online.chW = w;
+    ['sync','join','leave'].forEach(ev=> w.on('presence', { event:ev }, ()=> onlineRefresh()));
+    w.subscribe(async (st)=>{
+      if(st==='SUBSCRIBED'){ try{ await w.track(onlineWsPayload()); }catch(e){} onlineRefresh(); }
+      else if(st==='CHANNEL_ERROR' || st==='TIMED_OUT' || st==='CLOSED'){
+        online.chW=null; online.people=[]; updateOnlineChip();
+        setTimeout(()=>{ if(!online.chW) onlineJoinWs(); }, 4000);
+      }
+    });
+  }catch(e){ console.warn('presencia · espacio', e); }
 }
 function onlineDisconnect(){
-  try{ if(online.ch) sb.removeChannel(online.ch); }catch(e){}
-  online.ch = null; online.people = []; online.total = 0; online.mine = 0; online.others = 0;
+  try{ if(online.chG) sb.removeChannel(online.chG); }catch(e){}
+  try{ if(online.chW) sb.removeChannel(online.chW); }catch(e){}
+  online.chG=null; online.chW=null; online.wsId=null;
+  online.people=[]; online.total=0; online.mine=0; online.others=0;
   updateOnlineChip();
 }
-// al cambiar de espacio o de rol hay que volver a anunciarse
-function onlineTouch(){ try{ if(online.ch) online.ch.track(onlinePayload()); }catch(e){} }
+// al cambiar de espacio o de rol: reanunciarse (y cambiar de canal si toca)
+function onlineTouch(){ try{ onlineJoinWs(); }catch(e){} }
 function onlineRefresh(){
-  if(!online.ch) return;
+  // cuantas personas hay en la plataforma (sin saber quienes son)
+  let total = 0;
+  try{ total = online.chG ? Object.keys(online.chG.presenceState()||{}).length : 0; }catch(e){}
+  // quienes comparten espacio de trabajo conmigo
   let st = {};
-  try{ st = online.ch.presenceState() || {}; }catch(e){ return; }
-  const wsId = (WORKSPACE && WORKSPACE.id) || null;
+  try{ st = online.chW ? (online.chW.presenceState()||{}) : {}; }catch(e){}
   online.people = Object.keys(st).map(k=>{
     const ent = st[k] || [], e0 = ent[0] || {};
-    return { id:k, name:e0.n||'Alguien', ws:e0.ws||null, wsn:e0.wsn||'',
-             roles: ent.map(x=>x.role||null), devices: ent.length,
-             me: !!(sbUser && k===sbUser.id) };
+    return { id:k, name: (typeof e0.n === 'string' ? e0.n.slice(0,60) : 'Alguien'),
+             roles: ent.map(x=> x && typeof x.role==='string' ? x.role : null),
+             devices: ent.length, me: !!(sbUser && k===sbUser.id) };
   }).sort((a,b)=> (b.me?1:0)-(a.me?1:0) || a.name.localeCompare(b.name));
-  online.total  = online.people.length;
-  online.mine   = online.people.filter(p=>p.ws===wsId).length;
-  online.others = online.total - online.mine;
+  online.mine   = online.people.length;
+  online.total  = Math.max(total, online.mine);
+  online.others = Math.max(0, online.total - online.mine);
   updateOnlineChip();
   if(document.getElementById('onlinePop')) renderOnlinePanel();
 }
 function updateOnlineChip(){
   const c = document.getElementById('onlineChip'); if(!c) return;
-  if(!sbUser || !online.ch){ c.style.display='none'; return; }
+  if(!sbUser || !online.chG){ c.style.display='none'; return; }
   c.style.display='';
   const n = online.total;
   c.textContent = '👥 ' + n;
@@ -10330,8 +10355,7 @@ function renderOnlinePanel(){
   if(chip){ const r = chip.getBoundingClientRect();
     pop.style.top = (r.bottom + 8) + 'px';
     pop.style.right = Math.max(12, window.innerWidth - r.right) + 'px'; }
-  const wsId = (WORKSPACE && WORKSPACE.id) || null;
-  const aqui = online.people.filter(p=> p.ws===wsId);
+  const aqui = online.people;   // la lista ya viene solo del propio espacio
   const filas = aqui.map(p=>{
     const ini = (p.name||'?').trim().slice(0,2).toUpperCase();
     const rol = p.roles.filter(Boolean).map(onlineRoleLabel);
@@ -11502,7 +11526,26 @@ function syncSendMerge(){
 }
 function onRemoteMerge(p){
   if(!p || p.from===sync.meId) return;
-  try{ charMerges = JSON.parse(p.merges||'{}')||{}; }catch(e){ return; }
+  let m = null;
+  try{ m = JSON.parse(p.merges||'{}'); }catch(e){ return; }
+  if(!m || typeof m!=='object' || Array.isArray(m)) return;
+  // Solo se aceptan fusiones entre personajes que EXISTEN en este capitulo:
+  // sin esto, cualquiera en la sala podia reescribir el mapa de fusiones
+  // completo y forzar un reproceso del guion con nombres inventados.
+  const conocido = (k)=>{
+    if(typeof k!=='string' || !k || k.length>200) return false;
+    try{ if(charIdx && charIdx[k]) return true;
+         return !!(window._charsRaw||[]).some(c=> c.key===k); }catch(e){ return false; }
+  };
+  const limpio = {};
+  let n = 0;
+  for(const pk of Object.keys(m)){
+    if(++n > 500) break;
+    if(!conocido(pk) || !Array.isArray(m[pk])) continue;
+    const abs = m[pk].filter(conocido).slice(0, 200);
+    if(abs.length) limpio[pk] = abs;
+  }
+  charMerges = limpio;
   persistMergesLocalOnly();
   reprocessAfterMerge();
   libMsg('🔗 Personajes fusionados (desde el otro dispositivo)');
@@ -11511,7 +11554,8 @@ function onRemoteSaveAll(p){
   if(!p || p.from===sync.meId) return;
   if(!p.key || (p.key!=='_pages' && !charIdx[p.key])) return;   // '_pages' = páginas globales, no es un personaje
   const rec = recSet(p.key);
-  (p.pages||[]).forEach(pg=> p.recorded ? rec.add(pg) : rec.delete(pg));
+  const pags = valIntArr(p.pages, 5000, 20000) || [];   // solo numeros de pagina reales
+  pags.forEach(pg=> p.recorded ? rec.add(pg) : rec.delete(pg));
   progTouched(p.key);
   saveProgress();
   renderCards();
@@ -11566,9 +11610,82 @@ function syncSendMark(si, mark, del){
   cloudSaveMarks();
   if(pop2 && pop2.doc) refreshBlock(si);
 }
+/* ═══ VALIDACION DE LO QUE LLEGA POR EL CANAL ═════════════════════════
+   Cualquiera que este en la sala envia lo que quiera: los mensajes NO son de
+   fiar solo por venir del canal (hallazgo S9 de la auditoria). Aqui se recorta
+   cada payload a la forma que la propia app produce, antes de guardarlo o de
+   reprocesar el guion. */
+const VAL_MAX_TXT = 20000;     // un parlamento largo cabe de sobra
+const VAL_MAX_ARR = 5000;      // pausas/acentos por parlamento
+const VAL_MAX_TRAZOS = 4000;   // trazos por parlamento
+function valInt(v, min, max){
+  const n = Number(v);
+  return (Number.isFinite(n) && Number.isInteger(n) && n>=min && n<=max) ? n : null;
+}
+function valSi(v){
+  const n = valInt(v, 0, 200000);
+  if(n===null) return null;
+  try{ if(!Array.isArray(script) || n >= script.length) return null; }catch(e){ return null; }
+  return n;
+}
+function valIntArr(a, max, top){
+  if(!Array.isArray(a)) return null;
+  const out = [];
+  for(const x of a.slice(0, max)){ const n = valInt(x, 0, top); if(n!==null) out.push(n); }
+  return out;
+}
+function valPunto(q){
+  if(!Array.isArray(q) || q.length < 2) return null;
+  const x = Number(q[0]), y = Number(q[1]);
+  if(!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return [Math.max(0,Math.min(1,x)), Math.max(0,Math.min(1,y))];
+}
+function valColor(c){ return (typeof c==='string' && /^#[0-9a-fA-F]{3,8}$/.test(c)) ? c : '#22C55E'; }
+function valTrazos(a){
+  if(!Array.isArray(a)) return null;
+  const out = [];
+  for(const t of a.slice(0, VAL_MAX_TRAZOS)){
+    if(!t || typeof t!=='object') continue;
+    const pts = Array.isArray(t.p) ? t.p.map(valPunto).filter(Boolean).slice(0, 2000) : [];
+    if(!pts.length) continue;
+    out.push({ c: valColor(t.c), w: valInt(t.w,1,40) || 4, p: pts,
+               i: (typeof t.i==='string' ? t.i.slice(0,40) : undefined) });
+  }
+  return out;
+}
+function valGestos(a){
+  if(!Array.isArray(a)) return null;
+  const ok = new Set(['pause','fast','slow']);
+  const out = [];
+  for(const g of a.slice(0, VAL_MAX_TRAZOS)){
+    if(!g || typeof g!=='object' || !ok.has(g.k)) continue;
+    const x=Number(g.x), y=Number(g.y);
+    if(!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    out.push({ k:g.k, x:Math.max(0,Math.min(1,x)), y:Math.max(0,Math.min(1,y)),
+               i:(typeof g.i==='string' ? g.i.slice(0,40) : undefined) });
+  }
+  return out;
+}
+// deja una marca en la forma exacta que la app usa; descarta lo que no encaje
+function valMarca(m){
+  if(!m || typeof m!=='object') return null;
+  const out = {};
+  if('text' in m)    out.text    = (m.text===null) ? null : (typeof m.text==='string' ? m.text.slice(0,VAL_MAX_TXT) : undefined);
+  if('pauses' in m)  out.pauses  = valIntArr(m.pauses,  VAL_MAX_ARR, 100000);
+  if('accents' in m) out.accents = valIntArr(m.accents, VAL_MAX_ARR, 100000);
+  if('draw' in m)    out.draw    = valTrazos(m.draw);
+  if('gmk' in m)     out.gmk     = valGestos(m.gmk);
+  // un campo que no supera la validacion se DESCARTA, no se guarda como null:
+  // si no, bastaba mandar accents:'basura' para borrarle los acentos a otro.
+  for(const k of Object.keys(out)) if(out[k]===undefined || (out[k]===null && k!=='text')) delete out[k];
+  return Object.keys(out).length ? out : null;
+}
 function onRemoteMark(p){
   if(!p || p.from===sync.meId) return;
-  const delta = (p.d && typeof p.d==='object') ? p.d : (p.mark || {});
+  const si = valSi(p.si); if(si===null) return;          // parlamento inexistente: fuera
+  const delta = valMarca((p.d && typeof p.d==='object') ? p.d : p.mark);
+  if(!delta) return;
+  p = Object.assign({}, p, { si });
   const cur = sync.marks[p.si] || {};
   const next = Object.assign({}, cur, delta);
   // trazos y gestos se FUNDEN por id: cada dispositivo aporta los suyos y nadie
