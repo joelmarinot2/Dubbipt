@@ -1,0 +1,89 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self'; media-src 'self' file:; connect-src 'self' file:">
+<title>Overlay para Pro Tools</title>
+<link rel="stylesheet" href="control.css">
+
+<header>
+  <h1>Overlay para Pro Tools</h1>
+  <div class="estado"><span id="luz" class="luz"></span><span id="tc">--:--:--:--</span></div>
+</header>
+
+<main>
+  <section class="caja">
+    <h2>1 · Texto</h2>
+    <textarea id="texto" spellcheck="false"
+      placeholder="Pega aqui el texto de la escena.&#10;Un salto de linea es un corte de linea en pantalla."></textarea>
+    <div class="pie"><span id="cuenta">0 palabras</span></div>
+  </section>
+
+  <section class="caja">
+    <h2>2 · Audio</h2>
+    <div class="fila">
+      <button id="bAudio">Cargar audio…</button>
+      <span id="nomAudio" class="tenue">ningun archivo</span>
+    </div>
+    <div class="fila">
+      <label>Alineador externo <small>(opcional, para precision por palabra)</small></label>
+    </div>
+    <div class="fila">
+      <button id="bMarcas" class="sec">Cargar marcas JSON…</button>
+      <span id="nomMarcas" class="tenue">sin marcas</span>
+    </div>
+    <div class="fila">
+      <button id="bAlinear" class="pri" disabled>Alinear</button>
+      <span id="estadoAlin" class="tenue"></span>
+    </div>
+  </section>
+
+  <section class="caja">
+    <h2>3 · Sincronia</h2>
+    <div class="fila">
+      <label for="midi">Entrada MIDI (MTC)</label>
+      <select id="midi"><option value="">— sin MIDI —</option></select>
+    </div>
+    <div class="fila">
+      <label for="off">Calibracion</label>
+      <input id="off" type="range" min="-1000" max="1000" step="5" value="0">
+      <input id="offN" type="number" min="-1000" max="1000" step="5" value="0"> ms
+    </div>
+    <p class="nota">Negativo = el texto se adelanta. Ajusta hasta que la palabra
+      encendida coincida con lo que oyes.</p>
+    <div class="fila">
+      <button id="bLocal" class="sec">Reproducir aqui (sin Pro Tools)</button>
+      <button id="bParar" class="sec">Parar</button>
+    </div>
+  </section>
+
+  <section class="caja">
+    <h2>4 · Pantalla</h2>
+    <div class="fila">
+      <label for="pant">Monitor</label><select id="pant"></select>
+    </div>
+    <div class="fila">
+      <label for="tam">Tamano</label>
+      <input id="tam" type="range" min="18" max="90" step="1" value="38"><span id="tamN">38</span>
+    </div>
+    <div class="fila">
+      <label for="abajo">Altura</label>
+      <input id="abajo" type="range" min="0" max="80" step="1" value="6"><span id="abajoN">6</span>
+    </div>
+    <div class="fila colores">
+      <label>Colores</label>
+      <span>por decir <input id="cPend" type="color" value="#e9edf6"></span>
+      <span>ahora <input id="cAct" type="color" value="#ffd24a"></span>
+      <span>dicho <input id="cHec" type="color" value="#8f9bb3"></span>
+    </div>
+    <div class="fila">
+      <button id="bVer" class="pri">Mostrar overlay</button>
+      <button id="bColocar" class="sec">Colocar (el raton deja de pasar)</button>
+    </div>
+    <p class="nota">Ctrl+Alt+O esconde o saca el overlay desde cualquier sitio.</p>
+  </section>
+</main>
+
+<footer id="msg"></footer>
+
+<script src="../src/text.js"></script>
+<script src="../src/mtc.js"></script>
+<script src="control.js"></script>

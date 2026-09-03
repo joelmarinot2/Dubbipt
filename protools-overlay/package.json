@@ -1,0 +1,17 @@
+{
+  "name": "dubbipt-overlay",
+  "version": "0.1.0",
+  "description": "Overlay de letra sincronizada sobre el video a pantalla completa de Pro Tools",
+  "main": "main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/",
+    "e2e": "electron tools/e2e.js",
+    "captura": "electron tools/captura.js"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "electron": "^32.2.0"
+  }
+}

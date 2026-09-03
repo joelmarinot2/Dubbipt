@@ -1,0 +1,59 @@
+/* El fondo NO existe: la ventana es RGBA y todo lo que no se pinte deja ver
+   Pro Tools. Nada de color de fondo en html/body. */
+html, body{
+  margin:0; height:100%; background:transparent; overflow:hidden;
+  -webkit-user-select:none; user-select:none; cursor:default;
+}
+
+/* Ventana de tres lineas. El guion entero puede tener cientos de palabras: se
+   pinta todo una vez, pero solo se ASOMAN tres, y el bloque se desplaza para
+   dejar la linea en curso en el centro. Asi da igual lo larga que sea la escena. */
+#banda{
+  position:fixed; left:0; right:0; bottom:6vh;
+  height:calc(3 * 1.25em + 2 * .35em); overflow:hidden;
+  padding:0 4vw;
+  font-family:"Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  font-weight:700; font-size:38px; line-height:1.25; text-align:center;
+  transition:opacity .18s linear;
+}
+#banda.oculto{ opacity:0; }
+
+#lineas{
+  display:flex; flex-direction:column; align-items:center; gap:.35em;
+  transition:transform .22s cubic-bezier(.22,.61,.36,1); will-change:transform;
+}
+.linea{ opacity:.34; transition:opacity .18s linear; white-space:nowrap; }
+.linea.actual{ opacity:1; }
+
+/* Cada palabra se pinta dos veces: debajo el estado normal y encima el
+   resaltado, recortado por la izquierda. Ese recorte es el barrido karaoke. */
+.pal{ position:relative; display:inline-block; white-space:pre; }
+.pal .base{ color:var(--pendiente,#e9edf6); }
+.pal .luz{
+  position:absolute; inset:0; color:var(--activa,#ffd24a);
+  clip-path:inset(0 100% 0 0); will-change:clip-path;
+}
+/* Ya dicha: la capa de arriba se destapa entera, pero con el color de "dicho".
+   Si conservara el color de "ahora", todo lo dicho quedaria encendido y no se
+   distinguiria la palabra en curso. */
+.pal.hecha .base{ color:var(--hecha,#8f9bb3); }
+.pal.hecha .luz{ color:var(--hecha,#8f9bb3); clip-path:inset(0 0 0 0); }
+
+/* Contorno para que se lea sobre cualquier imagen, clara u oscura. */
+#banda, #aviso{
+  text-shadow:
+     0 0 6px rgba(0,0,0,.92),  0  2px 0 rgba(0,0,0,.85),
+     0 -2px 0 rgba(0,0,0,.85), 2px 0 0 rgba(0,0,0,.85),
+    -2px  0 0 rgba(0,0,0,.85);
+}
+
+#aviso{
+  position:fixed; top:3vh; left:0; right:0; text-align:center;
+  font-family:"Segoe UI", system-ui, sans-serif; font-size:15px; font-weight:600;
+  color:#ffd24a; opacity:0; transition:opacity .2s linear;
+}
+#aviso.ver{ opacity:1; }
+
+/* Modo colocacion: al desactivar el click-through se marca el area para que
+   se vea que ahora si acepta el raton. */
+body.colocando #banda{ outline:2px dashed rgba(255,210,74,.75); outline-offset:12px; }
