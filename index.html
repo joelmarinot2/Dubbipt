@@ -1631,7 +1631,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.44.0-nube';
+const APP_VER_NUM = 'v10.44.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -12830,9 +12830,28 @@ async function karIaPreparar(){
   }catch(e){
     karIa.cargando = false;
     karIa.error = e.message || String(e);
-    stMsg('⚠️ No se pudo preparar la IA: ' + karIa.error + ' — se sigue con el motor de energía');
+    stMsg('⚠️ No se pudo preparar la IA: ' + karIa.error + ' — comprobando por qué…');
+    // «Failed to fetch» no dice nada. Se prueba host por host para poder decir
+    // QUE es lo que no se alcanza: casi siempre la red del estudio bloqueando
+    // uno de los dos sitios, o falta de conexion.
+    stMsg('⚠️ ' + (await karIaDiagnostico(karIa.error)));
     return false;
   }
+}
+
+/** Averigua cual es el eslabon que falla y lo dice en cristiano. */
+async function karIaDiagnostico(err){
+  if(!navigator.onLine) return 'La IA necesita conexión la primera vez, para descargar el modelo. Ahora mismo no hay red. El resto del karaoke funciona sin conexión.';
+  const probar = async (url) => {
+    try{ const r = await fetch(url, { cache:'no-store' }); return r.ok; }catch(e){ return false; }
+  };
+  const lib = await probar('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2/package.json');
+  const mod = await probar('https://huggingface.co/Xenova/whisper-tiny/resolve/main/config.json');
+  if(!lib && !mod) return 'La red de este equipo no deja llegar ni a cdn.jsdelivr.net ni a huggingface.co. Suele ser el cortafuegos del estudio: pide que los permitan y la IA funcionará. El karaoke normal no los necesita.';
+  if(!mod) return 'Se llega a la librería pero no a huggingface.co, que es de donde baja el modelo de voz. Pide que permitan ese dominio.';
+  if(!lib) return 'Se llega a huggingface.co pero no a cdn.jsdelivr.net, de donde baja la librería. Pide que permitan ese dominio.';
+  return 'Los dos sitios responden, así que el fallo fue otro: ' + err
+       + '. Recarga con Ctrl+F5 — si vienes de una versión anterior, el service worker viejo se metía en medio de la descarga y esta versión lo corrige.';
 }
 
 /** Casa las palabras del libreto con las que oyó Whisper.

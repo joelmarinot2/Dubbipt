@@ -1,5 +1,5 @@
 // Service Worker · Dubbipt  (VERSION autogenerada en cada build)
-const VERSION = '2026-09-03T14:52';
+const VERSION = '2026-09-03T15:00';
 const CACHE   = 'dubbipt-' + VERSION;
 
 const SHELL = [
@@ -27,9 +27,19 @@ async function staleWhileRevalidate(req) {
   const cache = await caches.open(CACHE);
   const hit = await cache.match(req);
   const net = fetch(req).then(res => {
-    if (res && res.ok) cache.put(req, res.clone());
+    // Guardar puede fallar por mil motivos -respuesta parcial 206, cuota llena,
+    // respuesta opaca- y eso NO puede tumbar la peticion: se guarda si se puede
+    // y se devuelve la respuesta igualmente.
+    if (res && res.ok && res.status === 200) {
+      try { cache.put(req, res.clone()).catch(() => {}); } catch (e) {}
+    }
     return res;
-  }).catch(() => hit);
+  }).catch(err => {
+    // Sin copia en cache hay que propagar el error de verdad. Devolver `hit`
+    // valiendo undefined hacia que el navegador respondiera "Failed to fetch".
+    if (hit) return hit;
+    throw err;
+  });
   return hit || net;
 }
 
@@ -53,6 +63,15 @@ self.addEventListener('fetch', e => {
   const url = new URL(req.url);
 
   if (url.hostname.includes('supabase') || /\/(rest|auth|storage|realtime)\//.test(url.pathname)) return;
+
+  // Solo se gestiona lo NUESTRO y las librerias fijadas de arriba. Todo lo
+  // demas que salga a la red -por ejemplo el modelo de voz, que baja en trozos
+  // y pesa decenas de MB- se deja pasar al navegador sin tocarlo. Meterlo en
+  // la cache no aporta nada y rompia la descarga.
+  if (url.origin !== self.location.origin && SHELL.indexOf(req.url) < 0) return;
+
+  // peticiones por rango: la cache no las admite, van directas
+  if (req.headers.get('range')) return;
 
   if (req.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('/config.js')) {
     e.respondWith(networkFirst(req));
