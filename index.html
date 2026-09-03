@@ -1631,7 +1631,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.44.1-nube';
+const APP_VER_NUM = 'v10.45.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -12035,7 +12035,7 @@ function studioEnsureStrip(){
     +'<button id="stKarWin" class="st-btn ghost" title="Abre los parlamentos en una ventana aparte, con fondo regulable">🪟 Ventana</button>'
     +'<button id="stDlg" class="st-btn ghost" title="Carga la pista de dialogos limpia: el karaoke se guiara por ella">🎙 Diálogos</button>'
     +'<button id="stIa" class="st-btn ghost" title="Afina las marcas reconociendo la voz. El audio no sale de este equipo">✨ IA</button>'
-    +'<select id="stIaLang" class="st-btn ghost" style="padding:6px 8px" title="Idioma de los diálogos"><option value="spanish">español</option><option value="english">inglés</option><option value="portuguese">portugués</option><option value="french">francés</option><option value="italian">italiano</option><option value="german">alemán</option><option value="polish">polaco</option></select>'
+    +'<select id="stIaLang" class="st-btn ghost" style="padding:6px 8px" title="Idioma de los diálogos"><option value="spanish">español</option><option value="english">inglés</option><option value="portuguese">portugués</option><option value="french">francés</option><option value="italian">italiano</option><option value="german">alemán</option><option value="polish">polaco</option><option value="thai">tailandés</option></select>'
     +'<input type="file" id="stDlgIn" accept=".wav,.mp3,.m4a,.aac,.ogg,.oga,.opus,.flac,audio/*" style="display:none">'
     +'<span id="stDlgName" class="st-name"></span>'
     +'<span id="stName" class="st-name"></span>'
@@ -12492,8 +12492,17 @@ const kar = { on:false, cache:new Map(), raf:0, cur:-1, hechas:-1, wds:null };
 
 /** Sílabas aproximadas: grupos de vocales. Basta para repartir. */
 function karSilabas(t){
-  const v = (t.toLowerCase().match(/[aeiouáéíóúüy]+/g) || []).length;
-  return Math.max(1, v);
+  const s = (t||'').toLowerCase();
+  const lat = (s.match(/[aeiouáéíóúüy]+/g) || []).length;
+  if(lat) return lat;
+  // Tailandes: se cuentan los signos vocalicos, pero muchas silabas llevan la
+  // vocal implicita y no se ven, asi que se toma tambien una estimacion por
+  // numero de letras y gana la mayor. Es una aproximacion: solo sirve para
+  // repartir el peso entre palabras, no pretende silabear de verdad.
+  const th = (s.match(/[\u0E30-\u0E39\u0E40-\u0E45]/g) || []).length;
+  const letras = (s.match(/\p{L}/gu) || []).length;
+  if(th || letras) return Math.max(1, th, Math.round(letras/3));
+  return 1;
 }
 /** Del timecode del libreto al tiempo del video. Igual que studioSeekSi(). */
 function karVid(tc){ return tc - studioTc0() - studioFine(); }
@@ -12794,8 +12803,13 @@ const KARIA_MODELO = 'Xenova/whisper-tiny';
 /** Quita tildes, signos y mayusculas: para comparar palabras, no para mostrar. */
 function karNorm(t){
   return (t||'').toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g,'')
-    .replace(/[^a-z0-9ñ]/g,'');
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')   // tildes latinas: fuera
+    // Signos y espacios fuera, pero las LETRAS de cualquier escritura se
+    // quedan. Antes solo sobrevivia el alfabeto latino, asi que en tailandes
+    // -o en cirilico- toda palabra quedaba vacia y no casaba ninguna: la IA
+    // no habria servido de nada en esos idiomas.
+    .replace(/[^\p{L}\p{N}]/gu, '');
 }
 
 /** Descarga el modelo y prepara el audio a 16 kHz. Solo la primera vez. */
