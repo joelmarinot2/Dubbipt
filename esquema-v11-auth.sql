@@ -59,10 +59,16 @@ create trigger trg_lock_role before update on public.profiles
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
+  -- OJO: el rol se fija a 'member' A MANO, nunca se toma de raw_user_meta_data.
+  -- Esos metadatos los escribe el NAVEGADOR al registrarse, asi que leer 'role'
+  -- de ahi permitia crearse una cuenta ya como admin:
+  --   sb.auth.signUp({ ..., options:{ data:{ role:'admin' } } })
+  -- Corregido en sql/seguridad-02-rol-admin.sql; se arregla tambien aqui para
+  -- que volver a ejecutar este esquema base no reabra el agujero.
   insert into public.profiles (id, email, full_name, role)
   values (new.id, new.email,
           coalesce(new.raw_user_meta_data->>'full_name', ''),
-          coalesce(new.raw_user_meta_data->>'role', 'member'))
+          'member')
   on conflict (id) do nothing;
   return new;
 end $$;
