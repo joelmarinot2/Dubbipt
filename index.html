@@ -1628,7 +1628,19 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 } else {
   console.error('pdf.js no cargó: revisa el <script> del CDN o purga la caché del Service Worker.');
 }
-const APP_VERSION = 'v10.39.0-nube · 01-sep-2026';
+/* La fecha se saca del propio archivo servido (document.lastModified), asi que
+   se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
+   version y se quedaba clavada: la version subia y la fecha no. */
+const APP_VER_NUM = 'v10.40.0-nube';
+function appBuildDate(){
+  try{
+    const d = new Date(document.lastModified);
+    if(isNaN(d)) return '';
+    const MES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return String(d.getDate()).padStart(2,'0') + '-' + MES[d.getMonth()] + '-' + d.getFullYear();
+  }catch(e){ return ''; }
+}
+const APP_VERSION = APP_VER_NUM + (appBuildDate() ? ' · ' + appBuildDate() : '');
 window.addEventListener('DOMContentLoaded', ()=>{
   try{ const v=document.getElementById('appVer'); if(v) v.textContent = APP_VERSION; }catch(e){}
   try{ document.getElementById('verBox').textContent = APP_VERSION; }catch(e){}
@@ -4666,17 +4678,20 @@ function taskPanelEl(){
   let p = document.getElementById('taskPanel');
   if(p) return p;
   const st = document.createElement('style');
-  st.textContent = '#taskPanel{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:12000;contain:layout style;'
-    + 'background:#17102E;color:#ECE7FB;border:1px solid #3E3175;border-radius:14px;padding:12px 18px;'
-    + 'min-width:330px;max-width:92vw;box-shadow:0 14px 44px rgba(0,0,0,.5);display:none}'
+  // mismo lenguaje que el resto de la app: fondo #111316, borde #23262b, Inter
+  // y el verde de acento. Antes era la tarjeta morada con serif del diseno viejo.
+  st.textContent = '#taskPanel{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:12000;contain:layout style;'
+    + 'background:#111316;color:#e6e7ea;border:1px solid #23262b;border-radius:14px;padding:13px 18px;'
+    + 'min-width:min(330px,92vw);max-width:92vw;box-shadow:0 18px 50px rgba(0,0,0,.55);display:none;'
+    + "font-family:'Inter',sans-serif}"
     + '#taskPanel.on{display:block}'
-    + '#taskPanel .tp-t{font-family:Space Grotesk,sans-serif;font-weight:700;font-size:14.5px}'
-    + '#taskPanel .tp-k{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#9A90BC;font-family:ui-monospace,monospace;display:flex;align-items:center;gap:6px;min-height:16px}'
+    + "#taskPanel .tp-t{font-family:'Inter',sans-serif;font-weight:700;font-size:14.5px;color:#f2f3f5;margin-top:3px}"
+    + "#taskPanel .tp-k{font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:#6b7280;font-weight:700;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:6px;min-height:16px}"
     + '#taskPanel .tp-k svg{width:14px;height:14px}'
-    + '#taskPanel .tp-s{font-family:ui-monospace,monospace;font-size:12px;color:#A9E6A9;min-height:1.2em;margin-top:4px}'
-    + '#taskPanel .tp-b{height:6px;background:#2A2150;border-radius:4px;margin-top:9px;overflow:hidden}'
-    + '#taskPanel .tp-f{height:100%;width:0;background:linear-gradient(90deg,#4CB84C,#5FC85A);transition:width .25s}'
-    + '#taskPanel.load .tp-f{background:linear-gradient(90deg,#10B981,#4ADE80)}';
+    + "#taskPanel .tp-s{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;color:#4ADE80;min-height:1.2em;margin-top:5px}"
+    + '#taskPanel .tp-b{height:5px;background:#23262b;border-radius:99px;margin-top:10px;overflow:hidden}'
+    + '#taskPanel .tp-f{height:100%;width:0;background:linear-gradient(90deg,#16A34A,#4ADE80);border-radius:99px;transition:width .25s}'
+    + '#taskPanel.load .tp-f{background:linear-gradient(90deg,#0ea5e9,#4ADE80)}';
   document.head.appendChild(st);
   p = document.createElement('div'); p.id = 'taskPanel';
   document.body.appendChild(p);
