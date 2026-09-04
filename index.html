@@ -1219,6 +1219,14 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .cast-fuente.ok{ background:rgba(74,222,128,.12); color:#7ee3a4; border:1px solid rgba(74,222,128,.3); }
 .cast-fuente.mal{ background:rgba(255,107,107,.12); color:#ff9b9b; border:1px solid rgba(255,107,107,.35); }
 
+/* La misma marca naranja, en la tabla */
+body.modo-casting .pla tbody tr.heredado td{ background:rgba(245,158,11,.07); }
+body.modo-casting .pla tbody tr.heredado .ploc input{ color:#F59E0B; font-weight:700; }
+body.modo-casting .pla tbody tr.heredado td:first-child{ box-shadow:inset 3px 0 0 #F59E0B; }
+.pla .pest{ white-space:nowrap; }
+.est-ok{ color:#4ADE80; font-weight:700; }
+.est-no{ color:var(--ink-faint); }
+
 /* ═══ Heredado, pendiente de verificar ═══
    Naranja: ese talento NO lo pusiste en este capítulo, viene de otro. Se ve
    distinto hasta que le das el visto bueno. Solo en modo casting: en grabación
@@ -1721,7 +1729,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.53.0-nube';
+const APP_VER_NUM = 'v10.54.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4243,15 +4251,21 @@ function renderPlanilla(){
       const ta=(a.talent||'ZZZ'), tb=(b.talent||'ZZZ');
       return ta.localeCompare(tb) || a.display.localeCompare(b.display);
     });
+  const cast = (typeof DDL_MODO !== 'undefined' && DDL_MODO === 'casting');
   const doneN = rows.filter(c=>isCharDone(c)).length;
+  const conTal = rows.filter(c=> c.talent && String(c.talent).trim()).length;
+  const porVer = rows.filter(c=> c.heredado).length;
   let html = '<div class="pla show"><div class="pla-head" id="plaHead">'
-    +'<h2>Desglose visual</h2>'
+    +'<h2>'+(cast ? 'Casting' : 'Desglose visual')+'</h2>'
     +'<span class="cnt">'+rows.length+' personaje'+(rows.length===1?'':'s')
-    +(q?' · filtro activo':'')+' · '+doneN+' ✓</span>'
+    +(q?' · filtro activo':'')
+    +(cast ? (' · '+conTal+' con talento'+(porVer?(' · '+porVer+' por verificar'):''))
+           : (' · '+doneN+' ✓'))+'</span>'
     +'<span class="tg">'+(plaOpen?'▾ ocultar':'▸ mostrar')+'</span></div>';
   if(plaOpen && rows.length){
     html += '<div class="pla-wrap"><table><thead><tr>'
-      +'<th>Personaje</th><th>Talento</th><th>TC</th><th>Progreso</th>'
+      +(cast ? '<th>Personaje</th><th>Talento</th><th>Interv.</th><th>Estado</th>'
+             : '<th>Personaje</th><th>Talento</th><th>TC</th><th>Progreso</th>')
       +'</tr></thead><tbody>';
     for(const c of rows){
       const rec = recSet(c.key);
@@ -4259,16 +4273,22 @@ function renderPlanilla(){
       const recCount = c.pages.filter(pg=>rec.has(pg.p)).length;
       const pct = c.pages.length ? Math.round(100*recCount/c.pages.length) : 0;
       const tc = firstTCOf(c.key);
-      html += '<tr style="--pc:'+c.color+'"'+(done?' class="done"':'')+' data-k="'+esc(c.key)+'" title="Abrir el libreto de '+esc(c.display)+'">'
+      const clases = (done?'done':'') + (cast && c.heredado ? ' heredado' : '');
+      html += '<tr style="--pc:'+c.color+'"'+(clases.trim()?' class="'+clases.trim()+'"':'')+' data-k="'+esc(c.key)+'" title="Abrir el libreto de '+esc(c.display)+'">'
         +'<td class="pnm"><div class="nrow"><span class="cdot"></span>'
         +'<span class="nm2">'+esc(c.display)+'</span>'
         +(done?'<span class="bdg">✓</span>':'')
         +'<button class="delChar" data-k="'+esc(c.key)+'" title="Eliminar personaje del desglose" style="margin-left:auto;display:inline-grid;place-items:center;border:none;background:none;color:#7d76a8;cursor:pointer;padding:2px 4px">'+ICO.trash+'</button>'
         +'</div></td>'
         +'<td class="ploc'+(c.talent?'':' ng')+'"><input class="talIn" data-k="'+esc(c.key)+'" value="'+esc(c.talent||'')+'" placeholder="Asignar talento…" style="width:100%;min-width:90px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;color:inherit;font:inherit;outline:none">'+((c.noRec&&c.talent)?'<small>no se graba</small>':'')+'</td>'
-        +'<td class="ptime">'+(tc||'—')+'</td>'
-        +'<td><div class="prog"><span class="track"><i style="width:'+pct+'%"></i></span>'
-        +'<span class="pn">'+recCount+'/'+c.pages.length+'</span></div></td></tr>';
+        + (cast
+            ? ('<td class="ptime">'+(c.totalInts!=null?c.totalInts:'—')+'</td>'
+              +'<td class="pest">'+(c.heredado
+                  ? '<button class="verbtn" data-k="'+esc(c.key)+'" title="Viene de otro capítulo — pulsa para darlo por bueno">✓ verificar</button>'
+                  : (c.talent ? '<span class="est-ok">✓</span>' : '<span class="est-no">—</span>'))+'</td></tr>')
+            : ('<td class="ptime">'+(tc||'—')+'</td>'
+              +'<td><div class="prog"><span class="track"><i style="width:'+pct+'%"></i></span>'
+              +'<span class="pn">'+recCount+'/'+c.pages.length+'</span></div></td></tr>'));
     }
     html += '</tbody></table></div>';
   } else if(plaOpen){
@@ -4290,6 +4310,22 @@ function renderPlanilla(){
   });
   box.querySelectorAll('button.delChar').forEach(b=>{
     b.addEventListener('click', e=>{ e.stopPropagation(); removeChar(b.dataset.k); });
+  });
+  // el catálogo de la empresa también aquí, que es donde se teclea rápido
+  try{
+    if(typeof CAST_TALENTOS !== 'undefined' && CAST_TALENTOS.length)
+      box.querySelectorAll('input.talIn').forEach(i=> i.setAttribute('list','talList'));
+  }catch(e){}
+  // dar por bueno un talento heredado, desde la tabla
+  box.querySelectorAll('button.verbtn').forEach(b=>{
+    b.addEventListener('click', async e=>{
+      e.stopPropagation();
+      const k = b.dataset.k, c = charIdx[k];
+      try{ castHistPush(castFoto([k]), 'verificar ' + ((c&&c.display)||k)); }catch(x){}
+      castVerificar(k, true);
+      try{ renderPlanilla(); renderCards(); }catch(x){}
+      try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(x){}
+    });
   });
 }
 /* Remapea sync.marks cuando script se filtra y reindexa.
@@ -5531,6 +5567,8 @@ function ponerModo(epId, m){
   const bt = document.getElementById('btnTabla');
   if(bt) bt.style.display = (m === 'casting') ? '' : 'none';
   try{ castPintarFuente(); }catch(e){}
+  // la tabla cambia de columnas según el modo: hay que repintarla
+  try{ if(m === 'casting') plaOpen = true; renderPlanilla(); }catch(e){}
   // continuidad: lo que ya se repartió en otros capítulos del programa
   if(m === 'casting'){ try{ castHeredar(null); }catch(e){} }
   const bm = document.getElementById('btnModo');
@@ -6733,7 +6771,7 @@ function showTutorial(onDone){
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Casting', ic:'🎭', t:'Repartir los talentos',
-      d:'Primero, una vez por programa: <b>Formato de casting</b> sube el Excel de la empresa que se va a rellenar.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
+      d:'Primero, una vez por programa: <b>Formato de casting</b> sube el Excel de la empresa que se va a rellenar.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
        +'<span class="tut-tip">Se rellena tu archivo tal cual: fórmulas, formato y macros intactos. Si un personaje del libreto no está en el Excel, te avisa por su nombre.</span>' },
 
     { s:'Paso 11 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
