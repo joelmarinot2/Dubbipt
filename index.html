@@ -1549,6 +1549,8 @@ body.modo-casting #btnExport{ display:none !important; }
       </div>
       <div class="ac-div" aria-hidden="true"></div>
       <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar entre grabación y casting">Modo</button>
+      <button class="btnv sm" id="btnTabla" style="display:none" onclick="document.getElementById('tablaFile').click()" title="Sube un Excel con: A personaje · B talento · C intervenciones">Tabla de casting</button>
+      <input type="file" id="tablaFile" accept=".xlsx,.xls,.xlsm,.csv" style="display:none" onchange="if(this.files[0]) castSubirTabla(this.files[0]); this.value=''">
       <button type="button" class="cast-fuente" id="castFuente" style="display:none" onclick="document.getElementById('formatoFile').click()"></button>
       <input type="file" id="formatoFile" accept=".xlsm,.xlsx" style="display:none" onchange="if(this.files[0]) castSubirFormato(this.files[0]); this.value=''">
       <button class="btnv sm" id="btnUndo" style="display:none" onclick="castUndo()" disabled title="Nada que deshacer">↩ Deshacer</button>
@@ -1695,7 +1697,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.51.0-nube';
+const APP_VER_NUM = 'v10.52.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5487,6 +5489,8 @@ function ponerModo(epId, m){
   if(b) b.style.display = (m === 'casting') ? '' : 'none';
   const bu = document.getElementById('btnUndo');
   if(bu){ bu.style.display = (m === 'casting') ? '' : 'none'; castPintarUndo(); }
+  const bt = document.getElementById('btnTabla');
+  if(bt) bt.style.display = (m === 'casting') ? '' : 'none';
   try{ castPintarFuente(); }catch(e){}
   // continuidad: lo que ya se repartió en otros capítulos del programa
   if(m === 'casting'){ try{ castHeredar(null); }catch(e){} }
@@ -5885,6 +5889,128 @@ function castPreguntarDudosos(lista){
     };
     cap.addEventListener('click', (e) => { if(e.target === cap){ cap.remove(); resolve([]); } });
   });
+}
+
+/* ═══ TABLA DE CASTING PREVIA ═══════════════════════════════════════════
+
+   Un Excel sencillo con tres columnas: A personaje, B talento, C número de
+   intervenciones. Sirve para traer un reparto ya decidido fuera de Dubbipt.
+
+   Qué hace con cada fila:
+   · si el personaje está en este capítulo y no tiene talento, se lo pone;
+   · si ya tiene OTRO talento, no lo pisa: lo pregunta;
+   · esté o no en este capítulo, se apunta en el registro del programa, así que
+     los capítulos siguientes también lo heredan.
+
+   La columna C no se ignora: se compara con las intervenciones que Dubbipt
+   contó en el libreto y se avisa si no cuadran. Una diferencia gorda suele
+   significar que la tabla es de otro capítulo, y es mejor verlo antes de
+   repartir que después de grabar. */
+
+function castTablaLeer(rows){
+  // ¿La primera fila son cabeceras? Se comprueba con coincidencia EXACTA.
+  // Buscándolo «dentro» de la celda, una tabla cuyo primer talento se llamara
+  // «ACTOR A» perdía su primera fila: la palabra actor estaba ahí dentro.
+  let ini = 0;
+  const cab = (v) => String(v == null ? '' : v).toLowerCase().replace(/[^a-zñ ]/g,'').trim();
+  const a0 = cab((rows[0] || [])[0]), b0 = cab((rows[0] || [])[1]);
+  if(/^(personaje|locutor|character|nombre|personajes)$/.test(a0) ||
+     /^(talento|actor|actriz|voz|reparto|casting|talentos)$/.test(b0)) ini = 1;
+  const out = [];
+  for(let r = ini; r < rows.length; r++){
+    const f = rows[r] || [];
+    const personaje = String(f[0] == null ? '' : f[0]).trim();
+    const talento   = String(f[1] == null ? '' : f[1]).trim();
+    if(!personaje) continue;
+    // Vacío es DESCONOCIDO, no cero: si no, una celda en blanco disparaba el
+    // aviso de «no cuadran las intervenciones» sin que hubiera nada raro.
+    const crudo = String(f[2] == null ? '' : f[2]).replace(/[^\d.-]/g, '');
+    const ints = crudo === '' ? null : Number(crudo);
+    out.push({ personaje, talento, ints: (ints != null && isFinite(ints)) ? ints : null });
+  }
+  return out;
+}
+
+async function castSubirTabla(file){
+  if(!file) return;
+  try{
+    if(typeof XLSX === 'undefined'){ castAviso('❌ Falta la librería de Excel'); return; }
+    if(!LDB.showId && !(currentEp && currentEp.showId)){ castAviso('⚠️ Entra en un programa primero'); return; }
+    const wb = XLSX.read(await file.arrayBuffer(), { type:'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    if(!ws){ castAviso('❌ Ese Excel está vacío'); return; }
+    const filas = castTablaLeer(XLSX.utils.sheet_to_json(ws, { header:1, defval:'' }));
+    if(!filas.length){ castAviso('❌ No encontré filas: columna A el personaje, B el talento, C las intervenciones'); return; }
+
+    // por nombre normalizado, para casar con el libreto
+    const porClave = {};
+    for(const f of filas) if(f.talento) porClave[castNorm(f.personaje)] = f;
+
+    const llenar = [], chocan = [], descuadran = [];
+    for(const k in charIdx){
+      const c = charIdx[k];
+      if(!c) continue;
+      const f = porClave[castNorm(c.display || k)];
+      if(!f) continue;
+      if(f.ints != null && c.totalInts != null){
+        const dif = Math.abs(f.ints - c.totalInts);
+        if(dif > Math.max(2, c.totalInts * 0.5))
+          descuadran.push((c.display || k) + ': libreto ' + c.totalInts + ' / tabla ' + f.ints);
+      }
+      const actual = String(c.talent || '').trim();
+      if(!actual) llenar.push({ key:k, nombre:c.display || k, talent:f.talento, comoSe:f.personaje });
+      else if(castNorm(actual) !== castNorm(f.talento))
+        chocan.push({ key:k, nombre:c.display || k, talent:f.talento, comoSe:'ahora: ' + actual });
+    }
+
+    const aplicar = (lista) => {
+      if(!lista.length) return;
+      try{ castHistPush(castFoto(lista.map(x=>x.key)), 'tabla de casting (' + lista.length + ')'); }catch(e){}
+      for(const x of lista){
+        const c = charIdx[x.key]; if(!c) continue;
+        c.talent = x.talent;
+        try{ c.noRec = NO_REC.has(norm(x.talent)); }catch(e){}
+        try{ const raw=(window._charsRaw||[]).find(y=>y.key===x.key); if(raw){ raw.talent=x.talent; raw.noRec=c.noRec; } }catch(e){}
+      }
+    };
+    aplicar(llenar);
+
+    let reemplazados = [];
+    if(chocan.length) reemplazados = await castPreguntarDudosos(chocan);
+    aplicar(reemplazados);
+
+    // al registro TODAS las filas con talento, salgan o no en este capítulo:
+    // es lo que da continuidad a los capítulos siguientes
+    const showId = LDB.showId || (currentEp && currentEp.showId);
+    const reg = await castRegCargar(showId);
+    reg.personajes = reg.personajes || {};
+    let alRegistro = 0;
+    for(const f of filas){
+      if(!f.talento) continue;
+      const clave = castNorm(f.personaje);
+      if(!clave) continue;
+      const antes = reg.personajes[clave];
+      reg.personajes[clave] = { display: f.personaje, talent: f.talento,
+                                episodios: (antes && antes.episodios) || [], ts: Date.now() };
+      alRegistro++;
+    }
+    await castRegGuardar(showId, reg);
+
+    try{ renderCards(); }catch(e){}
+    try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+
+    const puestos = llenar.length + reemplazados.length;
+    let msg = '✅ ' + puestos + ' talento' + (puestos===1?'':'s') + ' de la tabla · '
+            + alRegistro + ' guardado' + (alRegistro===1?'':'s') + ' para los demás capítulos';
+    castAviso(msg);
+    if(descuadran.length){
+      castAviso('⚠️ No cuadran las intervenciones en ' + descuadran.length + ': '
+        + descuadran.slice(0,3).join(' · ') + (descuadran.length>3 ? ' …' : '')
+        + ' — ¿es la tabla de este capítulo?');
+    }
+  }catch(e){
+    castAviso('❌ No se pudo leer la tabla: ' + (e.message || e));
+  }
 }
 
 /* ═══ FORMATO DE DESGLOSE DEL PROGRAMA ═══════════════════════════════════
@@ -7255,6 +7381,15 @@ async function saveEpHere(){
     if(typeof libPing==='function') libPing('ep', epId, LDB.showId);   // 📡 avisar al otro equipo YA
     taskDone('✓ Capítulo guardado en la nube');
     libMsg('☁️ Capítulo guardado en la nube — visible para todo el estudio');
+    /* CONTINUIDAD al subir el capítulo siguiente.
+       Aquí no se pasa por el selector de modo -eso solo ocurre al ABRIR un
+       capítulo-, así que la herencia del registro no llegaba a ejecutarse y
+       las tarjetas salían vacías aunque el programa ya supiera quién hace a
+       quién. Los personajes ya están en memoria en este punto: es el sitio. */
+    try{
+      const reg = await castRegCargar(LDB.showId);
+      if(reg && reg.personajes && Object.keys(reg.personajes).length) await castHeredar(null);
+    }catch(e){ console.warn('herencia de casting', e); }
   }catch(err){ taskFail(err.message); libMsg('Error al subir: '+err.message); }
   renderLibrary();
 }
