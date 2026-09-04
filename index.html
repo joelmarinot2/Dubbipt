@@ -1208,6 +1208,13 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 @media(max-width:640px){ .drv-heads,.drv-row{ grid-template-columns:1fr 1fr 62px 40px; gap:8px; } .drv-title{ font-size:16px; } }
 </style>
 <style>
+.cast-fuente{
+  font-size:12px; padding:5px 10px; border-radius:8px; white-space:nowrap;
+  max-width:340px; overflow:hidden; text-overflow:ellipsis;
+}
+.cast-fuente.ok{ background:rgba(74,222,128,.12); color:#7ee3a4; border:1px solid rgba(74,222,128,.3); }
+.cast-fuente.mal{ background:rgba(255,107,107,.12); color:#ff9b9b; border:1px solid rgba(255,107,107,.35); }
+
 /* ═══ Selector de modo al abrir un capítulo ═══ */
 .modo-cap{
   position:fixed; inset:0; z-index:2147483000; display:flex;
@@ -1523,6 +1530,7 @@ body.modo-casting #btnExport{ display:none !important; }
       <div class="ac-div" aria-hidden="true"></div>
       <button class="btnv sm act-primary" id="btnCasting" onclick="document.getElementById('castingFile').click()" title="Asignar casting desde un Excel">Asignar casting</button>
       <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar entre grabación y casting">Modo</button>
+      <span class="cast-fuente" id="castFuente" style="display:none"></span>
       <button class="btnv sm" id="btnUndo" style="display:none" onclick="castUndo()" disabled title="Nada que deshacer">↩ Deshacer</button>
       <button class="btnv sm act-primary" id="btnCastOut" style="display:none" onclick="castDescargar()" title="Descarga el desglose de la empresa con los talentos ya puestos">⬇ Desglose con casting</button>
       <input type="file" id="castingFile" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="if(this.files[0]) assignCastingFromExcel(this.files[0]); this.value=''">
@@ -1668,7 +1676,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.48.0-nube';
+const APP_VER_NUM = 'v10.48.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5437,6 +5445,7 @@ function ponerModo(epId, m){
   if(b) b.style.display = (m === 'casting') ? '' : 'none';
   const bu = document.getElementById('btnUndo');
   if(bu){ bu.style.display = (m === 'casting') ? '' : 'none'; castPintarUndo(); }
+  try{ castPintarFuente(); }catch(e){}
   const bm = document.getElementById('btnModo');
   if(bm){ bm.style.display = ''; bm.textContent = (m === 'casting') ? 'Casting' : 'Grabación'; }
   if(m === 'casting') castCargarCatalogo();
@@ -5598,6 +5607,7 @@ async function castSubirFormato(file){
     CAST_TALENTOS = [];                 // el catálogo sale de este archivo
     await castCargarCatalogo();
     castPintarBotonFormato(file.name);
+    try{ castPintarFuente(); }catch(e){}
     libMsg('✅ Formato guardado' + (enNube ? '' : ' (solo en este equipo: no se pudo subir a la nube)')
       + ' · ' + personajes + ' personajes en la hoja ' + CAST_HOJA
       + (CAST_TALENTOS.length ? ' · ' + CAST_TALENTOS.length + ' talentos en el catálogo' : ''));
@@ -5672,23 +5682,54 @@ async function modoAlAbrir(epId, nombre){
 /* ── El desglose original del capítulo ─────────────────────────────────── */
 
 /** Los bytes del .xlsm que se subió al crear el capítulo. */
-async function castBufferOriginal(){
-  // 1) el formato del PROGRAMA, que es lo que se rellena
-  const f = await castFormatoBuf(LDB.showId || (currentEp && currentEp.showId));
-  if(f) return f;
-  // 2) por compatibilidad: el .xlsm que se subió al crear el capítulo, si lo hay
+/**
+ * El Excel de referencia: el que se rellena y se devuelve tal cual.
+ * Devuelve {buf, nombre, de} para poder DECIR cuál se está usando; adivinarlo
+ * era justo lo que no quedaba claro.
+ */
+async function castFuente(){
+  // 1) el formato subido al PROGRAMA
+  const showId = LDB.showId || (currentEp && currentEp.showId);
+  const f = await castFormatoBuf(showId);
+  if(f){
+    let nombre = 'formato del programa';
+    try{ const c = await idbGet('ddl-formato::' + showId); if(c && c.name) nombre = c.name; }catch(e){}
+    return { buf: f, nombre: nombre, de: 'el formato del programa' };
+  }
+  // 2) el desglose que se subió al crear ESTE capítulo
   if(currentEp && currentEp.id){
+    const ep = (LDB.epsAll || []).find(e => e.id === currentEp.id) || {};
     try{
       const c = await idbGet('ddl-files::' + currentEp.id);
-      if(c && c.xls) return c.xls;
+      if(c && c.xls) return { buf: c.xls, nombre: c.xls_name || ep.xls_name || 'desglose del capítulo',
+                              de: 'el desglose de este capítulo' };
     }catch(e){}
-    const ep = (LDB.epsAll || []).find(e => e.id === currentEp.id);
-    if(ep && ep.xls_path){
+    if(ep.xls_path){
       const r = await sb.storage.from('libretos').download(ep.xls_path);
-      if(!r.error && r.data) return await r.data.arrayBuffer();
+      if(!r.error && r.data) return { buf: await r.data.arrayBuffer(),
+                                      nombre: ep.xls_name || 'desglose del capítulo',
+                                      de: 'el desglose de este capítulo' };
     }
   }
-  throw new Error('este programa no tiene formato de casting: súbelo con el botón «Formato de casting»');
+  throw new Error('no hay ningún Excel de referencia: sube el desglose con «Formato de casting» y se rellenará ese mismo');
+}
+
+async function castBufferOriginal(){ return (await castFuente()).buf; }
+
+/** Deja escrito, donde se ve, qué archivo se va a rellenar. */
+async function castPintarFuente(){
+  const el = document.getElementById('castFuente');
+  if(!el) return;
+  if(DDL_MODO !== 'casting'){ el.style.display = 'none'; return; }
+  el.style.display = '';
+  try{
+    const f = await castFuente();
+    el.textContent = 'Se rellenará: ' + f.nombre + ' (' + f.de + ')';
+    el.className = 'cast-fuente ok';
+  }catch(e){
+    el.textContent = '⚠️ ' + (e.message || e);
+    el.className = 'cast-fuente mal';
+  }
 }
 
 /* ── Catálogo de talentos, para autocompletar ──────────────────────────── */
