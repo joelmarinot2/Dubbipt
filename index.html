@@ -1226,7 +1226,7 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .modo-ops{ display:flex; gap:14px; }
 @media (max-width:520px){ .modo-ops{ flex-direction:column; } }
 .modo-op{
-  flex:1; display:flex; flex-direction:column; align-items:center; gap:7px;
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:8px;
   background:#1c1f28; color:inherit; border:1px solid #2b3040; border-radius:13px;
   padding:20px 15px; cursor:pointer; font:inherit; text-align:center;
   transition:border-color .13s, background .13s, transform .08s;
@@ -1234,7 +1234,6 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .modo-op:hover{ background:#232734; border-color:#4ADE80; }
 .modo-op:active{ transform:translateY(1px); }
 .modo-op:focus-visible{ outline:2px solid #4ADE80; outline-offset:2px; }
-.modo-ic{ font-size:30px; line-height:1; }
 .modo-op b{ font-size:16px; }
 .modo-op small{ color:#8892a6; font-size:12.5px; line-height:1.45; }
 .modo-pie{ margin-top:16px; font-size:12px; color:#6d778c; }
@@ -1523,7 +1522,7 @@ body.modo-casting #btnExport{ display:none !important; }
       </div>
       <div class="ac-div" aria-hidden="true"></div>
       <button class="btnv sm act-primary" id="btnCasting" onclick="document.getElementById('castingFile').click()" title="Asignar casting desde un Excel">Asignar casting</button>
-      <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar entre grabación y casting">🎭 Modo</button>
+      <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar entre grabación y casting">Modo</button>
       <button class="btnv sm act-primary" id="btnCastOut" style="display:none" onclick="castDescargar()" title="Descarga el desglose de la empresa con los talentos ya puestos">⬇ Desglose con casting</button>
       <input type="file" id="castingFile" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="if(this.files[0]) assignCastingFromExcel(this.files[0]); this.value=''">
       <button class="btnv sm" id="btnEpsBack" onclick="appBack()" style="display:none" title="Volver a los episodios">‹ Episodios</button>
@@ -1668,7 +1667,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.46.0-nube';
+const APP_VER_NUM = 'v10.46.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4401,8 +4400,17 @@ function renderCards(){
       ev.stopPropagation();
       const talDiv = card.querySelector('.tal');
       if(!talDiv) return;
-      // si ya hay un input abierto, no abrir otro
-      if(card.querySelector('.ctal-input')) return;
+      // El botón ya dice «Guardar»: guardar, que es lo que pone.
+      //
+      // Aquí antes se salía sin hacer nada, y el guardado por blur tampoco
+      // saltaba: al pulsar el botón el foco pasa AL PROPIO BOTÓN, que está
+      // dentro de la tarjeta, y la comprobación de más abajo lo descartaba.
+      // Resultado: pulsar «Guardar» no guardaba nada. Solo funcionaba con
+      // Enter o pinchando fuera.
+      if(card.querySelector('.ctal-input')){
+        if(typeof card._guardarTal === 'function') card._guardarTal();
+        return;
+      }
       talDiv.innerHTML = '';
       const inp = document.createElement('input');
       inp.className = 'ctal-input';
@@ -4416,7 +4424,10 @@ function renderCards(){
       inp.focus(); inp.select();
       cb.textContent = 'Guardar';
 
+      let guardando = false;
       const save = async ()=>{
+        if(guardando) return;     // clic y blur pueden llegar los dos
+        guardando = true;
         const val = inp.value.trim();
         c.talent = val;
         c.noRec = (typeof NO_REC!=='undefined') ? NO_REC.has((typeof norm==='function'?norm(val):val)) : false;
@@ -4431,6 +4442,7 @@ function renderCards(){
         renderCards();
         if(typeof DDL_UI!=='undefined') DDL_UI.toast(val ? 'Talento asignado: '+val : 'Talento borrado');
       };
+      card._guardarTal = save;    // para que el botón «Guardar» pueda llamarlo
       inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); save(); } if(e.key==='Escape'){ renderCards(); } });
       inp.addEventListener('blur', ()=>{ setTimeout(()=>{ if(card.contains(document.activeElement)) return; save(); }, 120); });
     });
@@ -5418,7 +5430,7 @@ function ponerModo(epId, m){
   const b = document.getElementById('btnCastOut');
   if(b) b.style.display = (m === 'casting') ? '' : 'none';
   const bm = document.getElementById('btnModo');
-  if(bm){ bm.style.display = ''; bm.textContent = (m === 'casting') ? '🎭 Casting' : '🎙️ Grabación'; }
+  if(bm){ bm.style.display = ''; bm.textContent = (m === 'casting') ? 'Casting' : 'Grabación'; }
   if(m === 'casting') castCargarCatalogo();
 }
 
@@ -5433,10 +5445,10 @@ function preguntarModo(nombreEp){
     +   '<div class="modo-sub">¿Qué vas a hacer con este capítulo?</div>'
     +   '<div class="modo-ops">'
     +     '<button class="modo-op" data-m="grabacion">'
-    +       '<span class="modo-ic">🎙️</span><b>Grabación</b>'
+    +       '<b>Grabación</b>'
     +       '<small>El libreto, el marcado y la sincronía entre equipos.</small></button>'
     +     '<button class="modo-op" data-m="casting">'
-    +       '<span class="modo-ic">🎭</span><b>Casting</b>'
+    +       '<b>Casting</b>'
     +       '<small>Repartir los talentos entre los personajes y descargar el desglose relleno.</small></button>'
     +   '</div>'
     +   '<div class="modo-pie">Se puede cambiar luego desde el menú.</div>'
@@ -5458,7 +5470,7 @@ async function cambiarModo(){
   const m = await preguntarModo(currentEp.name);
   ponerModo(currentEp.id, m);
   if(typeof DDL_UI !== 'undefined' && DDL_UI.toast)
-    DDL_UI.toast(m === 'casting' ? '🎭 Modo casting' : '🎙️ Modo grabación');
+    DDL_UI.toast(m === 'casting' ? 'Modo casting' : 'Modo grabación');
 }
 
 /** Se llama al terminar de abrir un capítulo. */
