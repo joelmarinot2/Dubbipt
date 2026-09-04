@@ -1209,9 +1209,13 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 </style>
 <style>
 .cast-fuente{
-  font-size:12px; padding:5px 10px; border-radius:8px; white-space:nowrap;
+  font-size:12px; padding:6px 11px; border-radius:8px; white-space:nowrap;
   max-width:340px; overflow:hidden; text-overflow:ellipsis;
+  font-family:inherit; cursor:pointer;
 }
+.cast-fuente:hover{ filter:brightness(1.18); }
+.cast-fuente.mal{ animation:fuentePide 1.6s ease-in-out 3; }
+@keyframes fuentePide{ 0%,100%{ transform:none } 50%{ transform:translateY(-2px) } }
 .cast-fuente.ok{ background:rgba(74,222,128,.12); color:#7ee3a4; border:1px solid rgba(74,222,128,.3); }
 .cast-fuente.mal{ background:rgba(255,107,107,.12); color:#ff9b9b; border:1px solid rgba(255,107,107,.35); }
 
@@ -1481,7 +1485,7 @@ body.modo-casting #btnExport{ display:none !important; }
     </div>
     <div class="sec-title" id="ttlOpen" style="display:none"><svg class="sti" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg> Abrir un capítulo</div>
     <div class="lib-grid" id="libGrid"></div>
-    <div class="sec-title" id="ttlLoad" style="display:none"><svg class="sti" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5"/><path d="M8 9l4-4 4 4"/><path d="M5 16v2a2 2 0 002 2h10a2 2 0 002-2v-2"/></svg> Cargar un capítulo <span class="sec-hint">sube el guion (PDF o Word) — el desglose de personajes se genera automáticamente — y pulsa «💾 Guardar capítulo»</span> <button type="button" class="fmt-open-btn" onclick="openFormatProfile()" title="Configurar cómo se detecta este tipo de libreto">Perfil de formato</button> <button type="button" class="fmt-open-btn" id="btnFormato" onclick="document.getElementById('formatoFile').click()" title="Sube el Excel de la empresa que se rellenará con el casting">Formato de casting</button><input type="file" id="formatoFile" accept=".xlsm,.xlsx" style="display:none" onchange="if(this.files[0]) castSubirFormato(this.files[0]); this.value=''"></div>
+    <div class="sec-title" id="ttlLoad" style="display:none"><svg class="sti" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5"/><path d="M8 9l4-4 4 4"/><path d="M5 16v2a2 2 0 002 2h10a2 2 0 002-2v-2"/></svg> Cargar un capítulo <span class="sec-hint">sube el guion (PDF o Word) — el desglose de personajes se genera automáticamente — y pulsa «💾 Guardar capítulo»</span> <button type="button" class="fmt-open-btn" onclick="openFormatProfile()" title="Configurar cómo se detecta este tipo de libreto">Perfil de formato</button> <button type="button" class="fmt-open-btn" id="btnFormato" onclick="document.getElementById('formatoFile').click()" title="Sube el Excel de la empresa que se rellenará con el casting">Formato de casting</button></div>
     <div class="uploads" id="uploadsBox" style="display:none">
     <span id="dropXls" style="display:none"><span id="xlsName"></span><input type="file" id="inXls"></span>
     <label class="drop" id="dropPdf">
@@ -1529,7 +1533,8 @@ body.modo-casting #btnExport{ display:none !important; }
       </div>
       <div class="ac-div" aria-hidden="true"></div>
       <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar entre grabación y casting">Modo</button>
-      <span class="cast-fuente" id="castFuente" style="display:none"></span>
+      <button type="button" class="cast-fuente" id="castFuente" style="display:none" onclick="document.getElementById('formatoFile').click()"></button>
+      <input type="file" id="formatoFile" accept=".xlsm,.xlsx" style="display:none" onchange="if(this.files[0]) castSubirFormato(this.files[0]); this.value=''">
       <button class="btnv sm" id="btnUndo" style="display:none" onclick="castUndo()" disabled title="Nada que deshacer">↩ Deshacer</button>
       <button class="btnv sm act-primary" id="btnCastOut" style="display:none" onclick="castDescargar()" title="Descarga el desglose de la empresa con los talentos ya puestos">⬇ Desglose con casting</button>
       <button class="btnv sm" id="btnEpsBack" onclick="appBack()" style="display:none" title="Volver a los episodios">‹ Episodios</button>
@@ -1674,7 +1679,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.49.0-nube';
+const APP_VER_NUM = 'v10.49.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5731,10 +5736,15 @@ async function castPintarFuente(){
   el.style.display = '';
   try{
     const f = await castFuente();
-    el.textContent = 'Se rellenará: ' + f.nombre + ' (' + f.de + ')';
+    el.textContent = 'Se rellenará: ' + f.nombre;
+    el.title = 'De ' + f.de + ' · pulsa para subir otro desglose de referencia';
     el.className = 'cast-fuente ok';
   }catch(e){
-    el.textContent = '⚠️ ' + (e.message || e);
+    // Antes esto solo informaba, y el botón para subirlo estaba en una sección
+    // que el CSS esconde justo cuando hay un capítulo abierto: no había forma
+    // de encontrarlo. Ahora el propio aviso sube el archivo.
+    el.textContent = '⚠️ Falta el desglose de referencia — súbelo aquí';
+    el.title = 'Sube el Excel de la empresa: se rellenará ese mismo con los talentos';
     el.className = 'cast-fuente mal';
   }
 }
