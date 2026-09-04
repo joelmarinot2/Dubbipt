@@ -1523,6 +1523,7 @@ body.modo-casting #btnExport{ display:none !important; }
       <div class="ac-div" aria-hidden="true"></div>
       <button class="btnv sm act-primary" id="btnCasting" onclick="document.getElementById('castingFile').click()" title="Asignar casting desde un Excel">Asignar casting</button>
       <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar entre grabación y casting">Modo</button>
+      <button class="btnv sm" id="btnUndo" style="display:none" onclick="castUndo()" disabled title="Nada que deshacer">↩ Deshacer</button>
       <button class="btnv sm act-primary" id="btnCastOut" style="display:none" onclick="castDescargar()" title="Descarga el desglose de la empresa con los talentos ya puestos">⬇ Desglose con casting</button>
       <input type="file" id="castingFile" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="if(this.files[0]) assignCastingFromExcel(this.files[0]); this.value=''">
       <button class="btnv sm" id="btnEpsBack" onclick="appBack()" style="display:none" title="Volver a los episodios">‹ Episodios</button>
@@ -1667,7 +1668,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.47.0-nube';
+const APP_VER_NUM = 'v10.48.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4303,6 +4304,7 @@ async function removeChar(key){
 async function assignTalent(key, val){
   const c = charIdx[key]; if(!c) return;
   val = (val||'').trim();
+  try{ castHistPush(castFoto([key]), (c.talent ? 'talento de ' : 'asignar talento a ') + c.display); }catch(e){}
   c.talent = val; c.noRec = NO_REC.has(norm(val));
   try{ const raw=(window._charsRaw||[]).find(x=>x.key===key); if(raw){ raw.talent=val; raw.noRec=c.noRec; } }catch(e){}
   try{ renderCards(); }catch(e){}
@@ -4429,6 +4431,9 @@ function renderCards(){
         if(guardando) return;     // clic y blur pueden llegar los dos
         guardando = true;
         const val = inp.value.trim();
+        if(val !== (c.talent||'')){
+          try{ castHistPush(castFoto([c.key]), (c.talent ? 'talento de ' : 'asignar talento a ') + c.display); }catch(e){}
+        }
         c.talent = val;
         c.noRec = (typeof NO_REC!=='undefined') ? NO_REC.has((typeof norm==='function'?norm(val):val)) : false;
         // B1 (auditoría): applyCharMerges() reconstruye chars desde _charsRaw al
@@ -5430,6 +5435,8 @@ function ponerModo(epId, m){
   document.body.classList.toggle('modo-casting', m === 'casting');
   const b = document.getElementById('btnCastOut');
   if(b) b.style.display = (m === 'casting') ? '' : 'none';
+  const bu = document.getElementById('btnUndo');
+  if(bu){ bu.style.display = (m === 'casting') ? '' : 'none'; castPintarUndo(); }
   const bm = document.getElementById('btnModo');
   if(bm){ bm.style.display = ''; bm.textContent = (m === 'casting') ? 'Casting' : 'Grabación'; }
   if(m === 'casting') castCargarCatalogo();
@@ -5464,6 +5471,85 @@ function preguntarModo(nombreEp){
     const p = cap.querySelector('.modo-op'); if(p) p.focus();
   });
 }
+
+/* ═══ DESHACER EN EL CASTING ═══════════════════════════════════════════════
+
+   Guarda el estado ANTERIOR de los talentos que cambia cada acción, y el botón
+   los devuelve. Cubre los tres caminos por los que se asigna un talento —la
+   tarjeta, la tabla y la importación desde Excel—; si cubriera solo uno, el
+   botón estaría mintiendo.
+
+   La importación de un Excel entero cuenta como UN paso: se deshace de golpe,
+   que es lo que uno espera después de importar sin querer el archivo de otro
+   capítulo. */
+
+const castHist = { pila: [], max: 50 };
+
+/** Foto del estado actual de unos personajes, para poder volver. */
+function castFoto(keys){
+  const out = [];
+  for(const k of keys){
+    const c = charIdx[k];
+    if(!c) continue;
+    out.push({ key: k, talent: c.talent || '', noRec: !!c.noRec });
+  }
+  return out;
+}
+
+function castHistPush(antes, etiqueta){
+  if(!antes || !antes.length) return;
+  castHist.pila.push({ antes: antes, etiqueta: etiqueta || 'cambio' });
+  if(castHist.pila.length > castHist.max) castHist.pila.shift();
+  castPintarUndo();
+}
+
+function castPintarUndo(){
+  const b = document.getElementById('btnUndo');
+  if(!b) return;
+  const n = castHist.pila.length;
+  b.disabled = !n;
+  b.title = n ? ('Deshacer: ' + castHist.pila[n-1].etiqueta
+                 + ' · quedan ' + n + ' paso' + (n === 1 ? '' : 's'))
+              : 'Nada que deshacer';
+}
+
+async function castUndo(){
+  const paso = castHist.pila.pop();
+  if(!paso){ libMsg('No hay nada que deshacer'); castPintarUndo(); return; }
+  for(const e of paso.antes){
+    const c = charIdx[e.key];
+    if(!c) continue;
+    c.talent = e.talent;
+    c.noRec = e.noRec;
+    try{
+      const raw = (window._charsRaw || []).find(x => x.key === e.key);
+      if(raw){ raw.talent = e.talent; raw.noRec = e.noRec; }
+    }catch(x){}
+  }
+  try{ renderCards(); }catch(e){}
+  try{ if(typeof renderPlanilla === 'function') renderPlanilla(); }catch(e){}
+  try{ if(typeof pop2 !== 'undefined' && pop2.doc && typeof renderLibretoChips === 'function') renderLibretoChips(); }catch(e){}
+  try{
+    if(typeof currentEp !== 'undefined' && currentEp && currentEp.id){
+      await epDataUpsert(currentEp.id, currentEp.showId);
+      await saveEpCache(currentEp.id, new Date().toISOString());
+    }
+  }catch(e){}
+  castPintarUndo();
+  libMsg('↩ Deshecho: ' + paso.etiqueta);
+}
+
+/* Ctrl+Z mientras se reparte el casting. No se roba el atajo si se está
+   escribiendo: dentro de un campo, deshacer es lo del propio campo. */
+document.addEventListener('keydown', (e) => {
+  if(!(e.ctrlKey || e.metaKey) || e.shiftKey) return;
+  if(String(e.key).toLowerCase() !== 'z') return;
+  if(DDL_MODO !== 'casting') return;
+  const t = e.target;
+  if(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  e.preventDefault();
+  castUndo();
+});
 
 /* ═══ FORMATO DE DESGLOSE DEL PROGRAMA ═══════════════════════════════════
 
@@ -5688,6 +5774,18 @@ async function assignCastingFromExcel(file){
     }
     if(cChar<0||cTal<0){ cChar=0; cTal=1; headerRow=0; }   // sin cabeceras: col A=personaje, col B=talento
     let applied=0, miss=0;
+    // se guarda el estado de TODOS los que va a tocar, para poder deshacer
+    // la importación entera de una vez
+    try{
+      const tocados = [];
+      for(let r=headerRow+1; r<rows.length; r++){
+        const nm=(''+((rows[r]||[])[cChar]||'')).trim();
+        if(!nm) continue;
+        const k = findCharKey(nm);
+        if(k && charIdx[k]) tocados.push(k);
+      }
+      castHistPush(castFoto(tocados), 'importar casting de un Excel (' + tocados.length + ')');
+    }catch(e){}
     for(let r=headerRow+1; r<rows.length; r++){
       const nm=(''+((rows[r]||[])[cChar]||'')).trim();
       const tal=(''+((rows[r]||[])[cTal]||'')).trim();
@@ -6125,7 +6223,7 @@ function showTutorial(onDone){
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Casting', ic:'🎭', t:'Repartir los talentos',
-      d:'Primero, una vez por programa: <b>Formato de casting</b> sube el Excel de la empresa que se va a rellenar.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.'
+      d:'Primero, una vez por programa: <b>Formato de casting</b> sube el Excel de la empresa que se va a rellenar.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior; una importación de Excel entera se deshace de una vez.'
        +'<span class="tut-tip">Se rellena tu archivo tal cual: fórmulas, formato y macros intactos. Si un personaje del libreto no está en el Excel, te avisa por su nombre.</span>' },
 
     { s:'Paso 11 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
