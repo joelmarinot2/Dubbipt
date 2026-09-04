@@ -10,6 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.2/mammoth.browser.min.js" integrity="sha384-0H61yoxfMKjbSjFlpDEsx93BrLviZfSpurY4HWlCB4/moYeBGlCUqx2OBP8PqXog" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4/dist/umd/supabase.js" integrity="sha384-ysv13JVP3fufiEXfjML9OdCa/rRbMJvUBOWyor82wfuK8INNZAvmbxHgKIHi+oqz" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js" integrity="sha384-DT0Ls0mO7JmjTnT+oBuMhEJzYJO1zUqzuuMXNdnOmOQRIpN2BgSjvBV/j50NngIT" crossorigin="anonymous"></script>
 <script src="./config.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
@@ -1207,6 +1208,40 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 @media(max-width:640px){ .drv-heads,.drv-row{ grid-template-columns:1fr 1fr 62px 40px; gap:8px; } .drv-title{ font-size:16px; } }
 </style>
 <style>
+/* ═══ Selector de modo al abrir un capítulo ═══ */
+.modo-cap{
+  position:fixed; inset:0; z-index:2147483000; display:flex;
+  align-items:center; justify-content:center; padding:20px;
+  background:rgba(6,8,12,.72); backdrop-filter:blur(6px);
+  animation:modoEntra .16s ease-out;
+}
+@keyframes modoEntra{ from{ opacity:0 } to{ opacity:1 } }
+.modo-caja{
+  width:min(560px,100%); background:#14161c; color:#e7ebf3;
+  border:1px solid #2b3040; border-radius:16px; padding:26px 24px;
+  box-shadow:0 24px 70px rgba(0,0,0,.6); text-align:center;
+}
+.modo-tit{ font-size:13px; letter-spacing:.1em; text-transform:uppercase; color:#8892a6; }
+.modo-sub{ font-size:19px; font-weight:700; margin:6px 0 20px; }
+.modo-ops{ display:flex; gap:14px; }
+@media (max-width:520px){ .modo-ops{ flex-direction:column; } }
+.modo-op{
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:7px;
+  background:#1c1f28; color:inherit; border:1px solid #2b3040; border-radius:13px;
+  padding:20px 15px; cursor:pointer; font:inherit; text-align:center;
+  transition:border-color .13s, background .13s, transform .08s;
+}
+.modo-op:hover{ background:#232734; border-color:#4ADE80; }
+.modo-op:active{ transform:translateY(1px); }
+.modo-op:focus-visible{ outline:2px solid #4ADE80; outline-offset:2px; }
+.modo-ic{ font-size:30px; line-height:1; }
+.modo-op b{ font-size:16px; }
+.modo-op small{ color:#8892a6; font-size:12.5px; line-height:1.45; }
+.modo-pie{ margin-top:16px; font-size:12px; color:#6d778c; }
+
+/* En modo casting no estorban los botones de grabación */
+body.modo-casting #btnExport{ display:none !important; }
+
 /* ===== Vista de episodio / casting (imagen 10) ===== */
 .dens{ display:none !important; }
 #planilla{ display:none !important; }              /* solo se ven las cajas de personaje */
@@ -1488,6 +1523,8 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
       </div>
       <div class="ac-div" aria-hidden="true"></div>
       <button class="btnv sm act-primary" id="btnCasting" onclick="document.getElementById('castingFile').click()" title="Asignar casting desde un Excel">Asignar casting</button>
+      <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar entre grabación y casting">🎭 Modo</button>
+      <button class="btnv sm act-primary" id="btnCastOut" style="display:none" onclick="castDescargar()" title="Descarga el desglose de la empresa con los talentos ya puestos">⬇ Desglose con casting</button>
       <input type="file" id="castingFile" accept=".xlsx,.xls,.xlsm" style="display:none" onchange="if(this.files[0]) assignCastingFromExcel(this.files[0]); this.value=''">
       <button class="btnv sm" id="btnEpsBack" onclick="appBack()" style="display:none" title="Volver a los episodios">‹ Episodios</button>
       <button class="btnv sm" id="btnToPrograms" onclick="goPrograms()" style="display:none" title="Ir a Programas">📚 Programas</button>
@@ -1631,7 +1668,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.45.1-nube';
+const APP_VER_NUM = 'v10.46.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4372,6 +4409,8 @@ function renderCards(){
       inp.type = 'text';
       inp.value = c.talent || '';
       inp.placeholder = 'Nombre del talento…';
+      // catálogo de la empresa, si el desglose lo trae
+      try{ if(CAST_TALENTOS.length) inp.setAttribute('list','talList'); }catch(e){}
       inp.setAttribute('aria-label', 'Talento para '+c.display);
       talDiv.appendChild(inp);
       inp.focus(); inp.select();
@@ -5209,6 +5248,310 @@ function findCharKey(name){
   for(const c of chars){ const d=norm(c.display); if(d && (d.includes(n) || n.includes(d))) return c.key; }
   return null;
 }
+/* ═══ CASTING · rellenar el desglose de la empresa ═══════════════════════
+
+   El desglose que subes al crear el capítulo ya está guardado, y de él salieron
+   los personajes: los nombres casan por construcción. Al exportar se le mete el
+   talento de cada tarjeta en su fila.
+
+   Lo hace con BISTURÍ, no reescribiendo el libro. Probado con el desglose real
+   de un capítulo (10 hojas, 41.035 fórmulas, macros): abrirlo con la librería
+   de Excel y volver a guardarlo conserva los datos pero DESTROZA el formato
+   —Book Antiqua negrita acababa en Calibri— y engorda el archivo de 1,2 a
+   13,5 MB. Aquí se abre el ZIP, se tocan solo las celdas de la columna del
+   actor en la hoja de casting, y todo lo demás se copia tal cual.
+
+   Con eso: ni una fórmula perdida, formato intacto, macros dentro y 1 MB. */
+
+const CAST_HOJA = 'CASTING';     // hoja del libro donde va el casting
+const CAST_COL_PERSONAJE = 'A';  // LOCUTOR
+const CAST_COL_ACTOR = 'D';      // NOMBRE DEL ACTOR
+
+function castEsc(t){
+  return String(t == null ? '' : t)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+/** Nombre de personaje normalizado, para casar el libreto con el Excel. */
+function castClave(t){
+  return String(t == null ? '' : t).replace(/\s+/g,' ').trim().toUpperCase();
+}
+
+/** Del nombre de la hoja al archivo XML que la contiene dentro del ZIP. */
+function castHojaXml(arch, nombre){
+  const txt = (n) => arch[n] ? new TextDecoder().decode(arch[n]) : '';
+  const wbx = txt('xl/workbook.xml'), rels = txt('xl/_rels/workbook.xml.rels');
+  if(!wbx || !rels) throw new Error('el archivo no parece un Excel válido');
+  const esc = nombre.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = wbx.match(new RegExp('<sheet[^>]*name="' + esc + '"[^>]*/>', 'i'));
+  if(!m) throw new Error('el desglose no tiene una hoja «' + nombre + '»');
+  const rid = (m[0].match(/r:id="([^"]+)"/) || [])[1];
+  const t = rels.match(new RegExp('Id="' + rid + '"[^>]*Target="([^"]+)"'));
+  if(!t) throw new Error('no se encuentra la hoja «' + nombre + '» dentro del archivo');
+  return 'xl/' + t[1].replace(/^\/+/, '');
+}
+
+/* Una celda es <c r="D13" s="99"/> o <c r="D13" s="99" t="s"><v>903</v></c>.
+   OJO con el `*?` de los atributos: con `*` codicioso se traga la barra del
+   cierre corto, la alternativa que casa pasa a ser la larga y se lleva por
+   delante la celda siguiente. Eso borraba las fórmulas de la columna de al
+   lado sin dar ningún error. */
+function castReCelda(col){
+  return new RegExp('<c r="' + col + '(\\d+)"([^>]*?)(?:/>|>([\\s\\S]*?)</c>)', 'g');
+}
+
+/** {fila: texto} de una columna, tomando el valor CACHEADO (vale para fórmulas). */
+function castLeerColumna(xml, col){
+  const out = {};
+  const re = castReCelda(col);
+  let m;
+  while((m = re.exec(xml))){
+    const cuerpo = m[3] || '';
+    const v = cuerpo.match(/<v>([\s\S]*?)<\/v>/);
+    if(v) out[+m[1]] = v[1].trim();
+  }
+  return out;
+}
+
+/** Escribe {fila: texto} en una columna conservando el estilo de cada celda. */
+function castEscribirColumna(xml, col, valores){
+  let puestos = 0;
+  const xml2 = xml.replace(castReCelda(col), (todo, fila, attrs) => {
+    const f = +fila;
+    if(!(f in valores)) return todo;
+    const s = attrs.match(/\bs="(\d+)"/);
+    const est = s ? ' s="' + s[1] + '"' : '';
+    const txt = valores[f];
+    puestos++;
+    // Vacío: se deja la celda con su estilo, sin contenido.
+    if(txt === '' || txt == null) return '<c r="' + col + f + '"' + est + '/>';
+    // inlineStr: no toca la tabla de cadenas compartidas, así que no puede
+    // descolocar los textos del resto del libro.
+    return '<c r="' + col + f + '"' + est + ' t="inlineStr"><is><t xml:space="preserve">'
+         + castEsc(txt) + '</t></is></c>';
+  });
+  return { xml: xml2, puestos };
+}
+
+/**
+ * Rellena el desglose con el casting.
+ * @param {ArrayBuffer} buf   el .xlsm original
+ * @param {Object} asign      {NOMBRE DE PERSONAJE: 'Talento'}
+ * @returns {{datos:Uint8Array, puestos:number, sinCasar:string[], enExcel:number}}
+ */
+function castRellenar(buf, asign){
+  if(typeof fflate === 'undefined') throw new Error('falta la librería de ZIP');
+  const arch = fflate.unzipSync(new Uint8Array(buf));
+  const ruta = castHojaXml(arch, CAST_HOJA);
+  const xml = new TextDecoder().decode(arch[ruta]);
+
+  const personajes = castLeerColumna(xml, CAST_COL_PERSONAJE);
+  const valores = {};
+  const vistos = new Set();
+  for(const fila in personajes){
+    const k = castClave(personajes[fila]);
+    if(!k) continue;
+    if(Object.prototype.hasOwnProperty.call(asign, k)){
+      valores[+fila] = asign[k];
+      vistos.add(k);
+    }
+  }
+  const sinCasar = Object.keys(asign).filter(k => !vistos.has(k));
+
+  const r = castEscribirColumna(xml, CAST_COL_ACTOR, valores);
+  arch[ruta] = new TextEncoder().encode(r.xml);
+  return { datos: fflate.zipSync(arch, { level: 6 }), puestos: r.puestos,
+           sinCasar: sinCasar, enExcel: Object.keys(personajes).length };
+}
+
+/** Catálogo de talentos de la hoja TALENTOS, para autocompletar. */
+function castCatalogo(buf){
+  try{
+    const arch = fflate.unzipSync(new Uint8Array(buf));
+    let ruta;
+    try{ ruta = castHojaXml(arch, 'TALENTOS'); }catch(e){ return []; }
+    const xml = new TextDecoder().decode(arch[ruta]);
+    // los nombres son texto compartido: hay que resolver el índice
+    let compartidas = [];
+    if(arch['xl/sharedStrings.xml']){
+      const s = new TextDecoder().decode(arch['xl/sharedStrings.xml']);
+      compartidas = (s.match(/<si>[\s\S]*?<\/si>/g) || []).map(si =>
+        (si.match(/<t[^>]*>([\s\S]*?)<\/t>/g) || [])
+          .map(t => t.replace(/<[^>]+>/g,'')).join('')
+          .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>'));
+    }
+    const out = [];
+    const re = castReCelda('A');
+    let m;
+    while((m = re.exec(xml))){
+      const fila = +m[1], attrs = m[2] || '', cuerpo = m[3] || '';
+      if(fila < 4) continue;                     // 1-3 son cabecera y tarifas
+      const v = cuerpo.match(/<v>([\s\S]*?)<\/v>/);
+      if(!v) continue;
+      let txt = /t="s"/.test(attrs) ? (compartidas[+v[1]] || '') : v[1];
+      txt = String(txt).trim();
+      if(txt && /[A-Za-zÁÉÍÓÚÑ]/.test(txt)) out.push(txt);
+    }
+    return Array.from(new Set(out)).sort((a,b)=> a.localeCompare(b,'es'));
+  }catch(e){ return []; }
+}
+
+/* ═══ MODO CASTING ═══════════════════════════════════════════════════════
+
+   Al abrir un capítulo se pregunta a qué vienes: a GRABAR o a hacer CASTING.
+
+   · Grabación → lo de siempre.
+   · Casting   → se queda en el desglose, con las tarjetas para repartir los
+     talentos, el catálogo de la empresa para autocompletar, y un botón que
+     descarga el desglose ya relleno.
+
+   La elección se recuerda por capítulo: no vuelve a preguntar. */
+
+let DDL_MODO = 'grabacion';
+
+function modoDe(epId){
+  try{ return localStorage.getItem('ddl_modo::' + epId) || ''; }catch(e){ return ''; }
+}
+function ponerModo(epId, m){
+  DDL_MODO = m;
+  try{ if(epId) localStorage.setItem('ddl_modo::' + epId, m); }catch(e){}
+  document.body.classList.toggle('modo-casting', m === 'casting');
+  const b = document.getElementById('btnCastOut');
+  if(b) b.style.display = (m === 'casting') ? '' : 'none';
+  const bm = document.getElementById('btnModo');
+  if(bm){ bm.style.display = ''; bm.textContent = (m === 'casting') ? '🎭 Casting' : '🎙️ Grabación'; }
+  if(m === 'casting') castCargarCatalogo();
+}
+
+/** Pregunta el modo. Devuelve una promesa con 'grabacion' o 'casting'. */
+function preguntarModo(nombreEp){
+  return new Promise((resolve) => {
+    const cap = document.createElement('div');
+    cap.className = 'modo-cap';
+    cap.innerHTML =
+      '<div class="modo-caja" role="dialog" aria-modal="true" aria-label="¿Qué vas a hacer?">'
+    +   '<div class="modo-tit">' + (nombreEp ? String(nombreEp).replace(/</g,'&lt;') : 'Capítulo') + '</div>'
+    +   '<div class="modo-sub">¿Qué vas a hacer con este capítulo?</div>'
+    +   '<div class="modo-ops">'
+    +     '<button class="modo-op" data-m="grabacion">'
+    +       '<span class="modo-ic">🎙️</span><b>Grabación</b>'
+    +       '<small>El libreto, el marcado y la sincronía entre equipos.</small></button>'
+    +     '<button class="modo-op" data-m="casting">'
+    +       '<span class="modo-ic">🎭</span><b>Casting</b>'
+    +       '<small>Repartir los talentos entre los personajes y descargar el desglose relleno.</small></button>'
+    +   '</div>'
+    +   '<div class="modo-pie">Se puede cambiar luego desde el menú.</div>'
+    + '</div>';
+    document.body.appendChild(cap);
+    const elegir = (m) => { cap.remove(); resolve(m); };
+    cap.querySelectorAll('.modo-op').forEach(b => b.onclick = () => elegir(b.dataset.m));
+    cap.addEventListener('click', (e) => { if(e.target === cap) elegir('grabacion'); });
+    document.addEventListener('keydown', function esc(e){
+      if(e.key === 'Escape'){ document.removeEventListener('keydown', esc); elegir('grabacion'); }
+    });
+    const p = cap.querySelector('.modo-op'); if(p) p.focus();
+  });
+}
+
+/** Cambia de modo sobre la marcha. El modal lo promete, así que existe. */
+async function cambiarModo(){
+  if(!currentEp || !currentEp.id) return;
+  const m = await preguntarModo(currentEp.name);
+  ponerModo(currentEp.id, m);
+  if(typeof DDL_UI !== 'undefined' && DDL_UI.toast)
+    DDL_UI.toast(m === 'casting' ? '🎭 Modo casting' : '🎙️ Modo grabación');
+}
+
+/** Se llama al terminar de abrir un capítulo. */
+async function modoAlAbrir(epId, nombre){
+  const guardado = modoDe(epId);
+  if(guardado){ ponerModo(epId, guardado); return guardado; }
+  const m = await preguntarModo(nombre);
+  ponerModo(epId, m);
+  return m;
+}
+
+/* ── El desglose original del capítulo ─────────────────────────────────── */
+
+/** Los bytes del .xlsm que se subió al crear el capítulo. */
+async function castBufferOriginal(){
+  if(!currentEp || !currentEp.id) throw new Error('no hay capítulo abierto');
+  try{
+    const c = await idbGet('ddl-files::' + currentEp.id);
+    if(c && c.xls) return c.xls;
+  }catch(e){}
+  const ep = (LDB.epsAll || []).find(e => e.id === currentEp.id);
+  if(!ep || !ep.xls_path) throw new Error('este capítulo no tiene el desglose guardado: vuelve a subirlo');
+  const r = await sb.storage.from('libretos').download(ep.xls_path);
+  if(r.error || !r.data) throw new Error('no se pudo bajar el desglose de la nube');
+  return await r.data.arrayBuffer();
+}
+
+/* ── Catálogo de talentos, para autocompletar ──────────────────────────── */
+
+let CAST_TALENTOS = [];
+async function castCargarCatalogo(){
+  if(CAST_TALENTOS.length) return CAST_TALENTOS;
+  try{
+    const buf = await castBufferOriginal();
+    CAST_TALENTOS = castCatalogo(buf);
+    let dl = document.getElementById('talList');
+    if(!dl){ dl = document.createElement('datalist'); dl.id = 'talList'; document.body.appendChild(dl); }
+    dl.innerHTML = CAST_TALENTOS.map(t => '<option value="' + t.replace(/"/g,'&quot;') + '">').join('');
+    if(CAST_TALENTOS.length && typeof DDL_UI !== 'undefined' && DDL_UI.toast)
+      DDL_UI.toast('🎭 ' + CAST_TALENTOS.length + ' talentos cargados del desglose');
+  }catch(e){ /* sin catálogo se sigue escribiendo a mano */ }
+  return CAST_TALENTOS;
+}
+
+/* ── Descargar el desglose relleno ─────────────────────────────────────── */
+
+async function castDescargar(){
+  const btn = document.getElementById('btnCastOut');
+  const antes = btn ? btn.textContent : '';
+  try{
+    if(typeof fflate === 'undefined'){ libMsg('❌ Falta la librería de ZIP: recarga la página'); return; }
+    if(btn){ btn.disabled = true; btn.textContent = '⏳ Generando…'; }
+
+    // El casting sale de las tarjetas: personaje → talento
+    const asign = {};
+    let n = 0;
+    for(const k in charIdx){
+      const c = charIdx[k];
+      if(c && c.talent && String(c.talent).trim()){
+        asign[castClave(c.display || k)] = String(c.talent).trim();
+        n++;
+      }
+    }
+    if(!n){ libMsg('No hay ningún talento asignado todavía'); return; }
+
+    const buf = await castBufferOriginal();
+    const r = castRellenar(buf, asign);
+
+    const ep = (LDB.epsAll || []).find(e => e.id === currentEp.id);
+    const base = ((ep && (ep.xls_name || ep.name)) || currentEp.name || 'desglose')
+                   .replace(/\.(xlsm|xlsx|xls)$/i, '');
+    const nombre = base + ' · CASTING.xlsm';
+    const url = URL.createObjectURL(new Blob([r.datos],
+      { type: 'application/vnd.ms-excel.sheet.macroEnabled.12' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+
+    let msg = '✅ ' + r.puestos + ' de ' + n + ' talentos escritos en el desglose';
+    if(r.sinCasar.length){
+      // Aviso honesto: si un personaje del libreto no está en el Excel, su
+      // talento NO se ha escrito en ningún sitio. Callarlo seria peor.
+      msg += ' · ⚠️ sin sitio en el Excel: ' + r.sinCasar.slice(0,6).join(', ')
+           + (r.sinCasar.length > 6 ? ' y ' + (r.sinCasar.length-6) + ' más' : '');
+    }
+    libMsg(msg);
+  }catch(e){
+    libMsg('❌ No se pudo generar el desglose: ' + (e.message || e));
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = antes || '⬇ Desglose con casting'; }
+  }
+}
+
 async function assignCastingFromExcel(file){
   try{
     if(typeof XLSX==='undefined'){ libMsg('Falta la librería de Excel'); return; }
@@ -5662,10 +6005,14 @@ function showTutorial(onDone){
        +'· <b>✨ IA</b> afina las marcas <b>reconociendo la voz</b>. Tarda, así que va bloque a bloque de fondo; lo que aún no ha procesado sigue con el marcado normal. El audio <b>no sale de tu equipo</b>.'
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
-    { s:'Paso 10 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
+    { s:'Paso 10 · Casting', ic:'🎭', t:'Repartir los talentos',
+      d:'Al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS de tu desglose- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>tu propio Excel</b> con los actores puestos.'
+       +'<span class="tut-tip">Se rellena tu archivo tal cual: fórmulas, formato y macros intactos. Si un personaje del libreto no está en el Excel, te avisa por su nombre.</span>' },
+
+    { s:'Paso 11 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
       d:'Con el mismo espacio de trabajo, los equipos se emparejan solos. El <b>director</b> manda el desplazamiento y el tamaño; el <b>actor</b> sigue. Lo que marca cualquiera se ve en todas las pantallas.' },
 
-    { s:'Paso 11 · Tu equipo', ic:'👥', t:'Quién está conectado',
+    { s:'Paso 12 · Tu equipo', ic:'👥', t:'Quién está conectado',
       d:'El chip <b>👥</b> de la barra dice cuántas personas hay conectadas ahora. Al pulsarlo ves quiénes están en tu espacio y con qué dispositivo.' },
 
     { s:'Listo', ic:'🚀', t:'Ya puedes empezar',
@@ -6117,6 +6464,8 @@ async function openEpisode(id){
     libMsg('📂 '+(currentEp.name||'Capítulo')+' abierto');
     renderLibrary();
     _epOpen(true);
+    // ¿a grabar o a repartir casting? Se pregunta una vez por capítulo.
+    try{ modoAlAbrir(currentEp.id, currentEp.name); }catch(e){ console.warn('modo', e); }
   };
   const bg = ()=>{ return (async ()=>{ try{
       // SIEMPRE al abrir: si los archivos cambiaron en la nube, actualizar solo
