@@ -1474,7 +1474,7 @@ body.modo-casting #btnExport{ display:none !important; }
     </div>
     <div class="sec-title" id="ttlOpen" style="display:none"><svg class="sti" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg> Abrir un capítulo</div>
     <div class="lib-grid" id="libGrid"></div>
-    <div class="sec-title" id="ttlLoad" style="display:none"><svg class="sti" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5"/><path d="M8 9l4-4 4 4"/><path d="M5 16v2a2 2 0 002 2h10a2 2 0 002-2v-2"/></svg> Cargar un capítulo <span class="sec-hint">sube el guion (PDF o Word) — el desglose de personajes se genera automáticamente — y pulsa «💾 Guardar capítulo»</span> <button type="button" class="fmt-open-btn" onclick="openFormatProfile()" title="Configurar cómo se detecta este tipo de libreto">Perfil de formato</button></div>
+    <div class="sec-title" id="ttlLoad" style="display:none"><svg class="sti" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V5"/><path d="M8 9l4-4 4 4"/><path d="M5 16v2a2 2 0 002 2h10a2 2 0 002-2v-2"/></svg> Cargar un capítulo <span class="sec-hint">sube el guion (PDF o Word) — el desglose de personajes se genera automáticamente — y pulsa «💾 Guardar capítulo»</span> <button type="button" class="fmt-open-btn" onclick="openFormatProfile()" title="Configurar cómo se detecta este tipo de libreto">Perfil de formato</button> <button type="button" class="fmt-open-btn" id="btnFormato" onclick="document.getElementById('formatoFile').click()" title="Sube el Excel de la empresa que se rellenará con el casting">Formato de casting</button><input type="file" id="formatoFile" accept=".xlsm,.xlsx" style="display:none" onchange="if(this.files[0]) castSubirFormato(this.files[0]); this.value=''"></div>
     <div class="uploads" id="uploadsBox" style="display:none">
     <span id="dropXls" style="display:none"><span id="xlsName"></span><input type="file" id="inXls"></span>
     <label class="drop" id="dropPdf">
@@ -1667,7 +1667,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.46.1-nube';
+const APP_VER_NUM = 'v10.47.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4936,7 +4936,8 @@ async function renderLibrary(silent){
       const ub=$('uploadsBox'); if(ub) ub.style.display = inEps ? '' : 'none';
       const tO=$('ttlOpen'); if(tO) tO.style.display = inEps ? '' : 'none';
       const tL=$('ttlLoad'); if(tL) tL.style.display = inEps ? '' : 'none';
-      const sv2=$('btnSaveEp2'); if(sv2) sv2.onclick = saveEpHere; }
+      const sv2=$('btnSaveEp2'); if(sv2) sv2.onclick = saveEpHere;
+      if(inEps){ try{ castPintarBotonFormato(); }catch(e){} } }
 
     if(libView==='shows' || !LDB.showId){
       libView='shows';
@@ -5464,6 +5465,106 @@ function preguntarModo(nombreEp){
   });
 }
 
+/* ═══ FORMATO DE DESGLOSE DEL PROGRAMA ═══════════════════════════════════
+
+   El Excel de la empresa se sube UNA VEZ por programa y queda guardado en la
+   nube. Al exportar el casting se rellena una copia de ese mismo archivo.
+
+   Antes esto tiraba del .xlsm que se sube al crear cada capítulo, y ahí estaba
+   el fallo: el desglose se genera del guion, así que un capítulo cargado solo
+   con el PDF no tiene ningún Excel que rellenar y la exportación no podía
+   funcionar. Con el formato colgando del programa, da igual cómo se creara
+   el capítulo. */
+
+function castFormatoPath(showId){ return showId + '/formato-casting.xlsm'; }
+
+/** Sube el formato del programa. */
+async function castSubirFormato(file){
+  if(!LDB.showId){ libMsg('Entra en un programa primero'); return; }
+  if(!file) return;
+  const btn = document.getElementById('btnFormato');
+  const antes = btn ? btn.textContent : '';
+  try{
+    if(btn){ btn.disabled = true; btn.textContent = 'Subiendo…'; }
+    const buf = await file.arrayBuffer();
+
+    // Comprobar que sirve ANTES de guardarlo: si no trae la hoja de casting,
+    // decirlo ahora y no cuando el usuario esté esperando su descarga.
+    let personajes = 0;
+    try{
+      const arch = fflate.unzipSync(new Uint8Array(buf));
+      const ruta = castHojaXml(arch, CAST_HOJA);
+      const xml = new TextDecoder().decode(arch[ruta]);
+      personajes = Object.keys(castLeerColumna(xml, CAST_COL_PERSONAJE)).length;
+    }catch(e){
+      libMsg('❌ Ese archivo no vale como formato: ' + (e.message || e));
+      return;
+    }
+
+    await idbSet('ddl-formato::' + LDB.showId, { buf: buf, name: file.name, ts: Date.now() });
+    let enNube = false;
+    try{
+      const r = await sb.storage.from('libretos').upload(
+        castFormatoPath(LDB.showId), new Blob([buf]), { upsert: true });
+      enNube = !r.error;
+    }catch(e){}
+
+    CAST_TALENTOS = [];                 // el catálogo sale de este archivo
+    await castCargarCatalogo();
+    castPintarBotonFormato(file.name);
+    libMsg('✅ Formato guardado' + (enNube ? '' : ' (solo en este equipo: no se pudo subir a la nube)')
+      + ' · ' + personajes + ' personajes en la hoja ' + CAST_HOJA
+      + (CAST_TALENTOS.length ? ' · ' + CAST_TALENTOS.length + ' talentos en el catálogo' : ''));
+  }catch(e){
+    libMsg('❌ No se pudo guardar el formato: ' + (e.message || e));
+  }finally{
+    // Ojo: aquí NO se restaura el texto anterior, que pisaba el «Formato ✓»
+    // recién puesto. Se vuelve a pintar según el estado real.
+    // Primero se devuelve el texto anterior -para que no se quede en
+    // «Subiendo…» ni un instante- y luego se repinta según el estado real.
+    if(btn){ btn.disabled = false; btn.textContent = antes || 'Formato de casting';
+             try{ castPintarBotonFormato(); }catch(e){} }
+  }
+}
+
+/** El formato del programa: de la caché local o de la nube. */
+async function castFormatoBuf(showId){
+  const id = showId || LDB.showId;
+  if(!id) return null;
+  try{
+    const c = await idbGet('ddl-formato::' + id);
+    if(c && c.buf) return c.buf;
+  }catch(e){}
+  try{
+    const r = await sb.storage.from('libretos').download(castFormatoPath(id));
+    if(r && r.data){
+      const buf = await r.data.arrayBuffer();
+      try{ await idbSet('ddl-formato::' + id, { buf: buf, name: 'formato-casting.xlsm', ts: Date.now() }); }catch(e){}
+      return buf;
+    }
+  }catch(e){}
+  return null;
+}
+
+/** Deja el botón diciendo si el programa ya tiene formato. */
+async function castPintarBotonFormato(nombre){
+  const btn = document.getElementById('btnFormato');
+  if(!btn) return;
+  if(nombre){ btn.textContent = 'Formato ✓'; btn.title = 'Formato de casting: ' + nombre + ' — pulsa para cambiarlo'; return; }
+  let hay = false;
+  try{
+    const c = await idbGet('ddl-formato::' + LDB.showId);
+    hay = !!(c && c.buf);
+    if(!hay){
+      const l = await sb.storage.from('libretos').list(LDB.showId || '');
+      hay = !!(l && l.data && l.data.some(f => f.name === 'formato-casting.xlsm'));
+    }
+  }catch(e){}
+  btn.textContent = hay ? 'Formato ✓' : 'Formato de casting';
+  btn.title = hay ? 'Este programa ya tiene formato de casting — pulsa para cambiarlo'
+                  : 'Sube el Excel de la empresa que se rellenará con el casting';
+}
+
 /** Cambia de modo sobre la marcha. El modal lo promete, así que existe. */
 async function cambiarModo(){
   if(!currentEp || !currentEp.id) return;
@@ -5486,16 +5587,22 @@ async function modoAlAbrir(epId, nombre){
 
 /** Los bytes del .xlsm que se subió al crear el capítulo. */
 async function castBufferOriginal(){
-  if(!currentEp || !currentEp.id) throw new Error('no hay capítulo abierto');
-  try{
-    const c = await idbGet('ddl-files::' + currentEp.id);
-    if(c && c.xls) return c.xls;
-  }catch(e){}
-  const ep = (LDB.epsAll || []).find(e => e.id === currentEp.id);
-  if(!ep || !ep.xls_path) throw new Error('este capítulo no tiene el desglose guardado: vuelve a subirlo');
-  const r = await sb.storage.from('libretos').download(ep.xls_path);
-  if(r.error || !r.data) throw new Error('no se pudo bajar el desglose de la nube');
-  return await r.data.arrayBuffer();
+  // 1) el formato del PROGRAMA, que es lo que se rellena
+  const f = await castFormatoBuf(LDB.showId || (currentEp && currentEp.showId));
+  if(f) return f;
+  // 2) por compatibilidad: el .xlsm que se subió al crear el capítulo, si lo hay
+  if(currentEp && currentEp.id){
+    try{
+      const c = await idbGet('ddl-files::' + currentEp.id);
+      if(c && c.xls) return c.xls;
+    }catch(e){}
+    const ep = (LDB.epsAll || []).find(e => e.id === currentEp.id);
+    if(ep && ep.xls_path){
+      const r = await sb.storage.from('libretos').download(ep.xls_path);
+      if(!r.error && r.data) return await r.data.arrayBuffer();
+    }
+  }
+  throw new Error('este programa no tiene formato de casting: súbelo con el botón «Formato de casting»');
 }
 
 /* ── Catálogo de talentos, para autocompletar ──────────────────────────── */
@@ -6018,7 +6125,7 @@ function showTutorial(onDone){
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Casting', ic:'🎭', t:'Repartir los talentos',
-      d:'Al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS de tu desglose- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>tu propio Excel</b> con los actores puestos.'
+      d:'Primero, una vez por programa: <b>Formato de casting</b> sube el Excel de la empresa que se va a rellenar.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.'
        +'<span class="tut-tip">Se rellena tu archivo tal cual: fórmulas, formato y macros intactos. Si un personaje del libreto no está en el Excel, te avisa por su nombre.</span>' },
 
     { s:'Paso 11 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
