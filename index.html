@@ -1679,7 +1679,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.49.1-nube';
+const APP_VER_NUM = 'v10.50.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5355,6 +5355,32 @@ function castEscribirColumna(xml, col, valores){
   return { xml: xml2, puestos };
 }
 
+/** Marca el libro para que Excel RECALCULE todo al abrirlo.
+ *
+ *  Sin esto, cambiar la celda del actor no bastaba: las demás hojas -CASTING 1,
+ *  PLANILLA y PRESUPUESTO, con más de 650 fórmulas que leen esa columna- traen
+ *  guardado el resultado de la última vez que Excel calculó, y el libro viene
+ *  marcado como «ya calculado» (calcId, sin fullCalcOnLoad). Excel se fía de
+ *  esa marca y enseña los valores viejos: el talento aparecía en CASTING pero
+ *  no llegaba al resto.
+ *
+ *  fullCalcOnLoad="1" le dice que rehaga las cuentas al abrir. */
+function castForzarRecalculo(arch){
+  const ruta = 'xl/workbook.xml';
+  if(!arch[ruta]) return false;
+  let xml = new TextDecoder().decode(arch[ruta]);
+  if(/<calcPr[^>]*\/?>/.test(xml)){
+    xml = xml.replace(/<calcPr([^>]*?)\/?>/, (todo, attrs) => {
+      const limpio = attrs.replace(/\sfullCalcOnLoad="[^"]*"/g, '');
+      return '<calcPr' + limpio + ' fullCalcOnLoad="1"/>';
+    });
+  }else{
+    xml = xml.replace('</workbook>', '<calcPr fullCalcOnLoad="1"/></workbook>');
+  }
+  arch[ruta] = new TextEncoder().encode(xml);
+  return true;
+}
+
 /**
  * Rellena el desglose con el casting.
  * @param {ArrayBuffer} buf   el .xlsm original
@@ -5382,6 +5408,7 @@ function castRellenar(buf, asign){
 
   const r = castEscribirColumna(xml, CAST_COL_ACTOR, valores);
   arch[ruta] = new TextEncoder().encode(r.xml);
+  castForzarRecalculo(arch);   // que las demás hojas se enteren del cambio
   return { datos: fflate.zipSync(arch, { level: 6 }), puestos: r.puestos,
            sinCasar: sinCasar, enExcel: Object.keys(personajes).length };
 }
