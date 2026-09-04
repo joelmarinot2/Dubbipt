@@ -1219,6 +1219,22 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .cast-fuente.ok{ background:rgba(74,222,128,.12); color:#7ee3a4; border:1px solid rgba(74,222,128,.3); }
 .cast-fuente.mal{ background:rgba(255,107,107,.12); color:#ff9b9b; border:1px solid rgba(255,107,107,.35); }
 
+/* Diálogo de nombres parecidos */
+.dud-nota{ font-size:12.5px; color:#8892a6; margin-bottom:12px; line-height:1.5; }
+.dud-lista{ max-height:46vh; overflow:auto; display:flex; flex-direction:column; gap:7px; }
+.dud-fila{
+  display:flex; align-items:flex-start; gap:11px; padding:11px 13px;
+  background:#1c1f28; border:1px solid #2b3040; border-radius:10px; cursor:pointer;
+}
+.dud-fila:hover{ border-color:#4ADE80; }
+.dud-fila input{ margin-top:3px; accent-color:#4ADE80; width:16px; height:16px; flex:0 0 auto; }
+.dud-txt{ font-size:13.5px; line-height:1.5; }
+.dud-ant{ color:#8892a6; font-size:12px; }
+.dud-tal{ color:#FCD34D; font-weight:700; }
+.dud-btns{ display:flex; gap:9px; margin-top:15px; }
+.dud-b{ flex:1; padding:11px 12px !important; font-size:13.5px; }
+.dud-b.dud-ok{ background:#22C55E; color:#06210f; border-color:#22C55E; font-weight:700; }
+
 /* ═══ Selector de modo al abrir un capítulo ═══ */
 .modo-cap{
   position:fixed; inset:0; z-index:2147483000; display:flex;
@@ -1679,7 +1695,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.50.0-nube';
+const APP_VER_NUM = 'v10.51.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4325,6 +4341,7 @@ async function assignTalent(key, val){
   }
   try{ if(typeof pop2!=='undefined' && pop2.doc) renderLibretoChips(); }catch(e){}
   if(typeof libMsg==='function') libMsg('🎙️ Talento: '+(val||'(sin asignar)'));
+  try{ castRegAnotarPronto(); }catch(e){}
 }
 
 function renderStats(){
@@ -4457,6 +4474,7 @@ function renderCards(){
         }catch(e){ console.warn('save talent', e); }
         renderCards();
         if(typeof DDL_UI!=='undefined') DDL_UI.toast(val ? 'Talento asignado: '+val : 'Talento borrado');
+        try{ castRegAnotarPronto(); }catch(e){}
       };
       card._guardarTal = save;    // para que el botón «Guardar» pueda llamarlo
       inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); save(); } if(e.key==='Escape'){ renderCards(); } });
@@ -5470,6 +5488,8 @@ function ponerModo(epId, m){
   const bu = document.getElementById('btnUndo');
   if(bu){ bu.style.display = (m === 'casting') ? '' : 'none'; castPintarUndo(); }
   try{ castPintarFuente(); }catch(e){}
+  // continuidad: lo que ya se repartió en otros capítulos del programa
+  if(m === 'casting'){ try{ castHeredar(null); }catch(e){} }
   const bm = document.getElementById('btnModo');
   if(bm){ bm.style.display = ''; bm.textContent = (m === 'casting') ? 'Casting' : 'Grabación'; }
   if(m === 'casting') castCargarCatalogo();
@@ -5599,6 +5619,274 @@ document.addEventListener('keydown', (e) => {
   castUndo();
 });
 
+/* ═══ REGISTRO DE CASTING DEL PROGRAMA ═══════════════════════════════════
+
+   Quién hace a quién, guardado por PROGRAMA. Sirve para dos cosas:
+
+   · Si el desglose que subes ya trae actores en su columna, se leen y se
+     ponen en las tarjetas: no hay que volver a teclear lo que ya estaba.
+   · Al abrir un capítulo nuevo del mismo programa, los personajes que ya
+     salieron heredan su actor. Es la continuidad: si en el 101 hiciste que
+     ANANTHIP la hace Helen Piraban, en el 102 sale sola.
+
+   Sobre «decidir si son la misma persona»: aquí NO hay un modelo de lenguaje.
+   La comparación es tolerante -mayúsculas, tildes, puntuación, espacios de
+   más, y el número final de los personajes numerados- y lo que queda dudoso
+   se PREGUNTA en vez de adivinarlo. Un nombre mal heredado es peor que uno
+   sin heredar: el segundo se ve, el primero pasa a la grabación. */
+
+/** Nombre de personaje comparable: sin tildes, sin signos, sin dobles espacios. */
+function castNorm(t){
+  return String(t == null ? '' : t)
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .replace(/[^\p{L}\p{N} ]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+/** El número final, si lo hay: MALE SOLDIER 4 → «4». Distingue personajes. */
+function castNumFinal(t){
+  const m = castNorm(t).match(/(\d+)$/);
+  return m ? m[1] : '';
+}
+/** Parecido 0..1 entre dos nombres ya normalizados (distancia de edición). */
+function castSimil(a, b){
+  if(a === b) return 1;
+  if(!a || !b) return 0;
+  const m = a.length, n = b.length;
+  if(Math.abs(m - n) > Math.max(m, n) * 0.4) return 0;   // muy distintos de largo
+  let prev = new Array(n + 1);
+  for(let j = 0; j <= n; j++) prev[j] = j;
+  for(let i = 1; i <= m; i++){
+    const fila = [i];
+    for(let j = 1; j <= n; j++){
+      fila[j] = Math.min(prev[j] + 1, fila[j-1] + 1,
+                         prev[j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+    }
+    prev = fila;
+  }
+  return 1 - prev[n] / Math.max(m, n);
+}
+
+/* ── El registro, guardado por programa ────────────────────────────────── */
+
+function castRegPath(showId){ return showId + '/casting-registro.json'; }
+
+async function castRegCargar(showId){
+  const id = showId || LDB.showId;
+  if(!id) return { personajes: {} };
+  try{
+    const c = await idbGet('ddl-registro::' + id);
+    if(c && c.reg) return c.reg;
+  }catch(e){}
+  try{
+    const r = await sb.storage.from('libretos').download(castRegPath(id));
+    if(r && r.data){
+      const reg = JSON.parse(await r.data.text());
+      try{ await idbSet('ddl-registro::' + id, { reg: reg, ts: Date.now() }); }catch(e){}
+      return reg;
+    }
+  }catch(e){}
+  return { personajes: {} };
+}
+
+async function castRegGuardar(showId, reg){
+  const id = showId || LDB.showId;
+  if(!id) return false;
+  try{ await idbSet('ddl-registro::' + id, { reg: reg, ts: Date.now() }); }catch(e){}
+  try{
+    const r = await sb.storage.from('libretos').upload(
+      castRegPath(id), new Blob([JSON.stringify(reg)], { type:'application/json' }), { upsert:true });
+    return !r.error;
+  }catch(e){ return false; }
+}
+
+/** Apunta en el registro lo que hay ahora repartido. */
+async function castRegAnotar(){
+  const showId = LDB.showId || (currentEp && currentEp.showId);
+  if(!showId) return 0;
+  const reg = await castRegCargar(showId);
+  reg.personajes = reg.personajes || {};
+  const ep = (currentEp && currentEp.name) || '';
+  let n = 0;
+  for(const k in charIdx){
+    const c = charIdx[k];
+    if(!c || !c.talent || !String(c.talent).trim()) continue;
+    const clave = castNorm(c.display || k);
+    if(!clave) continue;
+    const antes = reg.personajes[clave];
+    const eps = (antes && antes.episodios) ? antes.episodios.slice() : [];
+    if(ep && eps.indexOf(ep) < 0) eps.push(ep);
+    reg.personajes[clave] = { display: c.display || k, talent: String(c.talent).trim(),
+                              episodios: eps, ts: Date.now() };
+    n++;
+  }
+  await castRegGuardar(showId, reg);
+  return n;
+}
+
+let _regT = 0;
+/** Apunta en el registro, pero esperando: asignar cinco seguidos no son cinco
+    subidas a la nube. */
+function castRegAnotarPronto(){
+  clearTimeout(_regT);
+  _regT = setTimeout(() => { try{ castRegAnotar(); }catch(e){} }, 1500);
+}
+
+/** Busca en el registro el actor de un personaje. Devuelve {talent, seguro, de}. */
+function castRegBuscar(reg, nombre){
+  const clave = castNorm(nombre);
+  if(!clave) return null;
+  const P = reg.personajes || {};
+  if(P[clave]) return { talent: P[clave].talent, seguro: true, de: P[clave].display, parecido: 1 };
+  // sin coincidencia exacta: el más parecido, pero sin decidir por tu cuenta
+  const num = castNumFinal(nombre);
+  let mejor = null;
+  for(const k in P){
+    if(castNumFinal(k) !== num) continue;      // «SOLDADO 1» no es «SOLDADO 2»
+    const s = castSimil(clave, k);
+    if(s >= 0.86 && (!mejor || s > mejor.parecido))
+      mejor = { talent: P[k].talent, seguro: false, de: P[k].display, parecido: s };
+  }
+  return mejor;
+}
+
+/** Lee el casting que YA trae un desglose: {personaje: actor}. */
+function castLeerCasting(buf){
+  const arch = fflate.unzipSync(new Uint8Array(buf));
+  const ruta = castHojaXml(arch, CAST_HOJA);
+  const xml = new TextDecoder().decode(arch[ruta]);
+  const personajes = castLeerColumna(xml, CAST_COL_PERSONAJE);
+  const actores = castLeerColumnaTexto(arch, xml, CAST_COL_ACTOR);
+  const out = {};
+  for(const fila in personajes){
+    const p = String(personajes[fila] || '').trim();
+    const a = String(actores[fila] || '').trim();
+    if(p && a) out[p] = a;
+  }
+  return out;
+}
+
+/** Igual que castLeerColumna, pero resolviendo el texto compartido.
+    La columna del personaje son fórmulas y su <v> ya es el texto; la del actor
+    puede ser texto compartido (t="s") y entonces el <v> es un ÍNDICE. Leerlo
+    como texto daría números en vez de nombres. */
+function castLeerColumnaTexto(arch, xml, col){
+  let comp = [];
+  if(arch['xl/sharedStrings.xml']){
+    const s = new TextDecoder().decode(arch['xl/sharedStrings.xml']);
+    comp = (s.match(/<si>[\s\S]*?<\/si>/g) || []).map(si =>
+      (si.match(/<t[^>]*>([\s\S]*?)<\/t>/g) || []).map(t => t.replace(/<[^>]+>/g,'')).join('')
+        .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>'));
+  }
+  const out = {};
+  const re = castReCelda(col);
+  let m;
+  while((m = re.exec(xml))){
+    const fila = +m[1], attrs = m[2] || '', cuerpo = m[3] || '';
+    if(/t="inlineStr"/.test(attrs)){
+      const t = cuerpo.match(/<t[^>]*>([\s\S]*?)<\/t>/);
+      if(t) out[fila] = t[1].replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+      continue;
+    }
+    const v = cuerpo.match(/<v>([\s\S]*?)<\/v>/);
+    if(!v) continue;
+    out[fila] = /t="s"/.test(attrs) ? (comp[+v[1]] || '') : v[1];
+  }
+  return out;
+}
+
+/**
+ * Reparte lo que ya se sabe: primero lo que trae el propio desglose, luego lo
+ * que el programa recuerda de capítulos anteriores. Solo toca personajes SIN
+ * talento: nunca pisa lo que hayas puesto a mano.
+ */
+async function castHeredar(desdeExcel){
+  const reg = await castRegCargar(LDB.showId || (currentEp && currentEp.showId));
+  const seguros = [], dudosos = [];
+
+  for(const k in charIdx){
+    const c = charIdx[k];
+    if(!c || (c.talent && String(c.talent).trim())) continue;   // ya tiene: no se toca
+    const nombre = c.display || k;
+
+    // 1) el casting que venía dentro del Excel subido
+    if(desdeExcel){
+      const clave = castNorm(nombre);
+      let dir = null;
+      for(const p in desdeExcel){ if(castNorm(p) === clave){ dir = desdeExcel[p]; break; } }
+      if(dir){ seguros.push({ key:k, nombre, talent:dir, de:'el desglose subido' }); continue; }
+    }
+    // 2) el registro del programa
+    const r = castRegBuscar(reg, nombre);
+    if(!r) continue;
+    if(r.seguro) seguros.push({ key:k, nombre, talent:r.talent, de:'capítulos anteriores' });
+    else dudosos.push({ key:k, nombre, talent:r.talent, comoSe:r.de, parecido:r.parecido });
+  }
+
+  const aplicar = (lista) => {
+    if(!lista.length) return;
+    try{ castHistPush(castFoto(lista.map(x => x.key)), 'heredar ' + lista.length + ' talento' + (lista.length===1?'':'s')); }catch(e){}
+    for(const x of lista){
+      const c = charIdx[x.key];
+      if(!c) continue;
+      c.talent = x.talent;
+      try{ c.noRec = NO_REC.has(norm(x.talent)); }catch(e){}
+      try{ const raw=(window._charsRaw||[]).find(y=>y.key===x.key); if(raw){ raw.talent=x.talent; raw.noRec=c.noRec; } }catch(e){}
+    }
+  };
+  aplicar(seguros);
+
+  let confirmados = [];
+  if(dudosos.length) confirmados = await castPreguntarDudosos(dudosos);
+  aplicar(confirmados);
+
+  const total = seguros.length + confirmados.length;
+  if(total){
+    try{ renderCards(); }catch(e){}
+    try{ if(typeof currentEp!=='undefined' && currentEp && currentEp.id){ await epDataUpsert(currentEp.id, currentEp.showId); } }catch(e){}
+    castAviso('✅ ' + total + ' talento' + (total===1?'':'s') + ' heredado' + (total===1?'':'s')
+      + (seguros.length && confirmados.length ? '' : '')
+      + ' · revisa antes de exportar');
+  }
+  return total;
+}
+
+/** Los casos que NO son coincidencia exacta se preguntan, uno por uno. */
+function castPreguntarDudosos(lista){
+  return new Promise((resolve) => {
+    const cap = document.createElement('div');
+    cap.className = 'modo-cap';
+    cap.innerHTML =
+      '<div class="modo-caja" role="dialog" aria-modal="true" style="max-width:640px;text-align:left">'
+    +   '<div class="modo-tit">Nombres parecidos</div>'
+    +   '<div class="modo-sub" style="margin-bottom:8px">¿Son el mismo personaje?</div>'
+    +   '<div class="dud-nota">No coinciden exactamente con los de capítulos anteriores, '
+    +     'así que no se asigna nada sin que lo confirmes.</div>'
+    +   '<div class="dud-lista">' + lista.map((d, i) =>
+          '<label class="dud-fila"><input type="checkbox" data-i="' + i + '">'
+        + '<span class="dud-txt"><b>' + String(d.nombre).replace(/</g,'&lt;') + '</b>'
+        + ' <span class="dud-ant">antes: ' + String(d.comoSe).replace(/</g,'&lt;') + '</span>'
+        + '<br><span class="dud-tal">' + String(d.talent).replace(/</g,'&lt;') + '</span></span></label>').join('')
+    +   '</div>'
+    +   '<div class="dud-btns">'
+    +     '<button class="modo-op dud-b" id="dudNo">Ninguno</button>'
+    +     '<button class="modo-op dud-b" id="dudTodos">Marcar todos</button>'
+    +     '<button class="modo-op dud-b dud-ok" id="dudOk">Asignar los marcados</button>'
+    +   '</div>'
+    + '</div>';
+    document.body.appendChild(cap);
+    const cajas = () => Array.prototype.slice.call(cap.querySelectorAll('input[type=checkbox]'));
+    cap.querySelector('#dudTodos').onclick = () => cajas().forEach(c => c.checked = true);
+    cap.querySelector('#dudNo').onclick = () => { cap.remove(); resolve([]); };
+    cap.querySelector('#dudOk').onclick = () => {
+      const sel = cajas().filter(c => c.checked).map(c => lista[+c.dataset.i]);
+      cap.remove(); resolve(sel);
+    };
+    cap.addEventListener('click', (e) => { if(e.target === cap){ cap.remove(); resolve([]); } });
+  });
+}
+
 /* ═══ FORMATO DE DESGLOSE DEL PROGRAMA ═══════════════════════════════════
 
    El Excel de la empresa se sube UNA VEZ por programa y queda guardado en la
@@ -5645,11 +5933,19 @@ async function castSubirFormato(file){
 
     CAST_TALENTOS = [];                 // el catálogo sale de este archivo
     await castCargarCatalogo();
+    // si el desglose ya venía con actores puestos, se aprovechan
+    let yaTraia = 0;
+    try{
+      const trae = castLeerCasting(buf);
+      yaTraia = Object.keys(trae).length;
+      if(yaTraia){ await castHeredar(trae); await castRegAnotar(); }
+    }catch(e){ console.warn('casting del desglose', e); }
     castPintarBotonFormato(file.name);
     try{ castPintarFuente(); }catch(e){}
     castAviso('✅ Formato guardado' + (enNube ? '' : ' (solo en este equipo: no se pudo subir a la nube)')
       + ' · ' + personajes + ' personajes en la hoja ' + CAST_HOJA
-      + (CAST_TALENTOS.length ? ' · ' + CAST_TALENTOS.length + ' talentos en el catálogo' : ''));
+      + (CAST_TALENTOS.length ? ' · ' + CAST_TALENTOS.length + ' talentos en el catálogo' : '')
+      + (yaTraia ? ' · ya traía ' + yaTraia + ' actores asignados' : ''));
   }catch(e){
     castAviso('❌ No se pudo guardar el formato: ' + (e.message || e));
   }finally{
@@ -6257,7 +6553,7 @@ function showTutorial(onDone){
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Casting', ic:'🎭', t:'Repartir los talentos',
-      d:'Primero, una vez por programa: <b>Formato de casting</b> sube el Excel de la empresa que se va a rellenar.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.'
+      d:'Primero, una vez por programa: <b>Formato de casting</b> sube el Excel de la empresa que se va a rellenar.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
        +'<span class="tut-tip">Se rellena tu archivo tal cual: fórmulas, formato y macros intactos. Si un personaje del libreto no está en el Excel, te avisa por su nombre.</span>' },
 
     { s:'Paso 11 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
