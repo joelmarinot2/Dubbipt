@@ -1219,6 +1219,30 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .cast-fuente.ok{ background:rgba(74,222,128,.12); color:#7ee3a4; border:1px solid rgba(74,222,128,.3); }
 .cast-fuente.mal{ background:rgba(255,107,107,.12); color:#ff9b9b; border:1px solid rgba(255,107,107,.35); }
 
+/* ═══ Heredado, pendiente de verificar ═══
+   Naranja: ese talento NO lo pusiste en este capítulo, viene de otro. Se ve
+   distinto hasta que le das el visto bueno. Solo en modo casting: en grabación
+   el color no aporta nada y compite con el verde de «completado». */
+body.modo-casting .card.heredado{
+  border-color:#F59E0B !important;
+  box-shadow:0 0 0 1px rgba(245,158,11,.35), 0 6px 18px rgba(245,158,11,.10);
+}
+body.modo-casting .card.heredado::before{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:4px;
+  background:#F59E0B; border-radius:4px 0 0 4px;
+}
+body.modo-casting .card.heredado .tal b{ color:#F59E0B; }
+.verbtn{
+  display:inline-flex; align-items:center; gap:4px; margin-left:8px;
+  background:#F59E0B; color:#2a1a02; border:none; border-radius:999px;
+  padding:3px 10px; font:inherit; font-size:11px; font-weight:700;
+  cursor:pointer; vertical-align:middle; white-space:nowrap;
+}
+.verbtn:hover{ filter:brightness(1.12); }
+.verbtn:active{ transform:translateY(1px); }
+/* fuera del casting no se enseña: es una marca de trabajo del reparto */
+body:not(.modo-casting) .verbtn{ display:none; }
+
 /* Diálogo de nombres parecidos */
 .dud-nota{ font-size:12.5px; color:#8892a6; margin-bottom:12px; line-height:1.5; }
 .dud-lista{ max-height:46vh; overflow:auto; display:flex; flex-direction:column; gap:7px; }
@@ -1697,7 +1721,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.52.1-nube';
+const APP_VER_NUM = 'v10.53.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4336,6 +4360,7 @@ async function assignTalent(key, val){
   try{ castHistPush(castFoto([key]), (c.talent ? 'talento de ' : 'asignar talento a ') + c.display); }catch(e){}
   c.talent = val; c.noRec = NO_REC.has(norm(val));
   try{ const raw=(window._charsRaw||[]).find(x=>x.key===key); if(raw){ raw.talent=val; raw.noRec=c.noRec; } }catch(e){}
+  try{ castVerificar(key, true); }catch(e){}   // escrito a mano: ya está verificado
   try{ renderCards(); }catch(e){}
   if(typeof currentEp!=='undefined' && currentEp && currentEp.id){
     try{ await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
@@ -4389,7 +4414,7 @@ function renderCards(){
     const pct = c.pages.length ? Math.round(100*[...rec].filter(p=>c.pages.some(x=>x.p===p)).length/c.pages.length) : 0;
     const card = document.createElement('div');
     const notInLib = !!(window._scanMissingKeys && window._scanMissingKeys.has(c.key));
-    card.className = 'card'+(done?' done':'')+(notInLib?' nolib':''); card.tabIndex=0;
+    card.className = 'card'+(done?' done':'')+(notInLib?' nolib':'')+(c.heredado?' heredado':''); card.tabIndex=0;
     if(notInLib) card.title = 'Este personaje no se encontró en el libreto';
     card.style.setProperty('--cc', c.color);
     const MAXPG=16;
@@ -4397,7 +4422,9 @@ function renderCards(){
       `<span class="pg ${rec.has(pg.p)?'rec':''}" data-p="${pg.p}" title="Abrir pág. ${pg.p}">${pg.p}·${pg.ints}</span>`).join('')
       + (c.pages.length>MAXPG?`<span class="pg more">+${c.pages.length-MAXPG}</span>`:'');
     const talDisplay = c.talent
-      ? `<b>${esc(c.talent)}</b>`
+      ? `<b>${esc(c.talent)}</b>` + (c.heredado
+          ? `<button class="verbtn" title="Viene de otro capítulo — pulsa para darlo por bueno" aria-label="Verificar el talento de ${esc(c.display)}">✓ verificar</button>`
+          : '')
       : '<span class="ng">Sin asignar</span>';
     const tc0 = (typeof firstTCOf==='function' ? firstTCOf(c.key) : '') || '';
     card.innerHTML =
@@ -4425,6 +4452,17 @@ function renderCards(){
     // checkbox: marcar/desmarcar todas las páginas
     const ab = card.querySelector('.allbtn');
     if(ab) ab.addEventListener('click', ev=>{ ev.stopPropagation(); markAllPages(c.key); });
+
+    // dar por bueno un talento heredado de otro capítulo
+    const vb = card.querySelector('.verbtn');
+    if(vb) vb.addEventListener('click', async ev=>{
+      ev.stopPropagation();
+      try{ castHistPush(castFoto([c.key]), 'verificar ' + c.display); }catch(e){}
+      castVerificar(c.key, true);
+      try{ renderCards(); }catch(e){}
+      try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+      if(typeof DDL_UI!=='undefined') DDL_UI.toast('Verificado: ' + c.display);
+    });
 
     // Asignar / Editar → input inline sobre la zona de talento
     const cb = card.querySelector('.cbtn');
@@ -4469,6 +4507,7 @@ function renderCards(){
         // B1 (auditoría): applyCharMerges() reconstruye chars desde _charsRaw al
         // reabrir; si el talento no está también en el crudo, se pierde.
         try{ const raw = (window._charsRaw||[]).find(x=> x.key===c.key); if(raw){ raw.talent = val; raw.noRec = c.noRec; } }catch(e){}
+        try{ castVerificar(c.key, true); }catch(e){}   // escrito a mano: verificado
         // persistir en Supabase si hay episodio abierto
         try{
           if(typeof currentEp!=='undefined' && currentEp && currentEp.id && typeof epDataUpsert==='function')
@@ -5563,7 +5602,7 @@ function castFoto(keys){
   for(const k of keys){
     const c = charIdx[k];
     if(!c) continue;
-    out.push({ key: k, talent: c.talent || '', noRec: !!c.noRec });
+    out.push({ key: k, talent: c.talent || '', noRec: !!c.noRec, heredado: !!c.heredado });
   }
   return out;
 }
@@ -5593,9 +5632,10 @@ async function castUndo(){
     if(!c) continue;
     c.talent = e.talent;
     c.noRec = e.noRec;
+    c.heredado = !!e.heredado;
     try{
       const raw = (window._charsRaw || []).find(x => x.key === e.key);
-      if(raw){ raw.talent = e.talent; raw.noRec = e.noRec; }
+      if(raw){ raw.talent = e.talent; raw.noRec = e.noRec; raw.heredado = !!e.heredado; }
     }catch(x){}
   }
   try{ renderCards(); }catch(e){}
@@ -5835,8 +5875,9 @@ async function castHeredar(desdeExcel){
       const c = charIdx[x.key];
       if(!c) continue;
       c.talent = x.talent;
+      c.heredado = true;      // viene de otro sitio: naranja hasta que se verifique
       try{ c.noRec = NO_REC.has(norm(x.talent)); }catch(e){}
-      try{ const raw=(window._charsRaw||[]).find(y=>y.key===x.key); if(raw){ raw.talent=x.talent; raw.noRec=c.noRec; } }catch(e){}
+      try{ const raw=(window._charsRaw||[]).find(y=>y.key===x.key); if(raw){ raw.talent=x.talent; raw.noRec=c.noRec; raw.heredado=true; } }catch(e){}
     }
   };
   aplicar(seguros);
@@ -5854,6 +5895,18 @@ async function castHeredar(desdeExcel){
       + ' · revisa antes de exportar');
   }
   return total;
+}
+
+/** Marca o desmarca un personaje como «viene de otro capítulo».
+    Se guarda también en el crudo: al reabrir, applyCharMerges() reconstruye
+    `chars` desde ahí y si no estuviera, el aviso naranja se perdería. */
+function castVerificar(key, verificado){
+  const c = charIdx[key];
+  if(c) c.heredado = !verificado;
+  try{
+    const raw = (window._charsRaw || []).find(x => x.key === key);
+    if(raw) raw.heredado = !verificado;
+  }catch(e){}
 }
 
 /** Los casos que NO son coincidencia exacta se preguntan, uno por uno. */
@@ -5969,8 +6022,9 @@ async function castSubirTabla(file){
       for(const x of lista){
         const c = charIdx[x.key]; if(!c) continue;
         c.talent = x.talent;
+        c.heredado = true;      // viene de otro sitio: naranja hasta que se verifique
         try{ c.noRec = NO_REC.has(norm(x.talent)); }catch(e){}
-        try{ const raw=(window._charsRaw||[]).find(y=>y.key===x.key); if(raw){ raw.talent=x.talent; raw.noRec=c.noRec; } }catch(e){}
+        try{ const raw=(window._charsRaw||[]).find(y=>y.key===x.key); if(raw){ raw.talent=x.talent; raw.noRec=c.noRec; raw.heredado=true; } }catch(e){}
       }
     };
     aplicar(llenar);
@@ -6679,7 +6733,7 @@ function showTutorial(onDone){
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Casting', ic:'🎭', t:'Repartir los talentos',
-      d:'Primero, una vez por programa: <b>Formato de casting</b> sube el Excel de la empresa que se va a rellenar.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
+      d:'Primero, una vez por programa: <b>Formato de casting</b> sube el Excel de la empresa que se va a rellenar.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
        +'<span class="tut-tip">Se rellena tu archivo tal cual: fórmulas, formato y macros intactos. Si un personaje del libreto no está en el Excel, te avisa por su nombre.</span>' },
 
     { s:'Paso 11 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
