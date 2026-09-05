@@ -87,8 +87,13 @@ grant  execute on function public.admin_set_approved(uuid, boolean) to authentic
 
 -- 8) BOOTSTRAP: tu primer administrador (aprobado). Ejecuta esto DESPUÉS de que
 --    la cuenta exista (regístrala en la app o créala en Authentication → Users).
+--    IMPORTANTE: hay que desactivar trg_lock_role mientras tanto, porque desde el
+--    SQL Editor auth.uid() es NULL → is_admin() es falso → el trigger revertiría
+--    el rol a 'member'. Se reactiva justo después.
+alter table public.profiles disable trigger trg_lock_role;
 update public.profiles set role = 'admin', approved = true
  where email = 'joelmarinot@gmail.com';
+alter table public.profiles enable trigger trg_lock_role;
 
 -- ── Verificación: la lista tal como la verá el panel ──
 select * from public.admin_list_accounts();
