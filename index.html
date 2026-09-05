@@ -1031,6 +1031,20 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .acc2-appr.ok{ color:#4ADE80; border-color:rgba(74,222,128,.4); background:rgba(74,222,128,.08); }
 .acc2-appr.no{ color:#FBBF24; border-color:rgba(251,191,36,.45); background:rgba(251,191,36,.10); }
 .acc2-conn{ font-size:10.5px; color:#6b7280; white-space:nowrap; }
+.acc2-see{ border:1px solid #2c2358; background:#191238; color:#B4ADD9; border-radius:8px; font-size:11px; padding:5px 9px; cursor:pointer; white-space:nowrap; }
+.acc2-see:hover{ border-color:#A78BFA; color:#EFECFB; }
+.acc2-cont{ margin:2px 0 8px 41px; border-left:2px solid #2c2358; padding:4px 0 4px 12px; display:none; }
+.acc2-cont.open{ display:block; }
+.acc2-ws{ margin-bottom:8px; }
+.acc2-wsname{ font-size:12px; font-weight:700; color:#c9b8ff; display:flex; align-items:center; gap:6px; }
+.acc2-wsname::before{ content:'🗂️'; font-size:12px; }
+.acc2-show{ margin:4px 0 4px 14px; }
+.acc2-showname{ font-size:12px; color:#e6e7ea; font-weight:600; display:flex; align-items:center; gap:6px; }
+.acc2-showname::before{ content:'🎬'; font-size:11px; }
+.acc2-eps{ margin:2px 0 2px 20px; display:flex; flex-direction:column; gap:1px; }
+.acc2-ep{ font-size:11.5px; color:#9aa0a6; display:flex; justify-content:space-between; gap:10px; }
+.acc2-ep span:last-child{ color:#6b7280; font-size:10.5px; white-space:nowrap; }
+.acc2-empty2{ font-size:11.5px; color:#6b7280; font-style:italic; }
 
 /* ===== Quién está conectado (presencia global) ===== */
 .tb-online{
@@ -11750,6 +11764,50 @@ async function acctSetApproved(id, ok){
 }
 window.acctSetRole = acctSetRole; window.acctSetApproved = acctSetApproved;
 
+// Ver/ocultar el contenido (espacios → programas → episodios) de una cuenta.
+async function acctToggleContent(id, btn){
+  const cont = document.getElementById('cont-'+id);
+  if(!cont) return;
+  if(cont.classList.contains('open')){
+    cont.classList.remove('open'); cont.innerHTML='';
+    if(btn) btn.textContent='Ver contenido';
+    return;
+  }
+  cont.classList.add('open');
+  cont.innerHTML='<div class="acc2-empty2">Cargando contenido…</div>';
+  if(btn) btn.textContent='Ocultar';
+  let tree=null, err=null;
+  try{
+    const r = await sb.rpc('admin_user_content', { p_user:id });
+    if(r.error) err=r.error; else tree=r.data;
+  }catch(e){ err=e; }
+  if(err){ cont.innerHTML='<div class="acc2-empty2">No se pudo cargar: '+esc((err&&err.message)||'')+'</div>'; return; }
+  cont.innerHTML = renderContentTree(tree);
+}
+function renderContentTree(tree){
+  if(!Array.isArray(tree) || !tree.length)
+    return '<div class="acc2-empty2">Sin espacios de trabajo ni programas.</div>';
+  return tree.map(function(ws){
+    const shows = Array.isArray(ws.shows)?ws.shows:[];
+    const showsH = shows.length ? shows.map(function(s){
+      const eps = Array.isArray(s.episodes)?s.episodes:[];
+      const epsH = eps.length
+        ? eps.map(function(e){
+            return '<div class="acc2-ep"><span>▪ '+esc(e.name||'(sin nombre)')+'</span>'
+                 + '<span>'+esc(acctDate(e.updated_at))+'</span></div>';
+          }).join('')
+        : '<div class="acc2-empty2">Sin episodios</div>';
+      return '<div class="acc2-show"><div class="acc2-showname">'+esc(s.name||'(sin nombre)')
+           + ' <small style="color:#6b7280;font-weight:500">· '+eps.length+' ep.</small></div>'
+           + '<div class="acc2-eps">'+epsH+'</div></div>';
+    }).join('') : '<div class="acc2-empty2" style="margin-left:14px">Sin programas</div>';
+    return '<div class="acc2-ws"><div class="acc2-wsname">'+esc(ws.name||'(sin nombre)')
+         + ' <small style="color:#6b7280;font-weight:500">· '+shows.length+' programa'+(shows.length===1?'':'s')+'</small></div>'
+         + showsH+'</div>';
+  }).join('');
+}
+window.acctToggleContent = acctToggleContent;
+
 async function showAccounts(){
   const old=document.getElementById('acctsOv'); if(old) old.remove();
   const ov=document.createElement('div'); ov.id='acctsOv'; ov.className='ddlm-ov';
@@ -11815,10 +11873,12 @@ async function renderAccounts(){
       const appr = pend
         ? '<button class="acc2-appr no" onclick="acctSetApproved(\''+r.id+'\', true)">Aprobar</button>'
         : '<button class="acc2-appr ok" onclick="acctSetApproved(\''+r.id+'\', false)" title="Dejar pendiente">Aprobado ✓</button>';
-      ctrl = '<span class="acc2-adm">'+sel+appr+'</span>';
+      const see = '<button class="acc2-see" onclick="acctToggleContent(\''+r.id+'\', this)">Ver contenido</button>';
+      ctrl = '<span class="acc2-adm">'+sel+appr+see+'</span>';
     } else {
       ctrl = '<span class="acc2-tags"><span class="acc2-rol'+(r.role==='admin'?' adm':'')+'">'+acctRoleLabel(r.role)+'</span>'+conn+'</span>';
     }
+    const cont = puedeGestionar ? '<div class="acc2-cont" id="cont-'+r.id+'"></div>' : '';
     return '<div class="acc2-row'+(on?' on':'')+(pend?' pend':'')+'">'
       + '<span class="acc2-av">'+esc(nom.trim().slice(0,2).toUpperCase())+'</span>'
       + '<span class="acc2-meta">'
@@ -11827,7 +11887,8 @@ async function renderAccounts(){
       +   (puedeGestionar ? '<small style="color:#6b7280;font-size:10.5px">'+ (on?'● En línea': esc(acctLastConn(r.last_sign_in_at))) +'</small>' : '')
       + '</span>'
       + ctrl
-      + '</div>';
+      + '</div>'
+      + cont;
   };
 
   const pendientes = rows.filter(r=> r.approved === false);
