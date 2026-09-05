@@ -1020,6 +1020,17 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .acc2-on{ font-size:10.5px; font-weight:700; color:#4ADE80; white-space:nowrap; }
 .acc2-since{ font-size:10.5px; color:#6b7280; white-space:nowrap; }
 .acc2-foot{ margin-top:12px; padding-top:10px; border-top:1px solid #1c1e22; font-size:11.5px; color:#6b7280; line-height:1.5; }
+/* --- controles de admin en el panel de cuentas --- */
+.acc2-row.pend{ border-color:rgba(251,191,36,.45); background:rgba(251,191,36,.06); }
+.acc2-sech{ font-size:11px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; color:#FBBF24; margin:4px 0 6px; }
+.acc2-sech.norm{ color:#6b7280; margin-top:14px; }
+.acc2-adm{ flex:0 0 auto; display:flex; align-items:center; gap:6px; }
+.acc2-rolsel{ background:#191238; border:1px solid #2c2358; color:#e6e7ea; border-radius:8px; font-size:11px; padding:5px 7px; cursor:pointer; }
+.acc2-rolsel:focus{ border-color:#A78BFA; outline:none; }
+.acc2-appr{ border:1px solid #2c2358; background:#191238; color:#B4ADD9; border-radius:8px; font-size:11px; font-weight:700; padding:5px 9px; cursor:pointer; white-space:nowrap; }
+.acc2-appr.ok{ color:#4ADE80; border-color:rgba(74,222,128,.4); background:rgba(74,222,128,.08); }
+.acc2-appr.no{ color:#FBBF24; border-color:rgba(251,191,36,.45); background:rgba(251,191,36,.10); }
+.acc2-conn{ font-size:10.5px; color:#6b7280; white-space:nowrap; }
 
 /* ===== Quién está conectado (presencia global) ===== */
 .tb-online{
@@ -11708,6 +11719,37 @@ function acctDate(s){
   try{ return new Date(s).toLocaleDateString('es', {day:'2-digit', month:'short', year:'numeric'}); }
   catch(e){ return ''; }
 }
+function acctLastConn(s){
+  if(!s) return 'Nunca ha entrado';
+  try{
+    const d=new Date(s), now=Date.now(), diff=now-d.getTime();
+    if(diff < 3*60*1000) return 'Hace un momento';
+    if(diff < 60*60*1000) return 'Hace '+Math.round(diff/60000)+' min';
+    if(diff < 24*60*60*1000) return 'Hace '+Math.round(diff/3600000)+' h';
+    return d.toLocaleDateString('es',{day:'2-digit',month:'short',year:'numeric'})
+         + ' '+d.toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){ return ''; }
+}
+// Cambiar el rol de una cuenta (RPC solo-admin). Refresca el panel al terminar.
+async function acctSetRole(id, role){
+  try{
+    const { error } = await sb.rpc('admin_set_role', { p_target:id, p_role:role });
+    if(error) throw error;
+    try{ toast && toast('Rol actualizado'); }catch(e){}
+  }catch(e){ alert('No se pudo cambiar el rol: '+((e&&e.message)||e)); }
+  renderAccounts();
+}
+// Aprobar / dejar pendiente una cuenta (RPC solo-admin).
+async function acctSetApproved(id, ok){
+  try{
+    const { error } = await sb.rpc('admin_set_approved', { p_target:id, p_ok:ok });
+    if(error) throw error;
+    try{ toast && toast(ok?'Cuenta aprobada':'Cuenta marcada como pendiente'); }catch(e){}
+  }catch(e){ alert('No se pudo actualizar: '+((e&&e.message)||e)); }
+  renderAccounts();
+}
+window.acctSetRole = acctSetRole; window.acctSetApproved = acctSetApproved;
+
 async function showAccounts(){
   const old=document.getElementById('acctsOv'); if(old) old.remove();
   const ov=document.createElement('div'); ov.id='acctsOv'; ov.className='ddlm-ov';
@@ -11720,51 +11762,95 @@ async function showAccounts(){
   document.body.appendChild(ov);
   ov.querySelector('#acc2Close').onclick=()=> ov.remove();
   ov.addEventListener('mousedown', e=>{ if(e.target===ov) ov.remove(); });
+  renderAccounts();
+}
 
-  let rows=[], err=null;
-  try{
-    const r = await sb.from('profiles').select('id,email,full_name,role,created_at').order('created_at');
-    if(r.error) err=r.error; else rows = r.data || [];
-  }catch(e){ err=e; }
-
+// Carga las cuentas (RPC admin con última conexión + estado; fallback al select
+// simple si aún no se aplicó sql/mejora-01) y pinta el panel con controles.
+async function renderAccounts(){
   const body = document.getElementById('acc2Body'); if(!body) return;
+  body.innerHTML='<div class="acc2-load">Cargando cuentas…</div>';
+
+  let rows=[], err=null, tieneRPC=true;
+  try{
+    const r = await sb.rpc('admin_list_accounts');
+    if(r.error){ tieneRPC=false; } else { rows = r.data || []; }
+  }catch(e){ tieneRPC=false; }
+  if(!tieneRPC){
+    // fallback: sin la mejora aplicada, solo lectura básica de profiles
+    try{
+      const r = await sb.from('profiles').select('id,email,full_name,role,created_at').order('created_at');
+      if(r.error) err=r.error; else rows = r.data || [];
+    }catch(e){ err=e; }
+  }
   if(err){
     body.innerHTML='<div class="acc2-msg">No se pudieron leer las cuentas.<br><small>'+esc((err&&err.message)||'')+'</small></div>';
     return;
   }
   acctDir = {}; for(const r of rows) acctDir[r.id] = r;
-  const soyAdmin = !!rows.find(r=> r.id===(sbUser&&sbUser.id) && r.role==='admin');
+  const soyAdmin = !!(MYROLE==='admin') || !!rows.find(r=> r.id===(sbUser&&sbUser.id) && r.role==='admin');
   if(!soyAdmin && rows.length<=1){
     body.innerHTML='<div class="acc2-msg">Solo un <b>administrador</b> puede ver la lista de cuentas de la plataforma.'
       +'<br><small>Tu cuenta: '+esc((sbUser&&sbUser.email)||'')+'</small></div>';
     return;
   }
   const enLinea = new Set((online.people||[]).map(p=>p.id));
-  const orden = rows.slice().sort((a,b)=>
-      (enLinea.has(b.id)?1:0)-(enLinea.has(a.id)?1:0)
-   || String(a.full_name||a.email||'').localeCompare(String(b.full_name||b.email||'')));
-  body.innerHTML =
-      '<div class="acc2-sum">'+rows.length+' cuenta'+(rows.length===1?'':'s')
-    + ' · '+enLinea.size+' en línea ahora</div>'
-    + '<div class="acc2-list">'
-    + orden.map(r=>{
-        const nom = r.full_name || (r.email||'').split('@')[0] || 'Sin nombre';
-        const on  = enLinea.has(r.id);
-        return '<div class="acc2-row'+(on?' on':'')+'">'
-          + '<span class="acc2-av">'+esc(nom.trim().slice(0,2).toUpperCase())+'</span>'
-          + '<span class="acc2-meta">'
-          +   '<b>'+esc(nom)+(r.id===(sbUser&&sbUser.id)?' <i>(tú)</i>':'')+'</b>'
-          +   '<code>'+esc(r.email||'sin correo')+'</code>'
-          + '</span>'
-          + '<span class="acc2-tags">'
-          +   '<span class="acc2-rol'+(r.role==='admin'?' adm':'')+'">'+acctRoleLabel(r.role)+'</span>'
-          +   (on ? '<span class="acc2-on">● En línea</span>'
-                  : '<span class="acc2-since">Alta '+esc(acctDate(r.created_at))+'</span>')
-          + '</span>'
-          + '</div>';
-      }).join('')
-    + '</div>'
-    + '<div class="acc2-foot">«En línea» es en tiempo real. La fecha es el alta de la cuenta: la plataforma no guarda un historial de entradas.</div>';
+  const yo = sbUser && sbUser.id;
+  const puedeGestionar = soyAdmin && tieneRPC;
+
+  // fila individual
+  const fila = (r)=>{
+    const nom = r.full_name || (r.email||'').split('@')[0] || 'Sin nombre';
+    const on  = enLinea.has(r.id);
+    const pend = (r.approved === false);
+    const conn = on ? '<span class="acc2-on">● En línea</span>'
+                    : (('last_sign_in_at' in r)
+                        ? '<span class="acc2-conn">'+esc(acctLastConn(r.last_sign_in_at))+'</span>'
+                        : '<span class="acc2-since">Alta '+esc(acctDate(r.created_at))+'</span>');
+    let ctrl='';
+    if(puedeGestionar){
+      const sel = '<select class="acc2-rolsel" onchange="acctSetRole(\''+r.id+'\', this.value)" aria-label="Rol de '+esc(nom)+'">'
+        + ['member','casting','admin'].map(v=>'<option value="'+v+'"'+(r.role===v?' selected':'')+'>'+acctRoleLabel(v)+'</option>').join('')
+        + '</select>';
+      const appr = pend
+        ? '<button class="acc2-appr no" onclick="acctSetApproved(\''+r.id+'\', true)">Aprobar</button>'
+        : '<button class="acc2-appr ok" onclick="acctSetApproved(\''+r.id+'\', false)" title="Dejar pendiente">Aprobado ✓</button>';
+      ctrl = '<span class="acc2-adm">'+sel+appr+'</span>';
+    } else {
+      ctrl = '<span class="acc2-tags"><span class="acc2-rol'+(r.role==='admin'?' adm':'')+'">'+acctRoleLabel(r.role)+'</span>'+conn+'</span>';
+    }
+    return '<div class="acc2-row'+(on?' on':'')+(pend?' pend':'')+'">'
+      + '<span class="acc2-av">'+esc(nom.trim().slice(0,2).toUpperCase())+'</span>'
+      + '<span class="acc2-meta">'
+      +   '<b>'+esc(nom)+(r.id===yo?' <i>(tú)</i>':'')+'</b>'
+      +   '<code>'+esc(r.email||'sin correo')+'</code>'
+      +   (puedeGestionar ? '<small style="color:#6b7280;font-size:10.5px">'+ (on?'● En línea': esc(acctLastConn(r.last_sign_in_at))) +'</small>' : '')
+      + '</span>'
+      + ctrl
+      + '</div>';
+  };
+
+  const pendientes = rows.filter(r=> r.approved === false);
+  const activas    = rows.filter(r=> r.approved !== false)
+                        .sort((a,b)=> (enLinea.has(b.id)?1:0)-(enLinea.has(a.id)?1:0)
+                          || String(a.full_name||a.email||'').localeCompare(String(b.full_name||b.email||'')));
+
+  let html = '<div class="acc2-sum">'+rows.length+' cuenta'+(rows.length===1?'':'s')
+    + ' · '+enLinea.size+' en línea ahora'
+    + (pendientes.length? ' · '+pendientes.length+' pendiente'+(pendientes.length===1?'':'s') : '')
+    + '</div>';
+  if(puedeGestionar && pendientes.length){
+    html += '<div class="acc2-sech">Pendientes de aprobación</div>'
+      + '<div class="acc2-list">'+pendientes.map(fila).join('')+'</div>'
+      + '<div class="acc2-sech norm">Cuentas activas</div>';
+  }
+  html += '<div class="acc2-list">'+ (activas.length? activas.map(fila).join('') : '<div class="acc2-empty" style="color:#6b7280;font-size:12px;padding:8px">Sin cuentas activas.</div>') +'</div>';
+  html += '<div class="acc2-foot">'
+    + (puedeGestionar
+        ? 'Cambia el rol en el desplegable y aprueba los registros con el botón. «Última conexión» viene de Supabase Auth.'
+        : '«En línea» es en tiempo real. La fecha es el alta de la cuenta.')
+    + '</div>';
+  body.innerHTML = html;
 }
 
 /* ¿Es este equipo un escritorio que ya tiene la tablet al otro lado? */

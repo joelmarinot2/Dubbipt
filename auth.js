@@ -181,6 +181,33 @@
 
   function removeGate() { const g = document.getElementById('authGate'); if (g) g.remove(); }
 
+  /* ---------- pantalla de "cuenta pendiente de aprobación" ---------- */
+  function removePending() { const p = document.getElementById('authPending'); if (p) p.remove(); }
+  function renderPending(profile) {
+    if (document.getElementById('authPending')) return;
+    const g = document.createElement('div');
+    g.id = 'authPending';
+    // reutiliza el estilo del gate (mismo #authGate look) via clase inline
+    g.style.cssText = 'position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:20px;'
+      + 'background:radial-gradient(1100px 560px at 80% -10%,rgba(167,139,250,.14),transparent 60%),#150F30';
+    const nombre = (profile && (profile.full_name || profile.email)) || '';
+    g.innerHTML =
+      '<div style="width:100%;max-width:420px;background:#1E1740;border:1px solid #3a2f6b;border-radius:16px;'
+      + 'padding:28px 26px;box-shadow:0 24px 60px rgba(0,0,0,.45);text-align:center;font-family:Inter,sans-serif">'
+      + '<div style="font-size:34px;margin-bottom:10px">⏳</div>'
+      + '<h2 style="font-family:\'Space Grotesk\',sans-serif;font-size:18px;color:#EFECFB;margin-bottom:10px">Cuenta pendiente de aprobación</h2>'
+      + '<p style="color:#B4ADD9;font-size:13.5px;line-height:1.6">Tu cuenta se creó correctamente, pero un administrador '
+      + 'debe aprobarla antes de que puedas entrar. Te avisaremos cuando esté lista.</p>'
+      + (nombre ? '<p style="color:#7d76a8;font-size:12px;margin-top:14px">' + esc(nombre) + '</p>' : '')
+      + '<button id="pendReload" style="margin-top:18px;border:0;border-radius:11px;padding:11px 16px;cursor:pointer;'
+      + 'background:linear-gradient(135deg,#A78BFA,#7C5CE0);color:#160f33;font-weight:700;font-family:\'Space Grotesk\',sans-serif;font-size:13.5px">'
+      + 'Ya me aprobaron → entrar</button>'
+      + '</div>';
+    document.body.appendChild(g);
+    const rb = g.querySelector('#pendReload'); if (rb) rb.onclick = () => location.reload();
+  }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, m => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+
   function addSignOut() {
     if (document.querySelector('.authOut')) return;
     const b = document.createElement('button');
@@ -208,7 +235,17 @@
     // hay sesión válida
     DDLAuth.user = session.user;
     DDLAuth.profile = await loadProfile(session.user);
+    // Puerta de aprobación: si el perfil existe y NO está aprobado (y no es admin),
+    // no se arranca la app; se muestra la pantalla de "pendiente".
+    const p = DDLAuth.profile;
+    if (p && p.approved === false && p.role !== 'admin') {
+      removeGate();
+      addSignOut();
+      renderPending(p);
+      return;
+    }
     removeGate();
+    removePending();
     addSignOut();
     if (!booted) {
       booted = true;
