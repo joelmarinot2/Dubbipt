@@ -5107,7 +5107,7 @@ async function renderLibrary(silent){
         c.innerHTML = '<div class="dcover" style="--cov1:'+cov[0]+';--cov2:'+cov[1]+'">'
           +'<button class="ldel" title="Eliminar programa" aria-label="Eliminar programa '+esc(sh.name)+'">'+ICO.trash+'</button>'
           +'<button class="lren" title="Renombrar programa" aria-label="Renombrar programa '+esc(sh.name)+'">'+ICO.edit+'</button>'
-          + (sh.cover_path ? '<img class="dcov" src="'+pubUrl(sh.cover_path)+'" alt="">' : '<span class="dinit">'+esc(progInitials(sh.name))+'</span>')
+          + (sh.cover_path ? '<img class="dcov" src="'+esc(pubUrl(sh.cover_path))+'" alt="">' : '<span class="dinit">'+esc(progInitials(sh.name))+'</span>')
           +'</div>'
           +'<div class="dbody">'
           +'<div class="dname">'+esc(sh.name)+'</div>'

@@ -1,6 +1,22 @@
 -- ============================================================
---  ESQUEMA v11.1 · Autenticación real + Desglose automático
---  Pega TODO en: Supabase → SQL Editor → New query → Run
+--  ⛔ NO EJECUTAR ESTE ARCHIVO ⛔  (revisión de seguridad 05-sep-2026)
+--
+--  Este esquema es un MODELO ALTERNATIVO obsoleto (usa buckets 'guiones' y NO
+--  tiene 'workspaces'). Sus políticas RLS de datos son `using(true)/with check(true)`
+--  → cualquier cuenta registrada leería/escribiría shows, episodes, scripts y
+--  breakdowns de TODOS los demás. El esquema realmente desplegado es
+--  esquema-original-v11.sql (modelo con workspaces). Se conserva solo como
+--  referencia histórica; el guardia de abajo aborta la ejecución completa.
+--
+--  Si de verdad quisieras usar este modelo, primero habría que portarle RLS por
+--  dueño (como en sql/seguridad-03/05) y luego eliminar el bloque DO de abajo.
+-- ============================================================
+do $$ begin
+  raise exception 'esquema-v11-auth.sql esta OBSOLETO y es inseguro (RLS abierta). Usa esquema-original-v11.sql + sql/seguridad-*.sql. Ejecucion abortada a proposito.';
+end $$;
+
+-- ============================================================
+--  ESQUEMA v11.1 · Autenticación real + Desglose automático   [REFERENCIA, NO CORRER]
 --  Idempotente: puedes correrlo varias veces sin romper nada.
 --  (v11.1: se crea la tabla profiles ANTES de las funciones que la usan)
 -- ============================================================

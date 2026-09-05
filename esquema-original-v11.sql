@@ -131,14 +131,31 @@ alter table public.shows add column if not exists banner_path text;   -- portada
 insert into storage.buckets (id, name, public) values ('portadas','portadas', true)
 on conflict (id) do nothing;
 
+-- SEGURIDAD S12: cada carátula/portada vive en covers/<show_id>/... y solo su
+-- dueño (por workspace) puede escribir/borrar; la enumeración anónima queda
+-- cerrada. La visualización sigue por URL pública directa (bucket public=true).
+-- Ver también sql/seguridad-12-bucket-portadas.sql (mismo contenido, idempotente).
+create or replace function public.owns_portada_path(p_name text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select (storage.foldername(p_name))[1] = 'covers'
+     and exists (
+       select 1 from public.shows s
+         join public.workspaces w on w.id = s.workspace_id
+        where s.id::text = (storage.foldername(p_name))[2]
+          and w.owner = auth.uid()
+     )
+$$;
+revoke execute on function public.owns_portada_path(text) from public, anon;
+grant  execute on function public.owns_portada_path(text) to authenticated;
+
 drop policy if exists portadas_read   on storage.objects;
 drop policy if exists portadas_write  on storage.objects;
 drop policy if exists portadas_update on storage.objects;
 drop policy if exists portadas_delete on storage.objects;
-create policy portadas_read   on storage.objects for select using (bucket_id='portadas');
-create policy portadas_write  on storage.objects for insert to authenticated with check (bucket_id='portadas');
-create policy portadas_update on storage.objects for update to authenticated using (bucket_id='portadas');
-create policy portadas_delete on storage.objects for delete to authenticated using (bucket_id='portadas');
+create policy portadas_read   on storage.objects for select to authenticated using (bucket_id='portadas' and public.owns_portada_path(name));
+create policy portadas_write  on storage.objects for insert to authenticated with check (bucket_id='portadas' and public.owns_portada_path(name));
+create policy portadas_update on storage.objects for update to authenticated using (bucket_id='portadas' and public.owns_portada_path(name)) with check (bucket_id='portadas' and public.owns_portada_path(name));
+create policy portadas_delete on storage.objects for delete to authenticated using (bucket_id='portadas' and public.owns_portada_path(name));
 
 -- ════════════════════════════════════════════════════════════════
 --  LOGIN REAL · perfiles de usuario (role) creados al registrarse
@@ -155,22 +172,50 @@ alter table public.profiles enable row level security;
 
 drop policy if exists profiles_read on public.profiles;
 drop policy if exists profiles_self on public.profiles;
-create policy profiles_read on public.profiles for select to authenticated using (true);
+-- SEGURIDAD S-perfiles: cada quien ve SOLO su propia fila (email/role ajenos no se
+-- filtran). La excepción para que un admin liste todas las cuentas la añade
+-- sql/seguridad-05-episode-data-profiles.sql como: using (id = auth.uid() or is_admin()).
+create policy profiles_read on public.profiles for select to authenticated using (id = auth.uid());
 create policy profiles_self on public.profiles for update to authenticated
   using (id = auth.uid()) with check (id = auth.uid());
 
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
+  -- SEGURIDAD S3: el rol de permisos nace SIEMPRE como 'member'. NO se toma de
+  -- raw_user_meta_data (lo controla el navegador en signUp → sería auto-admin).
+  -- Los admins se asignan solo a mano: update profiles set role='admin' where email=...
   insert into public.profiles (id, email, full_name, role)
   values (new.id, new.email, coalesce(new.raw_user_meta_data->>'full_name',''),
-          coalesce(new.raw_user_meta_data->>'role','member'))
+          'member')
   on conflict (id) do nothing;
   return new;
 end $$;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- SEGURIDAD S3: helper is_admin (idéntico a sql/seguridad-02); security definer
+-- para poder leer profiles desde el trigger sin recursión de RLS.
+create or replace function public.is_admin()
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce((select role = 'admin' from public.profiles where id = auth.uid()), false)
+$$;
+revoke execute on function public.is_admin() from public, anon;
+grant  execute on function public.is_admin() to authenticated;
+
+-- SEGURIDAD S3: nadie cambia su propio rol; solo un admin puede modificar `role`.
+create or replace function public.lock_role()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if new.role is distinct from old.role and not public.is_admin() then
+    new.role := old.role;
+  end if;
+  return new;
+end $$;
+drop trigger if exists trg_lock_role on public.profiles;
+create trigger trg_lock_role before update on public.profiles
+  for each row execute function public.lock_role();
 
 -- Verificación:
 -- select table_name from information_schema.tables where table_schema='public'

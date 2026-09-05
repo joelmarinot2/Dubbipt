@@ -45,7 +45,7 @@
   function normChar(ch) { const d = ch.normalize('NFD'); return (d[0] || ch).toUpperCase(); }
   function norm(s) { let r = ''; for (const ch of String(s || '')) r += normChar(ch); return r.replace(/[^A-Z0-9 ]/g, '').replace(/\s+/g, ' ').trim(); }
   function charColor(name) { let h = 0; const s = String(name || ''); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return PALETTE[h % PALETTE.length]; }
-  function esc(s) { return String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m])); }
+  function esc(s) { return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m])); }
   function emit(onProgress, patch) { if (typeof onProgress === 'function') { try { onProgress(patch); } catch (e) { /* silencioso: un listener roto no debe tumbar el motor */ } } }
 
   // mapea errores técnicos (Supabase / red / PDF) a mensajes en español con una acción clara
@@ -92,9 +92,11 @@
   async function extractDocx(buf, onProgress) {
     emit(onProgress, { stage: 'extract', indeterminate: true, label: 'Leyendo documento de Word…' });
     const { value: html } = await mammoth.convertToHtml({ arrayBuffer: buf });
-    const div = document.createElement('div'); div.innerHTML = html;
+    // SEGURIDAD (defensa en profundidad): parsear sin adjuntar al documento ni
+    // ejecutar recursos. DOMParser no dispara <img onerror>/carga como innerHTML.
+    const doc = new DOMParser().parseFromString(html, 'text/html');
     const lines = []; let chars = 0;
-    div.querySelectorAll('p, h1, h2, h3, li').forEach(el => {
+    doc.querySelectorAll('p, h1, h2, h3, li').forEach(el => {
       const text = (el.textContent || '').replace(/\s+/g, ' ').trim();
       if (!text) return;
       chars += text.length + 1;
@@ -224,9 +226,14 @@
   }
 
   // ---------- 5) API pública: extracción + análisis completos ----------
+  const MAX_FILE_BYTES = 50 * 1024 * 1024;   // 50 MB: por encima, se rechaza sin leer
   async function fromFile(file, opts) {
     opts = opts || {};
     const onProgress = opts.onProgress;
+    // SEGURIDAD/estabilidad: no leer a memoria archivos enormes (cuelgan la pestaña).
+    if (file && file.size > MAX_FILE_BYTES) {
+      throw new Error('El archivo pesa ' + (file.size / 1048576).toFixed(1) + ' MB; el máximo es 50 MB.');
+    }
     const buf = await file.arrayBuffer();
     const isDocx = /\.docx$/i.test(file.name) || file.type.includes('word');
     const src = isDocx ? await extractDocx(buf, onProgress) : await extractPdf(buf.slice(0), onProgress);
@@ -363,8 +370,11 @@
       rows.sort((a, b) => b.totalInts - a.totalInts || a.display.localeCompare(b.display, 'es'));
       rows.forEach((c, i) => {
         const tr = document.createElement('tr');
+        // SEGURIDAD: `color` puede venir de datos cargados (BD) y se interpola en un
+        // atributo style; si no es un hex válido, se re-deriva de la paleta fija.
+        const safeColor = /^#[0-9A-Fa-f]{3,8}$/.test(c.color) ? c.color : charColor(c.display || c.key || '');
         tr.innerHTML =
-          `<td><span class="dot" style="background:${c.color}"></span>
+          `<td><span class="dot" style="background:${safeColor}"></span>
              <input value="${esc(c.display)}" data-f="display" data-i="${i}" style="width:calc(100% - 20px)" aria-label="Nombre del personaje"></td>
            <td><input value="${esc(c.talent || '')}" placeholder="sin asignar" data-f="talent" data-i="${i}" aria-label="Talento asignado a ${esc(c.display)}"></td>
            <td class="num">${c.totalInts}</td>
@@ -566,10 +576,13 @@
     // guion procesado (texto fuente) — permite re-desglosar sin re-subir
     let scriptId = extra.scriptId || null;
     if (!scriptId && result.fullText) {
+      // tope defensivo: no mandar textos gigantes a una fila de Postgres.
+      const MAX_FULLTEXT = 2 * 1024 * 1024; // ~2 MB de texto
+      const fullText = String(result.fullText).slice(0, MAX_FULLTEXT);
       const { data, error } = await sb.from('scripts').insert({
         episode_id: episodeId, name: result.name || 'guion',
         source_type: result.sourceType || 'pdf',
-        num_pages: result.numPages, full_text: result.fullText
+        num_pages: result.numPages, full_text: fullText
       }).select('id').single();
       if (!error && data) scriptId = data.id;
     }
