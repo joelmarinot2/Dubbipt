@@ -1690,6 +1690,8 @@ body.modo-casting #btnExport{ display:none !important; }
       </div>
       <div class="ac-div" aria-hidden="true"></div>
       <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar entre grabación y casting">Modo</button>
+      <button class="btnv sm" id="btnImpDes" style="display:none" onclick="imprimirDesglose()" title="Imprimir el desglose: una fila por personaje">🖨 Desglose</button>
+      <button class="btnv sm" id="btnImpPla" style="display:none" onclick="imprimirPlanilla()" title="Imprimir la planilla: una fila por talento, con sus personajes y sus líneas">🖨 Planilla</button>
       <button class="btnv sm" id="btnTabla" style="display:none" onclick="document.getElementById('tablaFile').click()" title="Sube un Excel con: A personaje · B talento · C intervenciones">Tabla de casting</button>
       <input type="file" id="tablaFile" accept=".xlsx,.xls,.xlsm,.csv" style="display:none" onchange="if(this.files[0]) castSubirTabla(this.files[0]); this.value=''">
       <button type="button" class="cast-fuente" id="castFuente" style="display:none" onclick="document.getElementById('formatoFile').click()"></button>
@@ -1838,7 +1840,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.57.0-nube';
+const APP_VER_NUM = 'v10.58.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5683,6 +5685,10 @@ function ponerModo(epId, m){
   if(bu){ bu.style.display = (m === 'casting') ? '' : 'none'; castPintarUndo(); }
   const bt = document.getElementById('btnTabla');
   if(bt) bt.style.display = (m === 'casting') ? '' : 'none';
+  for(const id of ['btnImpDes','btnImpPla']){
+    const b = document.getElementById(id);
+    if(b) b.style.display = (m === 'casting') ? '' : 'none';
+  }
   try{ castPintarFuente(); }catch(e){}
   // la tabla cambia de columnas según el modo: hay que repintarla
   try{ if(m === 'casting') plaOpen = true; renderPlanilla(); }catch(e){}
@@ -5819,6 +5825,139 @@ document.addEventListener('keydown', (e) => {
   castUndo();
 });
 
+/* ═══ IMPRIMIR ═══════════════════════════════════════════════════════════
+
+   Dos hojas distintas, que en sala se usan para cosas distintas:
+
+   · DESGLOSE  · una fila por personaje: quién lo hace, cuántas intervenciones
+     tiene, en qué páginas y su primer timecode. Es la hoja de grabación.
+   · PLANILLA  · una fila por TALENTO: qué personajes lleva y cuántas líneas
+     suma cada uno. Es la hoja del actor, la que sirve para convocar y pagar.
+
+   Se imprime desde un iframe oculto, no abriendo una ventana: las emergentes
+   se bloquean y el botón se quedaría sin hacer nada. */
+
+function impEsc(t){
+  return String(t == null ? '' : t)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function impCabecera(titulo){
+  const ep = (currentEp && currentEp.name) || '';
+  const prog = (function(){
+    try{ return ((sbShows().find(x => x.id === LDB.showId) || {}).name) || ''; }catch(e){ return ''; }
+  })();
+  const hoy = new Date().toLocaleDateString('es', { day:'2-digit', month:'long', year:'numeric' });
+  return '<div class="enc"><div><h1>' + impEsc(titulo) + '</h1>'
+       + '<div class="sub">' + impEsc(prog) + (prog && ep ? ' · ' : '') + impEsc(ep) + '</div></div>'
+       + '<div class="fecha">' + impEsc(hoy) + '</div></div>';
+}
+
+const IMP_CSS = `
+  *{ box-sizing:border-box; }
+  body{ font:12px/1.45 Arial, Helvetica, sans-serif; color:#111; margin:22px; }
+  .enc{ display:flex; align-items:flex-end; justify-content:space-between;
+        border-bottom:2px solid #111; padding-bottom:9px; margin-bottom:14px; }
+  h1{ font-size:19px; margin:0; letter-spacing:.02em; }
+  .sub{ font-size:12.5px; color:#444; margin-top:3px; }
+  .fecha{ font-size:11px; color:#666; }
+  table{ width:100%; border-collapse:collapse; }
+  th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em;
+      color:#444; border-bottom:1.5px solid #111; padding:0 7px 5px; }
+  td{ padding:6px 7px; border-bottom:1px solid #ddd; vertical-align:top; }
+  tr:nth-child(even) td{ background:#fafafa; }
+  .num{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .pers{ font-weight:700; }
+  .sin{ color:#999; font-style:italic; }
+  .pgs{ color:#555; font-size:11px; }
+  .choque{ color:#b00; font-size:11px; }
+  .pie{ margin-top:16px; font-size:10.5px; color:#666; border-top:1px solid #ccc; padding-top:7px; }
+  @media print{
+    body{ margin:12mm; }
+    thead{ display:table-header-group; }   /* la cabecera se repite en cada hoja */
+    tr{ break-inside:avoid; }
+  }
+`;
+
+/** Lanza la impresión desde un iframe oculto. */
+function impLanzar(titulo, cuerpo){
+  const viejo = document.getElementById('impFrame');
+  if(viejo) viejo.remove();
+  const fr = document.createElement('iframe');
+  fr.id = 'impFrame';
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0';
+  document.body.appendChild(fr);
+  const d = fr.contentDocument;
+  d.open();
+  d.write('<!doctype html><html><head><meta charset="utf-8"><title>' + impEsc(titulo)
+        + '</title><style>' + IMP_CSS + '</style></head><body>' + cuerpo + '</body></html>');
+  d.close();
+  const dispara = () => {
+    try{ fr.contentWindow.focus(); fr.contentWindow.print(); }
+    catch(e){ castAviso('❌ No se pudo abrir la impresión: ' + (e.message || e)); }
+  };
+  // dar un respiro al maquetado antes de imprimir
+  if(d.readyState === 'complete') setTimeout(dispara, 120);
+  else fr.onload = () => setTimeout(dispara, 120);
+  return fr;
+}
+
+/** Una fila por personaje. */
+function imprimirDesglose(){
+  if(!chars || !chars.length){ castAviso('No hay personajes que imprimir'); return; }
+  const orden = chars.slice().sort((a,b)=> (b.totalInts||0) - (a.totalInts||0)
+    || String(a.display).localeCompare(String(b.display),'es'));
+  const conTal = orden.filter(c => c.talent && String(c.talent).trim()).length;
+  let filas = '';
+  for(const c of orden){
+    const pgs = (c.pages || []).map(p => p.p).join(', ');
+    const tc = (typeof firstTCOf === 'function' ? (firstTCOf(c.key) || '') : '');
+    filas += '<tr><td class="pers">' + impEsc(c.display) + '</td>'
+      + '<td>' + (c.talent ? impEsc(c.talent) : '<span class="sin">sin asignar</span>') + '</td>'
+      + '<td class="num">' + (c.totalInts != null ? c.totalInts : '') + '</td>'
+      + '<td class="num">' + impEsc(tc) + '</td>'
+      + '<td class="pgs">' + impEsc(pgs) + '</td></tr>';
+  }
+  const cuerpo = impCabecera('Desglose de casting')
+    + '<table><thead><tr><th>Personaje</th><th>Talento</th><th class="num">Interv.</th>'
+    + '<th class="num">1er TC</th><th>Páginas</th></tr></thead><tbody>' + filas + '</tbody></table>'
+    + '<div class="pie">' + orden.length + ' personajes · ' + conTal + ' con talento asignado · '
+    + (orden.length - conTal) + ' sin asignar</div>';
+  impLanzar('Desglose', cuerpo);
+}
+
+/** Una fila por talento: sus personajes y sus líneas. */
+function imprimirPlanilla(){
+  const filas = castOcupacion();
+  if(!filas.length){ castAviso('Todavía no hay talentos asignados'); return; }
+  const mapa = castChoques();
+  const total = filas.reduce((n, e) => n + e.ints, 0);
+  let html = '';
+  for(const e of filas){
+    const ch = mapa[castNorm(e.talento)];
+    const pgs = Array.from(e.paginas).sort((a,b)=>a-b);
+    html += '<tr><td class="pers">' + impEsc(e.talento) + '</td>'
+      + '<td>' + e.personajes.map(p => impEsc(p.display) + ' (' + p.ints + ')').join('<br>')
+      + (ch ? '<div class="choque">⚠ ' + ch.choques.map(x =>
+          impEsc(x.a) + ' y ' + impEsc(x.b) + ' a ' + x.dist + ' línea' + (x.dist===1?'':'s')
+          + (x.pagina != null ? ', pág. ' + x.pagina : '')).join('; ') + '</div>' : '')
+      + '</td>'
+      + '<td class="num">' + e.personajes.length + '</td>'
+      + '<td class="num">' + e.ints + '</td>'
+      + '<td class="pgs">' + pgs.join(', ') + '</td></tr>';
+  }
+  const sinTal = (chars || []).filter(c => !(c.talent && String(c.talent).trim()));
+  let pie = filas.length + ' talentos · ' + total + ' líneas en total';
+  if(sinTal.length) pie += ' · ⚠ ' + sinTal.length + ' personaje' + (sinTal.length===1?'':'s')
+    + ' sin talento: ' + sinTal.slice(0,10).map(c => impEsc(c.display)).join(', ')
+    + (sinTal.length > 10 ? '…' : '');
+  const cuerpo = impCabecera('Planilla de talentos')
+    + '<table><thead><tr><th>Talento</th><th>Personajes</th><th class="num">Pers.</th>'
+    + '<th class="num">Líneas</th><th>Páginas</th></tr></thead><tbody>' + html + '</tbody></table>'
+    + '<div class="pie">' + pie + '</div>';
+  impLanzar('Planilla', cuerpo);
+}
+
 /* ═══ OCUPACIÓN DE TALENTOS ═══════════════════════════════════════════════
 
    Cuánto carga cada actor en este capítulo y, sobre todo, si se pisa a sí
@@ -5930,8 +6069,8 @@ function castAvisarChoquesTodos(){
 /* ── El panel ─────────────────────────────────────────────────────────── */
 
 let ocuAbierto = (function(){
-  try{ const v = localStorage.getItem('ddl_ocu_abierto'); return v === null ? true : v === '1'; }
-  catch(e){ return true; }
+  try{ const v = localStorage.getItem('ddl_ocu_abierto'); return v === '1'; }
+  catch(e){ return false; }
 })();
 
 function castPintarOcupacion(){
@@ -7135,7 +7274,7 @@ function showTutorial(onDone){
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Casting', ic:'🎭', t:'Repartir los talentos',
-      d:'Cada capítulo tiene <b>su propio desglose</b>: lo subes con el aviso de la barra y es el que se rellena y se descarga. El del 101 no toca el del 102.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Ocupación de talentos:</b> en la pestaña del costado derecho ves cuántas líneas lleva cada actor; se despliega y se pliega, y recuerda cómo lo dejaste. Si le asignas dos personajes que hablan seguidos te avisa y las tarjetas se ponen en <b>rojo</b>: no le daría tiempo a cambiar de voz.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
+      d:'Cada capítulo tiene <b>su propio desglose</b>: lo subes con el aviso de la barra y es el que se rellena y se descarga. El del 101 no toca el del 102.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Ocupación de talentos:</b> en la pestaña del costado derecho ves cuántas líneas lleva cada actor; se despliega y se pliega, y recuerda cómo lo dejaste.<br><b>🖨 Desglose</b> imprime una fila por personaje; <b>🖨 Planilla</b>, una fila por talento con sus personajes y sus líneas. Si le asignas dos personajes que hablan seguidos te avisa y las tarjetas se ponen en <b>rojo</b>: no le daría tiempo a cambiar de voz.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
        +'<span class="tut-tip">Se rellena tu archivo tal cual: fórmulas, formato y macros intactos. Si un personaje del libreto no está en el Excel, te avisa por su nombre.</span>' },
 
     { s:'Paso 11 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
