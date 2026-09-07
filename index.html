@@ -1360,6 +1360,26 @@ body.modo-casting .card.heredado .tal b{ color:#F59E0B; }
 /* fuera del casting no se enseña: es una marca de trabajo del reparto */
 body:not(.modo-casting) .verbtn{ display:none; }
 
+/* Puente con DublajeCast */
+.dc-quien{ display:flex; align-items:center; gap:10px; font-size:13px; color:var(--ink-dim);
+  background:#1c1f28; border:1px solid #2b3040; border-radius:10px; padding:9px 12px; margin-bottom:11px; }
+.dc-salir{ margin-left:auto; background:none; border:1px solid #2b3040; color:#8892a6;
+  border-radius:7px; padding:4px 10px; font:inherit; font-size:12px; cursor:pointer; }
+.dc-salir:hover{ border-color:#ff6b6b; color:#ff9b9b; }
+.dc-nota{ font-size:12.5px; color:#8892a6; line-height:1.55; margin-bottom:13px; }
+.dc-acc{ display:flex; flex-direction:column; gap:9px; }
+.dc-b{ align-items:flex-start !important; text-align:left !important; padding:13px 15px !important; }
+.dc-b b{ font-size:14px; }
+.dc-b small{ color:#8892a6; font-size:12px; line-height:1.5; }
+.dc-b.dc-ok{ background:#22C55E; color:#06210f; border-color:#22C55E; align-items:center !important; text-align:center !important; }
+.dc-form{ display:flex; flex-direction:column; gap:10px; }
+.dc-form label{ display:flex; flex-direction:column; gap:4px; font-size:12px; color:#8892a6; }
+.dc-form input{ background:#11131a; color:#e7ebf3; border:1px solid #2b3040; border-radius:8px;
+  padding:9px 11px; font:inherit; font-size:13.5px; }
+.dc-form input:focus{ outline:none; border-color:#4ADE80; }
+.dc-msg{ margin-top:12px; font-size:12.5px; color:#7ee3a4; min-height:17px; }
+.dc-msg.mal{ color:#ff9b9b; }
+
 /* Diálogo de nombres parecidos */
 .dud-nota{ font-size:12.5px; color:#8892a6; margin-bottom:12px; line-height:1.5; }
 .dud-lista{ max-height:46vh; overflow:auto; display:flex; flex-direction:column; gap:7px; }
@@ -1691,6 +1711,7 @@ body.modo-casting #btnExport{ display:none !important; }
       </div>
       <div class="ac-div" aria-hidden="true"></div>
       <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar entre grabación y casting">Modo</button>
+      <button class="btnv sm" id="btnDcast" style="display:none" onclick="dcPanel()" title="Sincronizar el casting con DublajeCast">⇄ DublajeCast</button>
       <button class="btnv sm" id="btnImpDes" style="display:none" onclick="imprimirDesglose()" title="Imprimir el desglose: una fila por personaje">🖨 Desglose</button>
       <button class="btnv sm" id="btnImpPla" style="display:none" onclick="imprimirPlanilla()" title="Imprimir la planilla: una fila por talento, con sus personajes y sus líneas">🖨 Planilla</button>
       <button class="btnv sm" id="btnTabla" style="display:none" onclick="document.getElementById('tablaFile').click()" title="Sube un Excel con: A personaje · B talento · C intervenciones">Tabla de casting</button>
@@ -1841,7 +1862,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.58.1-nube';
+const APP_VER_NUM = 'v10.59.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5686,7 +5707,7 @@ function ponerModo(epId, m){
   if(bu){ bu.style.display = (m === 'casting') ? '' : 'none'; castPintarUndo(); }
   const bt = document.getElementById('btnTabla');
   if(bt) bt.style.display = (m === 'casting') ? '' : 'none';
-  for(const id of ['btnImpDes','btnImpPla']){
+  for(const id of ['btnImpDes','btnImpPla','btnDcast']){
     const b = document.getElementById(id);
     if(b) b.style.display = (m === 'casting') ? '' : 'none';
   }
@@ -5825,6 +5846,310 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   castUndo();
 });
+
+/* ═══ PUENTE CON DUBLAJECAST ══════════════════════════════════════════════
+
+   DublajeCast (dubcast.netlify.app) es otra aplicación, con SU PROPIO proyecto
+   de Supabase. Guarda todo en una sola tabla, `dc_data`: una fila por usuario
+   con un JSON, un número de revisión `rev`, y RLS que hace que cada cual solo
+   vea la suya. Dentro del JSON hay un modelo relacional: series, episodes,
+   chars, talents y castings {episode_id, character_id, talent_id}.
+
+   Por eso el puente vive AQUÍ y no allí: basta con leer y escribir esa fila
+   con la sesión del propio usuario. DublajeCast recoge los cambios solo, por
+   su suscripción Realtime.
+
+   Reglas que se respetan al escribir, porque se está tocando la base de datos
+   de otra aplicación en producción:
+
+   · Nunca se escribe sin haber leído antes, y el UPDATE va condicionado a la
+     `rev` leída. Si alguien cambió algo entre medias, la escritura no entra y
+     se avisa, en vez de pisarle el trabajo.
+   · Se MEZCLA sobre el JSON existente: solo se tocan las claves que este
+     puente entiende. Todo lo demás se copia tal cual, aunque no se sepa qué
+     es. Un campo desconocido es un campo que alguien necesita.
+   · Nada se escribe sin que el usuario lo pida y vea antes qué va a cambiar.
+*/
+
+const DC_URL  = 'https://fhzxfbxrwnjwucgtjkar.supabase.co';
+const DC_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZoenhmYnhyd25qd3VjZ3Rqa2FyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMTczMjcsImV4cCI6MjA5Njc5MzMyN30.brXM5tMvZ5tV0ap6vxoMlvL0zMo2ABZ1y-7hkiCAWj8';
+
+const dcast = { cli:null, sesion:null, payload:null, rev:null };
+
+/** Cliente aparte para el otro proyecto.
+    Con `storageKey` propio: sin eso, la sesión de DublajeCast pisaría la de
+    Dubbipt en localStorage y cerraría la sesión del usuario aquí. */
+function dcCliente(){
+  if(dcast.cli) return dcast.cli;
+  if(typeof supabase === 'undefined' || !supabase.createClient)
+    throw new Error('falta la librería de Supabase');
+  dcast.cli = supabase.createClient(DC_URL, DC_KEY, {
+    auth: { storageKey: 'dcast-auth', persistSession: true, autoRefreshToken: true }
+  });
+  return dcast.cli;
+}
+
+async function dcEntrar(email, pass){
+  const c = dcCliente();
+  const { data, error } = await c.auth.signInWithPassword({ email: email, password: pass });
+  if(error) throw new Error(error.message);
+  dcast.sesion = data.user;
+  return data.user;
+}
+async function dcSalir(){
+  try{ if(dcast.cli) await dcast.cli.auth.signOut(); }catch(e){}
+  dcast.sesion = null; dcast.payload = null; dcast.rev = null;
+}
+async function dcSesion(){
+  try{
+    const { data } = await dcCliente().auth.getSession();
+    dcast.sesion = (data && data.session && data.session.user) || null;
+  }catch(e){ dcast.sesion = null; }
+  return dcast.sesion;
+}
+
+/** Lee la fila del usuario. Guarda la `rev` para poder escribir con seguridad. */
+async function dcLeer(){
+  const c = dcCliente();
+  const u = await dcSesion();
+  if(!u) throw new Error('no has iniciado sesión en DublajeCast');
+  const { data, error } = await c.from('dc_data').select('payload, rev').eq('user_id', u.id).maybeSingle();
+  if(error) throw new Error(error.message);
+  if(!data) throw new Error('tu usuario de DublajeCast todavía no tiene datos');
+  dcast.payload = data.payload || {};
+  dcast.rev = data.rev;
+  return dcast.payload;
+}
+
+/** Escribe, pero solo si nadie ha tocado la fila mientras tanto. */
+async function dcEscribir(payloadNuevo){
+  const c = dcCliente();
+  const u = await dcSesion();
+  if(!u) throw new Error('no has iniciado sesión en DublajeCast');
+  if(dcast.rev == null) throw new Error('hay que leer antes de escribir');
+  const { data, error } = await c.from('dc_data')
+    .update({ payload: payloadNuevo, rev: dcast.rev + 1, updated_at: new Date().toISOString() })
+    .eq('user_id', u.id).eq('rev', dcast.rev)      // ← la condición que evita pisar
+    .select('rev');
+  if(error) throw new Error(error.message);
+  if(!data || !data.length)
+    throw new Error('alguien cambió los datos en DublajeCast mientras tanto: vuelve a leer y repite');
+  dcast.rev = data[0].rev;
+  dcast.payload = payloadNuevo;
+  return dcast.rev;
+}
+
+/* ── Casar los dos modelos ─────────────────────────────────────────────── */
+
+const dcN = (t) => castNorm(t);          // misma normalización que el casting
+
+/** Índices del payload, tolerando cómo se llame cada campo. */
+function dcIndices(p){
+  const lista = (k) => Array.isArray(p[k]) ? p[k] : [];
+  const nombre = (o) => String(o && (o.name || o.nombre || o.title || o.titulo || '') || '').trim();
+  return {
+    series:   lista('series'),
+    episodes: lista('episodes'),
+    chars:    lista('chars'),
+    talents:  lista('talents'),
+    castings: lista('castings'),
+    nombre: nombre
+  };
+}
+
+/** Busca la serie y el episodio de DublajeCast que corresponden a lo abierto aquí. */
+function dcLocalizar(p){
+  const ix = dcIndices(p);
+  const nomPrograma = (function(){
+    try{ return ((sbShows().find(x => x.id === LDB.showId) || {}).name) || ''; }catch(e){ return ''; }
+  })();
+  const nomEp = (currentEp && currentEp.name) || '';
+  const serie = ix.series.find(s => dcN(ix.nombre(s)) === dcN(nomPrograma)) || null;
+  // el episodio, por nombre; si la serie casó, se prefiere uno suyo
+  const cands = ix.episodes.filter(e => dcN(ix.nombre(e)) === dcN(nomEp));
+  const ep = (serie ? cands.find(e => String(e.series_id) === String(serie.id)) : null) || cands[0] || null;
+  return { serie, ep, ix, nomPrograma, nomEp };
+}
+
+/** Lo que DublajeCast sabe del capítulo abierto: {PERSONAJE: TALENTO}. */
+function dcCastingDelEpisodio(p){
+  const { ep, ix } = dcLocalizar(p);
+  if(!ep) return { casting: {}, ep: null };
+  const chars = {}; ix.chars.forEach(c => chars[String(c.id)] = ix.nombre(c));
+  const tals  = {}; ix.talents.forEach(t => tals[String(t.id)] = ix.nombre(t));
+  const out = {};
+  for(const c of ix.castings){
+    if(String(c.episode_id) !== String(ep.id)) continue;
+    const per = chars[String(c.character_id)], tal = tals[String(c.talent_id)];
+    if(per && tal) out[per] = tal;
+  }
+  return { casting: out, ep: ep };
+}
+
+/* ── Traer ─────────────────────────────────────────────────────────────── */
+
+async function dcImportar(){
+  const p = await dcLeer();
+  const { casting, ep } = dcCastingDelEpisodio(p);
+  if(!ep){
+    const l = dcLocalizar(p);
+    castAviso('⚠️ No encuentro «' + (l.nomEp || '?') + '» en DublajeCast'
+      + (l.serie ? '' : ' (ni el programa «' + (l.nomPrograma || '?') + '»)')
+      + ' — los nombres tienen que coincidir');
+    return 0;
+  }
+  const n = Object.keys(casting).length;
+  if(!n){ castAviso('Ese capítulo existe en DublajeCast pero no tiene casting todavía'); return 0; }
+  await castHeredar(casting);      // reutiliza el reparto de siempre: marca en naranja y no pisa lo tuyo
+  return n;
+}
+
+/* ── Llevar ────────────────────────────────────────────────────────────── */
+
+/** Qué cambiaría en DublajeCast si se exporta ahora. No escribe nada. */
+function dcPrevioExportar(p){
+  const loc = dcLocalizar(p);
+  if(!loc.ep) return { error: 'no encuentro el capítulo «' + loc.nomEp + '» en DublajeCast' };
+  const ix = loc.ix;
+  const chars = {}; ix.chars.forEach(c => { chars[dcN(ix.nombre(c))] = c; });
+  const tals  = {}; ix.talents.forEach(t => { tals[dcN(ix.nombre(t))] = t; });
+  const yaHay = {};
+  for(const c of ix.castings) if(String(c.episode_id) === String(loc.ep.id)) yaHay[String(c.character_id)] = c;
+
+  const nuevos = [], cambios = [], talentosNuevos = [], sinPersonaje = [];
+  for(const k in charIdx){
+    const c = charIdx[k];
+    const tal = c && c.talent && String(c.talent).trim();
+    if(!tal) continue;
+    const ch = chars[dcN(c.display || k)];
+    if(!ch){ sinPersonaje.push(c.display || k); continue; }
+    const t = tals[dcN(tal)];
+    if(!t && talentosNuevos.indexOf(tal) < 0) talentosNuevos.push(tal);
+    const actual = yaHay[String(ch.id)];
+    const idTal = t ? t.id : null;
+    if(!actual) nuevos.push({ personaje: c.display, talento: tal, charId: ch.id, talId: idTal });
+    else if(String(actual.talent_id) !== String(idTal))
+      cambios.push({ personaje: c.display, talento: tal, charId: ch.id, talId: idTal,
+                     antes: (ix.talents.find(x => String(x.id) === String(actual.talent_id)) || {}).name || '(vacío)' });
+  }
+  return { ep: loc.ep, nuevos, cambios, talentosNuevos, sinPersonaje };
+}
+
+/** Escribe el casting de este capítulo en DublajeCast. */
+async function dcExportar(){
+  const p = await dcLeer();                      // siempre releer: la rev tiene que ser fresca
+  const prev = dcPrevioExportar(p);
+  if(prev.error){ castAviso('⚠️ ' + prev.error); return 0; }
+  const total = prev.nuevos.length + prev.cambios.length;
+  if(!total && !prev.talentosNuevos.length){ castAviso('DublajeCast ya está al día con este capítulo'); return 0; }
+
+  let aviso = 'Se va a escribir en DublajeCast:\n\n'
+    + '· ' + prev.nuevos.length + ' asignaciones nuevas\n'
+    + '· ' + prev.cambios.length + ' cambiadas'
+    + (prev.cambios.length ? '\n   ' + prev.cambios.slice(0,5).map(c => c.personaje + ': ' + c.antes + ' → ' + c.talento).join('\n   ') : '')
+    + '\n· ' + prev.talentosNuevos.length + ' talentos nuevos en su catálogo';
+  if(prev.sinPersonaje.length)
+    aviso += '\n\n⚠️ Sin ese personaje en DublajeCast (se quedan fuera):\n   ' + prev.sinPersonaje.slice(0,8).join(', ');
+  aviso += '\n\n¿Seguir?';
+  if(!confirm(aviso)) return 0;
+
+  // copia del JSON: se toca lo que este puente entiende y nada más
+  const nuevo = JSON.parse(JSON.stringify(p));
+  if(!Array.isArray(nuevo.talents))  nuevo.talents = [];
+  if(!Array.isArray(nuevo.castings)) nuevo.castings = [];
+
+  const nuevoId = () => 'ddl-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
+  const idsTal = {};
+  for(const nom of prev.talentosNuevos){
+    const id = nuevoId();
+    idsTal[dcN(nom)] = id;
+    nuevo.talents.push({ id: id, name: nom, genero: '', edad_aparente: '', tono_de_voz: '' });
+  }
+  const resolver = (x) => x.talId != null ? x.talId : idsTal[dcN(x.talento)];
+
+  for(const x of prev.nuevos)
+    nuevo.castings.push({ id: nuevoId(), episode_id: prev.ep.id, character_id: x.charId, talent_id: resolver(x) });
+  for(const x of prev.cambios){
+    const c = nuevo.castings.find(c => String(c.episode_id) === String(prev.ep.id)
+                                    && String(c.character_id) === String(x.charId));
+    if(c) c.talent_id = resolver(x);
+  }
+
+  await dcEscribir(nuevo);
+  castAviso('✅ DublajeCast actualizado: ' + prev.nuevos.length + ' nuevas, ' + prev.cambios.length
+    + ' cambiadas' + (prev.talentosNuevos.length ? ', ' + prev.talentosNuevos.length + ' talentos añadidos' : ''));
+  return total;
+}
+
+/** Panel del puente con DublajeCast. */
+async function dcPanel(){
+  const viejo = document.getElementById('dcOv');
+  if(viejo) viejo.remove();
+  const u = await dcSesion();
+  const ov = document.createElement('div');
+  ov.id = 'dcOv';
+  ov.className = 'modo-cap';
+  ov.innerHTML =
+    '<div class="modo-caja" style="max-width:470px;text-align:left">'
+  +   '<div class="modo-tit">DublajeCast</div>'
+  +   '<div class="modo-sub" style="margin-bottom:14px">Sincronizar el casting</div>'
+  +   (u
+      ? '<div class="dc-quien">Conectado como <b>' + esc(u.email || '') + '</b>'
+        + '<button class="dc-salir" id="dcSalir">Salir</button></div>'
+        + '<div class="dc-nota">Se sincroniza <b>el capítulo abierto</b>. Los nombres del programa, '
+        + 'del capítulo y de los personajes tienen que coincidir en las dos aplicaciones.</div>'
+        + '<div class="dc-acc">'
+        +   '<button class="modo-op dc-b" id="dcTraer"><b>Traer de DublajeCast</b>'
+        +     '<small>Pone aquí el casting que ya tengas allí. No pisa lo que hayas asignado tú.</small></button>'
+        +   '<button class="modo-op dc-b" id="dcLlevar"><b>Llevar a DublajeCast</b>'
+        +     '<small>Escribe en su base de datos. Te enseña qué va a cambiar antes de hacerlo.</small></button>'
+        + '</div>'
+      : '<div class="dc-nota">Entra con tu cuenta de <b>dubcast.netlify.app</b>. La sesión se guarda '
+        + 'aparte de la de Dubbipt, así que no te cierra esta.</div>'
+        + '<form id="dcForm" class="dc-form" autocomplete="on">'
+        +   '<label>Correo<input type="email" id="dcMail" required autocomplete="username"></label>'
+        +   '<label>Contraseña<input type="password" id="dcPass" required autocomplete="current-password"></label>'
+        +   '<button class="modo-op dc-b dc-ok" type="submit" id="dcEntrarBtn">Entrar</button>'
+        + '</form>')
+  +   '<div class="dc-msg" id="dcMsg"></div>'
+  +   '<div class="modo-pie">Cerrar con Escape</div>'
+  + '</div>';
+  document.body.appendChild(ov);
+  const cerrar = () => ov.remove();
+  ov.addEventListener('click', (e)=>{ if(e.target === ov) cerrar(); });
+  document.addEventListener('keydown', function esc2(e){
+    if(e.key === 'Escape'){ document.removeEventListener('keydown', esc2); cerrar(); }
+  });
+  const msg = (t, mal) => { const m = ov.querySelector('#dcMsg'); if(m){ m.textContent = t; m.className = 'dc-msg' + (mal ? ' mal' : ''); } };
+
+  const f = ov.querySelector('#dcForm');
+  if(f) f.onsubmit = async (e) => {
+    e.preventDefault();
+    const b = ov.querySelector('#dcEntrarBtn');
+    b.disabled = true; msg('Entrando…');
+    try{
+      await dcEntrar(ov.querySelector('#dcMail').value.trim(), ov.querySelector('#dcPass').value);
+      cerrar(); dcPanel();
+    }catch(err){ msg('No se pudo entrar: ' + err.message, true); b.disabled = false; }
+  };
+  const sal = ov.querySelector('#dcSalir');
+  if(sal) sal.onclick = async () => { await dcSalir(); cerrar(); dcPanel(); };
+
+  const tr = ov.querySelector('#dcTraer');
+  if(tr) tr.onclick = async () => {
+    tr.disabled = true; msg('Leyendo DublajeCast…');
+    try{ const n = await dcImportar(); msg(n ? ('Traídas ' + n + ' asignaciones') : 'Nada que traer'); }
+    catch(err){ msg('Error: ' + err.message, true); }
+    tr.disabled = false;
+  };
+  const ll = ov.querySelector('#dcLlevar');
+  if(ll) ll.onclick = async () => {
+    ll.disabled = true; msg('Comprobando…');
+    try{ const n = await dcExportar(); msg(n ? ('Escritas ' + n + ' asignaciones') : 'Sin cambios'); }
+    catch(err){ msg('Error: ' + err.message, true); }
+    ll.disabled = false;
+  };
+}
 
 /* ═══ IMPRIMIR ═══════════════════════════════════════════════════════════
 
