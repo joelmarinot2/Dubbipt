@@ -1360,6 +1360,16 @@ body.modo-casting .card.heredado .tal b{ color:#F59E0B; }
 /* fuera del casting no se enseña: es una marca de trabajo del reparto */
 body:not(.modo-casting) .verbtn{ display:none; }
 
+/* Cabecera del programa */
+.meta-nota{ font-size:12.5px; color:#8892a6; line-height:1.55; margin-bottom:14px; }
+.meta-rej{ display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+@media (max-width:520px){ .meta-rej{ grid-template-columns:1fr; } }
+.meta-c{ display:flex; flex-direction:column; gap:4px; font-size:12px; color:#8892a6; }
+.meta-c i{ font-style:normal; color:#5c6478; font-size:11px; }
+.meta-c input{ background:#11131a; color:#e7ebf3; border:1px solid #2b3040; border-radius:8px;
+  padding:9px 11px; font:inherit; font-size:13.5px; }
+.meta-c input:focus{ outline:none; border-color:#4ADE80; }
+
 /* Puente con DublajeCast */
 .dc-quien{ display:flex; align-items:center; gap:10px; font-size:13px; color:var(--ink-dim);
   background:#1c1f28; border:1px solid #2b3040; border-radius:10px; padding:9px 12px; margin-bottom:11px; }
@@ -1714,6 +1724,7 @@ body.modo-casting #btnExport{ display:none !important; }
       </div>
       <div class="ac-div" aria-hidden="true"></div>
       <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar entre grabación y casting">Modo</button>
+      <button class="btnv sm" id="btnMeta" style="display:none" onclick="castMetaPanel()" title="Fecha, género, tiempo, director, técnico y estudio del programa">Cabecera</button>
       <button class="btnv sm" id="btnDcast" style="display:none" onclick="dcPanel()" title="Sincronizar el casting con DublajeCast">⇄ DublajeCast</button>
       <button class="btnv sm" id="btnImpDes" style="display:none" onclick="imprimirDesglose()" title="Imprimir el desglose: una fila por personaje">🖨 Desglose</button>
       <button class="btnv sm" id="btnImpPla" style="display:none" onclick="imprimirPlanilla()" title="Imprimir la planilla: una fila por talento, con sus personajes y sus líneas">🖨 Planilla</button>
@@ -1865,7 +1876,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.59.1-nube';
+const APP_VER_NUM = 'v10.60.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5626,7 +5637,7 @@ function castForzarRecalculo(arch){
  * @param {Object} asign      {NOMBRE DE PERSONAJE: 'Talento'}
  * @returns {{datos:Uint8Array, puestos:number, sinCasar:string[], enExcel:number}}
  */
-function castRellenar(buf, asign){
+function castRellenar(buf, asign, meta){
   if(typeof fflate === 'undefined') throw new Error('falta la librería de ZIP');
   const arch = fflate.unzipSync(new Uint8Array(buf));
   const ruta = castHojaXml(arch, CAST_HOJA);
@@ -5646,10 +5657,13 @@ function castRellenar(buf, asign){
   const sinCasar = Object.keys(asign).filter(k => !vistos.has(k));
 
   const r = castEscribirColumna(xml, CAST_COL_ACTOR, valores);
-  arch[ruta] = new TextEncoder().encode(r.xml);
+  // la cabecera del programa: fecha, género, tiempo, director, técnico, estudio
+  let xmlFinal = r.xml, cabecera = 0;
+  if(meta){ const m = castEscribirMeta(xmlFinal, meta); xmlFinal = m.xml; cabecera = m.puestas; }
+  arch[ruta] = new TextEncoder().encode(xmlFinal);
   castForzarRecalculo(arch);   // que las demás hojas se enteren del cambio
   return { datos: fflate.zipSync(arch, { level: 6 }), puestos: r.puestos,
-           sinCasar: sinCasar, enExcel: Object.keys(personajes).length };
+           sinCasar: sinCasar, enExcel: Object.keys(personajes).length, cabecera: cabecera };
 }
 
 /** Catálogo de talentos de la hoja TALENTOS, para autocompletar. */
@@ -5710,7 +5724,7 @@ function ponerModo(epId, m){
   if(bu){ bu.style.display = (m === 'casting') ? '' : 'none'; castPintarUndo(); }
   const bt = document.getElementById('btnTabla');
   if(bt) bt.style.display = (m === 'casting') ? '' : 'none';
-  for(const id of ['btnImpDes','btnImpPla','btnDcast']){
+  for(const id of ['btnImpDes','btnImpPla','btnDcast','btnMeta']){
     const b = document.getElementById(id);
     if(b) b.style.display = (m === 'casting') ? '' : 'none';
   }
@@ -5849,6 +5863,152 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   castUndo();
 });
+
+/* ═══ DATOS DE CABECERA DEL PROGRAMA ══════════════════════════════════════
+
+   La hoja CASTING tiene una cabecera que hay que rellenar a mano en cada
+   capítulo. Se guarda una vez por PROGRAMA y se escribe sola al exportar.
+
+   Dónde va cada cosa (comprobado sobre el desglose real):
+
+     B7  fecha        D7  director
+     B8  género       D8  técnico
+     B10 tiempo       D10 estudio
+
+   B9 NO se toca: es una fórmula que trae el título del capítulo. Escribir
+   encima la borraría y el título dejaría de actualizarse solo. */
+
+const CAST_META_CELDAS = {
+  fecha:    { ref:'B7',  etiqueta:'Fecha de creación' },
+  genero:   { ref:'B8',  etiqueta:'Género' },
+  tiempo:   { ref:'B10', etiqueta:'Tiempo (min)', numero:true },
+  director: { ref:'D7',  etiqueta:'Director' },
+  tecnico:  { ref:'D8',  etiqueta:'Técnico' },
+  estudio:  { ref:'D10', etiqueta:'Estudio nº', numero:true }
+};
+
+/** La fecha como la escribe el estudio: «03 DE SEPTIEMBRE». */
+function castFechaHoy(){
+  const m = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO',
+             'JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+  const d = new Date();
+  return String(d.getDate()).padStart(2,'0') + ' DE ' + m[d.getMonth()];
+}
+
+async function castMetaCargar(showId){
+  const id = showId || LDB.showId;
+  if(!id) return {};
+  try{ const c = await idbGet('ddl-meta::' + id); if(c && c.meta) return c.meta; }catch(e){}
+  try{
+    const r = await sb.storage.from('libretos').download(id + '/casting-meta.json');
+    if(r && r.data){
+      const meta = JSON.parse(await r.data.text());
+      try{ await idbSet('ddl-meta::' + id, { meta: meta, ts: Date.now() }); }catch(x){}
+      return meta;
+    }
+  }catch(e){}
+  return {};
+}
+
+async function castMetaGuardar(showId, meta){
+  const id = showId || LDB.showId;
+  if(!id) return false;
+  try{ await idbSet('ddl-meta::' + id, { meta: meta, ts: Date.now() }); }catch(e){}
+  try{
+    const r = await sb.storage.from('libretos').upload(id + '/casting-meta.json',
+      new Blob([JSON.stringify(meta)], { type:'application/json' }), { upsert:true });
+    return !r.error;
+  }catch(e){ return false; }
+}
+
+/** Escribe UNA celda conservando su estilo. Los números van como números,
+    no como texto: si no, las fórmulas que los usen dejarían de sumar. */
+function castEscribirCelda(xml, ref, valor, esNumero){
+  const col = ref.match(/^[A-Z]+/)[0], fila = ref.match(/\d+$/)[0];
+  const re = new RegExp('<c r="' + ref + '"([^>]*?)(?:/>|>([\\s\\S]*?)</c>)');
+  const m = xml.match(re);
+  const s = m ? (m[1].match(/\bs="(\d+)"/) || [])[1] : null;
+  const est = s ? ' s="' + s + '"' : '';
+  let celda;
+  if(valor === '' || valor == null){
+    celda = '<c r="' + ref + '"' + est + '/>';
+  }else if(esNumero && isFinite(Number(String(valor).replace(',', '.')))){
+    celda = '<c r="' + ref + '"' + est + '><v>' + Number(String(valor).replace(',', '.')) + '</v></c>';
+  }else{
+    celda = '<c r="' + ref + '"' + est + ' t="inlineStr"><is><t xml:space="preserve">'
+          + castEsc(valor) + '</t></is></c>';
+  }
+  if(m) return { xml: xml.replace(re, celda), puesto: true };
+
+  // la celda no existe todavía: se mete en su fila, en orden de columna
+  const reFila = new RegExp('(<row r="' + fila + '"[^>]*>)([\\s\\S]*?)(</row>)');
+  const mf = xml.match(reFila);
+  if(!mf) return { xml: xml, puesto: false };
+  const dentro = mf[2];
+  const refs = [...dentro.matchAll(/<c r="([A-Z]+)(\d+)"/g)].map(x => x[1]);
+  const orden = (c) => { let n = 0; for(const ch of c) n = n*26 + (ch.charCodeAt(0)-64); return n; };
+  let pos = dentro.length;
+  for(const m2 of dentro.matchAll(/<c r="([A-Z]+)\d+"/g)){
+    if(orden(m2[1]) > orden(col)){ pos = m2.index; break; }
+  }
+  const nuevoDentro = dentro.slice(0, pos) + celda + dentro.slice(pos);
+  return { xml: xml.replace(reFila, mf[1] + nuevoDentro + mf[3]), puesto: true };
+}
+
+/** Mete la cabecera del programa en el XML de la hoja de casting. */
+function castEscribirMeta(xml, meta){
+  let n = 0;
+  for(const k in CAST_META_CELDAS){
+    const def = CAST_META_CELDAS[k];
+    const v = meta && meta[k];
+    if(v === undefined || v === null || String(v).trim() === '') continue;
+    const r = castEscribirCelda(xml, def.ref, String(v).trim(), !!def.numero);
+    if(r.puesto){ xml = r.xml; n++; }
+  }
+  return { xml: xml, puestas: n };
+}
+
+/* ── El formulario ─────────────────────────────────────────────────────── */
+
+async function castMetaPanel(){
+  const viejo = document.getElementById('metaOv');
+  if(viejo) viejo.remove();
+  const meta = await castMetaCargar(LDB.showId);
+  const prog = (function(){
+    try{ return ((sbShows().find(x => x.id === LDB.showId) || {}).name) || 'este programa'; }catch(e){ return 'este programa'; }
+  })();
+  const campo = (k) => {
+    const d = CAST_META_CELDAS[k];
+    const val = meta[k] != null ? meta[k] : (k === 'fecha' ? castFechaHoy() : '');
+    return '<label class="meta-c"><span>' + d.etiqueta + ' <i>' + d.ref + '</i></span>'
+         + '<input id="meta_' + k + '" value="' + String(val).replace(/"/g,'&quot;') + '"'
+         + (d.numero ? ' inputmode="numeric"' : '') + '></label>';
+  };
+  const ov = document.createElement('div');
+  ov.id = 'metaOv'; ov.className = 'modo-cap';
+  ov.innerHTML = '<div class="modo-caja" style="max-width:540px;text-align:left">'
+    + '<div class="modo-tit">' + esc(prog) + '</div>'
+    + '<div class="modo-sub" style="margin-bottom:6px">Cabecera de la hoja de casting</div>'
+    + '<div class="meta-nota">Se guarda una vez por programa y se escribe sola en el Excel al '
+    + 'exportar. El título del capítulo no está aquí: esa celda ya lo trae con una fórmula.</div>'
+    + '<div class="meta-rej">' + Object.keys(CAST_META_CELDAS).map(campo).join('') + '</div>'
+    + '<div class="dud-btns"><button class="modo-op dud-b" id="metaCancel">Cancelar</button>'
+    + '<button class="modo-op dud-b dud-ok" id="metaOk">Guardar</button></div>'
+    + '<div class="dc-msg" id="metaMsg"></div></div>';
+  document.body.appendChild(ov);
+  const cerrar = () => ov.remove();
+  ov.querySelector('#metaCancel').onclick = cerrar;
+  ov.addEventListener('click', e => { if(e.target === ov) cerrar(); });
+  ov.querySelector('#metaOk').onclick = async () => {
+    const nuevo = {};
+    for(const k in CAST_META_CELDAS) nuevo[k] = ov.querySelector('#meta_' + k).value.trim();
+    const b = ov.querySelector('#metaOk'); b.disabled = true;
+    const enNube = await castMetaGuardar(LDB.showId, nuevo);
+    cerrar();
+    castAviso('✅ Cabecera guardada para «' + prog + '»'
+      + (enNube ? '' : ' (solo en este equipo: no se pudo subir)'));
+  };
+}
 
 /* ═══ PUENTE CON DUBLAJECAST ══════════════════════════════════════════════
 
@@ -7227,7 +7387,8 @@ async function castDescargar(){
     if(!n){ castAviso('No hay ningún talento asignado todavía'); return; }
 
     const buf = await castBufferOriginal();
-    const r = castRellenar(buf, asign);
+    const meta = await castMetaCargar(LDB.showId || (currentEp && currentEp.showId));
+    const r = castRellenar(buf, asign, meta);
 
     const ep = (LDB.epsAll || []).find(e => e.id === currentEp.id);
     const base = ((ep && (ep.xls_name || ep.name)) || currentEp.name || 'desglose')
@@ -7239,7 +7400,8 @@ async function castDescargar(){
     a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
 
-    let msg = '✅ ' + r.puestos + ' de ' + n + ' talentos escritos en el desglose';
+    let msg = '✅ ' + r.puestos + ' de ' + n + ' talentos escritos en el desglose'
+      + (r.cabecera ? ' · cabecera con ' + r.cabecera + ' datos' : ' · ⚠️ sin cabecera: rellénala en «Cabecera»');
     if(r.sinCasar.length){
       // Aviso honesto: si un personaje del libreto no está en el Excel, su
       // talento NO se ha escrito en ningún sitio. Callarlo seria peor.
