@@ -1243,6 +1243,7 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 @keyframes fuentePide{ 0%,100%{ transform:none } 50%{ transform:translateY(-2px) } }
 .cast-fuente.ok{ background:rgba(74,222,128,.12); color:#7ee3a4; border:1px solid rgba(74,222,128,.3); }
 .cast-fuente.mal{ background:rgba(255,107,107,.12); color:#ff9b9b; border:1px solid rgba(255,107,107,.35); }
+.cast-fuente.comun{ background:rgba(245,158,11,.12); color:#F59E0B; border:1px solid rgba(245,158,11,.35); }
 
 /* La misma marca naranja, en la tabla */
 body.modo-casting .pla tbody tr.heredado td{ background:rgba(245,158,11,.07); }
@@ -1754,7 +1755,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.54.0-nube';
+const APP_VER_NUM = 'v10.55.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -6141,7 +6142,14 @@ async function castSubirTabla(file){
    funcionar. Con el formato colgando del programa, da igual cómo se creara
    el capítulo. */
 
+/* El desglose de referencia es de CADA CAPÍTULO, no del programa.
+   Al hacerlo por programa, el casting del capítulo 2 se escribía sobre el
+   mismo archivo que el del 1: cada capítulo tiene sus personajes, sus
+   timecodes y su desglose, y el resultado se entrega por capítulo.
+   El del programa se queda como red de seguridad, para los capítulos que
+   todavía no tengan el suyo. */
 function castFormatoPath(showId){ return showId + '/formato-casting.xlsm'; }
+function castFormatoPathEp(showId, epId){ return showId + '/' + epId + '/formato-casting.xlsm'; }
 
 /** Sube el formato del programa. */
 async function castSubirFormato(file){
@@ -6166,13 +6174,20 @@ async function castSubirFormato(file){
       return;
     }
 
-    await idbSet('ddl-formato::' + LDB.showId, { buf: buf, name: file.name, ts: Date.now() });
+    // Con un capítulo abierto, el desglose es DE ESE CAPÍTULO. Guardarlo en el
+    // programa hacía que el casting del 2 acabara escrito sobre el archivo
+    // del 1. Solo cuando no hay capítulo abierto se guarda como formato común.
+    const epId = currentEp && currentEp.id;
+    const clave = epId ? ('ddl-formato-ep::' + epId) : ('ddl-formato::' + LDB.showId);
+    const ruta  = epId ? castFormatoPathEp(LDB.showId, epId) : castFormatoPath(LDB.showId);
+    await idbSet(clave, { buf: buf, name: file.name, ts: Date.now() });
     let enNube = false;
     try{
-      const r = await sb.storage.from('libretos').upload(
-        castFormatoPath(LDB.showId), new Blob([buf]), { upsert: true });
+      const r = await sb.storage.from('libretos').upload(ruta, new Blob([buf]), { upsert: true });
       enNube = !r.error;
     }catch(e){}
+    const donde = epId ? ('«' + ((currentEp && currentEp.name) || 'este capítulo') + '»')
+                       : 'el programa (común a sus capítulos)';
 
     CAST_TALENTOS = [];                 // el catálogo sale de este archivo
     await castCargarCatalogo();
@@ -6185,7 +6200,7 @@ async function castSubirFormato(file){
     }catch(e){ console.warn('casting del desglose', e); }
     castPintarBotonFormato(file.name);
     try{ castPintarFuente(); }catch(e){}
-    castAviso('✅ Formato guardado' + (enNube ? '' : ' (solo en este equipo: no se pudo subir a la nube)')
+    castAviso('✅ Desglose guardado para ' + donde + (enNube ? '' : ' (solo en este equipo: no se pudo subir a la nube)')
       + ' · ' + personajes + ' personajes en la hoja ' + CAST_HOJA
       + (CAST_TALENTOS.length ? ' · ' + CAST_TALENTOS.length + ' talentos en el catálogo' : '')
       + (yaTraia ? ' · ya traía ' + yaTraia + ' actores asignados' : ''));
@@ -6266,30 +6281,49 @@ async function modoAlAbrir(epId, nombre){
  * era justo lo que no quedaba claro.
  */
 async function castFuente(){
-  // 1) el formato subido al PROGRAMA
   const showId = LDB.showId || (currentEp && currentEp.showId);
-  const f = await castFormatoBuf(showId);
-  if(f){
-    let nombre = 'formato del programa';
-    try{ const c = await idbGet('ddl-formato::' + showId); if(c && c.name) nombre = c.name; }catch(e){}
-    return { buf: f, nombre: nombre, de: 'el formato del programa' };
-  }
-  // 2) el desglose que se subió al crear ESTE capítulo
-  if(currentEp && currentEp.id){
-    const ep = (LDB.epsAll || []).find(e => e.id === currentEp.id) || {};
+  const epId   = currentEp && currentEp.id;
+  const epNom  = (currentEp && currentEp.name) || 'este capítulo';
+
+  // 1) el desglose subido PARA ESTE CAPÍTULO
+  if(showId && epId){
     try{
-      const c = await idbGet('ddl-files::' + currentEp.id);
-      if(c && c.xls) return { buf: c.xls, nombre: c.xls_name || ep.xls_name || 'desglose del capítulo',
-                              de: 'el desglose de este capítulo' };
+      const c = await idbGet('ddl-formato-ep::' + epId);
+      if(c && c.buf) return { buf: c.buf, nombre: c.name || 'desglose del capítulo', de: epNom };
+    }catch(e){}
+    try{
+      const r = await sb.storage.from('libretos').download(castFormatoPathEp(showId, epId));
+      if(r && r.data){
+        const buf = await r.data.arrayBuffer();
+        try{ await idbSet('ddl-formato-ep::' + epId, { buf: buf, name: 'desglose del capítulo', ts: Date.now() }); }catch(x){}
+        return { buf: buf, nombre: 'desglose del capítulo', de: epNom };
+      }
+    }catch(e){}
+  }
+
+  // 2) el .xlsm con el que se creó ESTE capítulo
+  if(epId){
+    const ep = (LDB.epsAll || []).find(e => e.id === epId) || {};
+    try{
+      const c = await idbGet('ddl-files::' + epId);
+      if(c && c.xls) return { buf: c.xls, nombre: c.xls_name || ep.xls_name || 'desglose del capítulo', de: epNom };
     }catch(e){}
     if(ep.xls_path){
       const r = await sb.storage.from('libretos').download(ep.xls_path);
       if(!r.error && r.data) return { buf: await r.data.arrayBuffer(),
-                                      nombre: ep.xls_name || 'desglose del capítulo',
-                                      de: 'el desglose de este capítulo' };
+                                      nombre: ep.xls_name || 'desglose del capítulo', de: epNom };
     }
   }
-  throw new Error('no hay ningún Excel de referencia: sube el desglose con «Formato de casting» y se rellenará ese mismo');
+
+  // 3) red de seguridad: el formato del programa, común a todos sus capítulos
+  const f = await castFormatoBuf(showId);
+  if(f){
+    let nombre = 'formato del programa';
+    try{ const c = await idbGet('ddl-formato::' + showId); if(c && c.name) nombre = c.name; }catch(e){}
+    return { buf: f, nombre: nombre, de: 'formato del programa', comun: true };
+  }
+
+  throw new Error('este capítulo no tiene desglose de referencia: súbelo y se rellenará ese mismo');
 }
 
 async function castBufferOriginal(){ return (await castFuente()).buf; }
@@ -6302,14 +6336,17 @@ async function castPintarFuente(){
   el.style.display = '';
   try{
     const f = await castFuente();
-    el.textContent = 'Se rellenará: ' + f.nombre;
-    el.title = 'De ' + f.de + ' · pulsa para subir otro desglose de referencia';
-    el.className = 'cast-fuente ok';
+    el.textContent = 'Se rellenará: ' + f.nombre + (f.comun ? ' (común)' : '');
+    el.title = (f.comun
+        ? 'Es el formato COMÚN del programa: este capítulo no tiene el suyo. Pulsa para subirle uno propio.'
+        : 'Desglose de ' + f.de + ' · pulsa para cambiarlo');
+    // en amarillo si es el común: conviene ver que no es el de este capítulo
+    el.className = 'cast-fuente ' + (f.comun ? 'comun' : 'ok');
   }catch(e){
     // Antes esto solo informaba, y el botón para subirlo estaba en una sección
     // que el CSS esconde justo cuando hay un capítulo abierto: no había forma
     // de encontrarlo. Ahora el propio aviso sube el archivo.
-    el.textContent = '⚠️ Falta el desglose de referencia — súbelo aquí';
+    el.textContent = '⚠️ Este capítulo no tiene desglose — súbelo aquí';
     el.title = 'Sube el Excel de la empresa: se rellenará ese mismo con los talentos';
     el.className = 'cast-fuente mal';
   }
@@ -6796,7 +6833,7 @@ function showTutorial(onDone){
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Casting', ic:'🎭', t:'Repartir los talentos',
-      d:'Primero, una vez por programa: <b>Formato de casting</b> sube el Excel de la empresa que se va a rellenar.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
+      d:'Cada capítulo tiene <b>su propio desglose</b>: lo subes con el aviso de la barra y es el que se rellena y se descarga. El del 101 no toca el del 102.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
        +'<span class="tut-tip">Se rellena tu archivo tal cual: fórmulas, formato y macros intactos. Si un personaje del libreto no está en el Excel, te avisa por su nombre.</span>' },
 
     { s:'Paso 11 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
