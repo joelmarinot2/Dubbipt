@@ -17,3 +17,7 @@ settings.local.json
 manifest.webmanifest
 retropix.ttf
 Dubbipt-main/
+# herramientas para correrlo en un PC: no pintan nada en el sitio publicado
+local/
+*.cmd
+protools-overlay/
