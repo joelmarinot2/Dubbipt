@@ -1252,7 +1252,7 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .ocu-cajon{
   position:fixed; top:92px; bottom:14px; z-index:60;
   width:min(330px, 86vw); display:flex; align-items:flex-start; flex-direction:row-reverse;
-  right:-296px;   /* lo ajusta el JS con el ancho real */
+  right:-330px;   /* fuera del todo; el JS lo ajusta con el ancho real */
   transition:right .2s cubic-bezier(.22,.61,.36,1);
 }
 .ocu-cajon.abierto{ right:0; }
@@ -1285,6 +1285,7 @@ body.modo-casting{ transition:padding-right .2s cubic-bezier(.22,.61,.36,1); }
 
 .ocu{
   flex:1; min-width:0; height:100%; display:flex; flex-direction:column;
+  overflow:hidden;
   background:var(--panel); border:1px solid var(--line-soft); border-right:none;
   border-radius:14px 0 0 14px; overflow:hidden;
   box-shadow:-8px 0 26px rgba(0,0,0,.35);
@@ -1840,7 +1841,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.58.0-nube';
+const APP_VER_NUM = 'v10.58.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -6092,7 +6093,7 @@ function castPintarOcupacion(){
   // se está pintando -minimizada, en segundo plano- el rAF no llega a
   // ejecutarse nunca y el cajón se quedaba abierto para siempre.
   { const w = box.getBoundingClientRect().width || 330;
-    box.style.right = ocuAbierto ? '0px' : Math.round(34 - w) + 'px';
+    box.style.right = ocuAbierto ? '0px' : (-Math.round(w)) + 'px';
     box.style.left = 'auto'; }
   // El contenido se estrecha o se ensancha con el cajón. En píxeles y desde
   // aquí: por debajo de 1100 no se estrecha, porque dejaría las tarjetas
