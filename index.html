@@ -1250,22 +1250,30 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
    plegado, con el número de choques encima: si hay un problema de reparto
    tiene que verse sin abrir nada. */
 .ocu-cajon{
-  --ocu-w:min(330px, 86vw);
   position:fixed; top:92px; bottom:14px; z-index:60;
-  width:var(--ocu-w); display:flex; align-items:flex-start;
-  left:calc(34px - var(--ocu-w));
-  transition:left .2s cubic-bezier(.22,.61,.36,1);
+  width:min(330px, 86vw); display:flex; align-items:flex-start; flex-direction:row-reverse;
+  right:-296px;   /* lo ajusta el JS con el ancho real */
+  transition:right .2s cubic-bezier(.22,.61,.36,1);
 }
-.ocu-cajon.abierto{ left:0; }
+.ocu-cajon.abierto{ right:0; }
+
+/* Al desplegarse, el contenido se estrecha en vez de quedar tapado: la rejilla
+   de tarjetas es fluida y se reacomoda sola.
+   Se estrecha el BODY y no .wrap, porque esa clase trae `padding` con
+   !important en una regla posterior y cualquier cosa puesta aquí perdía. */
+body.modo-casting{ transition:padding-right .2s cubic-bezier(.22,.61,.36,1); }
+/* El valor lo pone castPintarOcupacion() en píxeles. Aquí llegó a estar como
+   calc(var(--ocu-w) + 10px) y NO se resolvía: quedaba en 0 y el contenido
+   nunca se estrechaba. Mismo problema que tuvo el propio cajón. */
 
 .ocu-tab{
-  position:absolute; left:100%; top:0; z-index:2;
+  position:absolute; right:100%; top:0; z-index:2;
   display:flex; flex-direction:column; align-items:center; gap:7px;
   background:var(--panel); color:var(--ink-dim);
-  border:1px solid var(--line-soft); border-left:none;
-  border-radius:0 12px 12px 0; padding:13px 8px 15px;
+  border:1px solid var(--line-soft); border-right:none;
+  border-radius:12px 0 0 12px; padding:13px 8px 15px;
   font:inherit; font-size:11.5px; font-weight:700; cursor:pointer;
-  box-shadow:4px 0 14px rgba(0,0,0,.3);
+  box-shadow:-4px 0 14px rgba(0,0,0,.3);
 }
 .ocu-tab:hover{ color:var(--ink); border-color:var(--violet); }
 .ocu-tab-txt{ writing-mode:vertical-rl; text-orientation:mixed; letter-spacing:.08em; }
@@ -1277,9 +1285,9 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 
 .ocu{
   flex:1; min-width:0; height:100%; display:flex; flex-direction:column;
-  background:var(--panel); border:1px solid var(--line-soft); border-left:none;
-  border-radius:0 14px 14px 0; overflow:hidden;
-  box-shadow:8px 0 26px rgba(0,0,0,.35);
+  background:var(--panel); border:1px solid var(--line-soft); border-right:none;
+  border-radius:14px 0 0 14px; overflow:hidden;
+  box-shadow:-8px 0 26px rgba(0,0,0,.35);
 }
 .ocu-head{ display:flex; align-items:center; gap:10px; padding:13px 15px 10px; cursor:pointer; user-select:none; flex:0 0 auto; }
 .ocu-head:hover{ background:rgba(255,255,255,.03); }
@@ -1291,7 +1299,7 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .ocu-lista{ border-top:1px solid var(--line-soft); overflow-y:auto; flex:1 1 auto; }
 .ocu-fila{ padding:11px 15px; border-bottom:1px solid var(--line-soft); }
 .ocu-fila:last-child{ border-bottom:none; }
-.ocu-fila.con-choque{ background:rgba(255,107,107,.06); box-shadow:inset 3px 0 0 #ff6b6b; }
+.ocu-fila.con-choque{ background:rgba(255,107,107,.06); box-shadow:inset -3px 0 0 #ff6b6b; }
 .ocu-nom{ font-weight:700; font-size:12.5px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-bottom:6px; }
 .ocu-bdg{ background:#ff6b6b; color:#2a0b0b; border-radius:999px; padding:2px 8px; font-size:10px; font-weight:800; }
 .ocu-barra{ height:7px; background:rgba(255,255,255,.07); border-radius:999px; overflow:hidden; margin-bottom:5px; }
@@ -1830,7 +1838,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.56.1-nube';
+const APP_VER_NUM = 'v10.57.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5930,7 +5938,10 @@ function castPintarOcupacion(){
   const box = document.getElementById('ocupacion');
   if(!box) return;
   if(typeof DDL_MODO === 'undefined' || DDL_MODO !== 'casting' || !chars.length){
-    box.innerHTML = ''; box.style.display = 'none'; return;
+    box.innerHTML = ''; box.style.display = 'none';
+    document.body.classList.remove('ocu-desplegado');   // que el contenido vuelva a su ancho
+    document.body.style.paddingRight = '';
+    return;
   }
   box.style.display = '';
   box.className = 'ocu-cajon' + (ocuAbierto ? ' abierto' : '');
@@ -5942,7 +5953,15 @@ function castPintarOcupacion(){
   // se está pintando -minimizada, en segundo plano- el rAF no llega a
   // ejecutarse nunca y el cajón se quedaba abierto para siempre.
   { const w = box.getBoundingClientRect().width || 330;
-    box.style.left = ocuAbierto ? '0px' : Math.round(34 - w) + 'px'; }
+    box.style.right = ocuAbierto ? '0px' : Math.round(34 - w) + 'px';
+    box.style.left = 'auto'; }
+  // El contenido se estrecha o se ensancha con el cajón. En píxeles y desde
+  // aquí: por debajo de 1100 no se estrecha, porque dejaría las tarjetas
+  // inservibles y es mejor que el cajón se ponga encima.
+  document.body.classList.toggle('ocu-desplegado', !!ocuAbierto);
+  { const w = box.getBoundingClientRect().width || 330;
+    const cabe = window.innerWidth > 1100;
+    document.body.style.paddingRight = (ocuAbierto && cabe) ? Math.round(w + 10) + 'px' : ''; }
   const filas = castOcupacion();
   const mapa = castChoques();
   const nChoques = Object.values(mapa).reduce((n, x) => n + x.choques.length, 0);
@@ -5954,10 +5973,10 @@ function castPintarOcupacion(){
   let html = '<button class="ocu-tab" id="ocuTab" title="' + (ocuAbierto ? 'Plegar' : 'Ver la ocupación de talentos') + '">'
     + '<span class="ocu-tab-txt">Ocupación</span>'
     + (nChoques ? '<span class="ocu-tab-n">' + nChoques + '</span>' : '')
-    + '<span class="ocu-tab-fl">' + (ocuAbierto ? '‹' : '›') + '</span></button>'
+    + '<span class="ocu-tab-fl">' + (ocuAbierto ? '›' : '‹') + '</span></button>'
     + '<div class="ocu"><div class="ocu-head" id="ocuHead">'
     + '<h2>Ocupación de talentos</h2>'
-    + '<span class="tg">‹ plegar</span></div>'
+    + '<span class="tg">plegar ›</span></div>'
     + '<div class="ocu-resumen">' + filas.length + ' talento' + (filas.length===1?'':'s')
     + ' · ' + totalInts + ' líneas'
     + (sinTal ? '<br>' + sinTal + ' personaje' + (sinTal===1?'':'s') + ' sin asignar' : '')
@@ -7116,7 +7135,7 @@ function showTutorial(onDone){
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Casting', ic:'🎭', t:'Repartir los talentos',
-      d:'Cada capítulo tiene <b>su propio desglose</b>: lo subes con el aviso de la barra y es el que se rellena y se descarga. El del 101 no toca el del 102.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Ocupación de talentos:</b> en la pestaña del costado izquierdo ves cuántas líneas lleva cada actor; se despliega y se pliega, y recuerda cómo lo dejaste. Si le asignas dos personajes que hablan seguidos te avisa y las tarjetas se ponen en <b>rojo</b>: no le daría tiempo a cambiar de voz.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
+      d:'Cada capítulo tiene <b>su propio desglose</b>: lo subes con el aviso de la barra y es el que se rellena y se descarga. El del 101 no toca el del 102.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Ocupación de talentos:</b> en la pestaña del costado derecho ves cuántas líneas lleva cada actor; se despliega y se pliega, y recuerda cómo lo dejaste. Si le asignas dos personajes que hablan seguidos te avisa y las tarjetas se ponen en <b>rojo</b>: no le daría tiempo a cambiar de voz.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
        +'<span class="tut-tip">Se rellena tu archivo tal cual: fórmulas, formato y macros intactos. Si un personaje del libreto no está en el Excel, te avisa por su nombre.</span>' },
 
     { s:'Paso 11 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
