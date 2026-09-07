@@ -1245,6 +1245,50 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .cast-fuente.mal{ background:rgba(255,107,107,.12); color:#ff9b9b; border:1px solid rgba(255,107,107,.35); }
 .cast-fuente.comun{ background:rgba(245,158,11,.12); color:#F59E0B; border:1px solid rgba(245,158,11,.35); }
 
+/* ═══ Ocupación de talentos ═══ */
+.ocu{ background:var(--panel); border:1px solid var(--line-soft); border-radius:var(--r); margin:14px 0 0; overflow:hidden; }
+.ocu-head{ display:flex; align-items:center; gap:12px; padding:12px 16px; cursor:pointer; user-select:none; }
+.ocu-head:hover{ background:rgba(255,255,255,.02); }
+.ocu-head h2{ font-family:var(--disp); font-size:14px; font-weight:700; }
+.ocu-head .cnt{ font-size:12px; color:var(--ink-faint); flex:1; }
+.ocu-head .tg{ font-size:12px; color:var(--ink-faint); }
+.ocu-alerta{ color:#ff6b6b; }
+.ocu-vacio{ padding:20px; text-align:center; color:var(--ink-faint); font-size:13px; }
+.ocu-lista{ border-top:1px solid var(--line-soft); }
+.ocu-fila{
+  display:grid; grid-template-columns:minmax(120px,190px) minmax(60px,1fr) 78px;
+  grid-template-areas:'nom barra num' 'pers pers pers';
+  gap:6px 12px; align-items:center; padding:11px 16px; border-bottom:1px solid var(--line-soft);
+}
+.ocu-fila:last-child{ border-bottom:none; }
+.ocu-fila.con-choque{ background:rgba(255,107,107,.06); box-shadow:inset 3px 0 0 #ff6b6b; }
+.ocu-nom{ grid-area:nom; font-weight:700; font-size:13px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+.ocu-bdg{ background:#ff6b6b; color:#2a0b0b; border-radius:999px; padding:2px 8px; font-size:10.5px; font-weight:800; }
+.ocu-barra{ grid-area:barra; height:8px; background:rgba(255,255,255,.07); border-radius:999px; overflow:hidden; }
+.ocu-barra i{ display:block; height:100%; background:linear-gradient(90deg,#4ADE80,#22C55E); border-radius:999px; }
+.ocu-fila.con-choque .ocu-barra i{ background:linear-gradient(90deg,#ff8a8a,#ff6b6b); }
+.ocu-num{ grid-area:num; text-align:right; font-size:12px; color:var(--ink-dim); font-variant-numeric:tabular-nums; }
+.ocu-pers{ grid-area:pers; display:flex; flex-wrap:wrap; gap:6px; }
+.ocu-p{
+  background:rgba(255,255,255,.06); border-radius:7px; padding:3px 9px; font-size:11.5px;
+  cursor:pointer; color:var(--ink-dim);
+}
+.ocu-p:hover{ background:rgba(255,255,255,.12); color:var(--ink); }
+.ocu-p b{ color:var(--ink); }
+.ocu-choques{ grid-area:pers; color:#ff9b9b; font-size:11.5px; line-height:1.55; margin-top:2px; }
+
+/* Tarjeta con choque: un actor haciendo dos personajes que hablan seguidos.
+   Rojo, distinto del naranja de «heredado» y del verde de «completado». */
+body.modo-casting .card.choque{
+  border-color:#ff6b6b !important;
+  box-shadow:0 0 0 1px rgba(255,107,107,.35), 0 6px 18px rgba(255,107,107,.10);
+}
+body.modo-casting .card.choque::after{
+  content:'⚠ choque'; position:absolute; right:10px; bottom:10px;
+  background:#ff6b6b; color:#2a0b0b; border-radius:999px;
+  padding:2px 9px; font-size:10.5px; font-weight:800;
+}
+
 /* La misma marca naranja, en la tabla */
 body.modo-casting .pla tbody tr.heredado td{ background:rgba(245,158,11,.07); }
 body.modo-casting .pla tbody tr.heredado .ploc input{ color:#F59E0B; font-weight:700; }
@@ -1624,6 +1668,7 @@ body.modo-casting #btnExport{ display:none !important; }
     <div id="filtrow" style="display:none"></div>
   </div>
   <div class="cards" id="cards"></div>
+  <div id="ocupacion" style="display:none"></div>
   <div id="planilla"></div>
   <div class="empty show" id="empty">
     <div class="ic"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v6h6"/></svg></div>
@@ -1755,7 +1800,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.55.0-nube';
+const APP_VER_NUM = 'v10.56.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4424,6 +4469,7 @@ async function assignTalent(key, val){
   try{ const raw=(window._charsRaw||[]).find(x=>x.key===key); if(raw){ raw.talent=val; raw.noRec=c.noRec; } }catch(e){}
   try{ castVerificar(key, true); }catch(e){}   // escrito a mano: ya está verificado
   try{ renderCards(); }catch(e){}
+  if(val) try{ castAvisarChoque(key); }catch(e){}
   if(typeof currentEp!=='undefined' && currentEp && currentEp.id){
     try{ await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
     try{ await saveEpCache(currentEp.id, new Date().toISOString()); }catch(e){}
@@ -4462,7 +4508,11 @@ function updateEpLine(){
 function isCharDone(c){ const r=recSet(c.key); return c.pages.length>0 && c.pages.every(pg=>r.has(pg.p)); }
 
 window._cardFilter = window._cardFilter || 'all';
+let _choqueMapa = null;
 function renderCards(){
+  // se calcula una sola vez por repintado: por tarjeta seria O(n²)
+  try{ _choqueMapa = (typeof DDL_MODO !== 'undefined' && DDL_MODO === 'casting') ? castChoques() : null; }
+  catch(e){ _choqueMapa = null; }
   const q = norm($('search').value||'');
   const box = $('cards'); box.innerHTML='';
   let shown=0;
@@ -4476,7 +4526,8 @@ function renderCards(){
     const pct = c.pages.length ? Math.round(100*[...rec].filter(p=>c.pages.some(x=>x.p===p)).length/c.pages.length) : 0;
     const card = document.createElement('div');
     const notInLib = !!(window._scanMissingKeys && window._scanMissingKeys.has(c.key));
-    card.className = 'card'+(done?' done':'')+(notInLib?' nolib':'')+(c.heredado?' heredado':''); card.tabIndex=0;
+    const enChoque = (typeof _choqueMapa !== 'undefined' && _choqueMapa) ? !!castChoqueDe(c.key, _choqueMapa) : false;
+    card.className = 'card'+(done?' done':'')+(notInLib?' nolib':'')+(c.heredado?' heredado':'')+(enChoque?' choque':''); card.tabIndex=0;
     if(notInLib) card.title = 'Este personaje no se encontró en el libreto';
     card.style.setProperty('--cc', c.color);
     const MAXPG=16;
@@ -4570,6 +4621,7 @@ function renderCards(){
         // reabrir; si el talento no está también en el crudo, se pierde.
         try{ const raw = (window._charsRaw||[]).find(x=> x.key===c.key); if(raw){ raw.talent = val; raw.noRec = c.noRec; } }catch(e){}
         try{ castVerificar(c.key, true); }catch(e){}   // escrito a mano: verificado
+        if(val) try{ castAvisarChoque(c.key); }catch(e){}
         // persistir en Supabase si hay episodio abierto
         try{
           if(typeof currentEp!=='undefined' && currentEp && currentEp.id && typeof epDataUpsert==='function')
@@ -4586,6 +4638,7 @@ function renderCards(){
 
     box.appendChild(card);
   }
+  try{ castPintarOcupacion(); }catch(e){}
   $('empty').classList.toggle('show', shown===0);
   if(shown===0 && chars.length){
     $('empty').querySelector('p').textContent = window._cardFilter!=='all'
@@ -5595,6 +5648,7 @@ function ponerModo(epId, m){
   try{ castPintarFuente(); }catch(e){}
   // la tabla cambia de columnas según el modo: hay que repintarla
   try{ if(m === 'casting') plaOpen = true; renderPlanilla(); }catch(e){}
+  try{ castPintarOcupacion(); }catch(e){}
   // continuidad: lo que ya se repartió en otros capítulos del programa
   if(m === 'casting'){ try{ castHeredar(null); }catch(e){} }
   const bm = document.getElementById('btnModo');
@@ -5726,6 +5780,176 @@ document.addEventListener('keydown', (e) => {
   e.preventDefault();
   castUndo();
 });
+
+/* ═══ OCUPACIÓN DE TALENTOS ═══════════════════════════════════════════════
+
+   Cuánto carga cada actor en este capítulo y, sobre todo, si se pisa a sí
+   mismo: un actor no puede hacer dos personajes que hablan seguidos, porque
+   no le da tiempo a cambiar de voz y en sala hay que rehacerlo.
+
+   La cercanía se mide en LÍNEAS del libreto, no en páginas: dos personajes
+   pueden compartir página y estar a treinta líneas, o estar en páginas
+   distintas y hablar uno detrás de otro. Lo que importa es cuántas
+   intervenciones hay en medio. */
+
+const CAST_CERCA = 4;        // líneas de margen: por debajo, se avisa
+
+/** Carga por talento: personajes, líneas y páginas. */
+function castOcupacion(){
+  const porTal = new Map();
+  for(const k in charIdx){
+    const c = charIdx[k];
+    const t = c && c.talent && String(c.talent).trim();
+    if(!t) continue;
+    const clave = castNorm(t);
+    let e = porTal.get(clave);
+    if(!e){ e = { talento: t, personajes: [], ints: 0, paginas: new Set() }; porTal.set(clave, e); }
+    e.personajes.push({ key: k, display: c.display || k, ints: c.totalInts || 0 });
+    e.ints += (c.totalInts || 0);
+    try{ for(const pg of (c.pages || [])) e.paginas.add(pg.p); }catch(x){}
+  }
+  return Array.from(porTal.values())
+    .map(e => { e.personajes.sort((a,b)=> b.ints - a.ints); return e; })
+    .sort((a,b)=> b.ints - a.ints || a.talento.localeCompare(b.talento,'es'));
+}
+
+/** Página de un bloque del libreto, si se sabe. */
+function castPagDe(idx){
+  try{ const b = script[idx]; return b && b.page != null ? b.page : null; }catch(e){ return null; }
+}
+
+/**
+ * Choques: dos personajes del MISMO talento hablando a menos de CAST_CERCA
+ * líneas. Devuelve {claveTalento: [{a, b, dist, pagina}]}.
+ */
+function castChoques(){
+  const out = {};
+  for(const e of castOcupacion()){
+    if(e.personajes.length < 2) continue;
+    // todas sus intervenciones en una sola lista ordenada por posición
+    const puntos = [];
+    for(const p of e.personajes){
+      const idxs = (typeof scriptByKey !== 'undefined' && scriptByKey[p.key]) || [];
+      for(const i of idxs) puntos.push({ i: i, key: p.key, display: p.display });
+    }
+    if(puntos.length < 2) continue;
+    puntos.sort((x, y) => x.i - y.i);
+    const choques = [];
+    const vistos = new Set();
+    for(let n = 1; n < puntos.length; n++){
+      const a = puntos[n-1], b = puntos[n];
+      if(a.key === b.key) continue;             // el mismo personaje seguido: normal
+      const dist = b.i - a.i;
+      if(dist > CAST_CERCA) continue;
+      const par = [a.key, b.key].sort().join('|');
+      if(vistos.has(par)) continue;             // un aviso por pareja, no por línea
+      vistos.add(par);
+      choques.push({ a: a.display, b: b.display, aKey: a.key, bKey: b.key,
+                     dist: dist, pagina: castPagDe(b.i) });
+    }
+    if(choques.length) out[castNorm(e.talento)] = { talento: e.talento, choques: choques };
+  }
+  return out;
+}
+
+/** ¿Este personaje está metido en algún choque? */
+function castChoqueDe(key, mapa){
+  const m = mapa || castChoques();
+  for(const c in m){
+    for(const ch of m[c].choques)
+      if(ch.aKey === key || ch.bKey === key) return { talento: m[c].talento, ch: ch };
+  }
+  return null;
+}
+
+/** Avisa si la última asignación ha creado un choque. */
+function castAvisarChoque(key){
+  try{
+    const hit = castChoqueDe(key);
+    if(!hit) return false;
+    const ch = hit.ch;
+    castAviso('⚠️ ' + hit.talento + ' hace «' + ch.a + '» y «' + ch.b + '», que hablan a '
+      + ch.dist + ' línea' + (ch.dist === 1 ? '' : 's')
+      + (ch.pagina != null ? ' (pág. ' + ch.pagina + ')' : '') + ' — no le da tiempo a cambiar de voz');
+    return true;
+  }catch(e){ return false; }
+}
+
+/** Resume todos los choques de golpe, tras heredar o importar una tabla. */
+function castAvisarChoquesTodos(){
+  const m = castChoques();
+  const claves = Object.keys(m);
+  if(!claves.length) return 0;
+  const n = claves.reduce((t, c) => t + m[c].choques.length, 0);
+  const ej = m[claves[0]].choques[0];
+  castAviso('⚠️ ' + n + ' choque' + (n===1?'':'s') + ' de reparto: ' + m[claves[0]].talento
+    + ' hace «' + ej.a + '» y «' + ej.b + '» a ' + ej.dist + ' línea' + (ej.dist===1?'':'s')
+    + (claves.length > 1 ? ' · y ' + (claves.length-1) + ' talento' + (claves.length===2?'':'s') + ' más' : '')
+    + ' — míralo en «Ocupación de talentos»');
+  return n;
+}
+
+/* ── El panel ─────────────────────────────────────────────────────────── */
+
+let ocuAbierto = true;
+
+function castPintarOcupacion(){
+  const box = document.getElementById('ocupacion');
+  if(!box) return;
+  if(typeof DDL_MODO === 'undefined' || DDL_MODO !== 'casting' || !chars.length){
+    box.innerHTML = ''; box.style.display = 'none'; return;
+  }
+  box.style.display = '';
+  const filas = castOcupacion();
+  const mapa = castChoques();
+  const nChoques = Object.values(mapa).reduce((n, x) => n + x.choques.length, 0);
+  const sinTal = chars.filter(c => !(c.talent && String(c.talent).trim())).length;
+  const totalInts = filas.reduce((n, e) => n + e.ints, 0);
+
+  let html = '<div class="ocu"><div class="ocu-head" id="ocuHead">'
+    + '<h2>Ocupación de talentos</h2>'
+    + '<span class="cnt">' + filas.length + ' talento' + (filas.length===1?'':'s')
+    + ' · ' + totalInts + ' líneas'
+    + (sinTal ? ' · ' + sinTal + ' personaje' + (sinTal===1?'':'s') + ' sin asignar' : '')
+    + (nChoques ? ' · <b class="ocu-alerta">' + nChoques + ' choque' + (nChoques===1?'':'s') + '</b>' : '')
+    + '</span><span class="tg">' + (ocuAbierto ? '▾ ocultar' : '▸ mostrar') + '</span></div>';
+
+  if(ocuAbierto){
+    if(!filas.length){
+      html += '<div class="ocu-vacio">Todavía no has asignado ningún talento.</div>';
+    }else{
+      const max = filas[0].ints || 1;
+      html += '<div class="ocu-lista">';
+      for(const e of filas){
+        const ch = mapa[castNorm(e.talento)];
+        html += '<div class="ocu-fila' + (ch ? ' con-choque' : '') + '">'
+          + '<div class="ocu-nom">' + esc(e.talento)
+          + (ch ? '<span class="ocu-bdg" title="Se pisa a sí mismo">⚠ choque</span>' : '')
+          + '</div>'
+          + '<div class="ocu-barra"><i style="width:' + Math.max(3, Math.round(100*e.ints/max)) + '%"></i></div>'
+          + '<div class="ocu-num">' + e.ints + ' líneas</div>'
+          + '<div class="ocu-pers">' + e.personajes.map(p =>
+              '<span class="ocu-p" data-k="' + esc(p.key) + '" title="Ver a ' + esc(p.display) + '">'
+              + esc(p.display) + ' <b>' + p.ints + '</b></span>').join('')
+          + '</div>';
+        if(ch){
+          html += '<div class="ocu-choques">' + ch.choques.map(x =>
+            '«' + esc(x.a) + '» y «' + esc(x.b) + '» a ' + x.dist + ' línea' + (x.dist===1?'':'s')
+            + (x.pagina != null ? ' · pág. ' + x.pagina : '')).join('<br>') + '</div>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+  }
+  html += '</div>';
+  box.innerHTML = html;
+
+  const head = document.getElementById('ocuHead');
+  if(head) head.addEventListener('click', ()=>{ ocuAbierto = !ocuAbierto; castPintarOcupacion(); });
+  box.querySelectorAll('.ocu-p').forEach(el =>
+    el.addEventListener('click', ()=>{ try{ openPopup(el.dataset.k); }catch(e){} }));
+}
 
 /* ═══ REGISTRO DE CASTING DEL PROGRAMA ═══════════════════════════════════
 
@@ -5954,6 +6178,7 @@ async function castHeredar(desdeExcel){
   if(total){
     try{ renderCards(); }catch(e){}
     try{ if(typeof currentEp!=='undefined' && currentEp && currentEp.id){ await epDataUpsert(currentEp.id, currentEp.showId); } }catch(e){}
+    try{ castAvisarChoquesTodos(); }catch(e){}
     castAviso('✅ ' + total + ' talento' + (total===1?'':'s') + ' heredado' + (total===1?'':'s')
       + (seguros.length && confirmados.length ? '' : '')
       + ' · revisa antes de exportar');
@@ -6121,6 +6346,7 @@ async function castSubirTabla(file){
     let msg = '✅ ' + puestos + ' talento' + (puestos===1?'':'s') + ' de la tabla · '
             + alRegistro + ' guardado' + (alRegistro===1?'':'s') + ' para los demás capítulos';
     castAviso(msg);
+    try{ castAvisarChoquesTodos(); }catch(e){}
     if(descuadran.length){
       castAviso('⚠️ No cuadran las intervenciones en ' + descuadran.length + ': '
         + descuadran.slice(0,3).join(' · ') + (descuadran.length>3 ? ' …' : '')
@@ -6833,7 +7059,7 @@ function showTutorial(onDone){
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Casting', ic:'🎭', t:'Repartir los talentos',
-      d:'Cada capítulo tiene <b>su propio desglose</b>: lo subes con el aviso de la barra y es el que se rellena y se descarga. El del 101 no toca el del 102.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
+      d:'Cada capítulo tiene <b>su propio desglose</b>: lo subes con el aviso de la barra y es el que se rellena y se descarga. El del 101 no toca el del 102.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Ocupación de talentos:</b> debajo de las tarjetas ves cuántas líneas lleva cada actor. Si le asignas dos personajes que hablan seguidos te avisa y las tarjetas se ponen en <b>rojo</b>: no le daría tiempo a cambiar de voz.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
        +'<span class="tut-tip">Se rellena tu archivo tal cual: fórmulas, formato y macros intactos. Si un personaje del libreto no está en el Excel, te avisa por su nombre.</span>' },
 
     { s:'Paso 11 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
