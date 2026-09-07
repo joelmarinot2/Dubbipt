@@ -1245,37 +1245,67 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .cast-fuente.mal{ background:rgba(255,107,107,.12); color:#ff9b9b; border:1px solid rgba(255,107,107,.35); }
 .cast-fuente.comun{ background:rgba(245,158,11,.12); color:#F59E0B; border:1px solid rgba(245,158,11,.35); }
 
-/* ═══ Ocupación de talentos ═══ */
-.ocu{ background:var(--panel); border:1px solid var(--line-soft); border-radius:var(--r); margin:14px 0 0; overflow:hidden; }
-.ocu-head{ display:flex; align-items:center; gap:12px; padding:12px 16px; cursor:pointer; user-select:none; }
-.ocu-head:hover{ background:rgba(255,255,255,.02); }
-.ocu-head h2{ font-family:var(--disp); font-size:14px; font-weight:700; }
-.ocu-head .cnt{ font-size:12px; color:var(--ink-faint); flex:1; }
-.ocu-head .tg{ font-size:12px; color:var(--ink-faint); }
-.ocu-alerta{ color:#ff6b6b; }
-.ocu-vacio{ padding:20px; text-align:center; color:var(--ink-faint); font-size:13px; }
-.ocu-lista{ border-top:1px solid var(--line-soft); }
-.ocu-fila{
-  display:grid; grid-template-columns:minmax(120px,190px) minmax(60px,1fr) 78px;
-  grid-template-areas:'nom barra num' 'pers pers pers';
-  gap:6px 12px; align-items:center; padding:11px 16px; border-bottom:1px solid var(--line-soft);
+/* ═══ Ocupación de talentos · cajón lateral ═══
+   Al costado izquierdo y desplegable. La pestaña se ve siempre, incluso
+   plegado, con el número de choques encima: si hay un problema de reparto
+   tiene que verse sin abrir nada. */
+.ocu-cajon{
+  --ocu-w:min(330px, 86vw);
+  position:fixed; top:92px; bottom:14px; z-index:60;
+  width:var(--ocu-w); display:flex; align-items:flex-start;
+  left:calc(34px - var(--ocu-w));
+  transition:left .2s cubic-bezier(.22,.61,.36,1);
 }
+.ocu-cajon.abierto{ left:0; }
+
+.ocu-tab{
+  position:absolute; left:100%; top:0; z-index:2;
+  display:flex; flex-direction:column; align-items:center; gap:7px;
+  background:var(--panel); color:var(--ink-dim);
+  border:1px solid var(--line-soft); border-left:none;
+  border-radius:0 12px 12px 0; padding:13px 8px 15px;
+  font:inherit; font-size:11.5px; font-weight:700; cursor:pointer;
+  box-shadow:4px 0 14px rgba(0,0,0,.3);
+}
+.ocu-tab:hover{ color:var(--ink); border-color:var(--violet); }
+.ocu-tab-txt{ writing-mode:vertical-rl; text-orientation:mixed; letter-spacing:.08em; }
+.ocu-tab-fl{ font-size:14px; line-height:1; opacity:.6; }
+.ocu-tab-n{
+  background:#ff6b6b; color:#2a0b0b; border-radius:999px;
+  min-width:19px; padding:2px 5px; font-size:11px; font-weight:800; text-align:center;
+}
+
+.ocu{
+  flex:1; min-width:0; height:100%; display:flex; flex-direction:column;
+  background:var(--panel); border:1px solid var(--line-soft); border-left:none;
+  border-radius:0 14px 14px 0; overflow:hidden;
+  box-shadow:8px 0 26px rgba(0,0,0,.35);
+}
+.ocu-head{ display:flex; align-items:center; gap:10px; padding:13px 15px 10px; cursor:pointer; user-select:none; flex:0 0 auto; }
+.ocu-head:hover{ background:rgba(255,255,255,.03); }
+.ocu-head h2{ font-family:var(--disp); font-size:14px; font-weight:700; flex:1; }
+.ocu-head .tg{ font-size:11.5px; color:var(--ink-faint); }
+.ocu-resumen{ padding:0 15px 11px; font-size:12px; color:var(--ink-faint); line-height:1.6; flex:0 0 auto; }
+.ocu-alerta{ color:#ff6b6b; }
+.ocu-vacio{ padding:22px 15px; text-align:center; color:var(--ink-faint); font-size:12.5px; }
+.ocu-lista{ border-top:1px solid var(--line-soft); overflow-y:auto; flex:1 1 auto; }
+.ocu-fila{ padding:11px 15px; border-bottom:1px solid var(--line-soft); }
 .ocu-fila:last-child{ border-bottom:none; }
 .ocu-fila.con-choque{ background:rgba(255,107,107,.06); box-shadow:inset 3px 0 0 #ff6b6b; }
-.ocu-nom{ grid-area:nom; font-weight:700; font-size:13px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
-.ocu-bdg{ background:#ff6b6b; color:#2a0b0b; border-radius:999px; padding:2px 8px; font-size:10.5px; font-weight:800; }
-.ocu-barra{ grid-area:barra; height:8px; background:rgba(255,255,255,.07); border-radius:999px; overflow:hidden; }
+.ocu-nom{ font-weight:700; font-size:12.5px; display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-bottom:6px; }
+.ocu-bdg{ background:#ff6b6b; color:#2a0b0b; border-radius:999px; padding:2px 8px; font-size:10px; font-weight:800; }
+.ocu-barra{ height:7px; background:rgba(255,255,255,.07); border-radius:999px; overflow:hidden; margin-bottom:5px; }
 .ocu-barra i{ display:block; height:100%; background:linear-gradient(90deg,#4ADE80,#22C55E); border-radius:999px; }
 .ocu-fila.con-choque .ocu-barra i{ background:linear-gradient(90deg,#ff8a8a,#ff6b6b); }
-.ocu-num{ grid-area:num; text-align:right; font-size:12px; color:var(--ink-dim); font-variant-numeric:tabular-nums; }
-.ocu-pers{ grid-area:pers; display:flex; flex-wrap:wrap; gap:6px; }
-.ocu-p{
-  background:rgba(255,255,255,.06); border-radius:7px; padding:3px 9px; font-size:11.5px;
-  cursor:pointer; color:var(--ink-dim);
-}
+.ocu-num{ font-size:11.5px; color:var(--ink-dim); font-variant-numeric:tabular-nums; margin-bottom:6px; }
+.ocu-pers{ display:flex; flex-wrap:wrap; gap:5px; }
+.ocu-p{ background:rgba(255,255,255,.06); border-radius:7px; padding:3px 8px; font-size:11px; cursor:pointer; color:var(--ink-dim); }
 .ocu-p:hover{ background:rgba(255,255,255,.12); color:var(--ink); }
 .ocu-p b{ color:var(--ink); }
-.ocu-choques{ grid-area:pers; color:#ff9b9b; font-size:11.5px; line-height:1.55; margin-top:2px; }
+.ocu-choques{ color:#ff9b9b; font-size:11px; line-height:1.55; margin-top:6px; }
+
+/* en pantallas estrechas el cajon abierto tapa: se cierra solo al pulsar fuera */
+@media (max-width:820px){ .ocu-cajon{ top:80px; } }
 
 /* Tarjeta con choque: un actor haciendo dos personajes que hablan seguidos.
    Rojo, distinto del naranja de «heredado» y del verde de «completado». */
@@ -1622,6 +1652,7 @@ body.modo-casting #btnExport{ display:none !important; }
     <div class="lpct" id="loadPct" style="display:none"></div>
   </div>
   <div class="stats" id="stats"></div>
+  <div id="ocupacion" style="display:none"></div>
   <div class="toolbar" id="toolbar">
     <div class="findrow">
       <label class="find">
@@ -1668,7 +1699,6 @@ body.modo-casting #btnExport{ display:none !important; }
     <div id="filtrow" style="display:none"></div>
   </div>
   <div class="cards" id="cards"></div>
-  <div id="ocupacion" style="display:none"></div>
   <div id="planilla"></div>
   <div class="empty show" id="empty">
     <div class="ic"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v12a1 1 0 01-1 1H7a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v6h6"/></svg></div>
@@ -1800,7 +1830,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.56.0-nube';
+const APP_VER_NUM = 'v10.56.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5891,7 +5921,10 @@ function castAvisarChoquesTodos(){
 
 /* ── El panel ─────────────────────────────────────────────────────────── */
 
-let ocuAbierto = true;
+let ocuAbierto = (function(){
+  try{ const v = localStorage.getItem('ddl_ocu_abierto'); return v === null ? true : v === '1'; }
+  catch(e){ return true; }
+})();
 
 function castPintarOcupacion(){
   const box = document.getElementById('ocupacion');
@@ -5900,21 +5933,38 @@ function castPintarOcupacion(){
     box.innerHTML = ''; box.style.display = 'none'; return;
   }
   box.style.display = '';
+  box.className = 'ocu-cajon' + (ocuAbierto ? ' abierto' : '');
+  // La posición se fija aquí, en píxeles, con el ancho REAL medido. Dejarlo a
+  // la hoja de estilos no bastaba: la regla aplicaba y el elemento se quedaba
+  // en left:0 igual.
+  //
+  // Y se hace SÍNCRONO, no dentro de requestAnimationFrame: si la pestaña no
+  // se está pintando -minimizada, en segundo plano- el rAF no llega a
+  // ejecutarse nunca y el cajón se quedaba abierto para siempre.
+  { const w = box.getBoundingClientRect().width || 330;
+    box.style.left = ocuAbierto ? '0px' : Math.round(34 - w) + 'px'; }
   const filas = castOcupacion();
   const mapa = castChoques();
   const nChoques = Object.values(mapa).reduce((n, x) => n + x.choques.length, 0);
   const sinTal = chars.filter(c => !(c.talent && String(c.talent).trim())).length;
   const totalInts = filas.reduce((n, e) => n + e.ints, 0);
 
-  let html = '<div class="ocu"><div class="ocu-head" id="ocuHead">'
+  // Cajón al costado izquierdo. La pestaña se ve SIEMPRE, también plegado:
+  // un panel que se esconde del todo es un panel que nadie encuentra.
+  let html = '<button class="ocu-tab" id="ocuTab" title="' + (ocuAbierto ? 'Plegar' : 'Ver la ocupación de talentos') + '">'
+    + '<span class="ocu-tab-txt">Ocupación</span>'
+    + (nChoques ? '<span class="ocu-tab-n">' + nChoques + '</span>' : '')
+    + '<span class="ocu-tab-fl">' + (ocuAbierto ? '‹' : '›') + '</span></button>'
+    + '<div class="ocu"><div class="ocu-head" id="ocuHead">'
     + '<h2>Ocupación de talentos</h2>'
-    + '<span class="cnt">' + filas.length + ' talento' + (filas.length===1?'':'s')
+    + '<span class="tg">‹ plegar</span></div>'
+    + '<div class="ocu-resumen">' + filas.length + ' talento' + (filas.length===1?'':'s')
     + ' · ' + totalInts + ' líneas'
-    + (sinTal ? ' · ' + sinTal + ' personaje' + (sinTal===1?'':'s') + ' sin asignar' : '')
-    + (nChoques ? ' · <b class="ocu-alerta">' + nChoques + ' choque' + (nChoques===1?'':'s') + '</b>' : '')
-    + '</span><span class="tg">' + (ocuAbierto ? '▾ ocultar' : '▸ mostrar') + '</span></div>';
+    + (sinTal ? '<br>' + sinTal + ' personaje' + (sinTal===1?'':'s') + ' sin asignar' : '')
+    + (nChoques ? '<br><b class="ocu-alerta">' + nChoques + ' choque' + (nChoques===1?'':'s') + ' de reparto</b>' : '')
+    + '</div>';
 
-  if(ocuAbierto){
+  {
     if(!filas.length){
       html += '<div class="ocu-vacio">Todavía no has asignado ningún talento.</div>';
     }else{
@@ -5945,8 +5995,15 @@ function castPintarOcupacion(){
   html += '</div>';
   box.innerHTML = html;
 
+  const alternar = ()=>{
+    ocuAbierto = !ocuAbierto;
+    try{ localStorage.setItem('ddl_ocu_abierto', ocuAbierto ? '1' : '0'); }catch(e){}
+    castPintarOcupacion();
+  };
+  const tab = document.getElementById('ocuTab');
+  if(tab) tab.addEventListener('click', alternar);
   const head = document.getElementById('ocuHead');
-  if(head) head.addEventListener('click', ()=>{ ocuAbierto = !ocuAbierto; castPintarOcupacion(); });
+  if(head) head.addEventListener('click', alternar);
   box.querySelectorAll('.ocu-p').forEach(el =>
     el.addEventListener('click', ()=>{ try{ openPopup(el.dataset.k); }catch(e){} }));
 }
@@ -7059,7 +7116,7 @@ function showTutorial(onDone){
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Casting', ic:'🎭', t:'Repartir los talentos',
-      d:'Cada capítulo tiene <b>su propio desglose</b>: lo subes con el aviso de la barra y es el que se rellena y se descarga. El del 101 no toca el del 102.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Ocupación de talentos:</b> debajo de las tarjetas ves cuántas líneas lleva cada actor. Si le asignas dos personajes que hablan seguidos te avisa y las tarjetas se ponen en <b>rojo</b>: no le daría tiempo a cambiar de voz.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
+      d:'Cada capítulo tiene <b>su propio desglose</b>: lo subes con el aviso de la barra y es el que se rellena y se descarga. El del 101 no toca el del 102.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Ocupación de talentos:</b> en la pestaña del costado izquierdo ves cuántas líneas lleva cada actor; se despliega y se pliega, y recuerda cómo lo dejaste. Si le asignas dos personajes que hablan seguidos te avisa y las tarjetas se ponen en <b>rojo</b>: no le daría tiempo a cambiar de voz.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
        +'<span class="tut-tip">Se rellena tu archivo tal cual: fórmulas, formato y macros intactos. Si un personaje del libreto no está en el Excel, te avisa por su nombre.</span>' },
 
     { s:'Paso 11 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
