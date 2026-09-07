@@ -1377,7 +1377,10 @@ body:not(.modo-casting) .verbtn{ display:none; }
 .dc-form input{ background:#11131a; color:#e7ebf3; border:1px solid #2b3040; border-radius:8px;
   padding:9px 11px; font:inherit; font-size:13.5px; }
 .dc-form input:focus{ outline:none; border-color:#4ADE80; }
-.dc-msg{ margin-top:12px; font-size:12.5px; color:#7ee3a4; min-height:17px; }
+.dc-ver{ margin-top:11px; width:100%; background:none; border:1px dashed #2b3040; color:#8892a6;
+  border-radius:9px; padding:8px; font:inherit; font-size:12px; cursor:pointer; }
+.dc-ver:hover{ border-color:#4ADE80; color:#e7ebf3; }
+.dc-msg{ margin-top:12px; font-size:12.5px; color:#7ee3a4; min-height:17px; line-height:1.55; word-break:break-word; }
 .dc-msg.mal{ color:#ff9b9b; }
 
 /* Diálogo de nombres parecidos */
@@ -1862,7 +1865,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.59.0-nube';
+const APP_VER_NUM = 'v10.59.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5957,18 +5960,62 @@ function dcIndices(p){
   };
 }
 
-/** Busca la serie y el episodio de DublajeCast que corresponden a lo abierto aquí. */
+/** El número de capítulo que lleva un nombre: «CHAINSMOKER CAT 109» → 109.
+    Se coge el ÚLTIMO número, que es el del capítulo; los programas suelen
+    llevar cifras en el título y si no, «24 HORAS 109» daría 24. */
+function dcNumeroEp(nombre){
+  const nums = String(nombre || '').match(/\d+/g);
+  if(!nums || !nums.length) return null;
+  return String(parseInt(nums[nums.length - 1], 10));
+}
+
+/** Busca la serie y el episodio de DublajeCast que corresponden a lo abierto aquí.
+
+    Sus episodios NO tienen nombre: tienen `episode_number` y `title`. Comparar
+    por nombre no encontraba nada nunca, que es por lo que «Traer» no hacía
+    nada. Se casa por NÚMERO dentro de la serie, que es lo estable. */
 function dcLocalizar(p){
   const ix = dcIndices(p);
   const nomPrograma = (function(){
     try{ return ((sbShows().find(x => x.id === LDB.showId) || {}).name) || ''; }catch(e){ return ''; }
   })();
   const nomEp = (currentEp && currentEp.name) || '';
-  const serie = ix.series.find(s => dcN(ix.nombre(s)) === dcN(nomPrograma)) || null;
-  // el episodio, por nombre; si la serie casó, se prefiere uno suyo
-  const cands = ix.episodes.filter(e => dcN(ix.nombre(e)) === dcN(nomEp));
-  const ep = (serie ? cands.find(e => String(e.series_id) === String(serie.id)) : null) || cands[0] || null;
-  return { serie, ep, ix, nomPrograma, nomEp };
+  const num = dcNumeroEp(nomEp);
+
+  // la serie, por nombre; si no cuadra exacto, la que más se le parezca
+  let serie = ix.series.find(s => dcN(ix.nombre(s)) === dcN(nomPrograma)) || null;
+  if(!serie && nomPrograma){
+    let mejor = null;
+    for(const s of ix.series){
+      const p2 = castSimil(dcN(ix.nombre(s)), dcN(nomPrograma));
+      if(p2 >= 0.82 && (!mejor || p2 > mejor.p)) mejor = { s: s, p: p2 };
+    }
+    if(mejor) serie = mejor.s;
+  }
+
+  const deLaSerie = serie ? ix.episodes.filter(e => String(e.series_id) === String(serie.id)) : ix.episodes;
+  let ep = null;
+  // 1) por número de capítulo, que es como los guarda DublajeCast
+  if(num != null) ep = deLaSerie.find(e => String(e.episode_number) === num) || null;
+  // 2) por título exacto, por si lo nombran así
+  if(!ep && nomEp) ep = deLaSerie.find(e => dcN(ix.nombre(e)) === dcN(nomEp)) || null;
+  // 3) sin serie identificada, el número tiene que ser único para no equivocarse
+  if(!ep && !serie && num != null){
+    const c = ix.episodes.filter(e => String(e.episode_number) === num);
+    if(c.length === 1) ep = c[0];
+  }
+  return { serie, ep, ix, nomPrograma, nomEp, num };
+}
+
+/** Qué hay en DublajeCast, para poder decirlo cuando no casa nada. */
+function dcQueHay(p){
+  const ix = dcIndices(p);
+  const series = ix.series.map(s => ix.nombre(s)).filter(Boolean);
+  const porSerie = ix.series.map(s => ix.nombre(s) + ': ' +
+      (ix.episodes.filter(e => String(e.series_id) === String(s.id))
+        .map(e => e.episode_number).filter(x => x != null).join(', ') || 'sin capítulos'));
+  return { series, porSerie, nEpisodios: ix.episodes.length, nPersonajes: ix.chars.length,
+           nTalentos: ix.talents.length, nCastings: ix.castings.length };
 }
 
 /** Lo que DublajeCast sabe del capítulo abierto: {PERSONAJE: TALENTO}. */
@@ -5992,10 +6039,16 @@ async function dcImportar(){
   const p = await dcLeer();
   const { casting, ep } = dcCastingDelEpisodio(p);
   if(!ep){
+    // Decir QUÉ hay, no solo que no se encontró: así se ve en el momento si
+    // falla el nombre del programa o el número del capítulo.
     const l = dcLocalizar(p);
-    castAviso('⚠️ No encuentro «' + (l.nomEp || '?') + '» en DublajeCast'
-      + (l.serie ? '' : ' (ni el programa «' + (l.nomPrograma || '?') + '»)')
-      + ' — los nombres tienen que coincidir');
+    const q = dcQueHay(p);
+    let t = '⚠️ No encuentro el capítulo ' + (l.num != null ? l.num : '«' + (l.nomEp || '?') + '»');
+    t += l.serie ? ' dentro de «' + dcIndices(p).nombre(l.serie) + '»'
+                 : ' · tampoco el programa «' + (l.nomPrograma || '?') + '»';
+    t += ' · En DublajeCast hay: ' + (q.porSerie.slice(0, 6).join(' | ') || 'nada')
+       + (q.porSerie.length > 6 ? ' …' : '');
+    castAviso(t);
     return 0;
   }
   const n = Object.keys(casting).length;
@@ -6111,6 +6164,7 @@ async function dcPanel(){
         +   '<label>Contraseña<input type="password" id="dcPass" required autocomplete="current-password"></label>'
         +   '<button class="modo-op dc-b dc-ok" type="submit" id="dcEntrarBtn">Entrar</button>'
         + '</form>')
+  +   (u ? '<button class="dc-ver" id="dcVer">¿Qué hay en DublajeCast?</button>' : '')
   +   '<div class="dc-msg" id="dcMsg"></div>'
   +   '<div class="modo-pie">Cerrar con Escape</div>'
   + '</div>';
@@ -6134,6 +6188,21 @@ async function dcPanel(){
   };
   const sal = ov.querySelector('#dcSalir');
   if(sal) sal.onclick = async () => { await dcSalir(); cerrar(); dcPanel(); };
+
+  const ver = ov.querySelector('#dcVer');
+  if(ver) ver.onclick = async () => {
+    ver.disabled = true; msg('Leyendo…');
+    try{
+      const p = await dcLeer();
+      const q = dcQueHay(p), l = dcLocalizar(p);
+      msg('Aquí: «' + (l.nomPrograma||'?') + '» capítulo ' + (l.num != null ? l.num : '?')
+        + ' · Allí: ' + q.nEpisodios + ' capítulos, ' + q.nPersonajes + ' personajes, '
+        + q.nTalentos + ' talentos, ' + q.nCastings + ' asignaciones · '
+        + (q.porSerie.join(' | ') || 'sin series')
+        + ' · Coincide: ' + (l.serie ? 'programa ✓' : 'programa ✗') + ' ' + (l.ep ? 'capítulo ✓' : 'capítulo ✗'));
+    }catch(err){ msg('Error: ' + err.message, true); }
+    ver.disabled = false;
+  };
 
   const tr = ov.querySelector('#dcTraer');
   if(tr) tr.onclick = async () => {
