@@ -1915,7 +1915,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.61.0-nube';
+const APP_VER_NUM = 'v10.61.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4474,7 +4474,7 @@ function renderPlanilla(){
         + (cast
             ? ('<td class="ptime">'+(c.totalInts!=null?c.totalInts:'—')+'</td>'
               +'<td class="pest">'+(gestPend
-                  ? '<button class="gestbtn" data-k="'+esc(c.key)+'" title="En este capítulo solo hace gestos — pulsa para dejarlo tal cual">🎭 verificar</button>'
+                  ? '<button class="gestbtn" data-k="'+esc(c.key)+'" title="En este capítulo solo hace gestos — pulsa para dejarlo original (no se dobla)">🎭 verificar</button>'
                   : c.heredado
                   ? '<button class="verbtn" data-k="'+esc(c.key)+'" title="Viene de otro capítulo — pulsa para darlo por bueno">✓ verificar</button>'
                   : (c.talent ? '<span class="est-ok">✓</span>' : '<span class="est-no">—</span>'))+'</td></tr>')
@@ -4670,7 +4670,7 @@ function renderCards(){
       `<span class="pg ${rec.has(pg.p)?'rec':''}" data-p="${pg.p}" title="Abrir pág. ${pg.p}">${pg.p}·${pg.ints}</span>`).join('')
       + (c.pages.length>MAXPG?`<span class="pg more">+${c.pages.length-MAXPG}</span>`:'');
     const gestBtn = soloGestos
-      ? `<button class="gestbtn" title="En este capítulo solo hace gestos — pulsa para dejarlo tal cual" aria-label="Verificar que ${esc(c.display)} solo hace gestos">✓ verificar</button>`
+      ? `<button class="gestbtn" title="En este capítulo solo hace gestos — pulsa para dejarlo original (no se dobla)" aria-label="Verificar que ${esc(c.display)} solo hace gestos">✓ verificar</button>`
       : '';
     const talDisplay = (c.talent
       ? `<b>${esc(c.talent)}</b>` + (c.heredado && !soloGestos
@@ -4724,7 +4724,7 @@ function renderCards(){
       try{ if(typeof renderPlanilla === 'function') renderPlanilla(); }catch(e){}
       try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
       try{ gestAvisar(); }catch(e){}
-      if(typeof DDL_UI!=='undefined') DDL_UI.toast('Verificado: ' + c.display);
+      if(typeof DDL_UI!=='undefined') DDL_UI.toast('Verificado: ' + c.display + ' → ' + GEST_ORIGINAL);
     });
 
     // Asignar / Editar → input inline sobre la zona de talento
@@ -6602,13 +6602,34 @@ function gestPendiente(key, mapa){
   }catch(e){ return false; }
 }
 
-/** «Dejarlo original»: se da por bueno y deja de estorbar. */
-function gestVerificar(key, ok){
+/**
+ * «Dejarlo original», al pie de la letra: dar por bueno que solo hace gestos
+ * es decir que ese personaje NO se dobla, y en el desglose eso se escribe
+ * ORIGINAL. Así sale ya puesto en el Excel y nadie tiene que acordarse.
+ *
+ * Se guarda en el deshacer, que para eso está: si te equivocaste al verificar,
+ * Ctrl+Z te devuelve el talento que hubiera antes.
+ */
+const GEST_ORIGINAL = 'ORIGINAL';
+function gestVerificar(key, ok, sinHistoria){
   const c = charIdx[key];
-  if(c) c.gestOk = !!ok;
+  if(c && ok && !sinHistoria){
+    try{ castHistPush(castFoto([key]), 'verificar gestos ' + (c.display || key)); }catch(e){}
+  }
+  if(c){
+    c.gestOk = !!ok;
+    if(ok){
+      c.talent = GEST_ORIGINAL;                  // no se dobla: queda el audio original
+      try{ c.noRec = NO_REC.has(norm(GEST_ORIGINAL)); }catch(e){ c.noRec = true; }
+      c.heredado = false;                        // lo acabas de decidir tú
+    }
+  }
   try{
     const raw = (window._charsRaw || []).find(x => x.key === key);
-    if(raw) raw.gestOk = !!ok;
+    if(raw){
+      raw.gestOk = !!ok;
+      if(ok && c){ raw.talent = c.talent; raw.noRec = c.noRec; raw.heredado = false; }
+    }
   }catch(e){}
 }
 
@@ -6637,7 +6658,9 @@ function gestPanel(){
     return '<div class="gest-f"><div><div class="gest-n">' + esc(x.display)
       + (ya ? ' <span class="est-ok">✓ verificado</span>' : '') + '</div>'
       + '<div class="gest-m">' + x.bloques + (x.bloques === 1 ? ' intervención' : ' intervenciones')
-      + ', todas gesto' + (x.talent ? ' · talento: ' + esc(x.talent) : '')
+      + ', todas gesto'
+      + (function(){ const c = charIdx[x.key], t = c && c.talent;
+                     return t ? ' · talento: ' + esc(t) : ''; })()
       + (x.muestras.length ? '<br><span class="gest-t">' + x.muestras.map(esc).join(' · ') + '</span>' : '')
       + '</div></div>'
       + (ya ? '<span class="est-no">—</span>'
@@ -6673,11 +6696,12 @@ function gestPanel(){
   });
   const t = ov.querySelector('#gestTodos');
   if(t) t.onclick = async () => {
-    for(const x of pend) gestVerificar(x.key, true);
+    try{ castHistPush(castFoto(pend.map(x => x.key)), 'verificar ' + pend.length + ' de gestos'); }catch(e){}
+    for(const x of pend) gestVerificar(x.key, true, true);
     await repintar();
     cerrar();
     castAviso('✅ ' + pend.length + ' personaje' + (pend.length === 1 ? '' : 's') + ' de gestos verificado'
-      + (pend.length === 1 ? '' : 's'));
+      + (pend.length === 1 ? '' : 's') + ' · se les pone ' + GEST_ORIGINAL);
   };
 }
 
@@ -8183,7 +8207,7 @@ function showTutorial(onDone){
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Casting', ic:'🎭', t:'Repartir los talentos',
-      d:'Una vez por programa, <b>Cabecera</b>: fecha, género, tiempo, director, técnico y estudio, que se escriben solos en la hoja de casting al exportar. Y <b>⇄ DublajeCast</b> trae o lleva el casting a la otra aplicación.<br>Cada capítulo tiene <b>su propio desglose</b>: lo subes con el aviso de la barra y es el que se rellena y se descarga. El del 101 no toca el del 102.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Ocupación de talentos:</b> en la pestaña del costado derecho ves cuántas líneas lleva cada actor; se despliega y se pliega, y recuerda cómo lo dejaste.<br><b>🖨 Desglose</b> imprime una fila por personaje; <b>🖨 Planilla</b>, una fila por talento con sus personajes y sus líneas. Si le asignas dos personajes que hablan seguidos te avisa y las tarjetas se ponen en <b>rojo</b>: no le daría tiempo a cambiar de voz.<br><b>🎭 Solo gestos:</b> antes de repartir, Dubbipt lee el libreto y busca a los personajes que en <i>este</i> capítulo no dicen ni una palabra -solo (REACCIÓN), (EFFORTS), (GRITA)…-. Salen en <b>violeta</b> y con un <b>✓ verificar</b> para dejarlos tal cual. Mientras no los verifiques <b>no se les reparte talento solo</b>: los extras («MALE SOLDIER», «FEMALE OWNER») repiten nombre sin ser la misma persona, y en un capítulo hablan y en el siguiente solo reaccionan. El botón <b>🎭 Solo gestos</b> los lista todos con un ejemplo de lo que hacen.<br>En la <b>ocupación</b> no se cuentan las casillas que no son un actor -«X», «ORIGINAL», «X ORIGINAL», «TODOS»-: ni suman líneas ni provocan choques.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
+      d:'Una vez por programa, <b>Cabecera</b>: fecha, género, tiempo, director, técnico y estudio, que se escriben solos en la hoja de casting al exportar. Y <b>⇄ DublajeCast</b> trae o lleva el casting a la otra aplicación.<br>Cada capítulo tiene <b>su propio desglose</b>: lo subes con el aviso de la barra y es el que se rellena y se descarga. El del 101 no toca el del 102.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Ocupación de talentos:</b> en la pestaña del costado derecho ves cuántas líneas lleva cada actor; se despliega y se pliega, y recuerda cómo lo dejaste.<br><b>🖨 Desglose</b> imprime una fila por personaje; <b>🖨 Planilla</b>, una fila por talento con sus personajes y sus líneas. Si le asignas dos personajes que hablan seguidos te avisa y las tarjetas se ponen en <b>rojo</b>: no le daría tiempo a cambiar de voz.<br><b>🎭 Solo gestos:</b> antes de repartir, Dubbipt lee el libreto y busca a los personajes que en <i>este</i> capítulo no dicen ni una palabra -solo (REACCIÓN), (EFFORTS), (GRITA)…-. Salen en <b>violeta</b> y con un <b>✓ verificar</b> para dejarlos tal cual: al verificarlos se les pone <b>ORIGINAL</b> como talento, que es lo que significa -ese personaje no se dobla, se queda el audio de origen-, y ya sale puesto en el Excel. Mientras no los verifiques <b>no se les reparte talento solo</b>: los extras («MALE SOLDIER», «FEMALE OWNER») repiten nombre sin ser la misma persona, y en un capítulo hablan y en el siguiente solo reaccionan. El botón <b>🎭 Solo gestos</b> los lista todos con un ejemplo de lo que hacen.<br>En la <b>ocupación</b> no se cuentan las casillas que no son un actor -«X», «ORIGINAL», «X ORIGINAL», «TODOS»-: ni suman líneas ni provocan choques.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
        +'<span class="tut-tip">Se rellena tu archivo tal cual: fórmulas, formato y macros intactos. Si un personaje del libreto no está en el Excel, te avisa por su nombre.</span>' },
 
     { s:'Paso 11 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
