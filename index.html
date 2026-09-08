@@ -1915,7 +1915,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.61.1-nube';
+const APP_VER_NUM = 'v10.61.2-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -9706,7 +9706,14 @@ body.toolhidden .ltoolhide{ top:0; border-top:1px solid #1c1e22; }
   .blk{ grid-template-columns:60px 1fr !important; padding:8px 12px !important; }
   .blk .tx{ font-size:15px !important; }
   #lCharSel{ max-width:130px !important; font-size:12px !important; }
-  #lScope,#lTheme,#lClean,#lPron,#lColor{ display:none !important; }
+  /* Aquí se escondían #lScope, #lTheme, #lClean, #lPron y #lColor. En la
+     práctica solo desaparecía el ALCANCE: a los demás los rescataba la regla
+     «.lh > button:not(.lbk):not(#lVid):not(#lScope):not(#lFree)», que pesa más
+     y les impone display:inline-grid — y que excluye justo a #lScope. Así que
+     al abrir el Vídeo, que parte el libreto en dos columnas y lo deja por
+     debajo de 680px, se perdía el botón de alcance y no había forma de pasar
+     de «este personaje» a «todo el libreto». #lClean y #lColor ya ni existen.
+     La barra se envuelve en dos filas y además desplaza en horizontal: caben. */
 }
 @media(max-width:420px){
   .blk{ grid-template-columns:52px 1fr !important; gap:0 8px !important; }
