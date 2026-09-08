@@ -1,5 +1,5 @@
 // Service Worker · Dubbipt  (VERSION autogenerada en cada build)
-const VERSION = '2026-09-07T14:47';
+const VERSION = '2026-09-08T12:20';
 const CACHE   = 'dubbipt-' + VERSION;
 
 const SHELL = [

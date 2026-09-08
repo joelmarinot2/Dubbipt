@@ -1360,6 +1360,44 @@ body.modo-casting .card.heredado .tal b{ color:#F59E0B; }
 /* fuera del casting no se enseña: es una marca de trabajo del reparto */
 body:not(.modo-casting) .verbtn{ display:none; }
 
+/* ═══ Personajes que en este capítulo SOLO hacen gestos ═══════════════════
+   Un «MALE SOLDIER» que en el 101 tenía texto y en el 102 solo reacciona no
+   es el mismo papel: no debe heredar actor sin que alguien lo mire. Violeta,
+   y por delante del naranja de «heredado» y del rojo de «choque»: esta marca
+   se decide antes que el reparto, así que se pinta encima de las otras. */
+body.modo-casting .card.gestos{
+  border-color:#A78BFA !important;
+  box-shadow:0 0 0 1px rgba(167,139,250,.38), 0 6px 18px rgba(167,139,250,.12) !important;
+}
+body.modo-casting .card.gestos::before{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:4px;
+  background:#A78BFA; border-radius:4px 0 0 4px;
+}
+body.modo-casting .card.gestos::after{
+  content:'🎭 solo gestos'; position:absolute; right:10px; bottom:10px;
+  background:#A78BFA; color:#1c1330; border-radius:999px;
+  padding:2px 9px; font-size:10.5px; font-weight:800;
+}
+body.modo-casting .card.gestos .tal b{ color:#A78BFA; }
+body.modo-casting .pla tbody tr.gestos td{ background:rgba(167,139,250,.08); }
+body.modo-casting .pla tbody tr.gestos td:first-child{ box-shadow:inset 3px 0 0 #A78BFA; }
+.gestbtn{
+  display:inline-flex; align-items:center; gap:4px; margin-left:8px;
+  background:#A78BFA; color:#1c1330; border:none; border-radius:999px;
+  padding:3px 10px; font:inherit; font-size:11px; font-weight:700;
+  cursor:pointer; vertical-align:middle; white-space:nowrap;
+}
+.gestbtn:hover{ filter:brightness(1.12); }
+.gestbtn:active{ transform:translateY(1px); }
+body:not(.modo-casting) .gestbtn{ display:none; }
+.gest-lista{ max-height:46vh; overflow:auto; margin:4px 0 14px; }
+.gest-f{ display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center;
+  padding:9px 2px; border-bottom:1px solid #22252f; }
+.gest-f:last-child{ border-bottom:none; }
+.gest-n{ font-weight:700; font-size:13.5px; color:#e7ebf3; }
+.gest-m{ font-size:11.5px; color:#8892a6; margin-top:2px; line-height:1.45; }
+.gest-t{ font-size:11.5px; color:#A78BFA; }
+
 /* Cabecera del programa */
 .meta-nota{ font-size:12.5px; color:#8892a6; line-height:1.55; margin-bottom:14px; }
 .meta-rej{ display:grid; grid-template-columns:1fr 1fr; gap:11px; }
@@ -1724,6 +1762,7 @@ body.modo-casting #btnExport{ display:none !important; }
       </div>
       <div class="ac-div" aria-hidden="true"></div>
       <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar entre grabación y casting">Modo</button>
+      <button class="btnv sm" id="btnGestos" style="display:none" onclick="gestPanel()" title="Personajes que en este capitulo solo hacen gestos, sin una sola palabra">🎭 Solo gestos</button>
       <button class="btnv sm" id="btnMeta" style="display:none" onclick="castMetaPanel()" title="Fecha, género, tiempo, director, técnico y estudio del programa">Cabecera</button>
       <button class="btnv sm" id="btnDcast" style="display:none" onclick="dcPanel()" title="Sincronizar el casting con DublajeCast">⇄ DublajeCast</button>
       <button class="btnv sm" id="btnImpDes" style="display:none" onclick="imprimirDesglose()" title="Imprimir el desglose: una fila por personaje">🖨 Desglose</button>
@@ -1876,7 +1915,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.60.0-nube';
+const APP_VER_NUM = 'v10.61.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4180,6 +4219,7 @@ function buildScript(){
     if(!hasPages && Array.isArray(script) && script.length){ return; }
   }catch(e){}
   script = []; scriptByKey = {};
+  try{ gestOlvidar(); }catch(e){}
   let cur = null;
   for(let p=1;p<=numPages;p++){
     const pd = pageData[p]; if(!pd) continue;
@@ -4402,11 +4442,13 @@ function renderPlanilla(){
   const doneN = rows.filter(c=>isCharDone(c)).length;
   const conTal = rows.filter(c=> c.talent && String(c.talent).trim()).length;
   const porVer = rows.filter(c=> c.heredado).length;
+  const porGesto = cast ? rows.filter(c=>{ try{ return gestPendiente(c.key); }catch(e){ return false; } }).length : 0;
   let html = '<div class="pla show"><div class="pla-head" id="plaHead">'
     +'<h2>'+(cast ? 'Casting' : 'Desglose visual')+'</h2>'
     +'<span class="cnt">'+rows.length+' personaje'+(rows.length===1?'':'s')
     +(q?' · filtro activo':'')
-    +(cast ? (' · '+conTal+' con talento'+(porVer?(' · '+porVer+' por verificar'):''))
+    +(cast ? (' · '+conTal+' con talento'+(porVer?(' · '+porVer+' por verificar'):'')
+             +(porGesto?(' · 🎭 '+porGesto+' solo gestos'):''))
            : (' · '+doneN+' ✓'))+'</span>'
     +'<span class="tg">'+(plaOpen?'▾ ocultar':'▸ mostrar')+'</span></div>';
   if(plaOpen && rows.length){
@@ -4420,7 +4462,8 @@ function renderPlanilla(){
       const recCount = c.pages.filter(pg=>rec.has(pg.p)).length;
       const pct = c.pages.length ? Math.round(100*recCount/c.pages.length) : 0;
       const tc = firstTCOf(c.key);
-      const clases = (done?'done':'') + (cast && c.heredado ? ' heredado' : '');
+      const gestPend = cast ? (function(){ try{ return gestPendiente(c.key); }catch(e){ return false; } })() : false;
+      const clases = (done?'done':'') + (cast && c.heredado ? ' heredado' : '') + (gestPend ? ' gestos' : '');
       html += '<tr style="--pc:'+c.color+'"'+(clases.trim()?' class="'+clases.trim()+'"':'')+' data-k="'+esc(c.key)+'" title="Abrir el libreto de '+esc(c.display)+'">'
         +'<td class="pnm"><div class="nrow"><span class="cdot"></span>'
         +'<span class="nm2">'+esc(c.display)+'</span>'
@@ -4430,7 +4473,9 @@ function renderPlanilla(){
         +'<td class="ploc'+(c.talent?'':' ng')+'"><input class="talIn" data-k="'+esc(c.key)+'" value="'+esc(c.talent||'')+'" placeholder="Asignar talento…" style="width:100%;min-width:90px;background:transparent;border:1px solid transparent;border-radius:6px;padding:4px 6px;color:inherit;font:inherit;outline:none">'+((c.noRec&&c.talent)?'<small>no se graba</small>':'')+'</td>'
         + (cast
             ? ('<td class="ptime">'+(c.totalInts!=null?c.totalInts:'—')+'</td>'
-              +'<td class="pest">'+(c.heredado
+              +'<td class="pest">'+(gestPend
+                  ? '<button class="gestbtn" data-k="'+esc(c.key)+'" title="En este capítulo solo hace gestos — pulsa para dejarlo tal cual">🎭 verificar</button>'
+                  : c.heredado
                   ? '<button class="verbtn" data-k="'+esc(c.key)+'" title="Viene de otro capítulo — pulsa para darlo por bueno">✓ verificar</button>'
                   : (c.talent ? '<span class="est-ok">✓</span>' : '<span class="est-no">—</span>'))+'</td></tr>')
             : ('<td class="ptime">'+(tc||'—')+'</td>'
@@ -4463,6 +4508,16 @@ function renderPlanilla(){
     if(typeof CAST_TALENTOS !== 'undefined' && CAST_TALENTOS.length)
       box.querySelectorAll('input.talIn').forEach(i=> i.setAttribute('list','talList'));
   }catch(e){}
+  // dar por bueno un personaje de solo gestos, desde la tabla
+  box.querySelectorAll('button.gestbtn').forEach(b=>{
+    b.addEventListener('click', async e=>{
+      e.stopPropagation();
+      gestVerificar(b.dataset.k, true);
+      try{ renderPlanilla(); renderCards(); }catch(x){}
+      try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(x){}
+      try{ gestAvisar(); }catch(x){}
+    });
+  });
   // dar por bueno un talento heredado, desde la tabla
   box.querySelectorAll('button.verbtn').forEach(b=>{
     b.addEventListener('click', async e=>{
@@ -4589,6 +4644,9 @@ function renderCards(){
   // se calcula una sola vez por repintado: por tarjeta seria O(n²)
   try{ _choqueMapa = (typeof DDL_MODO !== 'undefined' && DDL_MODO === 'casting') ? castChoques() : null; }
   catch(e){ _choqueMapa = null; }
+  let _gestM = null;
+  try{ _gestM = (typeof DDL_MODO !== 'undefined' && DDL_MODO === 'casting') ? gestMapa() : null; }
+  catch(e){ _gestM = null; }
   const q = norm($('search').value||'');
   const box = $('cards'); box.innerHTML='';
   let shown=0;
@@ -4603,18 +4661,22 @@ function renderCards(){
     const card = document.createElement('div');
     const notInLib = !!(window._scanMissingKeys && window._scanMissingKeys.has(c.key));
     const enChoque = (typeof _choqueMapa !== 'undefined' && _choqueMapa) ? !!castChoqueDe(c.key, _choqueMapa) : false;
-    card.className = 'card'+(done?' done':'')+(notInLib?' nolib':'')+(c.heredado?' heredado':'')+(enChoque?' choque':''); card.tabIndex=0;
+    const soloGestos = _gestM ? gestPendiente(c.key, _gestM) : false;
+    card.className = 'card'+(done?' done':'')+(notInLib?' nolib':'')+(c.heredado?' heredado':'')+(enChoque?' choque':'')+(soloGestos?' gestos':''); card.tabIndex=0;
     if(notInLib) card.title = 'Este personaje no se encontró en el libreto';
     card.style.setProperty('--cc', c.color);
     const MAXPG=16;
     const pgHtml = c.pages.slice(0,MAXPG).map(pg=>
       `<span class="pg ${rec.has(pg.p)?'rec':''}" data-p="${pg.p}" title="Abrir pág. ${pg.p}">${pg.p}·${pg.ints}</span>`).join('')
       + (c.pages.length>MAXPG?`<span class="pg more">+${c.pages.length-MAXPG}</span>`:'');
-    const talDisplay = c.talent
-      ? `<b>${esc(c.talent)}</b>` + (c.heredado
+    const gestBtn = soloGestos
+      ? `<button class="gestbtn" title="En este capítulo solo hace gestos — pulsa para dejarlo tal cual" aria-label="Verificar que ${esc(c.display)} solo hace gestos">✓ verificar</button>`
+      : '';
+    const talDisplay = (c.talent
+      ? `<b>${esc(c.talent)}</b>` + (c.heredado && !soloGestos
           ? `<button class="verbtn" title="Viene de otro capítulo — pulsa para darlo por bueno" aria-label="Verificar el talento de ${esc(c.display)}">✓ verificar</button>`
           : '')
-      : '<span class="ng">Sin asignar</span>';
+      : (soloGestos ? '<span class="ng">Solo gestos</span>' : '<span class="ng">Sin asignar</span>')) + gestBtn;
     const tc0 = (typeof firstTCOf==='function' ? firstTCOf(c.key) : '') || '';
     card.innerHTML =
       // fila superior: N intervenciones + checkbox
@@ -4650,6 +4712,18 @@ function renderCards(){
       castVerificar(c.key, true);
       try{ renderCards(); }catch(e){}
       try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+      if(typeof DDL_UI!=='undefined') DDL_UI.toast('Verificado: ' + c.display);
+    });
+
+    // dar por bueno un personaje que solo hace gestos
+    const gb = card.querySelector('.gestbtn');
+    if(gb) gb.addEventListener('click', async ev=>{
+      ev.stopPropagation();
+      gestVerificar(c.key, true);
+      try{ renderCards(); }catch(e){}
+      try{ if(typeof renderPlanilla === 'function') renderPlanilla(); }catch(e){}
+      try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+      try{ gestAvisar(); }catch(e){}
       if(typeof DDL_UI!=='undefined') DDL_UI.toast('Verificado: ' + c.display);
     });
 
@@ -5724,7 +5798,7 @@ function ponerModo(epId, m){
   if(bu){ bu.style.display = (m === 'casting') ? '' : 'none'; castPintarUndo(); }
   const bt = document.getElementById('btnTabla');
   if(bt) bt.style.display = (m === 'casting') ? '' : 'none';
-  for(const id of ['btnImpDes','btnImpPla','btnDcast','btnMeta']){
+  for(const id of ['btnImpDes','btnImpPla','btnDcast','btnMeta','btnGestos']){
     const b = document.getElementById(id);
     if(b) b.style.display = (m === 'casting') ? '' : 'none';
   }
@@ -5733,7 +5807,7 @@ function ponerModo(epId, m){
   try{ if(m === 'casting') plaOpen = true; renderPlanilla(); }catch(e){}
   try{ castPintarOcupacion(); }catch(e){}
   // continuidad: lo que ya se repartió en otros capítulos del programa
-  if(m === 'casting'){ try{ castHeredar(null); }catch(e){} }
+  if(m === 'casting'){ try{ gestAvisar(); }catch(e){} try{ castHeredar(null); }catch(e){} }
   const bm = document.getElementById('btnModo');
   if(bm){ bm.style.display = ''; bm.textContent = (m === 'casting') ? 'Casting' : 'Grabación'; }
   if(m === 'casting') castCargarCatalogo();
@@ -5803,7 +5877,8 @@ function castFoto(keys){
   for(const k of keys){
     const c = charIdx[k];
     if(!c) continue;
-    out.push({ key: k, talent: c.talent || '', noRec: !!c.noRec, heredado: !!c.heredado });
+    out.push({ key: k, talent: c.talent || '', noRec: !!c.noRec, heredado: !!c.heredado,
+               gestOk: !!c.gestOk });
   }
   return out;
 }
@@ -5834,9 +5909,11 @@ async function castUndo(){
     c.talent = e.talent;
     c.noRec = e.noRec;
     c.heredado = !!e.heredado;
+    c.gestOk = !!e.gestOk;
     try{
       const raw = (window._charsRaw || []).find(x => x.key === e.key);
-      if(raw){ raw.talent = e.talent; raw.noRec = e.noRec; raw.heredado = !!e.heredado; }
+      if(raw){ raw.talent = e.talent; raw.noRec = e.noRec; raw.heredado = !!e.heredado;
+               raw.gestOk = !!e.gestOk; }
     }catch(x){}
   }
   try{ renderCards(); }catch(e){}
@@ -6380,6 +6457,245 @@ async function dcPanel(){
   };
 }
 
+/* ═══ PERSONAJES QUE SOLO HACEN GESTOS ════════════════════════════════════
+
+   Los extras («MALE SOLDIER», «FEMALE OWNER») repiten nombre de un capítulo
+   a otro sin ser la misma persona: en un episodio tienen texto y en el
+   siguiente solo reaccionan. Si se les hereda el actor a ciegas, se convoca a
+   alguien para grabar tres jadeos, o peor, se le cambia la voz al que sí
+   habla.
+
+   Aquí se lee el LIBRETO -no el desglose- y se mira, intervención por
+   intervención, si queda algo que decir. Un personaje «mudo» es el que en
+   TODAS sus entradas solo tiene acotaciones: (REACCIÓN), (GRITA), (EFFORTS),
+   ah, hmm… Se pinta en violeta con un botón «✓ verificar» para dejarlo tal
+   cual, y hasta que no se verifique NO se le reparte talento solo: esta
+   comprobación va por delante del llenado. */
+
+/* Palabras que son gesto, no diálogo. En los dos idiomas, porque los guiones
+   llegan en inglés y se marcan en español. */
+const GEST_PAL = new Set(('REACCION REACCIONES REACC REACCIONA REACCIONAN REACT REACTS REACTION '
++ 'REACTIONS REACTING GESTO GESTOS GESTUAL ESFUERZO ESFUERZOS EFFORT EFFORTS EXERTION '
++ 'EXERTIONS GRITO GRITOS GRITA GRITAN GRITANDO SCREAM SCREAMS SCREAMING YELL YELLS '
++ 'YELLING SHOUT SHOUTS SHOUTING SHRIEK SHRIEKS RISA RISAS RIE RIEN RIENDO CARCAJADA '
++ 'CARCAJADAS LAUGH LAUGHS LAUGHING LAUGHTER CHUCKLE CHUCKLES CHUCKLING GIGGLE GIGGLES '
++ 'GIGGLING LLANTO LLORA LLORAN LLORANDO SOLLOZO SOLLOZOS SOLLOZA CRY CRIES CRYING SOB '
++ 'SOBS SOBBING WEEP WEEPS WEEPING SUSPIRO SUSPIROS SUSPIRA SIGH SIGHS SIGHING JADEO '
++ 'JADEOS JADEA JADEANDO PANT PANTS PANTING GASP GASPS GASPING BREATH BREATHS BREATHE '
++ 'BREATHES BREATHING RESPIRACION RESPIRA TOS TOSE TOSIENDO COUGH COUGHS COUGHING '
++ 'GRUNIDO GRUNIDOS GRUNE GRUNT GRUNTS GRUNTING GROAN GROANS GROANING GROWL GROWLS '
++ 'GROWLING RUGIDO RUGE ROAR ROARS MURMULLO MURMULLOS MURMURA MURMUR MURMURS MURMURING '
++ 'MUTTER MUTTERS MUTTERING MUMBLE MUMBLES MUMBLING SUSURRO SUSURROS SUSURRA WHISPER '
++ 'WHISPERS WHISPERING AMBIENTE AMBIENTES AMBIENTAL WALLA WALLAS BULLICIO CHATTER '
++ 'CHATTERING CROWD QUEJIDO QUEJIDOS QUEJA WHIMPER WHIMPERS WHIMPERING MOAN '
++ 'MOANS MOANING DOLOR PAIN HURT BOSTEZO BOSTEZA YAWN YAWNS YAWNING RONQUIDO RONCA '
++ 'SNORE SNORES SNORING ESTORNUDO ESTORNUDA SNEEZE SNEEZES HIPO HICCUP HICCUPS '
++ 'TARAREA TARAREO HUM HUMS HUMMING CANTURREA RESOPLA RESOPLIDO SNORT SNORTS SPIT '
++ 'SPITS ESCUPE TRAGA GULP GULPS SWALLOWS SILENCIO SILENCE BESO BESOS KISS KISSES '
++ 'SORPRESA SUSTO STARTLE STARTLED SOBRESALTO ASENTIMIENTO ASIENTE NOD NODS SHIVER '
++ 'SHIVERS TIRITA CHOKE CHOKES CHOKING ATRAGANTA VOMITA RETCH RETCHES '
++ 'ONOMATOPEYA ONOMATOPEYAS VOCALIZACION VOCALIZACIONES NONVERBAL VERBAL '
++ 'NOISES NOISE SOUNDS SOUND VARIOUS AD LIB ADLIB ADLIBS LIBS').split(/\s+/));
+
+/* Relleno que no cuenta ni a favor ni en contra: conectores y acotaciones de
+   sala («OFF», «V.O.», «x2»). */
+const GEST_RELLENO = new Set(('DE DEL LA EL LOS LAS UN UNA UNOS UNAS Y E O U A AL CON EN SE SU '
++ 'SUS POR PARA QUE SI NO MAS MUY THE OF AND TO IN ON AT FOR HIS HER ITS AS WITH '
++ 'OFF VO V S C SC MIC PRESENCIA PRESENTE X2 X3 X4 CONT CONTD').split(/\s+/));
+
+/* Sonidos sueltos: ah, ohh, hmm, ja ja, uf, ay, ugh… */
+const GEST_ONOMA = /^(?:a+h+|h+a+|o+h+|h+o+|e+h+|h+e+|u+h+|h+u+|h+m+|m+h*|m+m+|u+f+|f+u+|a+y+|u+y+|o+y+|a+u+|o+u+|w+o+w*|g+r+|r+g+|s+h+|p+f+|p+s+|t+s+|z+z+|j+a+|j+e+|j+i+|j+o+|h+i+|h+r+|n+g+|b+r+|u+g+h*|a+r+g*h*|e+r+|u+m+|o+w+|a+w+|y+a+y*|h+u+h+|s+i+g+h*)$/;
+
+/** Quita acotaciones -paréntesis, corchetes, asteriscos- y deja el diálogo. */
+function gestNucleo(t){
+  let s = String(t == null ? '' : t);
+  for(let i = 0; i < 5; i++){
+    const antes = s;
+    s = s.replace(/\([^()]*\)/g, ' ').replace(/\[[^\[\]]*\]/g, ' ').replace(/\{[^{}]*\}/g, ' ');
+    if(s === antes) break;
+  }
+  s = s.replace(/\*[^*]*\*/g, ' ');
+  // un paréntesis abierto y nunca cerrado se come el resto del renglón
+  s = s.replace(/[\(\[\{][^\)\]\}]*$/, ' ');
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+/** ¿Este renglón es gesto y nada más? */
+function gestRenglonMudo(t){
+  const nucleo = gestNucleo(t);
+  if(!nucleo) return true;                       // solo acotación, o vacío
+  const limpio = nucleo.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  const toks = limpio.split(/[^A-Z0-9]+/).filter(Boolean);
+  if(!toks.length) return true;                  // solo signos: «…», «—», «!»
+  // Hace falta una prueba A FAVOR, no basta con que no haya nada en contra:
+  // un renglon que solo dice «Sí.» o «No.» es diálogo, corto pero diálogo,
+  // y esas dos palabras están en el relleno. Sin gesto expreso, se habla.
+  let gesto = 0;
+  for(const t2 of toks){
+    if(GEST_PAL.has(t2) || GEST_ONOMA.test(t2.toLowerCase())){ gesto++; continue; }
+    if(GEST_RELLENO.has(t2)) continue;            // conectores y «OFF», «V.O.»
+    if(/^\d+$/.test(t2)) continue;                // números sueltos: numeración
+    return false;                                 // una palabra de verdad: habla
+  }
+  return gesto > 0;
+}
+
+/** ¿Esta intervención del libreto es solo gesto? */
+function gestBloqueMudo(b){
+  if(!b) return true;
+  const ls = Array.isArray(b.lines) ? b.lines : [];
+  if(!ls.length) return true;                    // cabecera sin texto debajo
+  return ls.every(gestRenglonMudo);
+}
+
+/**
+ * Recorre el libreto y devuelve los personajes cuyas intervenciones son TODAS
+ * gesto: { key: { display, bloques, muestras:[texto…] } }.
+ */
+function gestEscanear(){
+  const out = {};
+  if(typeof script === 'undefined' || !Array.isArray(script)) return out;
+  const porKey = {};
+  for(const b of script){
+    if(!b || !b.key) continue;
+    const e = porKey[b.key] || (porKey[b.key] = { total:0, mudos:0, muestras:[] });
+    e.total++;
+    if(gestBloqueMudo(b)){
+      e.mudos++;
+      if(e.muestras.length < 4){
+        const txt = (b.lines || []).join(' ').replace(/\s+/g, ' ').trim();
+        if(txt) e.muestras.push(txt.slice(0, 70));
+      }
+    }
+  }
+  for(const k in porKey){
+    const e = porKey[k];
+    if(!e.total || e.mudos !== e.total) continue;
+    const c = (typeof charIdx !== 'undefined') ? charIdx[k] : null;
+    out[k] = { key:k, display:(c && c.display) || k, bloques:e.total, muestras:e.muestras,
+               talent:(c && c.talent) || '' };
+  }
+  return out;
+}
+
+/* El escaneo se guarda: renderCards() lo pide en cada pintada y el libreto no
+   cambia entre una y otra. Se tira a la basura al cargar otro capítulo. */
+let _gestMapa = null, _gestSello = '';
+function gestSello(){
+  try{ return (window._dataEpId || '') + '|' + (script ? script.length : 0); }catch(e){ return ''; }
+}
+function gestMapa(){
+  const s = gestSello();
+  if(_gestMapa && _gestSello === s) return _gestMapa;
+  _gestMapa = gestEscanear(); _gestSello = s;
+  return _gestMapa;
+}
+function gestOlvidar(){ _gestMapa = null; _gestSello = ''; }
+
+/** ¿Hay que avisar de este personaje? Mudo y todavía sin verificar. */
+function gestPendiente(key, mapa){
+  try{
+    if(typeof DDL_MODO === 'undefined' || DDL_MODO !== 'casting') return false;
+    const c = charIdx[key];
+    if(c && c.gestOk) return false;              // ya lo miró alguien
+    return !!(mapa || gestMapa())[key];
+  }catch(e){ return false; }
+}
+
+/** «Dejarlo original»: se da por bueno y deja de estorbar. */
+function gestVerificar(key, ok){
+  const c = charIdx[key];
+  if(c) c.gestOk = !!ok;
+  try{
+    const raw = (window._charsRaw || []).find(x => x.key === key);
+    if(raw) raw.gestOk = !!ok;
+  }catch(e){}
+}
+
+/** Los que siguen pendientes, en orden de peso. */
+function gestPendientes(){
+  const mapa = gestMapa();
+  return Object.keys(mapa)
+    .filter(k => gestPendiente(k, mapa))
+    .map(k => mapa[k])
+    .sort((a, b) => b.bloques - a.bloques || String(a.display).localeCompare(String(b.display), 'es'));
+}
+
+/* ── El panel ─────────────────────────────────────────────────────────── */
+
+function gestPanel(){
+  const viejo = document.getElementById('gestOv');
+  if(viejo) viejo.remove();
+  const mapa = gestMapa();
+  const todos = Object.keys(mapa).map(k => mapa[k])
+    .sort((a, b) => b.bloques - a.bloques || String(a.display).localeCompare(String(b.display), 'es'));
+  const pend = todos.filter(x => gestPendiente(x.key, mapa));
+  const ov = document.createElement('div');
+  ov.id = 'gestOv'; ov.className = 'modo-cap';
+  const filas = todos.length ? todos.map(x => {
+    const ya = !gestPendiente(x.key, mapa);
+    return '<div class="gest-f"><div><div class="gest-n">' + esc(x.display)
+      + (ya ? ' <span class="est-ok">✓ verificado</span>' : '') + '</div>'
+      + '<div class="gest-m">' + x.bloques + (x.bloques === 1 ? ' intervención' : ' intervenciones')
+      + ', todas gesto' + (x.talent ? ' · talento: ' + esc(x.talent) : '')
+      + (x.muestras.length ? '<br><span class="gest-t">' + x.muestras.map(esc).join(' · ') + '</span>' : '')
+      + '</div></div>'
+      + (ya ? '<span class="est-no">—</span>'
+            : '<button class="gestbtn" data-k="' + esc(x.key) + '">✓ verificar</button>') + '</div>';
+  }).join('') : '<div class="gest-m" style="padding:14px 0">Ningún personaje habla solo con gestos en este capítulo.</div>';
+  ov.innerHTML = '<div class="modo-caja" style="max-width:560px;text-align:left">'
+    + '<div class="modo-tit">Solo gestos</div>'
+    + '<div class="modo-sub" style="margin-bottom:6px">'
+    + (pend.length ? pend.length + ' personaje' + (pend.length === 1 ? '' : 's') + ' por revisar'
+                   : 'Nada pendiente') + '</div>'
+    + '<div class="meta-nota">En este capítulo estos personajes no dicen ni una palabra: solo '
+    + 'reaccionan. Suelen ser extras que repiten nombre («MALE SOLDIER») sin ser la misma '
+    + 'persona, así que <b>no se les reparte talento solo</b> hasta que los des por buenos.</div>'
+    + '<div class="gest-lista">' + filas + '</div>'
+    + '<div class="dud-btns"><button class="modo-op dud-b" id="gestCerrar">Cerrar</button>'
+    + (pend.length ? '<button class="modo-op dud-b dud-ok" id="gestTodos">Verificar todos</button>' : '')
+    + '</div></div>';
+  document.body.appendChild(ov);
+  const cerrar = () => ov.remove();
+  ov.querySelector('#gestCerrar').onclick = cerrar;
+  ov.addEventListener('click', e => { if(e.target === ov) cerrar(); });
+  const repintar = async () => {
+    try{ renderCards(); }catch(e){}
+    try{ if(typeof renderPlanilla === 'function') renderPlanilla(); }catch(e){}
+    try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+  };
+  ov.querySelectorAll('button.gestbtn').forEach(b => {
+    b.onclick = async () => {
+      gestVerificar(b.dataset.k, true);
+      await repintar();
+      cerrar(); gestPanel();
+    };
+  });
+  const t = ov.querySelector('#gestTodos');
+  if(t) t.onclick = async () => {
+    for(const x of pend) gestVerificar(x.key, true);
+    await repintar();
+    cerrar();
+    castAviso('✅ ' + pend.length + ' personaje' + (pend.length === 1 ? '' : 's') + ' de gestos verificado'
+      + (pend.length === 1 ? '' : 's'));
+  };
+}
+
+/** Aviso al entrar en casting: primero esto, después el reparto. */
+function gestAvisar(){
+  try{
+    const pend = gestPendientes();
+    const b = document.getElementById('btnGestos');
+    if(b) b.textContent = pend.length ? ('🎭 Solo gestos · ' + pend.length) : '🎭 Solo gestos';
+    if(!pend.length) return 0;
+    castAviso('🎭 ' + pend.length + ' personaje' + (pend.length === 1 ? '' : 's')
+      + ' solo hace' + (pend.length === 1 ? '' : 'n') + ' gestos en este capítulo ('
+      + pend.slice(0, 3).map(x => x.display).join(', ') + (pend.length > 3 ? '…' : '')
+      + ') — míralos antes de repartir');
+    return pend.length;
+  }catch(e){ return 0; }
+}
+
 /* ═══ IMPRIMIR ═══════════════════════════════════════════════════════════
 
    Dos hojas distintas, que en sala se usan para cosas distintas:
@@ -6526,6 +6842,22 @@ function imprimirPlanilla(){
 
 const CAST_CERCA = 4;        // líneas de margen: por debajo, se avisa
 
+/* Casillas que se rellenan con algo que NO es un actor: «X» y «ORIGINAL»
+   (se deja el audio original, no se dobla), «X ORIGINAL», «TODOS» (ambientes
+   de sala, los hace quien esté). Contarlos aquí no dice nada: saldrían los
+   primeros de la lista con cien líneas y con choques falsos en cada página,
+   tapando a los actores de verdad. */
+const OCU_NO_ACTOR = new Set(['X','ORIGINAL','ORIGINALES','TODOS','TODAS','NA','N',
+  'VOZ','VOCES','AUDIO','IDIOMA','SIN','SE','DEJA','QUEDA','DOBLA','DOBLAR','DOBLAJE','NO','A']);
+function castEsActor(talento){
+  const t = String(talento == null ? '' : talento).trim();
+  if(!t) return false;
+  const toks = castNorm(t).split(/[^A-Z0-9]+/).filter(Boolean);
+  if(!toks.length) return false;
+  // si TODO lo escrito es relleno de «no se graba», no es un actor
+  return !toks.every(x => OCU_NO_ACTOR.has(x));
+}
+
 /** Carga por talento: personajes, líneas y páginas. */
 function castOcupacion(){
   const porTal = new Map();
@@ -6533,6 +6865,7 @@ function castOcupacion(){
     const c = charIdx[k];
     const t = c && c.talent && String(c.talent).trim();
     if(!t) continue;
+    if(!castEsActor(t)) continue;       // X, ORIGINAL, X ORIGINAL, TODOS…
     const clave = castNorm(t);
     let e = porTal.get(clave);
     if(!e){ e = { talento: t, personajes: [], ints: 0, paginas: new Set() }; porTal.set(clave, e); }
@@ -6905,11 +7238,14 @@ function castLeerColumnaTexto(arch, xml, col){
  */
 async function castHeredar(desdeExcel){
   const reg = await castRegCargar(LDB.showId || (currentEp && currentEp.showId));
-  const seguros = [], dudosos = [];
+  const seguros = [], dudosos = [], saltadosGesto = [];
 
   for(const k in charIdx){
     const c = charIdx[k];
     if(!c || (c.talent && String(c.talent).trim())) continue;   // ya tiene: no se toca
+    // Solo gestos y sin verificar: no es seguro que sea el mismo papel que en
+    // el capítulo anterior. Se deja en violeta y que lo mire una persona.
+    try{ if(gestPendiente(k)){ saltadosGesto.push(c.display || k); continue; } }catch(e){}
     const nombre = c.display || k;
 
     // 1) el casting que venía dentro del Excel subido
@@ -6953,6 +7289,13 @@ async function castHeredar(desdeExcel){
       + (seguros.length && confirmados.length ? '' : '')
       + ' · revisa antes de exportar');
   }
+  if(saltadosGesto.length){
+    castAviso('🎭 ' + saltadosGesto.length + ' personaje' + (saltadosGesto.length===1?'':'s')
+      + ' sin repartir porque en este capítulo solo hace' + (saltadosGesto.length===1?'':'n')
+      + ' gestos: ' + saltadosGesto.slice(0,4).join(', ') + (saltadosGesto.length>4?'…':'')
+      + ' — verifícalos en «🎭 Solo gestos»');
+  }
+  try{ gestAvisar(); }catch(e){}
   return total;
 }
 
@@ -7058,12 +7401,15 @@ async function castSubirTabla(file){
     const porClave = {};
     for(const f of filas) if(f.talento) porClave[castNorm(f.personaje)] = f;
 
-    const llenar = [], chocan = [], descuadran = [];
+    const llenar = [], chocan = [], descuadran = [], gestSalt = [];
     for(const k in charIdx){
       const c = charIdx[k];
       if(!c) continue;
       const f = porClave[castNorm(c.display || k)];
       if(!f) continue;
+      // en este capítulo solo hace gestos: puede no ser el mismo papel que en
+      // la tabla. Se salta hasta que alguien lo verifique.
+      try{ if(gestPendiente(k)){ gestSalt.push(c.display || k); continue; } }catch(e){}
       if(f.ints != null && c.totalInts != null){
         const dif = Math.abs(f.ints - c.totalInts);
         if(dif > Math.max(2, c.totalInts * 0.5))
@@ -7091,6 +7437,12 @@ async function castSubirTabla(file){
     let reemplazados = [];
     if(chocan.length) reemplazados = await castPreguntarDudosos(chocan);
     aplicar(reemplazados);
+
+    if(gestSalt.length){
+      castAviso('🎭 ' + gestSalt.length + ' personaje' + (gestSalt.length===1?'':'s')
+        + ' de la tabla no se rellenó porque aquí solo hace' + (gestSalt.length===1?'':'n')
+        + ' gestos: ' + gestSalt.slice(0,4).join(', ') + (gestSalt.length>4?'…':''));
+    }
 
     // al registro TODAS las filas con talento, salgan o no en este capítulo:
     // es lo que da continuidad a los capítulos siguientes
@@ -7831,7 +8183,7 @@ function showTutorial(onDone){
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Casting', ic:'🎭', t:'Repartir los talentos',
-      d:'Una vez por programa, <b>Cabecera</b>: fecha, género, tiempo, director, técnico y estudio, que se escriben solos en la hoja de casting al exportar. Y <b>⇄ DublajeCast</b> trae o lleva el casting a la otra aplicación.<br>Cada capítulo tiene <b>su propio desglose</b>: lo subes con el aviso de la barra y es el que se rellena y se descarga. El del 101 no toca el del 102.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Ocupación de talentos:</b> en la pestaña del costado derecho ves cuántas líneas lleva cada actor; se despliega y se pliega, y recuerda cómo lo dejaste.<br><b>🖨 Desglose</b> imprime una fila por personaje; <b>🖨 Planilla</b>, una fila por talento con sus personajes y sus líneas. Si le asignas dos personajes que hablan seguidos te avisa y las tarjetas se ponen en <b>rojo</b>: no le daría tiempo a cambiar de voz.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
+      d:'Una vez por programa, <b>Cabecera</b>: fecha, género, tiempo, director, técnico y estudio, que se escriben solos en la hoja de casting al exportar. Y <b>⇄ DublajeCast</b> trae o lleva el casting a la otra aplicación.<br>Cada capítulo tiene <b>su propio desglose</b>: lo subes con el aviso de la barra y es el que se rellena y se descarga. El del 101 no toca el del 102.<br>Luego, al abrir un capítulo eliges <b>Grabación</b> o <b>Casting</b>. En casting reparte los talentos en las tarjetas -el desplegable trae los nombres de la hoja TALENTOS del formato- y pulsa <b>⬇ Desglose con casting</b>: se descarga <b>ese mismo Excel</b> con los actores puestos.<br>Si te equivocas, <b>↩ Deshacer</b> (o Ctrl+Z) devuelve el talento anterior.<br><b>Ocupación de talentos:</b> en la pestaña del costado derecho ves cuántas líneas lleva cada actor; se despliega y se pliega, y recuerda cómo lo dejaste.<br><b>🖨 Desglose</b> imprime una fila por personaje; <b>🖨 Planilla</b>, una fila por talento con sus personajes y sus líneas. Si le asignas dos personajes que hablan seguidos te avisa y las tarjetas se ponen en <b>rojo</b>: no le daría tiempo a cambiar de voz.<br><b>🎭 Solo gestos:</b> antes de repartir, Dubbipt lee el libreto y busca a los personajes que en <i>este</i> capítulo no dicen ni una palabra -solo (REACCIÓN), (EFFORTS), (GRITA)…-. Salen en <b>violeta</b> y con un <b>✓ verificar</b> para dejarlos tal cual. Mientras no los verifiques <b>no se les reparte talento solo</b>: los extras («MALE SOLDIER», «FEMALE OWNER») repiten nombre sin ser la misma persona, y en un capítulo hablan y en el siguiente solo reaccionan. El botón <b>🎭 Solo gestos</b> los lista todos con un ejemplo de lo que hacen.<br>En la <b>ocupación</b> no se cuentan las casillas que no son un actor -«X», «ORIGINAL», «X ORIGINAL», «TODOS»-: ni suman líneas ni provocan choques.<br><b>Continuidad:</b> si el desglose que subes ya trae actores, se ponen solos; y en los siguientes capítulos del mismo programa los personajes que ya salieron heredan su actor. Lo heredado sale en <b>naranja</b> con un botón <b>✓ verificar</b>: no es tuyo hasta que lo das por bueno. Debajo tienes la <b>tabla de casting</b>: personaje, talento, intervenciones y estado, con el talento editable ahí mismo. Lo que no coincide exacto se te pregunta, y nunca se pisa un talento que hayas puesto tú.'
        +'<span class="tut-tip">Se rellena tu archivo tal cual: fórmulas, formato y macros intactos. Si un personaje del libreto no está en el Excel, te avisa por su nombre.</span>' },
 
     { s:'Paso 11 · Sincronía', ic:'🔗', t:'Los tres equipos a la vez',
@@ -8020,6 +8372,7 @@ function hydrateEpisode(d){ _epOpen(true);
     numIf(o,'page'); numIf(o,'idx'); numIf(o,'tcSec'); numIf(o,'tcEff');
     return o;
   };
+  try{ gestOlvidar(); }catch(e){}
   chars = (Array.isArray(d.chars) ? d.chars : []).map(sanChar).filter(Boolean);
   charIdx = {}; chars.forEach(c=> charIdx[c.key] = c);
   numPages = num(d.numPages)|0;
