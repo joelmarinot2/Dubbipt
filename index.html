@@ -1972,7 +1972,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.65.0-nube';
+const APP_VER_NUM = 'v10.65.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8269,7 +8269,7 @@ function showTutorial(onDone){
        +'· <b>⇄ Formatos</b> trae y lleva el libreto. <b>Trae</b> SRT, VTT, STL (el EBU de toda la vida) y CSV: si el texto viene con el personaje delante -«NILA: …»- se separa solo, y los tiempos, que en esos archivos se cuentan desde el principio del video, se pasan a timecode de reloj sumandoles el <b>TC inicio</b>. Al importar te avisa de que <b>sustituye el libreto</b> antes de tocar nada. <b>Lleva</b> SRT, CSV con todo el ADR (take, estado y notas incluidos), TTML y una lista de <b>marcadores</b> en el mismo formato en que Pro Tools escribe los suyos.<br>'
        +'· <b>✂ Planos</b> busca los <b>cambios de plano</b> del video mirandolo fotograma a fotograma. Salen como rayas azules finas sobre la onda, y desde ahi se pueden <b>pegar las entradas de los cues al corte</b> mas cercano. Los fundidos y las cortinillas no se cuelan: cambian poco de un fotograma al siguiente.<br>'
        +'· <b>🔎 Cotejar</b> transcribe cada intervencion y la compara con lo que pone el libreto. Lo que no se parece sale marcado -<b>no cuadra</b> o <b>dudoso</b>- con lo que se ha oido, en la ficha del cue y en la hoja. <b>No corrige nada solo</b>: el reconocedor se equivoca, y un libreto cambiado a espaldas de nadie es peor que una errata. El audio no sale de tu equipo.<br>'
-       +'· <b>⚙ Sala</b> ajusta todo eso: segundos de streamer, cuerpo de letra, arriba o abajo, píxeles por segundo de la banda, y qué partes quieres encendidas.'
+       +'· <b>⚙ Sala</b> ajusta todo eso: las duraciones de sala del streamer (1 · 2 · 2,67 · 3 · 3,3 · 5 s) y su sentido -de izquierda a derecha o de los dos bordes al centro-, el remate, cuerpo de letra, arriba o abajo, dónde va la línea de sincronía de la banda y su grosor, un carril por personaje, el nombre del talento, píxeles por segundo de la banda, y qué partes quieres encendidas.'
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
     { s:'Paso 10 · Casting', ic:'🎭', t:'Repartir los talentos',
@@ -16498,28 +16498,53 @@ const SALA = {
   barra:true,
   pos:'abajo',         // dónde va el texto sobre la imagen
   tam:26,              // cuerpo de letra del texto sobre la imagen
+  dir:'lr',            // 'lr' izquierda a derecha · 'bc' de los bordes al centro
+  remate:true,         // la barra fija que marca dónde muere el streamer
   pps:150,             // píxeles por segundo de la banda rítmica
   bandaTam:30,
+  marca:32,            // % de ancho donde está la línea de sincronía
+  marcaGrosor:3,
+  carriles:true,       // un carril por personaje en la banda
+  actor:false,         // enseñar también el nombre del talento
   raf:0, ac:null, beepHecho:-1, cues:null, sello:''
 };
+
+/* Duraciones de streamer que se usan en sala. La de 2,67 s y la de 3,3 s
+   vienen de los 4 y 5 metros de película a 24 fotogramas: no son caprichos,
+   son las que trae la tradición y las que espera un actor con oficio. */
+const SALA_SEGS = [1, 2, 2.67, 3, 3.3, 5];
 
 /** El segundo de VÍDEO de un timecode de libreto. */
 function salaVid(tc){ return tc - studioTc0() - studioFine(); }
 
 /** Los cues del capítulo, en segundos de vídeo. Con memoria. */
 function salaCues(){
-  const sello = (script ? script.length : 0) + '|' + studioTc0() + '|' + studioFine();
+  // el sello incluye las correcciones de los cues: si alguien mueve una
+  // entrada, la lista tiene que rehacerse sola
+  let firma = '';
+  try{ firma = JSON.stringify(window._adrDatos || {}).length + ':'
+             + Object.keys(window._adrDatos || {}).length; }catch(e){}
+  const sello = (script ? script.length : 0) + '|' + studioTc0() + '|' + studioFine() + '|' + firma;
   if(SALA.cues && SALA.sello === sello) return SALA.cues;
   const out = [];
   for(let i = 0; i < script.length; i++){
     const b = script[i];
     if(!b || b.tcEff == null) continue;
-    const ven = (typeof karVentana === 'function') ? karVentana(i) : null;
-    const t0 = salaVid(ven ? ven[0] : b.tcEff);
-    const t1 = salaVid(ven ? ven[1] : (b.tcEff + 2));
+    // La entrada y la salida son las del CUE, no las del libreto a secas: si
+    // alguien las ha corregido a mano -o las ha pegado a un corte de plano-,
+    // el streamer y la banda tienen que ir a donde de verdad entra.
+    let t0, t1;
+    const a = (typeof adrDe === 'function') ? adrDe(i) : null;
+    if(a && a.tc0 != null && a.tc1 != null){ t0 = salaVid(a.tc0); t1 = salaVid(a.tc1); }
+    else{
+      const ven = (typeof karVentana === 'function') ? karVentana(i) : null;
+      t0 = salaVid(ven ? ven[0] : b.tcEff);
+      t1 = salaVid(ven ? ven[1] : (b.tcEff + 2));
+    }
     const c = b.key ? charIdx[b.key] : null;
     out.push({ si:i, t0:t0, t1:Math.max(t0 + 0.25, t1), key:b.key || '',
                display:(c && c.display) || b.display || '',
+               talento:(c && c.talent) || '',
                color:(c && c.color) || '#4ADE80',
                texto:(b.lines || []).join(' ') });
   }
@@ -16527,7 +16552,35 @@ function salaCues(){
   SALA.cues = out; SALA.sello = sello;
   return out;
 }
-function salaOlvidar(){ SALA.cues = null; SALA.sello = ''; }
+function salaOlvidar(){ SALA.cues = null; SALA.sello = ''; _salaPalCache.clear(); }
+
+/**
+ * Un CARRIL por personaje, como en una banda rítmica de verdad: si dos
+ * personajes se solapan -y se solapan constantemente, que para eso es un
+ * diálogo- cada uno va por su altura y se leen los dos. Se reparten los
+ * carriles por orden de entrada y se reutiliza el primero que haya quedado
+ * libre, que es como se reparten las pistas de una sesión.
+ */
+const SALA_CARRILES = 4;
+function salaCarriles(cues){
+  const finDe = new Array(SALA_CARRILES).fill(-1e9);
+  const dePers = new Map();
+  for(const c of cues){
+    let carril = dePers.has(c.key) ? dePers.get(c.key) : -1;
+    // el personaje conserva su carril mientras no se pise consigo mismo
+    if(carril >= 0 && finDe[carril] > c.t0 + 0.001) carril = -1;
+    if(carril < 0){
+      carril = 0;
+      for(let i = 0; i < SALA_CARRILES; i++) if(finDe[i] <= c.t0 + 0.001){ carril = i; break; }
+      if(c.key) dePers.set(c.key, carril);
+    }
+    c.carril = carril;
+    finDe[carril] = Math.max(finDe[carril], c.t1);
+  }
+  let usados = 1;
+  for(const c of cues) usados = Math.max(usados, c.carril + 1);
+  return usados;
+}
 
 /** El cue que suena ahora, y el siguiente que va a entrar. */
 function salaSituar(t){
@@ -16624,15 +16677,31 @@ function salaPintar(t){
   if(prox){
     const falta = prox.t0 - t;
     if(falta >= 0 && falta <= SALA.seg){
-      const x = W * (1 - falta / SALA.seg);
+      const k = 1 - falta / SALA.seg;            // 0 al empezar, 1 al entrar
+      const raya = (x) => { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); };
       g.save();
       g.strokeStyle = prox.color;
       g.lineWidth = Math.max(3, 4 * dpr);
       g.shadowColor = prox.color; g.shadowBlur = 12 * dpr;
-      g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke();
+      if(SALA.dir === 'bc'){                     // de los dos bordes al centro
+        raya(W * 0.5 * k);
+        raya(W - W * 0.5 * k);
+      }else{                                     // de izquierda a derecha
+        raya(W * k);
+      }
       g.restore();
+      // el remate: la barra fija que dice dónde va a morir la raya
+      if(SALA.remate){
+        g.save(); g.globalAlpha = 0.5; g.fillStyle = prox.color;
+        const gr = Math.max(2, 3 * dpr);
+        if(SALA.dir === 'bc') g.fillRect(W/2 - gr/2, 0, gr, H);
+        else g.fillRect(W - gr, 0, gr, H);
+        g.restore();
+      }
       // el nombre del personaje viaja con la raya
-      salaTexto(g, prox.display, Math.min(W - 8 * dpr, x + 9 * dpr), 18 * dpr, 13 * dpr, prox.color);
+      const xn = (SALA.dir === 'bc') ? (W * 0.5 * k) : (W * k);
+      salaTexto(g, prox.display + (SALA.actor && prox.talento ? ' · ' + prox.talento : ''),
+                Math.min(W - 8 * dpr, xn + 9 * dpr), 18 * dpr, 13 * dpr, prox.color);
     }
   }
 
@@ -16737,23 +16806,28 @@ function salaBandaPintar(t){
   const W = cv.width, H = cv.height;
   const dpr = W / Math.max(1, cv.getBoundingClientRect().width);
   const pps = SALA.pps * dpr;
-  const xLinea = W * 0.32;
+  const xLinea = W * Math.min(0.9, Math.max(0.05, SALA.marca / 100));
   g.clearRect(0, 0, W, H);
   g.fillStyle = '#07060f'; g.fillRect(0, 0, W, H);
 
   const antes = xLinea / pps, despues = (W - xLinea) / pps;
   const cs = salaCues();
-  const base = SALA.bandaTam * dpr;
+  const nCar = SALA.carriles ? salaCarriles(cs) : 1;
+  const altoCar = H / nCar;
+  const base = Math.min(SALA.bandaTam * dpr, altoCar * 0.42);
 
   for(const c of cs){
     if(c.t1 < t - antes || c.t0 > t + despues) continue;
+    const car = SALA.carriles ? (c.carril || 0) : 0;
+    const y0 = car * altoCar;
     const x0 = xLinea + (c.t0 - t) * pps, x1 = xLinea + (c.t1 - t) * pps;
-    // banda del personaje, tenue, para ver dónde empieza y acaba
+    // la banda del personaje, tenue: se ve dónde empieza y dónde acaba
     g.save(); g.globalAlpha = 0.13; g.fillStyle = c.color;
-    g.fillRect(x0, H * 0.30, Math.max(2, x1 - x0), H * 0.52); g.restore();
+    g.fillRect(x0, y0 + altoCar * 0.26, Math.max(2, x1 - x0), altoCar * 0.62); g.restore();
     g.fillStyle = c.color;
-    g.fillRect(x0, H * 0.30, Math.max(2, 2 * dpr), H * 0.52);
-    salaTexto(g, c.display, x0 + 6 * dpr, H * 0.17, 12 * dpr, c.color);
+    g.fillRect(x0, y0 + altoCar * 0.26, Math.max(2, 2 * dpr), altoCar * 0.62);
+    salaTexto(g, c.display + (SALA.actor && c.talento ? ' · ' + c.talento : ''),
+              x0 + 6 * dpr, y0 + altoCar * 0.15, Math.min(12 * dpr, altoCar * 0.22), c.color);
 
     const pal = salaPalabrasCache(c.si);
     // el cuerpo se ajusta al tiempo que tiene la frase: es lo que permite
@@ -16764,9 +16838,9 @@ function salaBandaPintar(t){
       let ancho = 0;
       for(const w2 of pal) ancho += g.measureText(w2.p + ' ').width;
       const hueco = Math.max(1, x1 - x0);
-      if(ancho > hueco) px = Math.max(10 * dpr, base * (hueco / ancho));
+      if(ancho > hueco) px = Math.max(9 * dpr, base * (hueco / ancho));
     }
-    const y = H * 0.58;
+    const y = y0 + altoCar * 0.58;
     if(pal){
       for(const w2 of pal){
         const wx = xLinea + (w2.t0 - t) * pps;
@@ -16780,9 +16854,15 @@ function salaBandaPintar(t){
     }
   }
 
-  // la línea fija: lo que la cruza, se dice
+  // separación entre carriles, para no leer de un renglón a otro
+  if(nCar > 1){
+    g.fillStyle = 'rgba(255,255,255,.07)';
+    for(let i = 1; i < nCar; i++) g.fillRect(0, i * altoCar, W, 1);
+  }
+
+  // la línea de sincronía: lo que la cruza, se dice
   g.save();
-  g.strokeStyle = '#FFE066'; g.lineWidth = Math.max(2, 2.5 * dpr);
+  g.strokeStyle = '#FFE066'; g.lineWidth = Math.max(2, SALA.marcaGrosor * dpr);
   g.shadowColor = '#FFE066'; g.shadowBlur = 10 * dpr;
   g.beginPath(); g.moveTo(xLinea, 0); g.lineTo(xLinea, H); g.stroke();
   g.restore();
@@ -16840,12 +16920,15 @@ function salaGuardar(){
   try{ localStorage.setItem('ddl_sala', JSON.stringify({
     on:SALA.on, banda:SALA.banda, seg:SALA.seg, beeps:SALA.beeps, punch:SALA.punch,
     texto:SALA.texto, barra:SALA.barra, pos:SALA.pos, tam:SALA.tam,
-    pps:SALA.pps, bandaTam:SALA.bandaTam })); }catch(e){}
+    pps:SALA.pps, bandaTam:SALA.bandaTam, dir:SALA.dir, remate:SALA.remate,
+    marca:SALA.marca, marcaGrosor:SALA.marcaGrosor, carriles:SALA.carriles,
+    actor:SALA.actor })); }catch(e){}
 }
 function salaCargar(){
   try{
     const j = JSON.parse(localStorage.getItem('ddl_sala') || '{}');
-    for(const k of ['on','banda','seg','beeps','punch','texto','barra','pos','tam','pps','bandaTam'])
+    for(const k of ['on','banda','seg','beeps','punch','texto','barra','pos','tam','pps','bandaTam',
+                    'dir','remate','marca','marcaGrosor','carriles','actor'])
       if(j[k] !== undefined) SALA[k] = j[k];
   }catch(e){}
 }
@@ -16892,19 +16975,33 @@ function salaPanel(){
     + 'exacto de la entrada. Los <b>beeps</b> son tres, uno por segundo: el cuarto no suena, y ese '
     + 'es el de entrar.</div>'
     + '<div class="sala-rej">'
-    +   '<label class="sala-c">Streamer <input id="salaSeg" type="number" min="1" max="8" step="0.5" value="' + SALA.seg + '"> s</label>'
+    +   '<label class="sala-c">Streamer <select id="salaSeg">'
+    +     SALA_SEGS.map(v => '<option value="' + v + '"' + (Math.abs(SALA.seg - v) < 0.01 ? ' selected' : '') + '>'
+    +       String(v).replace('.', ',') + ' s</option>').join('')
+    +     (SALA_SEGS.some(v => Math.abs(SALA.seg - v) < 0.01) ? '' :
+    +       '<option value="' + SALA.seg + '" selected>' + String(SALA.seg).replace('.', ',') + ' s</option>')
+    +   '</select></label>'
+    +   '<label class="sala-c">Sentido <select id="salaDir">'
+    +     '<option value="lr"' + (SALA.dir === 'lr' ? ' selected' : '') + '>izquierda a derecha</option>'
+    +     '<option value="bc"' + (SALA.dir === 'bc' ? ' selected' : '') + '>de los bordes al centro</option>'
+    +   '</select></label>'
     +   '<label class="sala-c">Letra del texto <input id="salaTam" type="number" min="12" max="64" value="' + SALA.tam + '"> px</label>'
     +   '<label class="sala-c">Texto <select id="salaPos">'
     +     '<option value="abajo"' + (SALA.pos === 'abajo' ? ' selected' : '') + '>abajo</option>'
     +     '<option value="arriba"' + (SALA.pos === 'arriba' ? ' selected' : '') + '>arriba</option></select></label>'
     +   '<label class="sala-c">Banda <input id="salaPps" type="number" min="40" max="400" step="10" value="' + SALA.pps + '"> px/s</label>'
     +   '<label class="sala-c">Letra de la banda <input id="salaBTam" type="number" min="12" max="60" value="' + SALA.bandaTam + '"> px</label>'
+    +   '<label class="sala-c">Línea de sincronía <input id="salaMarca" type="number" min="5" max="90" value="' + SALA.marca + '"> %</label>'
+    +   '<label class="sala-c">Grosor de la línea <input id="salaMG" type="number" min="1" max="12" value="' + SALA.marcaGrosor + '"> px</label>'
     + '</div>'
     + '<div class="sala-rej">'
     +   chk('salaBeeps', SALA.beeps, 'Beeps')
     +   chk('salaPunch', SALA.punch, 'Punch (destello de entrada)')
     +   chk('salaTexto', SALA.texto, 'Texto sobre la imagen')
     +   chk('salaBarra', SALA.barra, 'Barra de lo que queda')
+    +   chk('salaRemate', SALA.remate, 'Remate: la barra fija donde muere el streamer')
+    +   chk('salaCarr', SALA.carriles, 'Un carril por personaje en la banda')
+    +   chk('salaActor', SALA.actor, 'Enseñar también el nombre del talento')
     + '</div>'
     + '<div class="dud-btns"><button class="modo-op dud-b" id="salaProbar">▶ Probar beeps</button>'
     + '<button class="modo-op dud-b dud-ok" id="salaOk">Listo</button></div></div>';
@@ -16921,10 +17018,15 @@ function salaPanel(){
     const e = ov.querySelector('#' + id);
     e.onchange = () => { const v = +e.value; if(isFinite(v)) SALA[campo] = Math.min(max, Math.max(min, v)); salaGuardar(); };
   };
-  num('salaSeg', 'seg', 1, 8); num('salaTam', 'tam', 12, 64);
+  num('salaTam', 'tam', 12, 64);
   num('salaPps', 'pps', 40, 400); num('salaBTam', 'bandaTam', 12, 60);
+  num('salaMarca', 'marca', 5, 90); num('salaMG', 'marcaGrosor', 1, 12);
+  ov.querySelector('#salaSeg').onchange = e => { SALA.seg = +e.target.value || 3; salaGuardar(); };
+  ov.querySelector('#salaDir').onchange = e => { SALA.dir = e.target.value; salaGuardar(); };
   ov.querySelector('#salaPos').onchange = e => { SALA.pos = e.target.value; salaGuardar(); };
-  for(const [id, campo] of [['salaBeeps','beeps'],['salaPunch','punch'],['salaTexto','texto'],['salaBarra','barra']])
+  for(const [id, campo] of [['salaBeeps','beeps'],['salaPunch','punch'],['salaTexto','texto'],
+                            ['salaBarra','barra'],['salaRemate','remate'],['salaCarr','carriles'],
+                            ['salaActor','actor']])
     ov.querySelector('#' + id).onchange = e => { SALA[campo] = e.target.checked; salaGuardar(); };
 }
 
