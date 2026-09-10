@@ -132,8 +132,8 @@ async function cortesAnalizar(){
   const dec = cortesDecidir(muestras);
   const cortes = dec.cortes, umbral = dec.umbral, mediana = dec.mediana;
   CORTES.lista = cortes;
-  try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
-  try{ stDrawWave(); }catch(e){}
+  try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · js\cortes.js:135', e, 'puede que esto no se haya guardado en la nube'); }
+  try{ stDrawWave(); }catch(e){ fallo('stDrawWave · js\cortes.js:136', e); }
   stMsg('✂ ' + cortes.length + ' cambio' + (cortes.length === 1 ? '' : 's') + ' de plano · '
         + muestras.length + ' fotogramas mirados');
   return { cortes: cortes.length, fotogramas: muestras.length, umbral: umbral, mediana: mediana };
@@ -244,7 +244,7 @@ function cortesPegar(margen){
     adrFijar(i, 'tc0', c + studioTc0() + studioFine());
     n++;
   }
-  try{ salaOlvidar(); adrRepintar(); }catch(e){}
+  try{ salaOlvidar(); adrRepintar(); }catch(e){ fallo('salaOlvidar · js\cortes.js:247', e); }
   stMsg(n ? ('✂ ' + n + ' entrada' + (n === 1 ? '' : 's') + ' pegada' + (n === 1 ? '' : 's') + ' al corte')
           : 'Ninguna entrada estaba lo bastante cerca de un corte');
   return n;
@@ -335,8 +335,8 @@ async function cotejarTodo(){
     await new Promise(r2 => setTimeout(r2, 0));      // dejar respirar a la interfaz
   }
   COTEJO.trabajando = false;
-  try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
-  try{ adrRepintar(); }catch(e){}
+  try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · js\cortes.js:338', e, 'puede que esto no se haya guardado en la nube'); }
+  try{ adrRepintar(); }catch(e){ fallo('adrRepintar · js\cortes.js:339', e); }
   const msg = '🔎 ' + COTEJO.hechos + ' cotejados · ' + mal + ' no cuadran · ' + dudosos + ' dudosos';
   stMsg(msg);
   castAviso(msg + ' — míralos en «📋 Cues», no se ha cambiado ni una palabra del libreto');

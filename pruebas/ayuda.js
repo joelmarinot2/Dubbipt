@@ -36,8 +36,21 @@ const INDEX = path.join(RAIZ, 'index.html');
  *
  * Devuelve `[{ nombre, src }]`.
  */
+/* Los finales de línea se normalizan a `\n` SIEMPRE.
+ *
+ * Git convierte a CRLF al sacar los archivos en Windows -este repositorio lo
+ * avisa en cada commit-, así que en un clon recién hecho index.html llega con
+ * 17.000 CRLF. Y varias marcas de recorte llevan un salto de línea dentro
+ * («/**\n * Rellena el desglose»), que con CRLF deja de encontrarse.
+ *
+ * Se descubrió por casualidad: un `git checkout` de ida y vuelta durante otra
+ * prueba convirtió el archivo y cuarenta y nueve comprobaciones desaparecieron
+ * sin que nadie tocara el código. Sin esto, el juego de pruebas entero se
+ * rompe para quien clone el repositorio en Windows. */
+const lf = (s) => String(s).replace(/\r\n/g, '\n');
+
 function fuentes(){
-  const html = fs.readFileSync(INDEX, 'utf8');
+  const html = lf(fs.readFileSync(INDEX, 'utf8'));
   const out = [];
 
   const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
@@ -52,7 +65,7 @@ function fuentes(){
     const f = path.join(RAIZ, rel);
     if(!fs.existsSync(f))
       throw new Error('index.html carga «' + rel + '» y ese archivo no existe.');
-    out.push({ nombre: rel, src: fs.readFileSync(f, 'utf8') });
+    out.push({ nombre: rel, src: lf(fs.readFileSync(f, 'utf8')) });
   }
   return out;
 }
@@ -94,6 +107,14 @@ function trozo(desde, hasta){
  * `contexto` son las variables globales que ese código espera encontrar
  * (script, charIdx, window…). Se pasan como parámetros de la función, así que
  * el código de dentro las ve exactamente como las vería en el navegador.
+ *
+ * Un nombre de `exportar` puede ser también una propiedad con expresión:
+ *
+ *   montar(recortes, ['applyCharMerges', 'verChars: () => chars'], ctx)
+ *
+ * Hace falta para el código que REASIGNA una global —`chars = […]`—: al ser un
+ * parámetro, la reasignación se queda dentro y desde fuera no se ve. Una
+ * flecha declarada ahí sí cierra sobre el parámetro y lee su valor de después.
  */
 function montar(recortes, exportar, contexto){
   const codigo = recortes.map(r => trozo(r[0], r[1])).join('\n');
@@ -106,7 +127,18 @@ function montar(recortes, exportar, contexto){
   }catch(e){
     throw new Error('El trozo recortado no compila: ' + e.message);
   }
-  return f(...valores);
+  const r = f(...valores);
+  /* Que TODO lo pedido exista de verdad.
+     Sin esta comprobación, un recorte que acaba dentro de un comentario deja
+     el `/*` abierto, se come el recorte siguiente, y el síntoma es un
+     «X is not defined» que no explica nada de lo que ha pasado. Esto lo dice. */
+  const faltan = exportar.map(n => String(n).split(':')[0].trim())
+                         .filter(n => r[n] === undefined);
+  if(faltan.length)
+    throw new Error('El montaje no ha definido: ' + faltan.join(', ') + '.\n'
+      + '   Lo más probable: una marca de fin cae DENTRO de un comentario, el comentario\n'
+      + '   se queda abierto y se lleva por delante el recorte siguiente. Mueve la marca.');
+  return r;
 }
 
 /* ── Lo mínimo del navegador que algunos módulos necesitan ─────────────── */

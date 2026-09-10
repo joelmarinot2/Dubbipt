@@ -94,7 +94,7 @@ function adrFijar(si, campo, valor){
   if(!Object.keys(g).length) delete d[si];
   clearTimeout(_adrGuardaT);
   _adrGuardaT = setTimeout(async () => {
-    try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+    try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · js\adr.js:97', e, 'puede que esto no se haya guardado en la nube'); }
   }, 700);
 }
 

@@ -31,6 +31,7 @@ compartido rompe cosas más rápido de lo que las arregla.
 | [`05-formatos.md`](05-formatos.md) | Traer y llevar SRT, STL, CSV, TTML, marcadores |
 | [`06-sincronia.md`](06-sincronia.md) | Nube, tiempo real, tablet y escritorio, concurrencia |
 | [`07-entorno.md`](07-entorno.md) | CSP, service worker, versiones, despliegue, reparto en archivos |
+| [`08-fallos.md`](08-fallos.md) | Que un fallo silencioso se oiga, y el trinquete de la deuda |
 
 ## Cómo se leen las reglas
 

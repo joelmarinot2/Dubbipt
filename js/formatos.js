@@ -295,11 +295,11 @@ async function ioImportar(file){
   if(!ok) return;
 
   const r = ioMontarLibreto(filas);
-  try{ renderCards(); }catch(e){}
-  try{ if(typeof renderPlanilla === 'function') renderPlanilla(); }catch(e){}
-  try{ if(typeof refreshLibretoChips === 'function') refreshLibretoChips(); }catch(e){}
-  try{ if(typeof renderLibretoBlocks === 'function' && pop2 && pop2.doc) renderLibretoBlocks(); }catch(e){}
-  try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+  try{ renderCards(); }catch(e){ fallo('renderCards · js\formatos.js:298', e); }
+  try{ if(typeof renderPlanilla === 'function') renderPlanilla(); }catch(e){ fallo('renderPlanilla · js\formatos.js:299', e); }
+  try{ if(typeof refreshLibretoChips === 'function') refreshLibretoChips(); }catch(e){ fallo('refreshLibretoChips · js\formatos.js:300', e); }
+  try{ if(typeof renderLibretoBlocks === 'function' && pop2 && pop2.doc) renderLibretoBlocks(); }catch(e){ fallo('renderLibretoBlocks · js\formatos.js:301', e); }
+  try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · js\formatos.js:302', e, 'puede que esto no se haya guardado en la nube'); }
   castAviso('✅ ' + r.cues + ' líneas · ' + r.personajes + ' personaje'
     + (r.personajes === 1 ? '' : 's') + ' · ' + r.paginas + ' páginas' + aviso);
 }
