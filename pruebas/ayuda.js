@@ -36,8 +36,21 @@ const INDEX = path.join(RAIZ, 'index.html');
  *
  * Devuelve `[{ nombre, src }]`.
  */
+/* Los finales de línea se normalizan a `\n` SIEMPRE.
+ *
+ * Git convierte a CRLF al sacar los archivos en Windows -este repositorio lo
+ * avisa en cada commit-, así que en un clon recién hecho index.html llega con
+ * 17.000 CRLF. Y varias marcas de recorte llevan un salto de línea dentro
+ * («/**\n * Rellena el desglose»), que con CRLF deja de encontrarse.
+ *
+ * Se descubrió por casualidad: un `git checkout` de ida y vuelta durante otra
+ * prueba convirtió el archivo y cuarenta y nueve comprobaciones desaparecieron
+ * sin que nadie tocara el código. Sin esto, el juego de pruebas entero se
+ * rompe para quien clone el repositorio en Windows. */
+const lf = (s) => String(s).replace(/\r\n/g, '\n');
+
 function fuentes(){
-  const html = fs.readFileSync(INDEX, 'utf8');
+  const html = lf(fs.readFileSync(INDEX, 'utf8'));
   const out = [];
 
   const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
@@ -52,7 +65,7 @@ function fuentes(){
     const f = path.join(RAIZ, rel);
     if(!fs.existsSync(f))
       throw new Error('index.html carga «' + rel + '» y ese archivo no existe.');
-    out.push({ nombre: rel, src: fs.readFileSync(f, 'utf8') });
+    out.push({ nombre: rel, src: lf(fs.readFileSync(f, 'utf8')) });
   }
   return out;
 }

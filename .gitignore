@@ -40,3 +40,9 @@ yarn-debug.log*
 yarn-error.log*
 tmp/
 temp/
+
+# === Claude Code (ajustes personales de este equipo) ===
+# El hook de guardado automatico es una preferencia de quien trabaja aqui,
+# no una regla del proyecto: no se comparte.
+.claude/settings.local.json
+.claude/worktrees/

@@ -24,6 +24,8 @@ saltárselas al probar significa probar otra aplicación.
 | **ENT-12** | Que un trozo de código viva dentro de `index.html` o en su propio archivo es **organización, no comportamiento**. Las pruebas miran el conjunto (`fuentes()` en `pruebas/ayuda.js`), así que mover código de sitio no obliga a tocar ninguna prueba. | ✅ |
 | **ENT-13** | Los iconos se **generan** con `node herramientas/icono.js`, nunca se editan a mano. Son cinco archivos más dos favicons incrustados en el HTML: a mano acabarían siendo siete iconos distintos. Ya pasó — los PNG tenían el icono nuevo y la pestaña seguía con el viejo. | 👁 |
 | **ENT-14** | El icono **maskable** es su propio archivo (`icon-512-mask.png`), con la letra más pequeña. Android recorta esos iconos en círculo y solo garantiza el 80 % central: al normal, que llega casi al borde, le corta las esquinas del asta. | 👁 |
+| **ENT-15** | Las pruebas **normalizan los finales de línea** antes de leer el código. Git convierte a CRLF al sacar los archivos en Windows, y varias marcas de recorte llevan un salto dentro: sin normalizar, el juego de pruebas se rompe entero para quien clone el repositorio. Se descubrió cuando un `checkout` de ida y vuelta hizo desaparecer 49 comprobaciones sin que nadie tocara el código. | ✅ |
+| **ENT-16** | El guardado automático (`herramientas/guardar.sh`, hook de fin de turno) **nunca commitea en `main`** y **nunca commitea con las pruebas en rojo**. Si el push falla, el commit se queda en local y se dice. | 👁 |
 
 ## Nunca
 
