@@ -107,7 +107,59 @@ try{
   console.log('    ✗ no pude comprobar la carcasa: ' + e.message);
 }
 
-/* ── 3. Comportamiento ─────────────────────────────────────────────────── */
+/* ── 3. Versiones: si cambia la aplicación, cambia el service worker ─────
+ *
+ * Regla ENT-8. Sin subir `VERSION` en sw.js, el navegador sigue sirviendo la
+ * versión antigua desde su caché y el despliegue «no hace nada»: ni un error,
+ * ni una pista. Se ha perdido más de una tarde con esto.
+ *
+ * Se mira lo que ha cambiado respecto al último commit; si no hay nada suelto
+ * -en integración continua no lo hay-, se mira el propio commit.
+ */
+
+console.log('');
+console.log('  VERSIONES');
+let malVersion = 0;
+try{
+  const git = (args) => {
+    const r = spawnSync('git', args, { cwd: RAIZ, encoding: 'utf8' });
+    return r.status === 0 ? String(r.stdout || '').trim() : null;
+  };
+  const APP = /const APP_VER_NUM\s*=\s*'([^']+)'/;
+  const SW = /const VERSION\s*=\s*'([^']+)'/;
+
+  let cambiados = git(['diff', '--name-only', 'HEAD']);
+  let de = 'lo que tienes sin guardar';
+  if(cambiados === null){
+    console.log('    · sin git aquí: no se puede comprobar');
+    cambiados = '';
+  }else if(!cambiados){
+    cambiados = git(['diff', '--name-only', 'HEAD~1', 'HEAD']) || '';
+    de = 'el último commit';
+  }
+  const lista = cambiados.split('\n').map(x => x.trim()).filter(Boolean);
+  const tocaApp = lista.some(f => f === 'index.html' || f.startsWith('js/'));
+  const tocaSw = lista.indexOf('sw.js') >= 0;
+
+  if(!lista.length){
+    console.log('    · nada que comparar (¿un primer commit, o sin historia?)');
+  }else if(!tocaApp){
+    console.log('    ✓ ' + de + ' no toca la aplicación, así que no hace falta subir versión');
+  }else if(tocaSw){
+    const v = (fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8').match(APP) || [])[1];
+    const s = (fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8').match(SW) || [])[1];
+    console.log('    ✓ la aplicación cambia y el service worker también · ' + v + ' · sw ' + s);
+  }else{
+    malVersion++;
+    console.log('    ✗ ' + de + ' cambia la aplicación pero NO sw.js');
+    console.log('      Sube VERSION en sw.js, o el navegador seguirá sirviendo la versión');
+    console.log('      antigua desde su caché y el despliegue no hará nada, sin dar ningún error.');
+  }
+}catch(e){
+  console.log('    · no se pudo comprobar: ' + e.message);
+}
+
+/* ── 4. Comportamiento ─────────────────────────────────────────────────── */
 
 const archivos = fs.readdirSync(__dirname)
   .filter(f => f.endsWith('.prueba.js'))

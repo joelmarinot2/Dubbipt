@@ -94,6 +94,14 @@ function trozo(desde, hasta){
  * `contexto` son las variables globales que ese código espera encontrar
  * (script, charIdx, window…). Se pasan como parámetros de la función, así que
  * el código de dentro las ve exactamente como las vería en el navegador.
+ *
+ * Un nombre de `exportar` puede ser también una propiedad con expresión:
+ *
+ *   montar(recortes, ['applyCharMerges', 'verChars: () => chars'], ctx)
+ *
+ * Hace falta para el código que REASIGNA una global —`chars = […]`—: al ser un
+ * parámetro, la reasignación se queda dentro y desde fuera no se ve. Una
+ * flecha declarada ahí sí cierra sobre el parámetro y lee su valor de después.
  */
 function montar(recortes, exportar, contexto){
   const codigo = recortes.map(r => trozo(r[0], r[1])).join('\n');
@@ -111,7 +119,8 @@ function montar(recortes, exportar, contexto){
      Sin esta comprobación, un recorte que acaba dentro de un comentario deja
      el `/*` abierto, se come el recorte siguiente, y el síntoma es un
      «X is not defined» que no explica nada de lo que ha pasado. Esto lo dice. */
-  const faltan = exportar.filter(n => r[n] === undefined);
+  const faltan = exportar.map(n => String(n).split(':')[0].trim())
+                         .filter(n => r[n] === undefined);
   if(faltan.length)
     throw new Error('El montaje no ha definido: ' + faltan.join(', ') + '.\n'
       + '   Lo más probable: una marca de fin cae DENTRO de un comentario, el comentario\n'

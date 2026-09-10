@@ -22,6 +22,8 @@ saltárselas al probar significa probar otra aplicación.
 | **ENT-10** | Las pruebas se pasan **antes** de desplegar: `pruebas.cmd` o `node pruebas/correr.js`. | ✅ |
 | **ENT-11** | Los módulos de `js/` son **scripts clásicos**, no módulos ES: comparten el mismo ámbito global que el código en línea, igual que cuando estaban dentro. Se cargan **al final**, después de los bloques en línea, y en un orden fijo. | ✅ |
 | **ENT-12** | Que un trozo de código viva dentro de `index.html` o en su propio archivo es **organización, no comportamiento**. Las pruebas miran el conjunto (`fuentes()` en `pruebas/ayuda.js`), así que mover código de sitio no obliga a tocar ninguna prueba. | ✅ |
+| **ENT-13** | Los iconos se **generan** con `node herramientas/icono.js`, nunca se editan a mano. Son cinco archivos más dos favicons incrustados en el HTML: a mano acabarían siendo siete iconos distintos. Ya pasó — los PNG tenían el icono nuevo y la pestaña seguía con el viejo. | 👁 |
+| **ENT-14** | El icono **maskable** es su propio archivo (`icon-512-mask.png`), con la letra más pequeña. Android recorta esos iconos en círculo y solo garantiza el 80 % central: al normal, que llega casi al borde, le corta las esquinas del asta. | 👁 |
 
 ## Nunca
 
