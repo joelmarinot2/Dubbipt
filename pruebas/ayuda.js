@@ -106,7 +106,17 @@ function montar(recortes, exportar, contexto){
   }catch(e){
     throw new Error('El trozo recortado no compila: ' + e.message);
   }
-  return f(...valores);
+  const r = f(...valores);
+  /* Que TODO lo pedido exista de verdad.
+     Sin esta comprobación, un recorte que acaba dentro de un comentario deja
+     el `/*` abierto, se come el recorte siguiente, y el síntoma es un
+     «X is not defined» que no explica nada de lo que ha pasado. Esto lo dice. */
+  const faltan = exportar.filter(n => r[n] === undefined);
+  if(faltan.length)
+    throw new Error('El montaje no ha definido: ' + faltan.join(', ') + '.\n'
+      + '   Lo más probable: una marca de fin cae DENTRO de un comentario, el comentario\n'
+      + '   se queda abierto y se lleva por delante el recorte siguiente. Mueve la marca.');
+  return r;
 }
 
 /* ── Lo mínimo del navegador que algunos módulos necesitan ─────────────── */

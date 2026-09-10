@@ -20,10 +20,10 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **CAST-5** | Si el desglose subido ya trae actores, se ponen solos en las tarjetas. | 👁 |
 | **CAST-6** | Existe un **registro por programa**: lo que se reparte queda apuntado y los capítulos siguientes del mismo programa heredan el actor de los personajes que ya salieron. | 👁 |
 | **CAST-7** | Lo heredado se marca en **naranja** con un botón `✓ verificar`. No es tuyo hasta que lo das por bueno. | 👁 |
-| **CAST-8** | Lo que **no coincide exacto** por nombre se **pregunta**, uno por uno. Un nombre mal heredado es peor que uno sin heredar. | 👁 |
+| **CAST-8** | Lo que **no coincide exacto** por nombre se **pregunta**, uno por uno. Un nombre mal heredado es peor que uno sin heredar. | ✅ |
 | **CAST-9** | Se puede subir una **tabla de casting previa** en Excel: columna A personaje, B talento, C número de intervenciones. | 👁 |
-| **CAST-10** | La cabecera de esa tabla se detecta por **coincidencia exacta** de la celda, no buscando la palabra dentro. Buscándola dentro, una tabla cuyo primer talento se llame `ACTOR A` perdía su primera fila. | 👁 |
-| **CAST-11** | Una celda de intervenciones **vacía** significa *desconocido*, no cero. Como cero disparaba el aviso de «no cuadran las intervenciones» sin que hubiera nada raro. | 👁 |
+| **CAST-10** | La cabecera de esa tabla se detecta por **coincidencia exacta** de la celda, no buscando la palabra dentro. Buscándola dentro, una tabla cuyo primer talento se llame `ACTOR A` perdía su primera fila. | ✅ |
+| **CAST-11** | Una celda de intervenciones **vacía** significa *desconocido*, no cero. Como cero disparaba el aviso de «no cuadran las intervenciones» sin que hubiera nada raro. | ✅ |
 | **CAST-12** | `↩ Deshacer` (y `Ctrl+Z`) devuelve el estado anterior de los personajes tocados: talento, `noRec`, heredado y el visto bueno de gestos. Un lote entero —heredar, o verificar todos— es **un solo paso**. | 👁 |
 | **CAST-13** | `Ctrl+Z` solo actúa en modo casting y solo si el foco no está en un campo de texto. | 👁 |
 | **CAST-14** | Los avisos del casting salen como **notificación flotante**, no en la cabecera del libreto: dentro de un programa esa cabecera está oculta y los mensajes no se veían. | 👁 |
@@ -53,26 +53,31 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 
 | | |
 |---|---|
-| **CAST-N1** | **Nunca se pisa un talento que haya escrito una persona.** Ni la herencia, ni la tabla previa, ni el puente con DublajeCast. Solo se rellenan casillas vacías. | 👁 |
-| **CAST-N2** | Nunca se reparte talento solo a un personaje de «solo gestos» sin verificar — ni por herencia del programa ni por tabla previa. Los extras (`MALE SOLDIER`, `FEMALE OWNER`) repiten nombre sin ser la misma persona. Se dice a quién se saltó y por qué. | 👁 |
-| **CAST-N3** | Nunca se adivina una coincidencia dudosa. Se pregunta. | 👁 |
+| **CAST-N1** | **Nunca se pisa un talento que haya escrito una persona.** Ni la herencia, ni la tabla previa, ni el puente con DublajeCast. Solo se rellenan casillas vacías. | ✅ |
+| **CAST-N2** | Nunca se reparte talento solo a un personaje de «solo gestos» sin verificar — ni por herencia del programa ni por tabla previa. Los extras (`MALE SOLDIER`, `FEMALE OWNER`) repiten nombre sin ser la misma persona. Se dice a quién se saltó y por qué. | ✅ |
+| **CAST-N3** | Nunca se adivina una coincidencia dudosa. Se pregunta. | ✅ |
 | **CAST-N4** | Nunca se borra un personaje con ≥ 15 intervenciones o con talento asignado sin confirmación explícita. | 👁 |
 
 ## Cómo se demuestra
 
+- **CAST-N1**, **CAST-N2**, **CAST-N3** y **CAST-8**:
+  `pruebas/casting.prueba.js`, sobre `castHeredar` de verdad. Se comprobó
+  rompiéndola: al quitar la guarda `if(c.talent) continue`, la prueba canta que
+  «QUIEN YO DIGA» ha sido sustituido por el talento del registro. Eso es la voz
+  de un protagonista cambiada, cazada en menos de un segundo.
+- **CAST-10** y **CAST-11**: la lectura de la tabla previa, incluido el caso
+  que ya falló —un talento llamado `ACTOR A` que hacía perder la primera fila—.
 - **CAST-15 a CAST-17** y **CAST-21 a CAST-23**: `pruebas/gestos.prueba.js` y
-  `pruebas/ocupacion.prueba.js`. Comprobadas rompiendo el código a propósito
-  (ver `pruebas/LEEME.md`).
+  `pruebas/ocupacion.prueba.js`.
 - El resto, a mano: abrir el 101 de un programa, repartir, abrir el 102 y
-  comprobar que hereda en naranja; subir una tabla previa con un talento
-  llamado `ACTOR A` y comprobar que no se pierde su fila.
+  comprobar que hereda en naranja.
 
 ## Sin resolver
 
-- **CAST-N1** es la regla más importante del archivo y **no tiene ninguna
-  prueba**. Hoy depende de una sola línea (`if(c.talent) continue`) repetida en
-  tres sitios: herencia, tabla previa y puente. Tres sitios es tres
-  oportunidades de que uno se quede atrás.
+- **CAST-N1** está probada en la **herencia**, que es la que se ejecuta sola al
+  abrir un capítulo y por tanto la que puede hacer daño sin que nadie la haya
+  pedido. Los otros dos sitios donde vive la misma regla —la tabla previa y el
+  puente con DublajeCast— siguen sin prueba. Es la primera cosa que añadir.
 - **CAST-24**: el margen de 4 líneas es un número elegido a ojo. No hay medida
   de si en sala es el bueno.
 - El puente con DublajeCast nunca se ha probado contra sus datos reales; no he

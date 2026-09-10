@@ -116,32 +116,45 @@ const archivos = fs.readdirSync(__dirname)
 let pasadas = 0;
 const fallos = [];
 
-for(const archivo of archivos){
-  let mod;
-  try{
-    mod = require(path.join(__dirname, archivo));
-  }catch(e){
-    fallos.push({ seccion: archivo, nombre: 'ni se pudo cargar', detalle: e.message });
+/* Se espera a `pruebas(t)` si devuelve una promesa. Hace falta: castHeredar
+   es async -lee el registro del programa- y sin esperar, sus comprobaciones
+   se ejecutaban DESPUES del resumen y no se contaban. Un fallo que no se
+   cuenta es peor que no tener la prueba. */
+async function correr(){
+  for(const archivo of archivos){
+    let mod;
+    try{
+      mod = require(path.join(__dirname, archivo));
+    }catch(e){
+      fallos.push({ seccion: archivo, nombre: 'ni se pudo cargar', detalle: e.message });
+      console.log('');
+      console.log('  ' + archivo.toUpperCase());
+      console.log('    ✗ no se pudo cargar: ' + e.message);
+      continue;
+    }
     console.log('');
-    console.log('  ' + archivo.toUpperCase());
-    console.log('    ✗ no se pudo cargar: ' + e.message);
-    continue;
+    console.log('  ' + String(mod.nombre || archivo).toUpperCase());
+    const t = nuevoTablero();
+    try{
+      await mod.pruebas(t);
+    }catch(e){
+      t.fallos.push({ seccion: '(se cortó)', nombre: 'la prueba lanzó una excepción', detalle: e.message });
+      console.log('    ✗ la prueba se cortó: ' + e.message);
+    }
+    pasadas += t.pasadas;
+    for(const f of t.fallos) fallos.push({ ...f, archivo });
   }
-  console.log('');
-  console.log('  ' + String(mod.nombre || archivo).toUpperCase());
-  const t = nuevoTablero();
-  try{
-    mod.pruebas(t);
-  }catch(e){
-    t.fallos.push({ seccion: '(se cortó)', nombre: 'la prueba lanzó una excepción', detalle: e.message });
-    console.log('    ✗ la prueba se cortó: ' + e.message);
-  }
-  pasadas += t.pasadas;
-  for(const f of t.fallos) fallos.push({ ...f, archivo });
 }
 
 /* ── Resumen ───────────────────────────────────────────────────────────── */
 
+correr().then(resumen, (e) => {
+  console.log('');
+  console.log('  ✗ el lanzador se rompió: ' + (e && e.message));
+  process.exit(1);
+});
+
+function resumen(){
 const seg = ((Date.now() - t0) / 1000).toFixed(1);
 console.log('');
 console.log('  ' + '─'.repeat(56));
@@ -159,3 +172,4 @@ for(const f of fallos)
             + (f.detalle ? ('  (' + f.detalle + ')') : ''));
 console.log('');
 process.exit(1);
+}
