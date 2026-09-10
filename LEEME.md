@@ -35,6 +35,15 @@ escritorio compartan los mismos programas y se sincronicen, **ambos dispositivos
 deben iniciar sesión con la MISMA cuenta**. Luego pulsa **Sincronizar** en cada
 uno y elige 📱 Tablet o 💻 Escritorio (el canal va por espacio de trabajo).
 
+## Antes de desplegar: pasa las pruebas
+Doble clic en **`pruebas.cmd`** (o `node pruebas/correr.js`). Tarda menos de un
+segundo, no instala nada y comprueba dos cosas: que `index.html` y `sw.js` no
+tengan la sintaxis rota -eso deja la app en blanco- y que las reglas del
+negocio sigan cumpliéndose. Si sale en rojo, no despliegues.
+
+Se corren también solas en cada empujón a `main`. Los detalles, en
+[`pruebas/LEEME.md`](pruebas/LEEME.md).
+
 ## Notas
 - El desglose automático deja el **talento vacío**; asígnalos con tu herramienta
   de siempre.

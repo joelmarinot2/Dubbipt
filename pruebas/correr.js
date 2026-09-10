@@ -1,0 +1,110 @@
+/* Corre todas las pruebas de Dubbipt.
+ *
+ *   node pruebas/correr.js
+ *
+ * Dos partes, en este orden:
+ *
+ *  1. SINTAXIS. Se saca el JavaScript de los dos <script> en línea de
+ *     index.html y de sw.js y se pasa por el propio comprobador de Node. Es lo
+ *     primero porque un paréntesis mal cerrado deja la aplicación en blanco, y
+ *     eso no lo detecta ninguna prueba de comportamiento: no llega a arrancar.
+ *
+ *  2. COMPORTAMIENTO. Cada archivo *.prueba.js recorta el trozo de index.html
+ *     que le toca y lo comprueba.
+ *
+ * Devuelve 1 si algo falla, para que la integración continua se ponga en rojo.
+ */
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const { spawnSync } = require('child_process');
+const { RAIZ, bloques, nuevoTablero } = require('./ayuda');
+
+const t0 = Date.now();
+let malSintaxis = 0;
+
+console.log('');
+console.log('  Dubbipt · pruebas');
+
+/* ── 1. Sintaxis ───────────────────────────────────────────────────────── */
+
+console.log('');
+console.log('  SINTAXIS');
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dubbipt-pruebas-'));
+try{
+  const trozos = bloques().map((src, i) => ({ nombre: 'index.html · <script> ' + (i + 1), src }));
+  try{
+    trozos.push({ nombre: 'sw.js', src: fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8') });
+  }catch(e){ console.log('    ✗ no pude leer sw.js: ' + e.message); malSintaxis++; }
+
+  for(const trozo of trozos){
+    const f = path.join(tmp, trozo.nombre.replace(/[^a-z0-9]+/gi, '_') + '.js');
+    fs.writeFileSync(f, trozo.src, 'utf8');
+    const r = spawnSync(process.execPath, ['--check', f], { encoding: 'utf8' });
+    if(r.status === 0){
+      console.log('    ✓ ' + trozo.nombre + '  (' + trozo.src.split('\n').length + ' líneas)');
+    }else{
+      malSintaxis++;
+      console.log('    ✗ ' + trozo.nombre);
+      console.log('      ' + String(r.stderr || '').trim().split('\n').slice(0, 6).join('\n      '));
+    }
+  }
+}catch(e){
+  malSintaxis++;
+  console.log('    ✗ no pude sacar el código de index.html: ' + e.message);
+}finally{
+  try{ fs.rmSync(tmp, { recursive: true, force: true }); }catch(e){}
+}
+
+/* ── 2. Comportamiento ─────────────────────────────────────────────────── */
+
+const archivos = fs.readdirSync(__dirname)
+  .filter(f => f.endsWith('.prueba.js'))
+  .sort();
+
+let pasadas = 0;
+const fallos = [];
+
+for(const archivo of archivos){
+  let mod;
+  try{
+    mod = require(path.join(__dirname, archivo));
+  }catch(e){
+    fallos.push({ seccion: archivo, nombre: 'ni se pudo cargar', detalle: e.message });
+    console.log('');
+    console.log('  ' + archivo.toUpperCase());
+    console.log('    ✗ no se pudo cargar: ' + e.message);
+    continue;
+  }
+  console.log('');
+  console.log('  ' + String(mod.nombre || archivo).toUpperCase());
+  const t = nuevoTablero();
+  try{
+    mod.pruebas(t);
+  }catch(e){
+    t.fallos.push({ seccion: '(se cortó)', nombre: 'la prueba lanzó una excepción', detalle: e.message });
+    console.log('    ✗ la prueba se cortó: ' + e.message);
+  }
+  pasadas += t.pasadas;
+  for(const f of t.fallos) fallos.push({ ...f, archivo });
+}
+
+/* ── Resumen ───────────────────────────────────────────────────────────── */
+
+const seg = ((Date.now() - t0) / 1000).toFixed(1);
+console.log('');
+console.log('  ' + '─'.repeat(56));
+if(!fallos.length && !malSintaxis){
+  console.log('  ✓ ' + pasadas + ' comprobaciones, todas bien · ' + seg + ' s');
+  console.log('');
+  process.exit(0);
+}
+console.log('  ✗ ' + fallos.length + ' de ' + (pasadas + fallos.length) + ' comprobaciones mal'
+          + (malSintaxis ? (' · ' + malSintaxis + ' archivo(s) con la sintaxis rota') : '')
+          + ' · ' + seg + ' s');
+for(const f of fallos)
+  console.log('      · ' + (f.archivo || '') + ' › ' + f.seccion + ' › ' + f.nombre
+            + (f.detalle ? ('  (' + f.detalle + ')') : ''));
+console.log('');
+process.exit(1);

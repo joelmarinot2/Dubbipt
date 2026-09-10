@@ -1,0 +1,29 @@
+# Las pruebas de Dubbipt, en cada empujón y en cada pull request.
+#
+# Solo hace falta Node: no hay empaquetador ni dependencias que instalar, así
+# que esto tarda segundos. Si se pone en rojo, es que index.html o sw.js tienen
+# la sintaxis rota, o que alguna regla del negocio ha dejado de cumplirse.
+name: pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Pruebas del web app
+        run: node pruebas/correr.js
+
+      - name: Pruebas del overlay de Pro Tools
+        working-directory: protools-overlay
+        run: node --test test/
