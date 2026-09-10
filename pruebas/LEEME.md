@@ -28,6 +28,7 @@ alguien la abre sin conexión, y entonces falla sin ninguna explicación.
 
 | Archivo | Qué protege |
 |---|---|
+| `libreto.prueba.js` | **`buildScript`**, la función de la que depende todo lo demás: que los timecodes vayan a su casilla y no al diálogo, que la cascada herede, y que un libreto de doblaje no sea secuestrado como audiodescripción. |
 | `casting.prueba.js` | **CAST-N1**: que nunca se pise un talento escrito por una persona. Y que lo dudoso se pregunte en vez de adivinarse. |
 | `excel.prueba.js` | Que escribir en el desglose de la empresa **no borre una sola fórmula**. Es donde más caro sale un fallo. |
 | `formatos.prueba.js` | Que un SRT, un STL o un CSV entren y salgan sin perder un fotograma. |
@@ -73,6 +74,8 @@ comprobaron rompiendo el código a propósito, una cosa a la vez:
 | Bajar el suelo absoluto de 0,06 a 0,004 | Sí — 1 comprobación |
 | Quitar la guarda de CAST-N1 (`if(c.talent) continue`) | Sí — 3 comprobaciones |
 | Volver a poner la expresión codiciosa del Excel | Sí — 3 comprobaciones |
+| Quitar la guarda de LIB-N1 (no borrar un libreto de la nube) | Sí — 1 comprobación |
+| Bajar el umbral de LIB-9 de 20 tomas a 6 | Sí — 2 comprobaciones |
 
 Las **dos de los cortes** no se detectaban con las pruebas iniciales: el vídeo
 de prueba era demasiado fácil y nada superaba el suelo salvo los cortes de
@@ -81,9 +84,13 @@ en mano, con movimiento fuerte y ningún corte, y un parpadeo en un plano
 quieto, veinte veces su vecindario pero una nadería en valor absoluto—. Si
 mañana alguien toca esos dos números, se enterará.
 
-Y las **dos últimas** son las que más tranquilidad dan, porque son los dos
-fallos que de verdad han costado dinero en este proyecto: la voz de un
+Las de **CAST-N1** y **el Excel** son las que más tranquilidad dan, porque son
+los dos fallos que de verdad han costado dinero en este proyecto: la voz de un
 protagonista cambiada y una columna de fórmulas borrada en silencio.
+
+Y las **dos de LIB** cubren la función de la que cuelga toda la aplicación. La
+de LIB-N1 canta `dio [], esperaba undefined`: eso es un capítulo entero
+borrado al abrirlo.
 
 ## Qué NO cubren
 
