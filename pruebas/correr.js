@@ -23,7 +23,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { spawnSync } = require('child_process');
-const { RAIZ, bloques, nuevoTablero } = require('./ayuda');
+const { RAIZ, fuentes, nuevoTablero } = require('./ayuda');
 
 const t0 = Date.now();
 let malSintaxis = 0;
@@ -37,7 +37,7 @@ console.log('');
 console.log('  SINTAXIS');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dubbipt-pruebas-'));
 try{
-  const trozos = bloques().map((src, i) => ({ nombre: 'index.html · <script> ' + (i + 1), src }));
+  const trozos = fuentes();
   try{
     trozos.push({ nombre: 'sw.js', src: fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8') });
   }catch(e){ console.log('    ✗ no pude leer sw.js: ' + e.message); malSintaxis++; }

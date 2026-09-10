@@ -30,7 +30,7 @@ compartido rompe cosas más rápido de lo que las arregla.
 | [`04-sala-adr.md`](04-sala-adr.md) | Cues, estados, takes, streamers, beeps, banda rítmica |
 | [`05-formatos.md`](05-formatos.md) | Traer y llevar SRT, STL, CSV, TTML, marcadores |
 | [`06-sincronia.md`](06-sincronia.md) | Nube, tiempo real, tablet y escritorio, concurrencia |
-| [`07-entorno.md`](07-entorno.md) | CSP, service worker, versiones, despliegue |
+| [`07-entorno.md`](07-entorno.md) | CSP, service worker, versiones, despliegue, reparto en archivos |
 
 ## Cómo se leen las reglas
 

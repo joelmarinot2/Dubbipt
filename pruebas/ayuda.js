@@ -1,8 +1,8 @@
 /* Ayudas para las pruebas.
  *
- * Todas leen el index.html QUE SE DESPLIEGA, no una copia. Se saca el
- * contenido de los dos <script> en línea, se recorta el trozo de código que se
- * quiere probar y se evalúa con las dependencias justas.
+ * Todas leen el código QUE SE DESPLIEGA, no una copia: los dos bloques en
+ * línea de index.html y los archivos locales que carga. Se recorta el trozo
+ * que se quiere probar y se evalúa con las dependencias justas.
  *
  * Es deliberado, y tiene dos virtudes:
  *
@@ -24,21 +24,47 @@ const path = require('path');
 const RAIZ = path.join(__dirname, '..');
 const INDEX = path.join(RAIZ, 'index.html');
 
-/** El contenido de los <script> en línea de index.html, en orden. */
-function bloques(){
+/**
+ * TODO el JavaScript de la aplicación, en el orden en que lo ejecuta el
+ * navegador: primero los <script> en línea de index.html y después los
+ * archivos locales que carga (`./js/*.js`, `./config.js`).
+ *
+ * Que los módulos vivan dentro de index.html o en su propio archivo es un
+ * detalle de organización, no de comportamiento: comparten el mismo ámbito
+ * global. Las pruebas miran el conjunto, así que la fase 2 —sacar módulos a
+ * archivos propios— no obliga a tocar ni una prueba.
+ *
+ * Devuelve `[{ nombre, src }]`.
+ */
+function fuentes(){
   const html = fs.readFileSync(INDEX, 'utf8');
-  const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
   const out = [];
-  let m;
-  while((m = re.exec(html))) out.push(m[1]);
-  if(out.length < 2)
-    throw new Error('Esperaba al menos dos <script> en línea en index.html y encontré ' + out.length);
+
+  const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
+  let m, n = 0;
+  while((m = re.exec(html))) out.push({ nombre: 'index.html · <script> ' + (++n), src: m[1] });
+  if(n < 2)
+    throw new Error('Esperaba al menos dos <script> en línea en index.html y encontré ' + n);
+
+  const reSrc = /<script[^>]*\ssrc="(\.\/[^"]+\.js)"/g;
+  while((m = reSrc.exec(html))){
+    const rel = m[1].replace(/^\.\//, '');
+    const f = path.join(RAIZ, rel);
+    if(!fs.existsSync(f))
+      throw new Error('index.html carga «' + rel + '» y ese archivo no existe.');
+    out.push({ nombre: rel, src: fs.readFileSync(f, 'utf8') });
+  }
   return out;
+}
+
+/** Solo los <script> en línea. Se conserva porque alguna prueba lo pide. */
+function bloques(){
+  return fuentes().filter(f => f.nombre.startsWith('index.html')).map(f => f.src);
 }
 
 let _cache = null;
 function todoElCodigo(){
-  if(!_cache) _cache = bloques();
+  if(!_cache) _cache = fuentes().map(f => f.src);
   return _cache;
 }
 
@@ -122,4 +148,4 @@ function nuevoTablero(){
   return t;
 }
 
-module.exports = { RAIZ, INDEX, bloques, trozo, montar, karNormReal, nuevoTablero };
+module.exports = { RAIZ, INDEX, fuentes, bloques, trozo, montar, karNormReal, nuevoTablero };
