@@ -1410,6 +1410,15 @@ body:not(.modo-casting) .gestbtn{ display:none; }
 
 .adr-cot{ color:var(--cc2); font-size:11.5px; margin-top:3px; line-height:1.4; }
 
+/* Fallos que no se oyen */
+.fallo-lista{ max-height:46vh; overflow:auto; margin-bottom:12px; }
+.fallo-f{ padding:9px 4px; border-bottom:1px solid #22252f; }
+.fallo-f:last-child{ border-bottom:none; }
+.fallo-d{ font-weight:700; font-size:12.5px; color:#F87171; word-break:break-word; }
+.fallo-n{ color:#8892a6; font-weight:400; }
+.fallo-m{ font-size:12px; color:#d7dae3; margin-top:2px; word-break:break-word; }
+.fallo-nota{ font-size:11.5px; color:#FBBF24; margin-top:2px; }
+
 /* Traer y llevar formatos */
 .io-tit{ font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:#6b7280;
   margin:12px 0 6px; }
@@ -1863,6 +1872,202 @@ body.modo-casting #btnExport{ display:none !important; }
 </div>
 
 <script>
+/* ═══ FALLOS QUE NO SE OYEN ════════════════════════════════════════════════
+
+   Este proyecto arrastraba 583 bloques try/catch cuyo manejador estaba vacío:
+   se comían el error sin decir nada. Eso significa que una función rota y una
+   función que funciona se veían EXACTAMENTE IGUAL. El capítulo no se guardaba
+   en la nube, la tarjeta no se repintaba, y nadie se enteraba hasta que lo
+   notaba un cliente.
+
+   No se trata de llenar la pantalla de avisos. Hay fallos que son normales y
+   no interesan a nadie: escribir en el almacenamiento local en una ventana
+   privada, o vaciar una memoria que ya estaba vacía. Esos se siguen callando,
+   a propósito.
+
+   Lo que se apunta es lo que NO debería fallar nunca en silencio:
+
+     · guardar o leer en la nube,
+     · escribir el Excel de la empresa,
+     · pintar la interfaz,
+     · y cualquier error que nadie haya capturado.
+
+   Se apunta, se cuenta y se enseña un aviso pequeño en una esquina. Ni una
+   ventana modal, ni un bloqueo: quien está grabando no puede pararse porque
+   una petición haya fallado. Pero al terminar puede pulsar el aviso, ver qué
+   pasó y copiarlo de una vez para mandarlo.
+
+   Regla de oro: EL AVISADOR NO PUEDE TIRAR LA APLICACIÓN. Todo lo de aquí va
+   envuelto en su propio manejador, y ese sí se calla, con su nota al lado. Si
+   el que avisa de los fallos provoca un fallo, no hemos arreglado nada: lo
+   hemos empeorado. */
+
+const DDL_FALLOS = { lista: [], porSitio: new Map(), max: 200, pintarT: 0, desde: Date.now() };
+
+/**
+ * Apunta un fallo que no debería haber pasado desapercibido.
+ *
+ *   fallo('epDataUpsert · index.html:4777', e)
+ *   fallo('castRellenar · index.html:5730', e, 'el archivo puede estar a medias')
+ *
+ * `donde` nombra la llamada que falló y su sitio exacto. Sale del propio
+ * código vigilado, no de la función que lo envuelve: buscando la envolvente
+ * hacia atrás se atribuían fallos a funciones que no tenían nada que ver.
+ */
+function fallo(donde, e, nota){
+  try{
+    const msg = (e && (e.message || e.name)) || String(e == null ? 'sin detalle' : e);
+    const clave = donde + ' | ' + msg;
+    const ya = DDL_FALLOS.porSitio.get(clave);
+    if(ya){
+      ya.veces++; ya.ts = Date.now();
+    }else{
+      const it = { donde: donde, msg: msg, nota: nota || '', veces: 1, ts: Date.now(),
+                   pila: (e && e.stack) ? String(e.stack).split('\n').slice(1, 4).join(' <- ') : '' };
+      DDL_FALLOS.porSitio.set(clave, it);
+      DDL_FALLOS.lista.push(it);
+      // con un tope: un fallo dentro de un bucle no puede comerse la memoria
+      while(DDL_FALLOS.lista.length > DDL_FALLOS.max){
+        const viejo = DDL_FALLOS.lista.shift();
+        DDL_FALLOS.porSitio.delete(viejo.donde + ' | ' + viejo.msg);
+      }
+    }
+    console.warn('[fallo] ' + donde + ': ' + msg, e || '');
+    falloPintar();
+  }catch(x){ /* el avisador no puede tirar la aplicacion */ }
+}
+
+/** Cuántos fallos distintos se han apuntado. */
+function falloCuantos(){
+  try{ return DDL_FALLOS.lista.length; }catch(e){ /* el avisador no puede tirar la aplicacion */ return 0; }
+}
+
+/* ── El aviso de la esquina ────────────────────────────────────────────── */
+
+function falloPintar(){
+  try{
+    clearTimeout(DDL_FALLOS.pintarT);
+    DDL_FALLOS.pintarT = setTimeout(function(){
+      try{
+        const n = DDL_FALLOS.lista.length;
+        let b = document.getElementById('falloAviso');
+        if(!n){ if(b) b.remove(); return; }
+        if(!b){
+          b = document.createElement('button');
+          b.id = 'falloAviso';
+          b.type = 'button';
+          b.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:99998;'
+            + 'background:#2a1113;color:#F87171;border:1px solid #F87171;border-radius:999px;'
+            + 'padding:6px 13px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;'
+            + 'box-shadow:0 4px 14px rgba(0,0,0,.4);opacity:.92';
+          b.addEventListener('click', falloPanel);
+          document.body.appendChild(b);
+        }
+        const veces = DDL_FALLOS.lista.reduce(function(s, x){ return s + x.veces; }, 0);
+        b.textContent = '⚠ ' + n + (n === 1 ? ' fallo' : ' fallos')
+                      + (veces > n ? (' · ' + veces + ' veces') : '');
+        b.title = 'Cosas que han fallado sin avisar. Pulsa para verlas.';
+      }catch(x){ /* el avisador no puede tirar la aplicacion */ }
+    }, 400);
+  }catch(e){ /* el avisador no puede tirar la aplicacion */ }
+}
+
+/** El informe, en texto plano y de una pieza, para poder mandarlo. */
+function falloInforme(){
+  try{
+    const L = [];
+    L.push('Dubbipt ' + (typeof APP_VERSION !== 'undefined' ? APP_VERSION : '?'));
+    L.push(new Date().toISOString());
+    try{ L.push(navigator.userAgent); }catch(e){ /* da igual */ }
+    try{ if(typeof currentEp !== 'undefined' && currentEp) L.push('capitulo: ' + currentEp.name); }
+    catch(e){ /* da igual */ }
+    L.push('');
+    for(const f of DDL_FALLOS.lista){
+      L.push('- ' + f.donde + (f.veces > 1 ? (' (x' + f.veces + ')') : ''));
+      L.push('    ' + f.msg);
+      if(f.nota) L.push('    ' + f.nota);
+      if(f.pila) L.push('    ' + f.pila);
+    }
+    return L.join('\n');
+  }catch(e){ return 'no se pudo montar el informe: ' + e.message; }
+}
+
+function falloPanel(){
+  try{
+    const viejo = document.getElementById('falloOv');
+    if(viejo) viejo.remove();
+    const ov = document.createElement('div');
+    ov.id = 'falloOv';
+    ov.className = 'modo-cap';
+    const filas = DDL_FALLOS.lista.slice().reverse().map(function(f){
+      return '<div class="fallo-f"><div class="fallo-d">' + esc(f.donde)
+        + (f.veces > 1 ? ' <span class="fallo-n">x' + f.veces + '</span>' : '') + '</div>'
+        + '<div class="fallo-m">' + esc(f.msg) + '</div>'
+        + (f.nota ? '<div class="fallo-nota">' + esc(f.nota) + '</div>' : '') + '</div>';
+    }).join('') || '<div class="adr-vacio">Nada ha fallado. Buena señal.</div>';
+    ov.innerHTML = '<div class="modo-caja" style="max-width:620px;text-align:left">'
+      + '<div class="modo-tit">Ha fallado algo</div>'
+      + '<div class="modo-sub" style="margin-bottom:6px">'
+      + DDL_FALLOS.lista.length + (DDL_FALLOS.lista.length === 1 ? ' cosa' : ' cosas')
+      + ' desde que abriste la aplicación</div>'
+      + '<div class="meta-nota">Esto <b>no te ha parado el trabajo</b>: son cosas que fallaron por '
+      + 'detrás y antes se callaban. Si algo no te ha cuadrado —un capítulo que no se guardó, un '
+      + 'Excel a medias— la explicación suele estar aquí. Copia el informe y mándalo.</div>'
+      + '<div class="fallo-lista">' + filas + '</div>'
+      + '<div class="dud-btns"><button class="modo-op dud-b" id="falloCopiar">Copiar el informe</button>'
+      + '<button class="modo-op dud-b" id="falloLimpiar">Vaciar la lista</button>'
+      + '<button class="modo-op dud-b dud-ok" id="falloCerrar">Cerrar</button></div></div>';
+    document.body.appendChild(ov);
+    const cerrar = function(){ ov.remove(); };
+    ov.querySelector('#falloCerrar').onclick = cerrar;
+    ov.addEventListener('click', function(e){ if(e.target === ov) cerrar(); });
+    ov.querySelector('#falloLimpiar').onclick = function(){
+      DDL_FALLOS.lista.length = 0; DDL_FALLOS.porSitio.clear();
+      cerrar(); falloPintar();
+    };
+    ov.querySelector('#falloCopiar').onclick = function(){
+      const txt = falloInforme();
+      const ok = function(){ try{ DDL_UI.toast('Informe copiado'); }catch(e){ /* da igual */ } };
+      try{
+        navigator.clipboard.writeText(txt).then(ok, function(){ falloCopiarAPelo(txt, ok); });
+      }catch(e){ falloCopiarAPelo(txt, ok); }
+    };
+  }catch(e){ console.warn('falloPanel', e); }
+}
+
+/** Si el portapapeles no está disponible (sin https, o sin permiso). */
+function falloCopiarAPelo(txt, ok){
+  try{
+    const ta = document.createElement('textarea');
+    ta.value = txt;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    if(ok) ok();
+  }catch(e){ console.warn('el informe no se pudo copiar; esta en la consola:\n' + txt); }
+}
+
+/* ── La red de seguridad: lo que nadie capturó ──────────────────────────
+   Esto es lo que más cubre y lo que menos cuesta: cualquier error que se
+   escape llega aquí. Antes se quedaba en la consola, que nadie mira. */
+
+try{
+  window.addEventListener('error', function(ev){
+    try{
+      if(ev && ev.message === 'ResizeObserver loop limit exceeded') return;   // ruido del navegador
+      const d = (ev && ev.filename ? String(ev.filename).split('/').pop() : 'la pagina')
+              + (ev && ev.lineno ? (':' + ev.lineno) : '');
+      fallo('sin capturar · ' + d, (ev && ev.error) || (ev && ev.message) || ev);
+    }catch(x){ /* el avisador no puede tirar la aplicacion */ }
+  });
+  window.addEventListener('unhandledrejection', function(ev){
+    try{ fallo('promesa sin atender', (ev && ev.reason) || ev); }
+    catch(x){ /* el avisador no puede tirar la aplicacion */ }
+  });
+}catch(e){ /* navegador muy viejo: sin red de seguridad, pero sin romper nada */ }
+
 /* ============================================================
    DDL_UI · toasts, modal de confirmación, skeleton, progreso,
    mensajes de error amigables (auditoría UX §2, §3, §9)
@@ -1972,7 +2177,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.66.0-nube';
+const APP_VER_NUM = 'v10.67.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -2697,7 +2902,7 @@ async function showNewPasswordScreen(){
   // 2) para cambiar la contraseña HACE FALTA sesión. Antes se mostraba el
   //    formulario sin comprobarlo y al guardar salía «Auth session missing».
   let hay = false;
-  try{ const { data } = await sb.auth.getSession(); hay = !!(data && data.session); }catch(e){}
+  try{ const { data } = await sb.auth.getSession(); hay = !!(data && data.session); }catch(e){ fallo('sb.auth.getSession · index.html:2905', e); }
   if(!hay && pr.code){
     try{ const r = await sb.auth.exchangeCodeForSession(pr.code); hay = !!(r && r.data && r.data.session); }
     catch(e){ console.error('[acceso] no se pudo canjear el enlace', e); }
@@ -2741,7 +2946,7 @@ async function showNewPasswordScreen(){
       try{
         const { data } = await sb.auth.getSession();
         if(data && data.session){ sbUser = data.session.user; authUnlock(); renderLibrary(); postLogin(); }
-      }catch(_){}
+      }catch(_){ fallo('sb.auth.getSession · index.html:2949', _); }
     }catch(err){
       console.error('[acceso] no se pudo cambiar la contraseña', err);
       const raw = (err && (err.message || err.error_description)) || '';
@@ -2806,7 +3011,7 @@ function authErrMsg(error, sinSesion){
 }
 document.getElementById('btnOut').addEventListener('click', async ()=>{
   try{ onlineDisconnect(); }catch(e){}
-  try{ if(sb) await sb.auth.signOut(); }catch(e){}
+  try{ if(sb) await sb.auth.signOut(); }catch(e){ fallo('sb.auth.signOut · index.html:3014', e); }
   try{ if(pop.win && !pop.win.closed) pop.win.close(); }catch(e){}
   try{ if(typeof pop2!=='undefined' && pop2.win && pop2.win!==window && !pop2.win.closed) pop2.win.close(); }catch(e){}
   // al cambiar de usuario: no arrastrar el libreto/capítulo del usuario anterior
@@ -3721,7 +3926,7 @@ function reprocessAfterMerge(){
   // rehacer el libreto para que las cabeceras de ambos nombres queden bajo el primario
   try{ if(pdfDoc || (script&&script.length)) buildScript(); }catch(e){}
   rebuild();
-  if(typeof pop2!=='undefined' && pop2.doc){ try{ renderLibretoBlocks(); renderLibretoChips(); }catch(e){} }
+  if(typeof pop2!=='undefined' && pop2.doc){ try{ renderLibretoBlocks(); renderLibretoChips(); }catch(e){ fallo('renderLibretoBlocks · index.html:3929', e); } }
 }
 function persistMerges(){
   persistMergesLocalOnly();
@@ -4571,8 +4776,8 @@ function renderPlanilla(){
     b.addEventListener('click', async e=>{
       e.stopPropagation();
       gestVerificar(b.dataset.k, true);
-      try{ renderPlanilla(); renderCards(); }catch(x){}
-      try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(x){}
+      try{ renderPlanilla(); renderCards(); }catch(x){ fallo('renderPlanilla · index.html:4779', x); }
+      try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(x){ fallo('epDataUpsert · index.html:4780', x, 'puede que esto no se haya guardado en la nube'); }
       try{ gestAvisar(); }catch(x){}
     });
   });
@@ -4583,8 +4788,8 @@ function renderPlanilla(){
       const k = b.dataset.k, c = charIdx[k];
       try{ castHistPush(castFoto([k]), 'verificar ' + ((c&&c.display)||k)); }catch(x){}
       castVerificar(k, true);
-      try{ renderPlanilla(); renderCards(); }catch(x){}
-      try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(x){}
+      try{ renderPlanilla(); renderCards(); }catch(x){ fallo('renderPlanilla · index.html:4791', x); }
+      try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(x){ fallo('epDataUpsert · index.html:4792', x, 'puede que esto no se haya guardado en la nube'); }
     });
   });
 }
@@ -4642,10 +4847,10 @@ async function removeChar(key){
   try{ delete occByChar[key]; delete charMarks[key]; if(progress[key]){ delete progress[key]; progTouched(key); } }catch(e){}
   try{ saveProgress(); }catch(e){}
   try{ rebuild(); }catch(e){}
-  try{ if(typeof renderStats==='function') renderStats(); }catch(e){}
-  try{ if(typeof pop2!=='undefined' && pop2.doc){ if(pop2.key===key){ pop2.key=null; pop2.hl=null; pop2.scopeAll=true; } renderLibretoBlocks(); renderLibretoChips(); } }catch(e){}
+  try{ if(typeof renderStats==='function') renderStats(); }catch(e){ fallo('renderStats · index.html:4850', e); }
+  try{ if(typeof pop2!=='undefined' && pop2.doc){ if(pop2.key===key){ pop2.key=null; pop2.hl=null; pop2.scopeAll=true; } renderLibretoBlocks(); renderLibretoChips(); } }catch(e){ fallo('renderLibretoBlocks · index.html:4851', e); }
   if(typeof currentEp!=='undefined' && currentEp && currentEp.id){
-    try{ epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+    try{ epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · index.html:4853', e, 'puede que esto no se haya guardado en la nube'); }
     try{ saveEpCache(currentEp.id, new Date().toISOString()); }catch(e){}
   }
   DDL_UI.toast('Personaje eliminado: '+c.display);
@@ -4657,13 +4862,13 @@ async function assignTalent(key, val){
   c.talent = val; c.noRec = NO_REC.has(norm(val));
   try{ const raw=(window._charsRaw||[]).find(x=>x.key===key); if(raw){ raw.talent=val; raw.noRec=c.noRec; } }catch(e){}
   try{ castVerificar(key, true); }catch(e){}   // escrito a mano: ya está verificado
-  try{ renderCards(); }catch(e){}
+  try{ renderCards(); }catch(e){ fallo('renderCards · index.html:4865', e); }
   if(val) try{ castAvisarChoque(key); }catch(e){}
   if(typeof currentEp!=='undefined' && currentEp && currentEp.id){
-    try{ await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+    try{ await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · index.html:4868', e, 'puede que esto no se haya guardado en la nube'); }
     try{ await saveEpCache(currentEp.id, new Date().toISOString()); }catch(e){}
   }
-  try{ if(typeof pop2!=='undefined' && pop2.doc) renderLibretoChips(); }catch(e){}
+  try{ if(typeof pop2!=='undefined' && pop2.doc) renderLibretoChips(); }catch(e){ fallo('renderLibretoChips · index.html:4871', e); }
   if(typeof libMsg==='function') libMsg('🎙️ Talento: '+(val||'(sin asignar)'));
   try{ castRegAnotarPronto(); }catch(e){}
 }
@@ -4768,8 +4973,8 @@ function renderCards(){
       ev.stopPropagation();
       try{ castHistPush(castFoto([c.key]), 'verificar ' + c.display); }catch(e){}
       castVerificar(c.key, true);
-      try{ renderCards(); }catch(e){}
-      try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+      try{ renderCards(); }catch(e){ fallo('renderCards · index.html:4976', e); }
+      try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · index.html:4977', e, 'puede que esto no se haya guardado en la nube'); }
       if(typeof DDL_UI!=='undefined') DDL_UI.toast('Verificado: ' + c.display);
     });
 
@@ -4778,9 +4983,9 @@ function renderCards(){
     if(gb) gb.addEventListener('click', async ev=>{
       ev.stopPropagation();
       gestVerificar(c.key, true);
-      try{ renderCards(); }catch(e){}
-      try{ if(typeof renderPlanilla === 'function') renderPlanilla(); }catch(e){}
-      try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+      try{ renderCards(); }catch(e){ fallo('renderCards · index.html:4986', e); }
+      try{ if(typeof renderPlanilla === 'function') renderPlanilla(); }catch(e){ fallo('renderPlanilla · index.html:4987', e); }
+      try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · index.html:4988', e, 'puede que esto no se haya guardado en la nube'); }
       try{ gestAvisar(); }catch(e){}
       if(typeof DDL_UI!=='undefined') DDL_UI.toast('Verificado: ' + c.display + ' → ' + GEST_ORIGINAL);
     });
@@ -5310,7 +5515,7 @@ function otherWsNote(){
 }
 async function renderLibrary(silent){
   if((!sb || !sbUser) && !window.OFFLINE) return;
-  try{ refreshTopbar(); }catch(e){}
+  try{ refreshTopbar(); }catch(e){ fallo('refreshTopbar · index.html:5518', e); }
   const grid = $('libGrid'), crumb = $('libCrumb'), act = $('libAction'), lib = $('lib');
   try{
     if(!silent) await libEnsure();
@@ -5422,15 +5627,15 @@ async function renderLibrary(silent){
             if(ok){
               try{
                 const deEps = sbEps(sh.id);
-                for(const oe of deEps){ try{ await sb.from('episode_data').delete().eq('ep_id', oe.id); }catch(err){} }
+                for(const oe of deEps){ try{ await sb.from('episode_data').delete().eq('ep_id', oe.id); }catch(err){ fallo('sb.from · index.html:5630', err, 'puede que esto no se haya guardado en la nube'); } }
                 await sb.from('episodes').delete().eq('show_id', sh.id);
                 for(const oe of deEps){
                   try{
                     const { data:fl } = await sb.storage.from('libretos').list(sh.id+'/'+oe.id);
                     if(fl && fl.length) await sb.storage.from('libretos').remove(fl.map(f=> sh.id+'/'+oe.id+'/'+f.name));
-                  }catch(err){}
+                  }catch(err){ fallo('sb.storage.from · index.html:5636', err); }
                 }
-              }catch(err){}
+              }catch(err){ fallo('sb.storage.from · index.html:5638', err); }
               await sb.from('shows').delete().eq('id', sh.id);
               await libFetchAll(); renderLibrary(true);
               if(typeof libPing==='function') libPing('show', sh.id);
@@ -5649,8 +5854,8 @@ function setSort(mode){
     ob.textContent = window._sortMode==='abc' ? 'Organizar: A–Z ' : 'Organizar ';
     if(svg) ob.appendChild(svg);
   }
-  try{ renderCards(); }catch(e){}
-  try{ if(typeof renderPlanilla==='function') renderPlanilla(); }catch(e){}
+  try{ renderCards(); }catch(e){ fallo('renderCards · index.html:5857', e); }
+  try{ if(typeof renderPlanilla==='function') renderPlanilla(); }catch(e){ fallo('renderPlanilla · index.html:5858', e); }
 }
 
 /* ═══ CASTING · rellenar el desglose de la empresa ═══════════════════════
@@ -5862,7 +6067,7 @@ function ponerModo(epId, m){
   }
   try{ castPintarFuente(); }catch(e){}
   // la tabla cambia de columnas según el modo: hay que repintarla
-  try{ if(m === 'casting') plaOpen = true; renderPlanilla(); }catch(e){}
+  try{ if(m === 'casting') plaOpen = true; renderPlanilla(); }catch(e){ fallo('renderPlanilla · index.html:6070', e); }
   try{ castPintarOcupacion(); }catch(e){}
   // continuidad: lo que ya se repartió en otros capítulos del programa
   if(m === 'casting'){ try{ gestAvisar(); }catch(e){} try{ castHeredar(null); }catch(e){} }
@@ -5974,15 +6179,15 @@ async function castUndo(){
                raw.gestOk = !!e.gestOk; }
     }catch(x){}
   }
-  try{ renderCards(); }catch(e){}
-  try{ if(typeof renderPlanilla === 'function') renderPlanilla(); }catch(e){}
-  try{ if(typeof pop2 !== 'undefined' && pop2.doc && typeof renderLibretoChips === 'function') renderLibretoChips(); }catch(e){}
+  try{ renderCards(); }catch(e){ fallo('renderCards · index.html:6182', e); }
+  try{ if(typeof renderPlanilla === 'function') renderPlanilla(); }catch(e){ fallo('renderPlanilla · index.html:6183', e); }
+  try{ if(typeof pop2 !== 'undefined' && pop2.doc && typeof renderLibretoChips === 'function') renderLibretoChips(); }catch(e){ fallo('renderLibretoChips · index.html:6184', e); }
   try{
     if(typeof currentEp !== 'undefined' && currentEp && currentEp.id){
       await epDataUpsert(currentEp.id, currentEp.showId);
       await saveEpCache(currentEp.id, new Date().toISOString());
     }
-  }catch(e){}
+  }catch(e){ fallo('epDataUpsert · index.html:6190', e, 'puede que esto no se haya guardado en la nube'); }
   castPintarUndo();
   castAviso('↩ Deshecho: ' + paso.etiqueta);
 }
@@ -6741,9 +6946,9 @@ function gestPanel(){
   ov.querySelector('#gestCerrar').onclick = cerrar;
   ov.addEventListener('click', e => { if(e.target === ov) cerrar(); });
   const repintar = async () => {
-    try{ renderCards(); }catch(e){}
-    try{ if(typeof renderPlanilla === 'function') renderPlanilla(); }catch(e){}
-    try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+    try{ renderCards(); }catch(e){ fallo('renderCards · index.html:6949', e); }
+    try{ if(typeof renderPlanilla === 'function') renderPlanilla(); }catch(e){ fallo('renderPlanilla · index.html:6950', e); }
+    try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · index.html:6951', e, 'puede que esto no se haya guardado en la nube'); }
   };
   ov.querySelectorAll('button.gestbtn').forEach(b => {
     b.onclick = async () => {
@@ -7364,8 +7569,8 @@ async function castHeredar(desdeExcel){
 
   const total = seguros.length + confirmados.length;
   if(total){
-    try{ renderCards(); }catch(e){}
-    try{ if(typeof currentEp!=='undefined' && currentEp && currentEp.id){ await epDataUpsert(currentEp.id, currentEp.showId); } }catch(e){}
+    try{ renderCards(); }catch(e){ fallo('renderCards · index.html:7572', e); }
+    try{ if(typeof currentEp!=='undefined' && currentEp && currentEp.id){ await epDataUpsert(currentEp.id, currentEp.showId); } }catch(e){ fallo('epDataUpsert · index.html:7573', e, 'puede que esto no se haya guardado en la nube'); }
     try{ castAvisarChoquesTodos(); }catch(e){}
     castAviso('✅ ' + total + ' talento' + (total===1?'':'s') + ' heredado' + (total===1?'':'s')
       + (seguros.length && confirmados.length ? '' : '')
@@ -7543,8 +7748,8 @@ async function castSubirTabla(file){
     }
     await castRegGuardar(showId, reg);
 
-    try{ renderCards(); }catch(e){}
-    try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+    try{ renderCards(); }catch(e){ fallo('renderCards · index.html:7751', e); }
+    try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · index.html:7752', e, 'puede que esto no se haya guardado en la nube'); }
 
     const puestos = llenar.length + reemplazados.length;
     let msg = '✅ ' + puestos + ' talento' + (puestos===1?'':'s') + ' de la tabla · '
@@ -7615,7 +7820,7 @@ async function castSubirFormato(file){
     try{
       const r = await sb.storage.from('libretos').upload(ruta, new Blob([buf]), { upsert: true });
       enNube = !r.error;
-    }catch(e){}
+    }catch(e){ fallo('sb.storage.from · index.html:7823', e, 'puede que esto no se haya guardado en la nube'); }
     const donde = epId ? ('«' + ((currentEp && currentEp.name) || 'este capítulo') + '»')
                        : 'el programa (común a sus capítulos)';
 
@@ -7853,9 +8058,9 @@ async function castDescargar(){
 function goPrograms(){
   try{ document.body.classList.remove('ep-open'); }catch(e){}
   try{ LDB.browse=true; libView='shows'; LDB.showId=null; }catch(e){}
-  try{ renderLibrary(true); }catch(e){}
+  try{ renderLibrary(true); }catch(e){ fallo('renderLibrary · index.html:8061', e); }
   try{ updateBackBtn(); }catch(e){}
-  try{ refreshTopbar(); }catch(e){}
+  try{ refreshTopbar(); }catch(e){ fallo('refreshTopbar · index.html:8063', e); }
 }
 // ===== Módulo 8 · Perfil de la cuenta (conectado a Supabase) =====
 async function showAccountProfile(){
@@ -7872,7 +8077,7 @@ async function showAccountProfile(){
     const { data, error } = await sb.from('profiles').select('*').eq('id', sbUser.id).single();
     // solo el nombre: profiles.role es el rol de permisos, no el cargo que se muestra aquí
     if(!error && data){ hasProfiles = true; name0 = data.full_name || name0; }
-  }catch(e){}
+  }catch(e){ fallo('sb.from · index.html:8080', e); }
 
   const initials = topbarInitials();
   const planTxt = 'Cuenta activa · ' + (email0 || '');
@@ -7953,7 +8158,7 @@ async function showAccountProfile(){
       // refresca estado local + barra superior
       try{ if(sbUser.user_metadata){ sbUser.user_metadata.full_name=name; sbUser.user_metadata.role=role; } }catch(e){}
       try{ if(typeof DDLAuth!=='undefined' && DDLAuth.profile){ DDLAuth.profile.full_name=name; DDLAuth.profile.role=role; } }catch(e){}
-      try{ refreshTopbar(); }catch(e){}
+      try{ refreshTopbar(); }catch(e){ fallo('refreshTopbar · index.html:8161', e); }
       msg('Cambios guardados ✓', 'ok');
       if(typeof DDL_UI!=='undefined') DDL_UI.toast('Perfil actualizado');
       setTimeout(close, 700);
@@ -7970,7 +8175,7 @@ function editEpisode(){
   const nm = (currentEp && currentEp.name) ? currentEp.name : 'Episodio';
   showDesgloseReview(nm, async ()=>{
     if(currentEp && currentEp.id){
-      try{ await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}
+      try{ await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · index.html:8178', e, 'puede que esto no se haya guardado en la nube'); }
       try{ await saveEpCache(currentEp.id, new Date().toISOString()); }catch(e){}
       if(typeof libPing==='function') libPing('ep', currentEp.id, currentEp.showId);
       libMsg('✔ Desglose actualizado');
@@ -8094,7 +8299,7 @@ function openFormatProfile(){
     FMT.custom=(q('fmtCustom').value||'').split('\n').map(s=>s.trim()).filter(Boolean);
     saveFMT();
     if(typeof DDL_UI!=='undefined'&&DDL_UI.toast) DDL_UI.toast('Perfil de formato guardado. Recarga el capítulo para re-desglosar.',{kind:'ok'});
-    try{ if(typeof pop2!=='undefined'&&pop2.doc) renderLibretoBlocks(); }catch(e){}
+    try{ if(typeof pop2!=='undefined'&&pop2.doc) renderLibretoBlocks(); }catch(e){ fallo('renderLibretoBlocks · index.html:8302', e); }
     close();
   };
   setTimeout(()=>{ const t=q('fmtTC'); if(t) t.focus(); },60);
@@ -8282,6 +8487,15 @@ function showTutorial(onDone){
     { s:'Paso 12 · Tu equipo', ic:'👥', t:'Quién está conectado',
       d:'El chip <b>👥</b> de la barra dice cuántas personas hay conectadas ahora. Al pulsarlo ves quiénes están en tu espacio y con qué dispositivo.' },
 
+    { s:'Si algo falla', ic:'⚠️', t:'El aviso de la esquina',
+      d:'Si abajo a la izquierda aparece un <b>⚠ fallo</b>, es que algo ha fallado por detrás. '
+       +'<b>No te ha parado el trabajo</b> y a lo mejor ni te afecta, pero si algo no te cuadró '
+       +'-un capítulo que no se guardó, un Excel a medias- la explicación suele estar ahí.<br>'
+       +'Púlsalo, mira qué dice y usa <b>Copiar el informe</b>: sale con la versión, el capítulo y el '
+       +'detalle técnico. Con eso se puede arreglar; sin eso, hay que adivinar.'
+       +'<span class="tut-tip">Antes estas cosas se caían en silencio y nadie se enteraba. Que aparezca '
+       +'el aviso es buena señal: significa que ya se ve.</span>' },
+
     { s:'Listo', ic:'🚀', t:'Ya puedes empezar',
       d:'Eso es todo lo esencial. Puedes volver a ver este tutorial cuando quieras en <b>⚙ → Ayuda y documentación</b>.' }
   ];
@@ -8429,7 +8643,7 @@ async function ddlResetCache(){
   location.reload();
 }
 // reconstruir todo el estado desde la caché (sin descargar ni re-procesar)
-function _epOpen(v){ try{ document.body.classList.toggle('ep-open', !!v); }catch(e){} try{ refreshTopbar(); }catch(e){} }
+function _epOpen(v){ try{ document.body.classList.toggle('ep-open', !!v); }catch(e){} try{ refreshTopbar(); }catch(e){ fallo('refreshTopbar · index.html:8637', e); } }
 function hydrateEpisode(d){ _epOpen(true);
   // al cambiar de capítulo, el modo estudio arranca apagado (no arrastrar video del anterior)
   try{ if(typeof studio!=='undefined') studio.on=false; const _l=document.getElementById('stLeft'); if(_l) _l.style.display='none'; }catch(e){}
@@ -8565,7 +8779,7 @@ async function epStamp(ep){
   try{
     const { data:ls } = await sb.storage.from('libretos').list(ep.show_id+'/'+ep.id);
     if(ls && ls.length) return ls.map(f=> f.name+':'+(f.updated_at||f.created_at||'')).sort().join('|');
-  }catch(e){}
+  }catch(e){ fallo('sb.storage.from · index.html:8773', e); }
   return (ep.xls_path||'')+'|'+(ep.pdf_path||'');
 }
 // ═══ NUEVA ESTRUCTURA: el libreto procesado vive en la BASE DE DATOS (episode_data) ═══
@@ -8721,7 +8935,7 @@ async function openEpisodeFromJson(ep){
     _epOpen(true);
     (async ()=>{ try{ await cloudLoadProgress(); loadProgress(); rebuild();
       if(typeof loadCloudMarks==='function') await loadCloudMarks();
-      if(typeof pop2!=='undefined' && pop2.doc){ refreshOpenLibretoForEpisode(); } }catch(e){} })();
+      if(typeof pop2!=='undefined' && pop2.doc){ refreshOpenLibretoForEpisode(); } }catch(e){ fallo('cloudLoadProgress · index.html:8929', e); } })();
     return true;
   }catch(e){ console.error('openEpisodeFromJson', e); return false; }
 }
@@ -8873,7 +9087,7 @@ async function openEpisode(id){
   if(error || !ep){ taskFail('No se pudo abrir el capítulo'); libMsg('No se pudo abrir el capítulo'); return false; }
   if(ep.json_path){
     if(await openEpisodeFromJson(ep)){
-      try{ if(window._OPTIMIZING) await epDataUpsert(ep.id, ep.show_id); else epDataUpsert(ep.id, ep.show_id); }catch(e){}
+      try{ if(window._OPTIMIZING) await epDataUpsert(ep.id, ep.show_id); else epDataUpsert(ep.id, ep.show_id); }catch(e){ fallo('epDataUpsert · index.html:9081', e, 'puede que esto no se haya guardado en la nube'); }
       return true;
     }
   }
@@ -8923,7 +9137,7 @@ async function openEpisodeLegacy(ep){
     }
     try{ if(nf.xls || nf.pdf) idbSet('ddl-files::'+id, nf); }catch(e){}
     if(script && script.length) epStamp(ep).then(stamp=> saveEpCache(ep.id, stamp));   // cachear solo si quedó completo
-    if(script && script.length){ try{ await epDataUpsert(ep.id, ep.show_id); }catch(e){} }   // ⭐ migrar a la base de datos: próximas aperturas instantáneas
+    if(script && script.length){ try{ await epDataUpsert(ep.id, ep.show_id); }catch(e){ fallo('epDataUpsert · index.html:9131', e, 'puede que esto no se haya guardado en la nube'); } }   // ⭐ migrar a la base de datos: próximas aperturas instantáneas
     await cloudLoadProgress();
     loadProgress();
     rebuild();
@@ -9056,7 +9270,7 @@ const LIBRT = { ch:null, on:false, busy:false, next:0 };
 function libRealtimeStart(){
   if(!sb || !sbUser || LIBRT.busy || LIBRT.on) return;
   LIBRT.busy = true;
-  if(LIBRT.ch){ try{ sb.removeChannel(LIBRT.ch); }catch(e){} LIBRT.ch = null; }
+  if(LIBRT.ch){ try{ sb.removeChannel(LIBRT.ch); }catch(e){ fallo('sb.removeChannel · index.html:9264', e); } LIBRT.ch = null; }
   const ch = sb.channel('ddl:library', rtCfg({ broadcast:{ self:false } }));
   LIBRT.ch = ch;
   ch.on('broadcast', { event:'lib' }, ({payload})=> onLibPing(payload))
@@ -9094,7 +9308,7 @@ async function libAutoRefresh(){
     await libFetchAll();
     renderLibrary(true);
     await refreshOpenEpisodeFromCloud();
-  }catch(e){}
+  }catch(e){ fallo('libFetchAll · index.html:9302', e); }
 }
 // si el capítulo abierto cambió en la nube (otro equipo re-subió archivos),
 // descargarlos y refrescar sin que el usuario haga nada
@@ -10410,7 +10624,7 @@ async function libEmptyAction(what, silent){
       await loadPdfBuf(await dl.data.arrayBuffer(), f.name);
       window._dataEpId = ep.id;
       try{ saveEpCache(ep.id); }catch(e){}
-      try{ epDataUpsert(ep.id, ep.showId); }catch(e){}
+      try{ epDataUpsert(ep.id, ep.showId); }catch(e){ fallo('epDataUpsert · index.html:10618', e, 'puede que esto no se haya guardado en la nube'); }
       rebuild();
       try{ openLibretoInline((pop2.key && charIdx[pop2.key]) ? pop2.key : null); }catch(e){}
       say('✅ Libreto cargado: '+f.name);
@@ -10776,8 +10990,8 @@ function buildLibretoDoc(pc){
       pop2.hl = pop2.key;
       pop2.scopeAll = true;            // mostrar todo el libreto y resaltar al elegido
       try{ if(typeof pop2.doc.querySelector('.lh h2')!=='undefined'){ const h=pop2.doc.querySelector('.lh h2'); if(h) h.textContent = (pop2.key&&charIdx[pop2.key])?charIdx[pop2.key].display:'Libreto'; } }catch(e){}
-      try{ renderLibretoBlocks(); }catch(e){}
-      try{ renderLibretoChips(); }catch(e){}
+      try{ renderLibretoBlocks(); }catch(e){ fallo('renderLibretoBlocks · index.html:10984', e); }
+      try{ renderLibretoChips(); }catch(e){ fallo('renderLibretoChips · index.html:10985', e); }
       try{ if(typeof syncSendHl==='function') syncSendHl(pop2.key); }catch(e){}   // avisar al otro dispositivo
       try{ pop2._interact = performance.now(); const f = pop2.doc.querySelector('.blk.mine'); if(f) libCenterTo(f); }catch(e){}
     });
@@ -11566,10 +11780,10 @@ async function libDoSplit(si, t1, t2, tcSec){
   // re-indexar marcas de los bloques que se corrieron (descendente, para no pisar)
   if(typeof sync!=='undefined' && sync.marks){ for(let k=oldLen-1; k>si; k--){ if(sync.marks[k]!==undefined){ sync.marks[k+1]=sync.marks[k]; delete sync.marks[k]; } } }
   try{ scriptByKey = {}; for(let i=0;i<script.length;i++){ const k=script[i].key; if(k){ (scriptByKey[k]=scriptByKey[k]||[]).push(i); } } }catch(e){}
-  try{ pop2._hiVi=null; renderLibretoBlocks(); renderLibretoChips(); }catch(e){}
+  try{ pop2._hiVi=null; renderLibretoBlocks(); renderLibretoChips(); }catch(e){ fallo('renderLibretoBlocks · index.html:11774', e); }
   // persistir: script nuevo + marcas re-indexadas (reemplazo COMPLETO, no merge)
-  try{ if(typeof epDataUpsert==='function') await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}   // B5: era .show_id (no existe) → guardaba NULL
-  try{ if(sb && currentEp) await sb.from('episodes').update({ marks: sync.marks }).eq('id', currentEp.id); }catch(e){}
+  try{ if(typeof epDataUpsert==='function') await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · index.html:11776', e, 'puede que esto no se haya guardado en la nube'); }   // B5: era .show_id (no existe) → guardaba NULL
+  try{ if(sb && currentEp) await sb.from('episodes').update({ marks: sync.marks }).eq('id', currentEp.id); }catch(e){ fallo('sb.from · index.html:11777', e, 'puede que esto no se haya guardado en la nube'); }
   // sincronizar al otro dispositivo: que re-hidrate el capítulo con la nueva estructura
   try{ if(sync.isOn && sync.channel && typeof syncEmit==='function') syncEmit('reload', { epId: currentEp.id }, true); }catch(e){}
   try{ if(typeof DDL_UI!=='undefined' && DDL_UI.toast) DDL_UI.toast('Parlamento dividido en dos cajas', {kind:'ok'}); }catch(e){}
@@ -11621,9 +11835,9 @@ async function libDoMerge(si, mergedText){
     for(let k=si+2; k<oldLen; k++){ if(sync.marks[k]!==undefined){ sync.marks[k-1]=sync.marks[k]; delete sync.marks[k]; } }
   }
   try{ scriptByKey = {}; for(let i=0;i<script.length;i++){ const k=script[i].key; if(k){ (scriptByKey[k]=scriptByKey[k]||[]).push(i); } } }catch(e){}
-  try{ pop2._hiVi=null; renderLibretoBlocks(); renderLibretoChips(); }catch(e){}
-  try{ if(typeof epDataUpsert==='function') await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){}   // B5: era .show_id (no existe) → guardaba NULL
-  try{ if(sb && currentEp) await sb.from('episodes').update({ marks: sync.marks }).eq('id', currentEp.id); }catch(e){}
+  try{ pop2._hiVi=null; renderLibretoBlocks(); renderLibretoChips(); }catch(e){ fallo('renderLibretoBlocks · index.html:11829', e); }
+  try{ if(typeof epDataUpsert==='function') await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · index.html:11830', e, 'puede que esto no se haya guardado en la nube'); }   // B5: era .show_id (no existe) → guardaba NULL
+  try{ if(sb && currentEp) await sb.from('episodes').update({ marks: sync.marks }).eq('id', currentEp.id); }catch(e){ fallo('sb.from · index.html:11831', e, 'puede que esto no se haya guardado en la nube'); }
   try{ if(sync.isOn && sync.channel && typeof syncEmit==='function') syncEmit('reload', { epId: currentEp.id }, true); }catch(e){}
   try{ if(typeof DDL_UI!=='undefined' && DDL_UI.toast) DDL_UI.toast('Cajas unidas', {kind:'ok'}); }catch(e){}
 }
@@ -11828,7 +12042,7 @@ async function reanalizarGuion(btn){
         try{
           const q = await sb.from('episodes').select('pdf_path,pdf_name').eq('id', currentEp.id).maybeSingle();
           if(q && q.data) ep = Object.assign({}, ep, q.data);
-        }catch(e){}
+        }catch(e){ fallo('sb.from · index.html:12036', e); }
       }
       if(ep.pdf_path){
         say('Descargando el PDF del capítulo…');
@@ -11846,7 +12060,7 @@ async function reanalizarGuion(btn){
     await loadPdfBuf(buf, nombre);
     try{ if(typeof epDataUpsert==='function') await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ console.warn('guardar', e); }
     try{ if(typeof refreshOpenLibretoForEpisode==='function') refreshOpenLibretoForEpisode();
-         else if(typeof renderLibretoBlocks==='function') renderLibretoBlocks(); }catch(e){}
+         else if(typeof renderLibretoBlocks==='function') renderLibretoBlocks(); }catch(e){ fallo('refreshOpenLibretoForEpisode · index.html:12054', e); }
     say('Guion analizado de nuevo. Cierra y vuelve a abrir el personaje.');
   }catch(e){
     console.error(e);
@@ -12487,8 +12701,8 @@ function libToggleDone(si){
   } else {
     done = markPageGlobal(page);   // libreto completo: página global
   }
-  try{ if(typeof renderPlanilla==='function') renderPlanilla(); }catch(e){}
-  try{ if(typeof renderStats==='function') renderStats(); }catch(e){}
+  try{ if(typeof renderPlanilla==='function') renderPlanilla(); }catch(e){ fallo('renderPlanilla · index.html:12695', e); }
+  try{ if(typeof renderStats==='function') renderStats(); }catch(e){ fallo('renderStats · index.html:12696', e); }
   if(typeof refreshLibretoChips==='function') refreshLibretoChips();
   if(typeof libReportPage==='function') libReportPage(true);
   libSyncDoneBtns(page);
@@ -12873,7 +13087,7 @@ async function syncConnect(role){
   if(sync.isOn && sync.channel) return;    // ya conectado
   sync._connecting = true;
   // limpiar por completo cualquier canal anterior (evita canales fantasma que pelean)
-  if(sync.channel){ try{ sb.removeChannel(sync.channel); }catch(e){} sync.channel = null; }
+  if(sync.channel){ try{ sb.removeChannel(sync.channel); }catch(e){ fallo('sb.removeChannel · index.html:13081', e); } sync.channel = null; }
   sync.room = 'ws:' + ((WORKSPACE && WORKSPACE.id) ? WORKSPACE.id : 'x');
   const role0 = sync.role;
   const ch = sb.channel(sync.room, rtCfg({ broadcast:{ self:false, ack:false }, presence:{ key:sync.meId } }));
@@ -12974,7 +13188,7 @@ function ddlOnTick(){
   // 3) cada ~25 s: latido de presencia + mantener fresco el token de sesión
   if(_ddlTick % 500 === 0){
     if(sync.isOn && sync.channel){ try{ sync.channel.send({ type:'broadcast', event:'ping', payload:{} }); }catch(e){} }
-    try{ if(sb) sb.auth.getSession(); }catch(e){}   // renueva el token aun en fondo
+    try{ if(sb) sb.auth.getSession(); }catch(e){ fallo('sb.auth.getSession · index.html:13182', e); }   // renueva el token aun en fondo
   }
   // 4) cada ~45 s: biblioteca al día (capítulos/archivos de otros equipos)
   if(_ddlTick % 900 === 0){ try{ if(typeof libAutoRefresh==='function') libAutoRefresh(); }catch(e){} }
@@ -12988,7 +13202,7 @@ function syncHealth(){
   // canal "zombi": el socket murió sin avisar → derribar y reconectar YA
   const sockDead = !!(sb && sb.realtime && typeof sb.realtime.isConnected==='function' && !sb.realtime.isConnected());
   if(sync.isOn && sockDead){
-    try{ if(sync.channel) sb.removeChannel(sync.channel); }catch(e){}
+    try{ if(sync.channel) sb.removeChannel(sync.channel); }catch(e){ fallo('sb.removeChannel · index.html:13196', e); }
     sync.channel = null; sync.isOn = false; sync._connecting = false;
     sync._nextTryAt = 0; updateSyncUI();
   }
@@ -13002,7 +13216,7 @@ function syncDisconnect(){
   stopTxLoop();
   sync._nextTryAt = 0; sync._fail = 0;
   sync._connecting = false;
-  if(sync.channel){ try{ sb.removeChannel(sync.channel); }catch(e){} }
+  if(sync.channel){ try{ sb.removeChannel(sync.channel); }catch(e){ fallo('sb.removeChannel · index.html:13210', e); } }
   sync.channel=null; sync.isOn=false; sync.role=null; sync.peers=0; updateSyncUI();
 }
 // emisor con cola: si el canal aún no está listo, guarda y envía al conectar
@@ -13035,7 +13249,7 @@ window.addEventListener('pageshow', ()=>{ if(sync.role && !sync.isOn) scheduleRe
 try{
   sb.auth.onAuthStateChange((ev, session)=>{
     if((ev==='TOKEN_REFRESHED'||ev==='SIGNED_IN') && session && sb.realtime && sb.realtime.setAuth){
-      try{ sb.realtime.setAuth(session.access_token); }catch(e){}
+      try{ sb.realtime.setAuth(session.access_token); }catch(e){ fallo('sb.realtime.setAuth · index.html:13243', e); }
       try{ window._sbAccessToken = session.access_token; }catch(e){}   // para cloudFlushProgressNow (síncrono)
     }
   });
@@ -13071,9 +13285,9 @@ function applyTalentFree(){
     if(libre && !pop2.scopeAll){
       pop2.scopeAll = true;
       try{ const sc = pop2.els && pop2.els.scope; if(sc) sc.innerHTML = LIB_ICON.scopeAll; }catch(e){}
-      try{ renderLibretoBlocks(); }catch(e){}
+      try{ renderLibretoBlocks(); }catch(e){ fallo('renderLibretoBlocks · index.html:13279', e); }
     }
-  }catch(e){}
+  }catch(e){ fallo('renderLibretoBlocks · index.html:13281', e); }
 }
 function isTablet(){ return sync.isOn && (sync.role==='tablet' || sync.role==='talent'); }
 function isTalent(){ return DEVROLE==='talent'; }
@@ -13129,7 +13343,7 @@ function onlineConnect(){
 function onlineJoinWs(){
   const wsId = (WORKSPACE && WORKSPACE.id) || null;
   if(online.chW && online.wsId === wsId){ try{ online.chW.track(onlineWsPayload()); }catch(e){} return; }
-  try{ if(online.chW) sb.removeChannel(online.chW); }catch(e){}
+  try{ if(online.chW) sb.removeChannel(online.chW); }catch(e){ fallo('sb.removeChannel · index.html:13337', e); }
   online.chW = null; online.wsId = wsId; online.people = [];
   if(!sb || !sbUser || !wsId){ onlineRefresh(); return; }
   try{
@@ -13146,8 +13360,8 @@ function onlineJoinWs(){
   }catch(e){ console.warn('presencia · espacio', e); }
 }
 function onlineDisconnect(){
-  try{ if(online.chG) sb.removeChannel(online.chG); }catch(e){}
-  try{ if(online.chW) sb.removeChannel(online.chW); }catch(e){}
+  try{ if(online.chG) sb.removeChannel(online.chG); }catch(e){ fallo('sb.removeChannel · index.html:13354', e); }
+  try{ if(online.chW) sb.removeChannel(online.chW); }catch(e){ fallo('sb.removeChannel · index.html:13355', e); }
   online.chG=null; online.chW=null; online.wsId=null;
   online.people=[]; online.total=0; online.mine=0; online.others=0;
   updateOnlineChip();
@@ -13592,8 +13806,8 @@ function onRemoteHl(p){
   pop2.key = key; pop2.hl = key; pop2.scopeAll = true;
   try{ const sel = pop2.doc.getElementById('lCharSel'); if(sel) sel.value = key || ''; }catch(e){}
   try{ const h = pop2.doc.querySelector('.lh h2'); if(h) h.textContent = (key && charIdx[key]) ? charIdx[key].display : 'Libreto'; }catch(e){}
-  try{ renderLibretoBlocks(); }catch(e){}
-  try{ renderLibretoChips(); }catch(e){}
+  try{ renderLibretoBlocks(); }catch(e){ fallo('renderLibretoBlocks · index.html:13800', e); }
+  try{ renderLibretoChips(); }catch(e){ fallo('renderLibretoChips · index.html:13801', e); }
 }
 function onRemoteOpen(p){
   if(!p || p.from===sync.meId) return;
@@ -13620,7 +13834,7 @@ function onRemoteOpen(p){
   // solo cambia el RESALTADO. Reconstruir aquí le devolvería el scroll al
   // principio y le quitaría lo que tiene de libre.
   if(typeof talentFree==='function' && talentFree() && sameEp && pop2.win && !pop2.win.closed && pop2.doc){
-    try{ pop2.hl = key; renderLibretoBlocks(); renderLibretoChips(); }catch(e){}
+    try{ pop2.hl = key; renderLibretoBlocks(); renderLibretoChips(); }catch(e){ fallo('renderLibretoBlocks · index.html:13828', e); }
     return;
   }
   if(!p.force && pop2.win && !pop2.win.closed && pop2.key === key && sameEp && pop2.doc){
@@ -14881,7 +15095,7 @@ function studioWireSplit(){
       left.style.removeProperty('max-height');
     }
     try{ localStorage.setItem('ddl_st_split', String(Math.round(pct))); }catch(e){}
-    try{ stDrawWave(); }catch(e){}
+    try{ stDrawWave(); }catch(e){ fallo('stDrawWave · index.html:15089', e); }
   };
   studio.applySplit = apply;
   let on = false;
@@ -14989,7 +15203,7 @@ function studioWireStrip(){
   { const d = $('stDlg'), i = $('stDlgIn');
     if(d && i){ d.onclick = ()=> i.click();
                 i.onchange = ()=>{ if(i.files && i.files[0]) karAudioDialogos(i.files[0]); i.value=''; }; } }
-  $('stCps').onchange = (e)=>{ window._stCps = e.target.checked; try{ renderLibretoBlocks(); }catch(e){} };
+  $('stCps').onchange = (e)=>{ window._stCps = e.target.checked; try{ renderLibretoBlocks(); }catch(e){ fallo('renderLibretoBlocks · index.html:15197', e); } };
   $('stTc0').onchange = (e)=>{
     const v = studioParseTC(e.target.value);
     if(v!=null){ studioSetTc0(v); studio.cur=-1; studioTick(); stMsg('✅ TC inicial del video: '+stFmtTC(v)+' (guardado y sincronizado)'); }
@@ -15296,7 +15510,7 @@ function studioTick(){
     if(tc) tc.textContent = '⏱ '+stFmtTC(t);
   }catch(e){}
   stDrawWave();
-  try{ adrRepintar(); }catch(e){}
+  try{ adrRepintar(); }catch(e){ fallo('adrRepintar · index.html:15504', e); }
 }
 /* ═══ KARAOKE ═══ enciende el parlamento palabra por palabra al ritmo del audio.
    Se apoya en lo que ya hay: cada bloque trae su timecode (tcEff) y el audio ya
@@ -16158,7 +16372,7 @@ async function karAudioDialogos(file){
     studioSetPcm(buf);
     studio.pcmSrc = 'dialogos';
     kar.cache.clear(); kar.cur = -1; kar.wds = null;
-    try{ stDrawWave(); }catch(e){}
+    try{ stDrawWave(); }catch(e){ fallo('stDrawWave · index.html:16366', e); }
     const n = $('stDlgName');
     if(n) n.textContent = file.name;
     const el = studioEl();
@@ -16880,7 +17094,7 @@ function studioAutoMark(){
         }
       }
       cloudSaveMarks();
-      if(pop2 && pop2.doc){ try{ changed.forEach(si=> refreshBlock(si)); }catch(e){} }
+      if(pop2 && pop2.doc){ try{ changed.forEach(si=> refreshBlock(si)); }catch(e){ fallo('changed.forEach · index.html:17088', e); } }
       stMsg('✅ Marcado automático: '+added+' pausa'+(added===1?'':'s')+' colocada'+(added===1?'':'s')+' ('+pauses.length+' silencios). Con «✕ Pausa» tocas una / para borrarla.');
     }catch(e){ console.error(e); stMsg('⚠️ Error en el marcado: '+(e.message||e)); }
   }, 30);
@@ -16895,7 +17109,7 @@ function studioClearMarks(){
   }
   studio.pauses = []; stDrawWave();
   cloudSaveMarks();
-  if(pop2 && pop2.doc){ try{ script.forEach((b,i)=> refreshBlock(i)); }catch(e){} }
+  if(pop2 && pop2.doc){ try{ script.forEach((b,i)=> refreshBlock(i)); }catch(e){ fallo('script.forEach · index.html:17103', e); } }
   stMsg('🧹 Marcas de pausa eliminadas ('+n+' líneas)');
 }
 function studioMarkAtPlayhead(){
@@ -16913,7 +17127,7 @@ function studioMarkAtPlayhead(){
   else { m.pauses.push(wi); m.pauses.sort((a,b2)=>a-b2); stMsg('➕ pausa marcada tras «'+words[Math.max(0,wi-1)]+'»'); }
   if(typeof _marksDirty!=='undefined') _marksDirty.add(si);
   cloudSaveMarks();
-  if(pop2 && pop2.doc) try{ refreshBlock(si); }catch(e){}
+  if(pop2 && pop2.doc) try{ refreshBlock(si); }catch(e){ fallo('refreshBlock · index.html:17121', e); }
 }
 function studioKeyHandler(e){
   if(!studioStripOn()) return;

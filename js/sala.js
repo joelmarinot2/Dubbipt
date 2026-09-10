@@ -429,8 +429,8 @@ function salaBucle(){
   if(!SALA.on && !SALA.banda) return;
   const t = salaAhora();
   if(t != null){
-    try{ salaPintar(t); }catch(e){}
-    try{ salaBandaPintar(t); }catch(e){}
+    try{ salaPintar(t); }catch(e){ fallo('salaPintar · js\sala.js:432', e); }
+    try{ salaBandaPintar(t); }catch(e){ fallo('salaBandaPintar · js\sala.js:433', e); }
     try{ salaBeeps(t); }catch(e){}
   }
   SALA.raf = requestAnimationFrame(salaBucle);

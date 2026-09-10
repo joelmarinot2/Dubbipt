@@ -50,6 +50,6 @@ saltárselas al probar significa probar otra aplicación.
   despliegue «no haga nada», sin ningún error. Se puede automatizar: avisar si
   `index.html` cambió respecto al último commit sin que cambiara `VERSION` en
   `sw.js`. Media hora, y cierra una clase entera de error.
-- **583 de los 784 `try/catch`** del proyecto se comen el error sin decir nada.
-  Es lo que la fase 3 tiene que arreglar: hoy una función rota y una función
-  que funciona se ven exactamente igual.
+- Los `try/catch` que se comían el error sin decir nada eran 583. La fase 3 los
+  bajó a 486 y puso 97 avisos; ver [`08-fallos.md`](08-fallos.md), que además
+  trae el trinquete que impide que el número vuelva a subir.
