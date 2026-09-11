@@ -1654,7 +1654,7 @@ body.modo-casting #btnExport{ display:none !important; }
 </style>
 <style>
 /* ===== DDL UI kit: toasts, confirm modal, skeleton, progreso ===== */
-#ddlToasts{ position:fixed; top:14px; right:14px; z-index:11000; display:flex; flex-direction:column; gap:8px; max-width:340px; }
+#ddlToasts{ position:fixed; top:14px; right:14px; z-index:2147482000; display:flex; flex-direction:column; gap:8px; max-width:340px; }
 .ddl-toast{ animation:ddlToastIn .2s ease-out; background:#191c20; border:1px solid #2c3036; border-left:3px solid #4ADE80; border-radius:8px;
   padding:11px 13px; display:flex; align-items:center; gap:10px; box-shadow:0 8px 24px rgba(0,0,0,.4); font-family:'Inter',sans-serif; }
 .ddl-toast.err{ border-left-color:#F472B6; }
@@ -1664,7 +1664,7 @@ body.modo-casting #btnExport{ display:none !important; }
 .ddl-toast .act:hover{ border-color:#4ADE80; color:#fff; }
 @keyframes ddlToastIn{ from{ transform:translateY(-10px); opacity:0 } to{ transform:translateY(0); opacity:1 } }
 
-#ddlConfirmOv{ position:fixed; inset:0; z-index:11500; background:rgba(8,9,11,.7); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+#ddlConfirmOv{ position:fixed; inset:0; z-index:2147482500; background:rgba(8,9,11,.7); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
   display:flex; align-items:center; justify-content:center; padding:20px; font-family:'Inter',sans-serif; }
 .ddl-confirm{ width:min(420px,94vw); background:#15171a; border:1px solid #2c3036; border-radius:12px; padding:22px; }
 .ddl-confirm .cf-head{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
@@ -2076,7 +2076,7 @@ const DDL_UI = (function(){
   function esc_(s){ return String(s).replace(/[&<>"]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
   function toastBox(){
     let b = document.getElementById('ddlToasts');
-    if(!b){ b = document.createElement('div'); b.id='ddlToasts'; b.setAttribute('role','status'); b.setAttribute('aria-live','polite'); document.body.appendChild(b); }
+    if(!b){ b = document.createElement('div'); b.id='ddlToasts'; b.className='ddl-encima'; b.setAttribute('role','status'); b.setAttribute('aria-live','polite'); document.body.appendChild(b); }
     return b;
   }
   // toast(msg, {kind:'ok'|'err', actionLabel, onAction, duration})
@@ -2102,7 +2102,7 @@ const DDL_UI = (function(){
     cfg = cfg || {};
     return new Promise((resolve)=>{
       const old = document.getElementById('ddlConfirmOv'); if(old) old.remove();
-      const ov = document.createElement('div'); ov.id='ddlConfirmOv';
+      const ov = document.createElement('div'); ov.id='ddlConfirmOv'; ov.className='ddl-encima';
       const itemsHtml = (cfg.items||[]).map(it=>
         `<div class="cf-item"><span>${esc_(it.label)}${it.meta?`<small>· ${esc_(it.meta)}</small>`:''}</span></div>`).join('');
       ov.innerHTML = `<div class="ddl-confirm" role="alertdialog" aria-modal="true">
@@ -2177,7 +2177,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.69.1-nube';
+const APP_VER_NUM = 'v10.70.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -13916,7 +13916,20 @@ function ddlOvSync(){
     if(!document.getElementById('ddlOvCss')){
       const st = document.createElement('style');
       st.id = 'ddlOvCss';
-      st.textContent = 'body.ddlov > *:not(#trackpad):not(#libInline):not(#tabChooser):not(#syncPop):not(#openLibPrompt):not(script):not(style){display:none !important}';
+      /* La lista de excepciones va por CLASE, no solo por identificador.
+         Iba solo por identificador, y todo lo que naciera despues quedaba
+         fuera sin que nadie se enterara: los paneles de las herramientas de
+         video -sala, cues, formatos, planos- se abrian con display:none, y
+         los botones que los abren viven DENTRO del libreto, asi que no habia
+         manera de verlos nunca. Los avisos y las preguntas de confirmacion,
+         igual: se pulsaba y no pasaba nada.
+         `.modo-cap` es la clase de TODAS las ventanas modales, y
+         `.ddl-encima` la de lo que tiene que verse por encima pase lo que
+         pase. Con eso, lo que venga manana ya esta cubierto. */
+      st.textContent = 'body.ddlov > *'
+        + ':not(#trackpad):not(#libInline):not(#tabChooser):not(#syncPop):not(#openLibPrompt)'
+        + ':not(.modo-cap):not(.ddl-encima):not(script):not(style)'
+        + '{display:none !important}';
       document.head.appendChild(st);
     }
     const tp = document.getElementById('trackpad');

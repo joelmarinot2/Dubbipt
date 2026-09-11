@@ -37,6 +37,7 @@ alguien la abre sin conexión, y entonces falla sin ninguna explicación.
 | `planos.prueba.js` | Que los cambios de plano se encuentren y que los fundidos, las cámaras en mano y los parpadeos de compresión **no** se cuelen como cortes. Y que el cotejo con la voz respete el orden de las palabras. |
 | `acentos.prueba.js` | Que la clave de un personaje salga **siempre** de `norm()`, venga de donde venga. Un nombre con tilde con la clave sin normalizar da una tarjeta que se abre y un libreto en blanco, sin un solo error. |
 | `estudio.prueba.js` | Que el modo estudio se pueda encender sin haber abierto antes el libreto: el contenedor que no existe se crea y se vuelve a pedir. Vino de un informe de fallos de producción. |
+| `paneles.prueba.js` | Que los paneles de las herramientas de vídeo se vean con el libreto abierto, que es la única situación en la que se pueden abrir. Y que los avisos y las preguntas no se queden debajo de nada. |
 | `callados.prueba.js` | El trinquete: que el número de `catch` que se comen el error **no suba nunca**. |
 
 ## Cómo están hechas
@@ -80,6 +81,7 @@ comprobaron rompiendo el código a propósito, una cosa a la vez:
 | Bajar el umbral de LIB-9 de 20 tomas a 6 | Sí — 2 comprobaciones |
 | Guardar la clave del personaje sin `norm()` (LIB-N4) | Sí — 4 comprobaciones y una excepción |
 | Quitar la relectura del contenedor en el modo estudio (EST-N1) | Sí — 6 comprobaciones |
+| Quitar `.modo-cap` de las excepciones de `ddlov` (EST-N2) | Sí — 5 comprobaciones |
 
 Las **dos de los cortes** no se detectaban con las pruebas iniciales: el vídeo
 de prueba era demasiado fácil y nada superaba el suelo salvo los cortes de

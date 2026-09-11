@@ -37,6 +37,8 @@ qué dijo el director.
 |---|---|---|
 | **EST-1** | El modo estudio parte la ventana del libreto en **dos columnas**: el panel de vídeo a la izquierda y el libreto a la derecha. Al apagarlo, el libreto vuelve a ocupar todo el ancho. | ✅ |
 | **EST-2** | Se puede encender **sin haber abierto antes el libreto incrustado**: si el contenedor no existe, se crea, y se vuelve a pedir antes de usarlo. | ✅ |
+| **EST-3** | Los paneles de las herramientas —sala, cues, formatos, planos— se abren desde botones que viven **dentro** del libreto, así que siempre con `body.ddlov` puesto. Tienen que **verse igual**. La lista de excepciones de esa regla va por **clase** (`.modo-cap`, `.ddl-encima`), no por identificador. | ✅ |
+| **EST-4** | Los avisos y las preguntas de confirmación se ven **por encima de todo**, también del libreto y del trackpad. Una pregunta que no se ve es un botón que no hace nada. | ✅ |
 
 ## Reglas · cues
 
@@ -60,6 +62,7 @@ qué dijo el director.
 |---|---|
 | **SALA-N1** | Nunca dibujar por encima de la imagen algo que capture el ratón. La capa de señalización no recibe clics. | 👁 |
 | **ADR-N1** | Nunca guardar en el cue lo que ya está en el libreto. Duplicarlo garantiza que un día no coincidan. | 👁 |
+| **EST-N2** | **Nunca ampliar una lista de excepciones por identificador.** Lo que nazca después queda fuera y nadie se entera: el elemento se crea entero y se le pone `display:none`. Así estuvieron los cuatro paneles de las herramientas de vídeo — se pulsaba el botón y no pasaba nada. Se exime por clase. | ✅ |
 | **EST-N1** | **Nunca usar un nodo del DOM que se pidió antes de existir.** Una variable que se leyó en null se queda en null aunque el nodo se cree dos líneas más abajo. Pasó en `studioToggleStrip`: el primer clic del día en «modo estudio», sin el libreto abierto, se caía con «Cannot read properties of null (reading 'style')». Lo contó el informe de fallos desde producción — que es exactamente para lo que está. | ✅ |
 | **ADR-N2** | Nunca dejar el vídeo alterado al terminar un análisis o un bucle: el volumen, la velocidad y la posición se devuelven como estaban. | 👁 |
 
@@ -77,6 +80,11 @@ qué dijo el director.
   DOM de mentira: lo que se prueba no es el navegador, sino el **orden** en
   que la función pide las cosas. Quitar la relectura del contenedor pone seis
   comprobaciones en rojo.
+- **EST-3**, **EST-4** y **EST-N2**, en `pruebas/paneles.prueba.js`. No monta
+  un navegador: lee la regla de CSS que el código escribe y los overlays que el
+  código crea, y aplica la semántica de la regla a cada uno. Nada está escrito
+  dos veces, así que un panel nuevo entra solo en la prueba. Quitar `.modo-cap`
+  de las excepciones pone cinco comprobaciones en rojo.
 
 ## Sin resolver
 
