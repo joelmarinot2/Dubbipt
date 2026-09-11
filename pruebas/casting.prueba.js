@@ -193,5 +193,41 @@ exports.pruebas = function(t){
     t.eq('y un numero es su numero', conVacio[2].ints, 7);
     t.eq('una fila sin personaje se descarta',
          T.castTablaLeer([['', 'ANA', 4], ['NILA', 'ANA', 4]]).length, 1);
+
+    /* ── Escribir en el Excel: la MISMA clave que todo lo demas ────────── */
+    t.seccion('9 · el nombre se casa igual al heredar que al escribir');
+    const C = montar(
+      [['function castNorm(t){', 'async function castRegCargar(showId){'],
+       ['/* Nombre de personaje normalizado', '/** Del nombre de la hoja al archivo XML']],
+      ['castClave', 'castNorm'], {}
+    );
+    /* Cada par es un personaje escrito de dos maneras: como lo trae el libreto
+       y como lo trae el Excel de la empresa. Con la clave floja de antes -solo
+       mayusculas y espacios- ninguno casaba, y la celda del Excel se quedaba
+       vacia sin un aviso. */
+    const PARES = [
+      ["AMAR'S MALE GANG MEMBER 1", 'AMAR’S MALE GANG MEMBER 1', 'la comilla curva y la recta'],
+      ['PÚBLICO',                   'PUBLICO',                        'una tilde de diferencia'],
+      ['NIÑO',                      'NINO',                           'la eñe'],
+      ['DR. KIM',                   'DR KIM',                         'el punto de la abreviatura'],
+      ['MALE POACHER  1',           'MALE POACHER 1',                 'dos espacios en vez de uno'],
+      ['maid 2',                    'MAID 2',                         'minúsculas']
+    ];
+    for(const [a, b, por] of PARES)
+      t.eq(por + ': «' + a + '» = «' + b + '»', C.castClave(a), C.castClave(b),
+           'si no casan, el talento no se escribe en ninguna parte y la celda sale vacía');
+
+    t.eq('y es exactamente la misma clave que usa la herencia',
+         C.castClave("AMAR'S MALE GANG MEMBER 1"), C.castNorm("AMAR'S MALE GANG MEMBER 1"),
+         'dos normalizadores para el mismo trabajo es lo que dejó a PÚBLICO sin parlamentos');
+
+    t.seccion('10 · dos personajes distintos siguen siendo distintos');
+    t.ok('MALE POACHER 1 no es MALE POACHER 2',
+         C.castClave('MALE POACHER 1') !== C.castClave('MALE POACHER 2'));
+    t.ok('MAID 1 no es MAID 2', C.castClave('MAID 1') !== C.castClave('MAID 2'));
+    t.ok('PERNURU MAN 1 no es PERNURU WOMAN 1',
+         C.castClave('PERNURU MAN 1') !== C.castClave('PERNURU WOMAN 1'));
+    t.ok('un nombre vacío no casa con otro vacío por accidente',
+         C.castClave('') === '' && C.castClave('   ') === '');
   });
 };

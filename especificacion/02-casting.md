@@ -49,6 +49,9 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **CAST-24** | Un **choque** es el mismo actor haciendo dos personajes que hablan a menos de **4 líneas** de distancia. Se mide en líneas del libreto, no en páginas: dos personajes pueden compartir página y estar a treinta líneas, o estar en páginas distintas y hablar seguidos. | 👁 |
 | **CAST-25** | Un choque avisa y pinta las dos tarjetas en **rojo**. Un aviso por pareja, no por línea. | 👁 |
 
+| **CAST-26** | Al escribir el desglose, el nombre del personaje se casa con la fila del Excel usando **la misma clave** que la herencia (`castNorm`): sin tildes, sin apostrofos, sin puntos. | ✅ |
+| **CAST-27** | Cada celda de la columna del actor que se quede **en blanco** se dice, y se dice **por qué**: o el personaje es de solo gestos sin verificar, o no tiene talento asignado. Las dos cosas se ven igual en el Excel y no se arreglan igual. | ✅ |
+
 ## Nunca
 
 | | |
@@ -56,6 +59,7 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **CAST-N1** | **Nunca se pisa un talento que haya escrito una persona.** Ni la herencia, ni la tabla previa, ni el puente con DublajeCast. Solo se rellenan casillas vacías. | ✅ |
 | **CAST-N2** | Nunca se reparte talento solo a un personaje de «solo gestos» sin verificar — ni por herencia del programa ni por tabla previa. Los extras (`MALE SOLDIER`, `FEMALE OWNER`) repiten nombre sin ser la misma persona. Se dice a quién se saltó y por qué. | ✅ |
 | **CAST-N3** | Nunca se adivina una coincidencia dudosa. Se pregunta. | ✅ |
+| **CAST-N5** | **Nunca tener dos normalizadores de nombre para el mismo trabajo.** `castClave` era más floja que `castNorm` —solo mayúsculas y espacios— y al escribir el Excel no encontraba la fila de `AMAR’S MALE GANG MEMBER 1` ni la de un nombre con tilde. El talento estaba puesto en la tarjeta y la celda salía vacía, sin un aviso. Es la misma trampa que dejó a `PÚBLICO` sin parlamentos. | ✅ |
 | **CAST-N4** | Nunca se borra un personaje con ≥ 15 intervenciones o con talento asignado sin confirmación explícita. | 👁 |
 
 ## Cómo se demuestra
@@ -67,6 +71,11 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
   de un protagonista cambiada, cazada en menos de un segundo.
 - **CAST-10** y **CAST-11**: la lectura de la tabla previa, incluido el caso
   que ya falló —un talento llamado `ACTOR A` que hacía perder la primera fila—.
+- **CAST-26** y **CAST-N5**: en `pruebas/casting.prueba.js`, con los pares de
+  nombres que fallaban de verdad —la comilla curva contra la recta, la tilde, la
+  eñe, el punto de la abreviatura— y comprobando además que dos personajes
+  distintos (`MAID 1` y `MAID 2`) siguen siendo distintos. Devolver la clave
+  floja pone cinco comprobaciones en rojo.
 - **CAST-15 a CAST-17** y **CAST-21 a CAST-23**: `pruebas/gestos.prueba.js` y
   `pruebas/ocupacion.prueba.js`.
 - El resto, a mano: abrir el 101 de un programa, repartir, abrir el 102 y

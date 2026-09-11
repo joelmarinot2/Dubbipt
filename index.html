@@ -2177,7 +2177,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.70.0-nube';
+const APP_VER_NUM = 'v10.71.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5891,9 +5891,18 @@ function castEsc(t){
   return String(t == null ? '' : t)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-/** Nombre de personaje normalizado, para casar el libreto con el Excel. */
+/* Nombre de personaje normalizado, para casar el libreto con el Excel.
+ *
+ * Es EXACTAMENTE el mismo `castNorm` que usa la herencia de talentos. Antes era
+ * mas flojo -solo mayusculas y espacios- y ahi se perdian filas: el libreto
+ * escribe AMAR’S con la comilla curva y el Excel AMAR'S con la recta, o el
+ * libreto trae una tilde que el Excel no. La fila no se encontraba, el talento
+ * no se escribia en ninguna parte, y en el Excel quedaba una celda en blanco.
+ *
+ * Dos normalizadores para el mismo trabajo es la misma trampa que dejo a
+ * PUBLICO sin parlamentos (LIB-N4). Aqui hay UNO. */
 function castClave(t){
-  return String(t == null ? '' : t).replace(/\s+/g,' ').trim().toUpperCase();
+  return castNorm(t);
 }
 
 /** Del nombre de la hoja al archivo XML que la contiene dentro del ZIP. */
@@ -5993,12 +6002,20 @@ function castRellenar(buf, asign, meta){
   const personajes = castLeerColumna(xml, CAST_COL_PERSONAJE);
   const valores = {};
   const vistos = new Set();
+  /* Las filas del Excel que se van a quedar EN BLANCO. Es la queja que llego:
+     el desglose sale con la mitad de la columna vacia y la aplicacion no dice
+     ni una palabra. Una celda vacia puede ser dos cosas muy distintas -no hay
+     talento asignado, o lo hay y no se encontro la fila- y hasta ahora las dos
+     se veian igual. */
+  const enBlanco = [];
   for(const fila in personajes){
     const k = castClave(personajes[fila]);
     if(!k) continue;
     if(Object.prototype.hasOwnProperty.call(asign, k)){
       valores[+fila] = asign[k];
       vistos.add(k);
+    }else{
+      enBlanco.push(String(personajes[fila]).trim());
     }
   }
   const sinCasar = Object.keys(asign).filter(k => !vistos.has(k));
@@ -6010,7 +6027,8 @@ function castRellenar(buf, asign, meta){
   arch[ruta] = new TextEncoder().encode(xmlFinal);
   castForzarRecalculo(arch);   // que las demás hojas se enteren del cambio
   return { datos: fflate.zipSync(arch, { level: 6 }), puestos: r.puestos,
-           sinCasar: sinCasar, enExcel: Object.keys(personajes).length, cabecera: cabecera };
+           sinCasar: sinCasar, enBlanco: enBlanco,
+           enExcel: Object.keys(personajes).length, cabecera: cabecera };
 }
 
 /** Catálogo de talentos de la hoja TALENTOS, para autocompletar. */
@@ -8058,6 +8076,27 @@ async function castDescargar(){
            + (r.sinCasar.length > 6 ? ' y ' + (r.sinCasar.length-6) + ' más' : '');
     }
     castAviso(msg);
+    /* Y las celdas que se quedan VACÍAS, que era la queja: el desglose salía a
+       medias sin una palabra. Se separan los que están así a propósito —solo
+       gestos, pendientes de verificar— de los que sencillamente no tienen
+       talento puesto, porque la acción a tomar no es la misma. */
+    if(r.enBlanco.length){
+      const gesto = [], sinTal = [];
+      for(const nombre of r.enBlanco){
+        const k = castClave(nombre);
+        const c = Object.keys(charIdx).find(x => castClave(charIdx[x].display || x) === k);
+        let esGesto = false;
+        try{ esGesto = !!(c && gestPendiente(c)); }catch(e){}
+        (esGesto ? gesto : sinTal).push(nombre);
+      }
+      const trozos = [];
+      if(gesto.length) trozos.push('🎭 ' + gesto.length + ' por solo gestos sin verificar ('
+        + gesto.slice(0,4).join(', ') + (gesto.length>4 ? '…' : '') + ')');
+      if(sinTal.length) trozos.push('✎ ' + sinTal.length + ' sin talento asignado ('
+        + sinTal.slice(0,6).join(', ') + (sinTal.length>6 ? '…' : '') + ')');
+      castAviso('⚠️ ' + r.enBlanco.length + ' celda' + (r.enBlanco.length===1?'':'s')
+        + ' del Excel se quedan en blanco · ' + trozos.join(' · '));
+    }
   }catch(e){
     castAviso('❌ No se pudo generar el desglose: ' + (e.message || e));
   }finally{

@@ -82,6 +82,7 @@ comprobaron rompiendo el código a propósito, una cosa a la vez:
 | Guardar la clave del personaje sin `norm()` (LIB-N4) | Sí — 4 comprobaciones y una excepción |
 | Quitar la relectura del contenedor en el modo estudio (EST-N1) | Sí — 6 comprobaciones |
 | Quitar `.modo-cap` de las excepciones de `ddlov` (EST-N2) | Sí — 5 comprobaciones |
+| Devolver la clave floja de `castClave` (CAST-N5) | Sí — 5 comprobaciones |
 
 Las **dos de los cortes** no se detectaban con las pruebas iniciales: el vídeo
 de prueba era demasiado fácil y nada superaba el suelo salvo los cortes de
