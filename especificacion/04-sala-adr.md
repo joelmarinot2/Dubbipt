@@ -26,7 +26,9 @@ qué dijo el director.
 |---|---|---|
 | **BAN-1** | El texto se desplaza **de derecha a izquierda** contra una línea de sincronía fija, y cada palabra la cruza en su instante. | 👁 |
 | **BAN-2** | La línea se puede colocar (por defecto al **32 %** del ancho) y engrosar. | 👁 |
-| **BAN-3** | El cuerpo de letra **se encoge** para que la frase quepa en el tiempo que tiene. Es lo que permite leerla montada sobre la boca. | 👁 |
+| **BAN-3** | Cada palabra se **estrecha** para caber en el hueco que va hasta la siguiente. El **cuerpo de letra no cambia** de una palabra a otra —eso se lee fatal—: lo que cambia es el ancho, como en una banda rítmica de verdad, donde las letras se aprietan con la velocidad del habla. Suelo de legibilidad: el 25 %. | ✅ |
+| **BAN-7** | **Ninguna palabra se pisa con la de al lado, y ninguna deja de entrar en su instante.** Son las dos cosas a la vez, y era fácil cumplir solo una: dibujadas todas del mismo ancho desde su instante, una palabra larga dicha deprisa se comía a la siguiente («Peescaparon», «cuandpudieron», vistas en sala). | ✅ |
+| **BAN-8** | Las palabras se reparten sobre la ventana del **cue**, no sobre la del libreto a secas —igual que **SALA-9**—. Si no, una entrada corregida a mano mueve la banda de color del personaje y deja su texto repartido sobre el sitio viejo. | 👁 |
 | **BAN-4** | Un **carril por personaje**. Si dos hablan solapados —y en un diálogo se solapan constantemente— cada uno va por su altura. Un personaje conserva su carril mientras no se pise consigo mismo. | 👁 |
 | **BAN-5** | Los tiempos de palabra salen del mismo reparto que el karaoke, incluido el afinado con IA cuando está puesto. | 👁 |
 | **BAN-6** | Si el reparto de palabras devuelve un `NaN`, se **descarta el reparto entero** y se pinta la frase sin palabras sueltas. Un `NaN` vaciaba la banda completa sin decir nada. | 👁 |
@@ -88,13 +90,18 @@ qué dijo el director.
 
 ## Sin resolver
 
+- **BAN-3** y **BAN-7**, en `pruebas/banda.prueba.js`, con un canvas de mentira
+  que apunta cada trazo con su posición y su ancho ya escalado. La geometría es
+  exacta porque el ancho de un carácter se fija en la prueba. Se comprueba el
+  caso que llegó de sala: ninguna palabra se pisa **y** cada una sigue cruzando
+  la línea en su instante. Quitar el estrechado pone dos comprobaciones en rojo.
 - **SALA-5**, los beeps, **no se han oído nunca en una prueba**. La lógica que
   decide cuándo suenan está escrita y revisada, pero nadie ha comprobado con un
   cronómetro que caen a −3, −2 y −1 s. Es lo primero que hay que verificar en
   sala.
-- Nada de la señalización tiene prueba automática. Se podría: `salaPintar` y
-  `salaBandaPintar` dibujan en un canvas, y en Node se puede usar un canvas de
-  mentira que apunte las llamadas. Con eso se cerrarían **SALA-1** a **SALA-4**
-  y **BAN-1** a **BAN-4**.
+- El canvas de mentira ya existe (`pruebas/banda.prueba.js`) y cerró **BAN-3** y
+  **BAN-7**. Con él se pueden cerrar también **SALA-1** a **SALA-4** y **BAN-1**,
+  **BAN-2** y **BAN-4**, que siguen abiertas: es medir posiciones, y la máquina
+  para medirlas ya está escrita.
 - La captura de fotogramas del vídeo real (`drawImage` sobre el `<video>`) no
   se ha podido comprobar: hace falta una ventana que se esté pintando.

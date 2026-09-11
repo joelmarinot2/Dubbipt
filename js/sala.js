@@ -28,9 +28,10 @@
    · TEXTO · el parlamento sobre la imagen, con el color del personaje.
 
    Y aparte, la BANDA RÍTMICA: la tira de texto que se desplaza bajo la imagen
-   contra una línea fija. Cada palabra cruza esa línea en su instante, y el
-   tamaño de la letra se ajusta al tiempo que tiene esa frase — que es lo que
-   hace que se pueda leer «montado» sobre la boca. El karaoke enciende palabras
+   contra una línea fija. Cada palabra cruza esa línea en su instante, y se
+   aprieta o se ensancha para caber en el tiempo que tiene — que es lo que hace
+   que se pueda leer «montado» sobre la boca. El cuerpo de letra no cambia de
+   una palabra a otra: lo que cambia es el ancho. El karaoke enciende palabras
    en su sitio; la banda las mueve. Son cosas distintas y se usan a la vez.
 
    Todo se apoya en lo que ya hay: los timecodes del libreto (tcEff), el
@@ -295,7 +296,16 @@ function salaPalabras(si){
   const b = script[si]; if(!b) return null;
   const pal = (b.lines || []).join(' ').split(/\s+/).filter(Boolean);
   if(!pal.length) return null;
-  const ven = karVentana(si); if(!ven) return null;
+  /* La ventana es la del CUE, igual que en salaCues. Aquí se usaba karVentana
+     a secas, o sea el libreto sin corregir: si alguien movía la entrada a mano
+     o la pegaba a un corte de plano, la banda de color del personaje iba al
+     sitio nuevo y sus PALABRAS se quedaban repartidas sobre el viejo. El
+     personaje aparecía donde toca y su texto llegaba a destiempo. */
+  let ven = null;
+  const a0 = (typeof adrDe === 'function') ? adrDe(si) : null;
+  if(a0 && a0.tc0 != null && a0.tc1 != null && a0.tc1 > a0.tc0) ven = [a0.tc0, a0.tc1];
+  else ven = karVentana(si);
+  if(!ven) return null;
   const ia = (typeof karIa !== 'undefined' && karIa.on && karIa.marcas.get(si)) || null;
   let tr = null;
   if(ia && ia.length === pal.length) tr = ia;
@@ -379,24 +389,44 @@ function salaBandaPintar(t){
               x0 + 6 * dpr, y0 + altoCar * 0.15, Math.min(12 * dpr, altoCar * 0.22), c.color);
 
     const pal = salaPalabrasCache(c.si);
-    // el cuerpo se ajusta al tiempo que tiene la frase: es lo que permite
-    // leerla montada sobre la boca en vez de ir a destiempo
-    let px = base;
-    if(pal){
-      g.font = '700 ' + base + 'px Inter, system-ui, sans-serif';
-      let ancho = 0;
-      for(const w2 of pal) ancho += g.measureText(w2.p + ' ').width;
-      const hueco = Math.max(1, x1 - x0);
-      if(ancho > hueco) px = Math.max(9 * dpr, base * (hueco / ancho));
-    }
+    const px = base;
     const y = y0 + altoCar * 0.58;
     if(pal){
-      for(const w2 of pal){
+      /* Cada palabra empieza EN SU INSTANTE y se estrecha para caber en el
+         hueco que va hasta la siguiente. Es lo que hace una banda rítmica de
+         verdad: las letras se aprietan y se estiran con la velocidad del habla.
+         Así se cumplen las dos cosas a la vez —cada palabra entra a tiempo y
+         ninguna se pisa con la de al lado—, que antes eran incompatibles: se
+         dibujaban todas del mismo tamaño desde su instante, y una palabra larga
+         dicha deprisa se comía a la siguiente. En la captura se leía
+         «Peescaparon» y «cuandpudieron».
+         El tamaño del cuerpo NO se toca por palabra: cambiarlo de una a otra se
+         lee fatal. Lo que cambia es el ancho. */
+      g.font = '700 ' + px + 'px Inter, system-ui, sans-serif';
+      for(let i2 = 0; i2 < pal.length; i2++){
+        const w2 = pal[i2];
         const wx = xLinea + (w2.t0 - t) * pps;
-        if(wx > W + 40 * dpr || wx < -140 * dpr) continue;
+        if(wx > W + 40 * dpr || wx < -W - 40 * dpr) continue;
+        // el hueco de ESTA palabra: hasta que entra la siguiente, nunca más
+        const sig = pal[i2 + 1];
+        const finW = sig ? Math.min(w2.t1, sig.t0) : w2.t1;
+        const hueco = Math.max(4 * dpr, (finW - w2.t0) * pps);
+        const ancho = g.measureText(w2.p + ' ').width;
+        // 0,25 es el suelo: por debajo la palabra ya no se lee, y una palabra
+        // ilegible en su sitio sigue siendo mejor que dos superpuestas
+        const k = Math.max(0.25, Math.min(1, hueco / Math.max(1, ancho)));
         const dicha = t >= w2.t0;
         const ahora = t >= w2.t0 && t < w2.t1;
-        salaTexto(g, w2.p, wx, y, px, ahora ? '#FFE066' : (dicha ? c.color : '#E7EBF3'));
+        const color = ahora ? '#FFE066' : (dicha ? c.color : '#E7EBF3');
+        if(k >= 0.995){
+          salaTexto(g, w2.p, wx, y, px, color);
+        }else{
+          g.save();
+          g.translate(wx, y); g.scale(k, 1);
+          salaTexto(g, w2.p, 0, 0, px, color);
+          g.restore();
+          g.font = '700 ' + px + 'px Inter, system-ui, sans-serif';   // salaTexto la cambia
+        }
       }
     }else{
       salaTexto(g, c.texto, x0 + 6 * dpr, y, px * 0.8, '#E7EBF3');
