@@ -31,6 +31,13 @@ qué dijo el director.
 | **BAN-5** | Los tiempos de palabra salen del mismo reparto que el karaoke, incluido el afinado con IA cuando está puesto. | 👁 |
 | **BAN-6** | Si el reparto de palabras devuelve un `NaN`, se **descarta el reparto entero** y se pinta la frase sin palabras sueltas. Un `NaN` vaciaba la banda completa sin decir nada. | 👁 |
 
+## Reglas · modo estudio
+
+| | Regla | |
+|---|---|---|
+| **EST-1** | El modo estudio parte la ventana del libreto en **dos columnas**: el panel de vídeo a la izquierda y el libreto a la derecha. Al apagarlo, el libreto vuelve a ocupar todo el ancho. | ✅ |
+| **EST-2** | Se puede encender **sin haber abierto antes el libreto incrustado**: si el contenedor no existe, se crea, y se vuelve a pedir antes de usarlo. | ✅ |
+
 ## Reglas · cues
 
 | | Regla | |
@@ -53,6 +60,7 @@ qué dijo el director.
 |---|---|
 | **SALA-N1** | Nunca dibujar por encima de la imagen algo que capture el ratón. La capa de señalización no recibe clics. | 👁 |
 | **ADR-N1** | Nunca guardar en el cue lo que ya está en el libreto. Duplicarlo garantiza que un día no coincidan. | 👁 |
+| **EST-N1** | **Nunca usar un nodo del DOM que se pidió antes de existir.** Una variable que se leyó en null se queda en null aunque el nodo se cree dos líneas más abajo. Pasó en `studioToggleStrip`: el primer clic del día en «modo estudio», sin el libreto abierto, se caía con «Cannot read properties of null (reading 'style')». Lo contó el informe de fallos desde producción — que es exactamente para lo que está. | ✅ |
 | **ADR-N2** | Nunca dejar el vídeo alterado al terminar un análisis o un bucle: el volumen, la velocidad y la posición se devuelven como estaban. | 👁 |
 
 ## Cómo se demuestra
@@ -65,6 +73,10 @@ qué dijo el director.
 - Los carriles: tres personajes solapados salen en 0, 1 y 2, y el primero
   recupera su carril al volver.
 - Los cues, a mano: recorrer el ciclo de estados y ver subir el take.
+- **EST-1**, **EST-2** y **EST-N1**, en `pruebas/estudio.prueba.js`, con un
+  DOM de mentira: lo que se prueba no es el navegador, sino el **orden** en
+  que la función pide las cosas. Quitar la relectura del contenedor pone seis
+  comprobaciones en rojo.
 
 ## Sin resolver
 

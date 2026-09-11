@@ -2177,7 +2177,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.69.0-nube';
+const APP_VER_NUM = 'v10.69.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -15352,10 +15352,21 @@ function studioPlayPause(){
 }
 function studioToggleStrip(){
   if(!currentEp){ libMsg('Abre primero un capítulo'); return; }
-  const host = $('libInline');
-  if(!host || host.style.display==='none' || !pop2.doc){ try{ openLibretoInline(pop2.key||null); }catch(e){} }
+  /* `libInline` puede NO existir todavia: la primera vez que se entra en modo
+     estudio sin haber abierto antes el libreto incrustado, hay que crearlo. Y
+     entonces hay que VOLVER A PEDIRLO, porque el de arriba se leyo antes de que
+     existiera y se queda en null para siempre. Asi fue como un clic en «modo
+     estudio» reventaba con «Cannot read properties of null»: el panel se creaba
+     bien, `stLeft` pasaba la guarda, y el que faltaba era el contenedor. */
+  let host = $('libInline');
+  if(!host || host.style.display==='none' || !pop2.doc){
+    try{ openLibretoInline(pop2.key||null); }
+    catch(e){ fallo('openLibretoInline · index.html:15361', e, 'no se pudo abrir el libreto'); }
+    host = $('libInline');
+  }
   studioEnsureStrip();
   const left = $('stLeft'); if(!left) return;
+  if(!host){ libMsg('No se pudo abrir el libreto para el modo estudio'); return; }
   const show = left.style.display==='none';
   // cambio de capítulo: soltar el medio del anterior
   if(show && studio.epId && studio.epId!==currentEp.id){
