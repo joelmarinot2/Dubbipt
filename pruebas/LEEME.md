@@ -35,6 +35,7 @@ alguien la abre sin conexión, y entonces falla sin ninguna explicación.
 | `gestos.prueba.js` | Que a un extra que en este capítulo solo reacciona no se le herede el actor del anterior. Y, sobre todo, que no se marque como «solo gestos» a alguien que sí habla. |
 | `ocupacion.prueba.js` | Que «X», «ORIGINAL», «X ORIGINAL» y «TODOS» no cuenten como carga de ningún actor, y que un actor que se llame «MÁXIMO» u «ORIGINALES DE LA TORRE» no desaparezca por parecerse. |
 | `planos.prueba.js` | Que los cambios de plano se encuentren y que los fundidos, las cámaras en mano y los parpadeos de compresión **no** se cuelen como cortes. Y que el cotejo con la voz respete el orden de las palabras. |
+| `acentos.prueba.js` | Que la clave de un personaje salga **siempre** de `norm()`, venga de donde venga. Un nombre con tilde con la clave sin normalizar da una tarjeta que se abre y un libreto en blanco, sin un solo error. |
 | `callados.prueba.js` | El trinquete: que el número de `catch` que se comen el error **no suba nunca**. |
 
 ## Cómo están hechas
@@ -76,6 +77,7 @@ comprobaron rompiendo el código a propósito, una cosa a la vez:
 | Volver a poner la expresión codiciosa del Excel | Sí — 3 comprobaciones |
 | Quitar la guarda de LIB-N1 (no borrar un libreto de la nube) | Sí — 1 comprobación |
 | Bajar el umbral de LIB-9 de 20 tomas a 6 | Sí — 2 comprobaciones |
+| Guardar la clave del personaje sin `norm()` (LIB-N4) | Sí — 4 comprobaciones y una excepción |
 
 Las **dos de los cortes** no se detectaban con las pruebas iniciales: el vídeo
 de prueba era demasiado fácil y nada superaba el suelo salvo los cortes de

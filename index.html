@@ -2177,7 +2177,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.68.0-nube';
+const APP_VER_NUM = 'v10.69.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3660,15 +3660,25 @@ function desgloseByRules(){
     if(esNombre){
       const ints = contarIntervenciones(dial);
       if(ints>0){
-        if(!byName[name]){ byName[name] = { key:name, firstTC:tc, pages:{} }; order.push(name); }
-        byName[name].pages[page] = (byName[name].pages[page]||0) + ints;
+        /* La clave va NORMALIZADA, igual que en todos los demás caminos.
+           Aquí se guardaba el nombre crudo del PDF mientras las marcas del
+           libreto se guardan con norm(): PÚBLICO de un lado, PUBLICO del otro.
+           Cualquier nombre con tilde o eñe -PÚBLICO, ANDRÉS, NIÑO- se quedaba
+           sin un solo parlamento y sin ningún error: la tarjeta existía y su
+           libreto salía en blanco. El nombre con sus tildes se guarda aparte,
+           que es el que se enseña. */
+        const nk = norm(name);
+        if(nk){
+          if(!byName[nk]){ byName[nk] = { key:nk, display:name, firstTC:tc, pages:{} }; order.push(nk); }
+          byName[nk].pages[page] = (byName[nk].pages[page]||0) + ints;
+        }
       }
     }
     i = k;
   }
   if(!order.length) return false;
   chars = order.map(nm=>{ const c=byName[nm];
-    return { key:c.key, display:c.key, talent:'',
+    return { key:c.key, display:c.display || c.key, talent:'',
       pages:Object.keys(c.pages).map(p=>({p:+p, ints:c.pages[p]})).sort((a,b)=>a.p-b.p),
       totalInts:Object.values(c.pages).reduce((s,x)=>s+x,0),
       firstTC:c.firstTC, color:charColor(c.key), noRec:NO_REC.has(c.key) };
@@ -12075,7 +12085,10 @@ async function reanalizarGuion(btn){
    renglones del PDF contienen ese nombre. Un botón lo copia entero, para poder
    pegarlo sin pasar por la consola del navegador. */
 function libDiagData(key){
-  const flat = (k)=> String(k||'').replace(/[^A-Z0-9]/g,'');
+  /* Se compara sobre el nombre YA normalizado. Sin esto, la Ú de PÚBLICO no
+     se doblaba a U: se caía entera, y el diagnóstico enseñaba «PBLICO» y «0
+     marcas», mandando a buscar un fallo de lectura del PDF que no existía. */
+  const flat = (k)=> latFold(norm(k)).replace(/[^A-Z0-9]/g,'');
   const objetivo = flat(key);
   const clavesBloques = [...new Set((script||[]).map(b=>b.key).filter(Boolean))];
   const casi = clavesBloques.filter(k=> flat(k).includes(objetivo) || objetivo.includes(flat(k)));
@@ -12127,7 +12140,7 @@ function libDiagHtml(key){
   // procesada que se guardó del capítulo. Decirlo cambia la accion a tomar.
   const deCopia = !(typeof pageData!=='undefined' && pageData && Object.keys(pageData).length);
   const sinParlamentos = Object.keys(charIdx||{}).filter(k=>{
-    const f=(x)=>String(x||'').replace(/[^A-Z0-9]/g,'');
+    const f=(x)=>latFold(norm(x)).replace(/[^A-Z0-9]/g,'');
     return !(script||[]).some(b=> b.key && f(b.key)===f(k));
   });
   return '<div class="ldiag" id="lDiag">'
