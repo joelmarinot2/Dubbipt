@@ -79,6 +79,27 @@ header p{font-size:13px;color:var(--ink-dim);margin-top:2px}
 .card:hover{transform:translateY(-2px);border-color:var(--violet);box-shadow:0 8px 24px rgba(0,0,0,.35)}
 .card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--cc,#5FC85A)}
 .card.done{opacity:.72}
+/* ═══ Pestañas de reparto ═══
+   Por repartir · Personajes completados · Todos. Solo en casting: en grabación
+   «completado» significa otra cosa y las tarjetas no sobran. */
+#filtrow{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+#filtrow .fchip{display:inline-flex;align-items:center;gap:7px;background:var(--panel);
+  border:1px solid var(--line-soft);border-radius:999px;padding:7px 14px;cursor:pointer;
+  color:var(--dim);font-family:'Inter',sans-serif;font-size:13px;font-weight:600;
+  transition:border-color .12s,color .12s,background .12s}
+#filtrow .fchip:hover{border-color:var(--violet);color:var(--ink)}
+#filtrow .fchip.on{background:rgba(34,197,94,.12);border-color:#22C55E;color:#4ADE80}
+#filtrow .fchip .fnum{font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:700;
+  background:rgba(255,255,255,.07);border-radius:999px;padding:1px 7px;min-width:20px;text-align:center}
+#filtrow .fchip.on .fnum{background:rgba(34,197,94,.22);color:#4ADE80}
+/* Un personaje ya cerrado: el borde verde dice que no espera nada de nadie. */
+body.modo-casting .card.listo{border-color:rgba(34,197,94,.45)}
+body.modo-casting .card.listo .tal b{color:#4ADE80}
+/* Al verificar, la tarjeta se apaga y se encoge antes de irse a su pestaña.
+   Ver ADÓNDE se fue es la diferencia entre «ya está» y «¿se ha borrado?». */
+.card.saliendo{opacity:0;transform:scale(.94);pointer-events:none;
+  transition:opacity .24s ease,transform .24s ease}
+@media (prefers-reduced-motion:reduce){ .card.saliendo{transition:none} }
 .card .top{display:flex;align-items:baseline;gap:8px;margin-bottom:3px}
 .card h3{font-family:var(--disp);font-weight:600;font-size:15.5px;color:var(--cc,#5FC85A)}
 .card .n{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--ink-faint);flex:none}
@@ -2180,7 +2201,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.73.0-nube';
+const APP_VER_NUM = 'v10.74.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4914,7 +4935,70 @@ function updateEpLine(){
 }
 function isCharDone(c){ const r=recSet(c.key); return c.pages.length>0 && c.pages.every(pg=>r.has(pg.p)); }
 
-window._cardFilter = window._cardFilter || 'all';
+/* ═══ PERSONAJES COMPLETADOS ══════════════════════════════════════════════
+
+   Repartir un capítulo de sesenta personajes es ir tachando. Con todas las
+   tarjetas siempre a la vista, cada vez que buscas al siguiente sin repartir
+   vuelves a barrer los cuarenta que ya están hechos. Así que en cuanto uno
+   queda cerrado, se va: pasa a su pestaña y deja de estorbar.
+
+   Un personaje está COMPLETADO cuando su reparto ya no espera nada de nadie:
+   tiene talento, ese talento no está pendiente de verificar -si vino heredado
+   de otro capítulo, alguien lo ha dado por bueno- y si solo hace gestos,
+   también se ha mirado. Es justo lo que hace el botón «✓ verificar».
+
+   Solo en modo casting. En grabación, «completado» ya significa otra cosa
+   -todas sus páginas grabadas- y mezclar las dos sería un lío. */
+function castCompletado(c, gestM){
+  if(typeof DDL_MODO === 'undefined' || DDL_MODO !== 'casting') return false;
+  if(!c || !(c.talent && String(c.talent).trim())) return false;
+  if(c.heredado) return false;                     // naranja: todavía sin dar por bueno
+  try{ if(gestPendiente(c.key, gestM)) return false; }catch(e){ /* sin gestos: no estorba */ }
+  return true;
+}
+
+/** Cuántos hay de cada cosa, para los números de las pestañas. */
+function castCuentas(){
+  let gestM = null;
+  try{ gestM = gestMapa(); }catch(e){ /* sin libreto no hay gestos que mirar */ }
+  let ok = 0, pend = 0;
+  for(const c of chars){ if(castCompletado(c, gestM)) ok++; else pend++; }
+  return { ok: ok, pend: pend, total: chars.length };
+}
+
+/** Las pestañas. Solo tienen sentido repartiendo. */
+function castPintarPestanas(){
+  const fila = document.getElementById('filtrow');
+  if(!fila) return;
+  const cast = (typeof DDL_MODO !== 'undefined' && DDL_MODO === 'casting');
+  if(!cast || !chars.length){ fila.style.display = 'none'; fila.innerHTML = ''; return; }
+  const n = castCuentas();
+  const chip = (f, txt, num) =>
+    '<button class="fchip' + (window._cardFilter === f ? ' on' : '') + '" data-f="' + f + '">'
+    + txt + '<span class="fnum">' + num + '</span></button>';
+  fila.style.display = 'flex';
+  fila.innerHTML = chip('pend', 'Por repartir', n.pend)
+                 + chip('ok', 'Personajes completados', n.ok)
+                 + chip('all', 'Todos', n.total);
+  fila.querySelectorAll('.fchip').forEach(b => b.addEventListener('click', () => {
+    window._cardFilter = b.dataset.f;
+    try{ localStorage.setItem('ddl_card_filter', b.dataset.f); }catch(e){ /* no se recuerda, nada mas */ }
+    renderCards();
+  }));
+}
+
+/* Al verificar, la tarjeta no desaparece de golpe: se apaga y se encoge.
+   Ver ADÓNDE se fue lo que acabas de tocar es la diferencia entre «ya está» y
+   «¿se ha borrado?». */
+function castSalirTarjeta(key, despues){
+  const card = document.querySelector('.card[data-key="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]');
+  if(!card || window._cardFilter === 'all' || window._cardFilter === 'ok'){ despues(); return; }
+  card.classList.add('saliendo');
+  setTimeout(despues, 260);
+}
+
+window._cardFilter = window._cardFilter || 'pend';
+try{ window._cardFilter = localStorage.getItem('ddl_card_filter') || window._cardFilter; }catch(e){ /* el de por defecto */ }
 let _choqueMapa = null;
 function renderCards(){
   // se calcula una sola vez por repintado: por tarjeta seria O(n²)
@@ -4924,12 +5008,22 @@ function renderCards(){
   try{ _gestM = (typeof DDL_MODO !== 'undefined' && DDL_MODO === 'casting') ? gestMapa() : null; }
   catch(e){ _gestM = null; }
   const q = norm($('search').value||'');
+  const enCasting = (typeof DDL_MODO !== 'undefined' && DDL_MODO === 'casting');
   const box = $('cards'); box.innerHTML='';
   let shown=0;
   for(const c of sortedChars()){
     if(q && !c.key.includes(q) && !norm(c.talent).includes(q)) continue;
     if(window._cardFilter==='unassigned' && c.talent) continue;
     if(window._cardFilter==='assigned' && !c.talent) continue;
+    /* Los ya cerrados se van a su pestaña. En grabación NO se filtra: allí
+       «completado» significa otra cosa, las pestañas ni se enseñan, y si el
+       filtro siguiera puesto de la última vez la vista saldría vacía sin que
+       hubiera manera de arreglarlo. */
+    const listo = castCompletado(c, _gestM);
+    if(enCasting){
+      if(window._cardFilter==='pend' && listo) continue;
+      if(window._cardFilter==='ok' && !listo) continue;
+    }
     shown++;
     const rec = recSet(c.key);
     const done = isCharDone(c);
@@ -4938,7 +5032,9 @@ function renderCards(){
     const notInLib = !!(window._scanMissingKeys && window._scanMissingKeys.has(c.key));
     const enChoque = (typeof _choqueMapa !== 'undefined' && _choqueMapa) ? !!castChoqueDe(c.key, _choqueMapa) : false;
     const soloGestos = _gestM ? gestPendiente(c.key, _gestM) : false;
-    card.className = 'card'+(done?' done':'')+(notInLib?' nolib':'')+(c.heredado?' heredado':'')+(enChoque?' choque':'')+(soloGestos?' gestos':''); card.tabIndex=0;
+    card.className = 'card'+(done?' done':'')+(notInLib?' nolib':'')+(c.heredado?' heredado':'')+(enChoque?' choque':'')+(soloGestos?' gestos':'')+(listo?' listo':'');
+    card.dataset.key = c.key;    // para poder animarla al salir de la vista
+    card.tabIndex=0;
     if(notInLib) card.title = 'Este personaje no se encontró en el libreto';
     card.style.setProperty('--cc', c.color);
     const MAXPG=16;
@@ -4986,9 +5082,12 @@ function renderCards(){
       ev.stopPropagation();
       try{ castHistPush(castFoto([c.key]), 'verificar ' + c.display); }catch(e){}
       castVerificar(c.key, true);
-      try{ renderCards(); }catch(e){ fallo('renderCards · index.html:4976', e); }
+      // ya está cerrado: se apaga y se va a «Personajes completados»
+      castSalirTarjeta(c.key, ()=>{
+        try{ renderCards(); }catch(e){ fallo('renderCards · index.html:4976', e); }
+      });
       try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · index.html:4977', e, 'puede que esto no se haya guardado en la nube'); }
-      if(typeof DDL_UI!=='undefined') DDL_UI.toast('Verificado: ' + c.display);
+      if(typeof DDL_UI!=='undefined') DDL_UI.toast('✓ ' + c.display + ' completado');
     });
 
     // dar por bueno un personaje que solo hace gestos
@@ -4996,7 +5095,10 @@ function renderCards(){
     if(gb) gb.addEventListener('click', async ev=>{
       ev.stopPropagation();
       gestVerificar(c.key, true);
-      try{ renderCards(); }catch(e){ fallo('renderCards · index.html:4986', e); }
+      // queda en ORIGINAL y verificado: también está cerrado
+      castSalirTarjeta(c.key, ()=>{
+        try{ renderCards(); }catch(e){ fallo('renderCards · index.html:4986', e); }
+      });
       try{ if(typeof renderPlanilla === 'function') renderPlanilla(); }catch(e){ fallo('renderPlanilla · index.html:4987', e); }
       try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · index.html:4988', e, 'puede que esto no se haya guardado en la nube'); }
       try{ gestAvisar(); }catch(e){}
@@ -5094,20 +5196,25 @@ function renderCards(){
     box.appendChild(card);
   }
   try{ castPintarOcupacion(); }catch(e){}
+  try{ castPintarPestanas(); }catch(e){ fallo('castPintarPestanas · index.html:5100', e); }
   $('empty').classList.toggle('show', shown===0);
   if(shown===0 && chars.length){
-    $('empty').querySelector('p').textContent = window._cardFilter!=='all'
-      ? 'Sin personajes para ese filtro.'
-      : 'Sin resultados para esa búsqueda.';
+    const p = $('empty').querySelector('p');
+    const h = $('empty').querySelector('h4');
+    if(q) p.textContent = 'Sin resultados para esa búsqueda.';
+    else if(!enCasting) p.textContent = 'Sin personajes para ese filtro.';
+    else if(window._cardFilter==='pend'){
+      /* Que no parezca un error: es el final del trabajo, no una vista vacía. */
+      if(h) h.textContent = '¡Reparto terminado!';
+      p.textContent = 'No queda ningún personaje por repartir. Los tienes todos en '
+                    + '«Personajes completados».';
+    }
+    else if(window._cardFilter==='ok') p.textContent = 'Todavía no has completado ninguno.';
+    else p.textContent = 'Sin personajes para ese filtro.';
   }
 }
-document.querySelectorAll('#filtrow .fchip').forEach(b=>{
-  b.addEventListener('click', ()=>{
-    window._cardFilter = b.dataset.f;
-    document.querySelectorAll('#filtrow .fchip').forEach(x=> x.classList.toggle('on', x===b));
-    renderCards();
-  });
-});
+/* Los chips los cablea castPintarPestanas en cada repintado: aqui se hacia
+   una sola vez al cargar, con #filtrow todavia vacio, y no cableaba nada. */
 $('search').addEventListener('input', ()=>{ const sc=$('searchClear'); if(sc) sc.style.display=$('search').value?'':'none'; renderCards(); renderPlanilla(); });
 { const sc=$('searchClear'); if(sc) sc.addEventListener('click', ()=>{ $('search').value=''; sc.style.display='none'; renderCards(); renderPlanilla(); $('search').focus(); }); }
 // densidad de la vista: Cómoda / Compacta

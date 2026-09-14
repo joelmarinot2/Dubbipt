@@ -40,6 +40,7 @@ alguien la abre sin conexión, y entonces falla sin ninguna explicación.
 | `paneles.prueba.js` | Que los paneles de las herramientas de vídeo se vean con el libreto abierto, que es la única situación en la que se pueden abrir. Y que los avisos y las preguntas no se queden debajo de nada. |
 | `banda.prueba.js` | Que en la banda rítmica ninguna palabra se pise con la de al lado y que ninguna deje de entrar en su instante. Con un canvas de mentira que apunta cada trazo. |
 | `base-talentos.prueba.js` | Que solo se pueda repartir a quien esté en la base de la empresa, que `ORIGINAL`, `TODOS` y `X` pasen siempre, y que sin base no se restrinja nada. |
+| `completados.prueba.js` | Cuándo se da un personaje por cerrado, que es lo único que decide si su tarjeta desaparece de la vista. Esconder uno sin resolver es lo caro: no se reparte y nadie se entera. |
 | `callados.prueba.js` | El trinquete: que el número de `catch` que se comen el error **no suba nunca**. |
 
 ## Cómo están hechas
@@ -87,6 +88,7 @@ comprobaron rompiendo el código a propósito, una cosa a la vez:
 | Devolver la clave floja de `castClave` (CAST-N5) | Sí — 5 comprobaciones |
 | Dibujar las palabras de la banda sin estrechar (BAN-7) | Sí — 2 comprobaciones |
 | Dejar pasar un nombre que no está en la base (BAS-2) | Sí — 3 comprobaciones |
+| Esconder un heredado sin verificar (FIN-N1) | Sí — 4 comprobaciones |
 
 Las **dos de los cortes** no se detectaban con las pruebas iniciales: el vídeo
 de prueba era demasiado fácil y nada superaba el suelo salvo los cortes de
