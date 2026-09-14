@@ -2242,7 +2242,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.76.0-nube';
+const APP_VER_NUM = 'v10.77.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5201,9 +5201,10 @@ function renderCards(){
         if(typeof talValidar === 'function'){
           const v = talValidar(val);
           if(!v.ok){
-            castAviso('❌ ' + v.motivo
-              + (v.cerca && v.cerca.length ? ' · ¿querías ' + v.cerca.join(', ') + '?'
-                                           : ' · añádelo en «🎭 Base de talentos»'));
+            /* El aviso trae el botón de crear el talento. Es aquí donde te
+               enteras de que falta, así que es aquí donde tiene que poder
+               arreglarse: mandarte al panel y volver es perder el hilo. */
+            talAvisarDesconocido(v, (nombre)=>{ inp.value = nombre; save(true); });
             if(explicito){
               inp.classList.add('ctal-mal');
               try{ inp.focus(); inp.select(); }catch(e){}

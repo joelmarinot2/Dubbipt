@@ -92,6 +92,7 @@ comprobaron rompiendo el código a propósito, una cosa a la vez:
 | Mandar la tarjeta fuera sin chulearla antes (FIN-5, FIN-6) | Sí — 3 comprobaciones |
 | Devolver la casilla de grabacion a la vista de casting (FIN-8) | Sí — 1 comprobacion |
 | Quitarle el fondo verde a la tarjeta verificada (FIN-9) | Sí — 1 comprobacion |
+| Dejar que crear el mismo talento dos veces lo duplique (BAS-12) | Sí — 5 comprobaciones |
 
 Las **dos de los cortes** no se detectaban con las pruebas iniciales: el vídeo
 de prueba era demasiado fácil y nada superaba el suelo salvo los cortes de
