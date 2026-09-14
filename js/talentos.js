@@ -486,7 +486,12 @@ async function talAsignar(key, valor){
   }catch(e){ fallo('talAsignar · js/talentos.js:482', e, 'el talento puede perderse al reabrir el capitulo'); }
   try{ castVerificar(key, true); }catch(e){ /* se queda en naranja: es solo el aviso */ }   // escrito a mano
   if(val) try{ castAvisarChoque(key); }catch(e){ /* el choque se vuelve a mirar al repintar */ }
-  try{ renderCards(); }catch(e){ fallo('renderCards · js/talentos.js:471', e); }
+  /* Asignar a mano deja el personaje cerrado, asi que su tarjeta se va a
+     «Personajes completados». Se apaga primero: ver adonde fue lo que acabas
+     de tocar es la diferencia entre «ya esta» y «se ha borrado». */
+  const repintar = () => { try{ renderCards(); }catch(e){ fallo('renderCards · js/talentos.js:471', e); } };
+  if(val && typeof castSalirTarjeta === 'function') castSalirTarjeta(key, repintar);
+  else repintar();
   /* Repintar ANTES de subir a la nube. Si se deja para despues, la barra se
      queda enseñando lo que tecleaste -«marcela borda»- hasta que responde el
      servidor, y parece que no ha cogido el nombre bueno. */

@@ -52,6 +52,16 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **CAST-26** | Al escribir el desglose, el nombre del personaje se casa con la fila del Excel usando **la misma clave** que la herencia (`castNorm`): sin tildes, sin apostrofos, sin puntos. | ✅ |
 | **CAST-27** | Cada celda de la columna del actor que se quede **en blanco** se dice, y se dice **por qué**: o el personaje es de solo gestos sin verificar, o no tiene talento asignado. Las dos cosas se ven igual en el Excel y no se arreglan igual. | ✅ |
 
+## Reglas · personajes completados
+
+| | Regla | |
+|---|---|---|
+| **FIN-1** | Un personaje está **completado** cuando su reparto no espera nada de nadie: tiene talento, ese talento **no está pendiente de verificar**, y si solo hace gestos, también se ha mirado. | ✅ |
+| **FIN-2** | Al **verificar**, su tarjeta se apaga y pasa a la pestaña **Personajes completados**. Repartir sesenta personajes es ir tachando: con todos siempre a la vista, buscar al siguiente obliga a barrer los cuarenta ya hechos. | ✅ |
+| **FIN-3** | Tres pestañas con sus números: **Por repartir**, **Personajes completados** y **Todos**. Los dos primeros suman el tercero — nadie se queda fuera de las tres. | ✅ |
+| **FIN-4** | Las marcas de producción (`ORIGINAL`, `TODOS`, `X`) **cierran** el personaje: son una decisión tomada, no un hueco por rellenar. | ✅ |
+| **FIN-5** | La tarjeta no desaparece de golpe: se apaga y se encoge. Ver **adónde** fue lo que acabas de tocar es la diferencia entre «ya está» y «¿se ha borrado?». | 👁 |
+
 ## Reglas · base de talentos
 
 | | Regla | |
@@ -73,6 +83,8 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **CAST-N2** | Nunca se reparte talento solo a un personaje de «solo gestos» sin verificar — ni por herencia del programa ni por tabla previa. Los extras (`MALE SOLDIER`, `FEMALE OWNER`) repiten nombre sin ser la misma persona. Se dice a quién se saltó y por qué. | ✅ |
 | **CAST-N3** | Nunca se adivina una coincidencia dudosa. Se pregunta. | ✅ |
 | **CAST-N5** | **Nunca tener dos normalizadores de nombre para el mismo trabajo.** `castClave` era más floja que `castNorm` —solo mayúsculas y espacios— y al escribir el Excel no encontraba la fila de `AMAR’S MALE GANG MEMBER 1` ni la de un nombre con tilde. El talento estaba puesto en la tarjeta y la celda salía vacía, sin un aviso. Es la misma trampa que dejó a `PÚBLICO` sin parlamentos. | ✅ |
+| **FIN-N1** | **Nunca esconder un personaje heredado sin verificar.** El naranja significa «míralo tú»: quitarlo de la vista es darlo por bueno en su nombre, y nadie se entera hasta que el actor no aparece en la sesión. | ✅ |
+| **FIN-N2** | Nunca filtrar en **grabación**. Allí «completado» significa otra cosa —todas sus páginas grabadas—, las pestañas ni se enseñan, y un filtro que siguiera puesto de la última vez dejaría la vista vacía sin manera de arreglarlo. | ✅ |
 | **BAS-N1** | **Nunca restringir si no hay base cargada.** Bloquear a quien todavía no ha importado el Excel es peor que el problema que se quiere evitar: el campo sigue siendo libre hasta que haya base. | ✅ |
 | **BAS-N2** | Nunca meter `ORIGINAL`, `TODOS` o `X` **dentro** de la base aunque vengan en el Excel: ahí contarían como un actor con carga en la ocupación. | ✅ |
 | **BAS-N3** | Nunca robarle el foco a quien acaba de pinchar en otro sitio porque el nombre no valga. Al salir del campo se avisa y se deja como estaba; con Enter o con «Guardar» sí se queda para corregir. | 👁 |
@@ -92,6 +104,10 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
   eñe, el punto de la abreviatura— y comprobando además que dos personajes
   distintos (`MAID 1` y `MAID 2`) siguen siendo distintos. Devolver la clave
   floja pone cinco comprobaciones en rojo.
+- **FIN-1 a FIN-4** y **FIN-N1**, **FIN-N2**: `pruebas/completados.prueba.js`.
+  Equivocarse por exceso es lo caro, así que lo que se prueba es cuándo se da un
+  personaje por cerrado. Dejar que un heredado sin verificar cuente como cerrado
+  pone cuatro comprobaciones en rojo.
 - **BAS-1 a BAS-6** y **BAS-N1**, **BAS-N2**: `pruebas/base-talentos.prueba.js`, con
   los nombres de la base real que más guerra dan. La lectura del Excel se prueba
   con el XML de verdad —incluido un nombre partido en dos `<t>`, que es como Excel
