@@ -36,6 +36,9 @@ El modelo es siempre el mismo:
 | **LIB-15** | Se enseñan **líneas y parlamentos por separado**, cada uno con su nombre. Son cosas distintas —las líneas son la unidad del desglose; los parlamentos, las cajas que se leen en pantalla— y un personaje con cuarenta parlamentos cortos puede tener sesenta líneas. | ✅ |
 | **LIB-16** | Si el personaje **no tiene ni un parlamento** en el libreto, se dice ahí mismo. Es el síntoma de **LIB-N4** —la clave que no casa— y callarlo fue lo que hizo que `PÚBLICO` pasara desapercibido. | ✅ |
 
+| **LIB-17** | La cuenta y el talento van en **una sola banda**, y el nombre del personaje sale **una vez**. Eran dos filas apiladas con el nombre repetido; en la segunda caía justo detrás de la palabra «Talento», y «TALENTO MELODIE GODBY» se leía como si el actor se llamara igual que el personaje. | ✅ |
+| **LIB-18** | La banda **publica su alto** (`--lbarsH`) para que lo que va fijo debajo se aparte. Tiene una fila o dos según el ancho, así que un número fijo se queda corto o largo — y la flecha de ocultar la barra acababa encima del nombre. | ✅ |
+
 ## Nunca
 
 | | |
@@ -77,7 +80,7 @@ de cada personaje coincide.
   carácter que `norm()` doblaría, y que el `display` sí conserve sus tildes.
   Se cerraron a posteriori, después de que el fallo saliera con un capítulo
   real.
-- **LIB-14** a **LIB-16** los prueba `pruebas/libreto.prueba.js`, con un documento
+- **LIB-14** a **LIB-18** los prueba `pruebas/libreto.prueba.js`, con un documento
   de mentira: los singulares incluidos, que «1 líneas» canta mucho. Quitar la
   cuenta del desglose pone tres comprobaciones en rojo.
 - **LIB-7**, **LIB-10** a **LIB-13** y **LIB-N2** siguen
