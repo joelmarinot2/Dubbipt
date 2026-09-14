@@ -2242,7 +2242,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.77.0-nube';
+const APP_VER_NUM = 'v10.78.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -10528,6 +10528,20 @@ body.finding .lfind{display:flex}
 body.deskchips.finding .lfind{ padding-right:100px; }
 body.haschips.finding  .lfind{ padding-left:100px; }
 #lFindClose{ font-weight:800; }
+/* Cuántas líneas tiene el personaje que estás leyendo. Es el número por el que
+   se paga y por el que se cita a un actor, así que tenerlo a la vista mientras
+   lees su libreto ahorra volver a la tarjeta cada vez. */
+.lcuenta{ align-items:center; gap:10px; padding:7px 13px; background:var(--head);
+  border-bottom:1px solid var(--card-b); position:sticky; top:var(--lhH,54px); z-index:39;
+  font-family:'Inter',sans-serif; font-size:12.5px; color:var(--dim,#8b8f97); flex-wrap:wrap }
+body.deskchips .lcuenta{ padding-right:100px; }
+body.haschips  .lcuenta{ padding-left:100px; }
+.lcuenta .lc-qui{ font-weight:700; font-size:13.5px; color:var(--pc,#5FC85A); flex:none;
+  max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.lcuenta b{ color:var(--ink); font-family:'JetBrains Mono',monospace; font-size:13px }
+.lcuenta .lc-sep{ opacity:.45 }
+.lcuenta .lc-ojo{ color:#F59E0B; font-weight:600 }
+
 /* Repartir sin salir del libreto. Estas leyendo los parlamentos del personaje,
    que es EL momento en que sabes quien lo hace; volver a las tarjetas para
    escribirlo rompe la lectura. Misma barra, mismo sitio que la de buscar. */
@@ -11039,6 +11053,7 @@ function buildLibretoDoc(pc){
       <button id="lFindNext" title="Siguiente">▼</button>
       <button id="lFindClose" title="Cerrar">✕</button>
     </div>
+    <div class="lcuenta" id="lCuenta" style="display:none"></div>
     <div class="ltal" id="lTal" style="display:none"></div>
     <div class="lchips" id="lChips"></div>
     <div class="ltools" id="lTools">
@@ -13134,13 +13149,55 @@ function fillCharSelect(){
   sel.innerHTML = '<option value="">— Resaltar personaje —</option>' +
     list.map(c=>'<option value="'+esc(c.key)+'"'+(c.key===cur?' selected':'')+'>'+esc(c.display)+' ('+c.totalInts+')</option>').join('');
 }
+/* ═══ CUÁNTAS LÍNEAS TIENE ESTE PERSONAJE ═════════════════════════════════
+
+   Las LÍNEAS son la unidad con la que se paga y con la que se cita a un actor
+   a una sesión, así que es el número que más se consulta. Estaba solo en la
+   tarjeta: para verlo había que cerrar el libreto y volver.
+
+   Se enseñan dos cuentas, porque son dos cosas distintas y confundirlas sale
+   caro: las LÍNEAS son las del desglose —la unidad de facturación—, y los
+   PARLAMENTOS son las cajas que vas a leer en pantalla. Un personaje con
+   cuarenta parlamentos cortos puede tener sesenta líneas.
+
+   Si el libreto no tiene ni un parlamento suyo se dice ahí mismo: es el
+   síntoma de LIB-N4 —la clave que no casa— y quedarse callado fue justo lo
+   que hizo que PÚBLICO pasara desapercibido. */
+function libBarraCuenta(){
+  if(typeof pop2 === 'undefined' || !pop2 || !pop2.doc) return;
+  const barra = pop2.doc.getElementById('lCuenta');
+  if(!barra) return;
+  const c = pop2.key ? charIdx[pop2.key] : null;
+  if(!c){ barra.style.display = 'none'; barra.innerHTML = ''; return; }
+
+  const lineas = (c.totalInts != null) ? c.totalInts : null;
+  let parlamentos = 0;
+  try{ parlamentos = (scriptByKey[pop2.key] || []).length; }catch(e){ parlamentos = 0; }
+  const paginas = (c.pages || []).length;
+  const plural = (n, uno, varios) => n + ' ' + (n === 1 ? uno : varios);
+
+  barra.style.display = 'flex';
+  barra.innerHTML =
+      '<span class="lc-qui">' + esc(c.display || pop2.key) + '</span>'
+    + (lineas != null
+        ? '<span><b>' + lineas + '</b> ' + (lineas === 1 ? 'línea' : 'líneas') + '</span>'
+          + '<span class="lc-sep">·</span>'
+        : '')
+    + '<span><b>' + parlamentos + '</b> ' + (parlamentos === 1 ? 'parlamento' : 'parlamentos') + '</span>'
+    + (paginas ? '<span class="lc-sep">·</span><span>' + plural(paginas, 'página', 'páginas') + '</span>' : '')
+    + (parlamentos === 0
+        ? '<span class="lc-ojo">⚠ sin parlamentos en el libreto</span>'
+        : '');
+}
+
 function renderLibretoChips(){
   if(!pop2 || !pop2.doc) return;
   try{ fillCharSelect(); }catch(e){}
-  /* La barra para repartir sin salir del libreto. Va aquí porque el documento
-     del iframe se reconstruye entero al abrirlo, y este es el único punto por
-     el que pasan todas las aperturas y todos los refrescos. */
-  try{ talBarraLibreto(); }catch(e){ fallo('talBarraLibreto · index.html:12958', e); }
+  /* Las dos barras del personaje abierto. Van aquí porque el documento del
+     iframe se reconstruye entero al abrirlo, y este es el único punto por el
+     que pasan todas las aperturas y todos los refrescos. */
+  try{ libBarraCuenta(); }catch(e){ fallo('libBarraCuenta · index.html:12958', e); }
+  try{ talBarraLibreto(); }catch(e){ fallo('talBarraLibreto · index.html:12959', e); }
   const box = pop2.doc.getElementById('lChips');
   if(!box) return;
   const c = pop2.key ? charIdx[pop2.key] : null;

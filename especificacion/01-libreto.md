@@ -32,6 +32,10 @@ El modelo es siempre el mismo:
 | **LIB-12** | Las fusiones se aplican sobre una copia **cruda** (`_charsRaw`). Deshacer una fusión reconstruye desde ahí: nunca se pierde el reparto original. | 👁 |
 | **LIB-13** | Al rehidratar un capítulo guardado, todo lo que venga de la nube se **sanea**: los números se fuerzan a número, los textos a texto, y el color se **recalcula siempre** en vez de confiar en el guardado. | 👁 |
 
+| **LIB-14** | Con un personaje abierto, el libreto enseña **cuántas líneas tiene**: es la unidad con la que se paga y con la que se cita a un actor a una sesión, o sea el número que más se consulta. Estaba solo en la tarjeta. | ✅ |
+| **LIB-15** | Se enseñan **líneas y parlamentos por separado**, cada uno con su nombre. Son cosas distintas —las líneas son la unidad del desglose; los parlamentos, las cajas que se leen en pantalla— y un personaje con cuarenta parlamentos cortos puede tener sesenta líneas. | ✅ |
+| **LIB-16** | Si el personaje **no tiene ni un parlamento** en el libreto, se dice ahí mismo. Es el síntoma de **LIB-N4** —la clave que no casa— y callarlo fue lo que hizo que `PÚBLICO` pasara desapercibido. | ✅ |
+
 ## Nunca
 
 | | |
@@ -73,6 +77,9 @@ de cada personaje coincide.
   carácter que `norm()` doblaría, y que el `display` sí conserve sus tildes.
   Se cerraron a posteriori, después de que el fallo saliera con un capítulo
   real.
+- **LIB-14** a **LIB-16** los prueba `pruebas/libreto.prueba.js`, con un documento
+  de mentira: los singulares incluidos, que «1 líneas» canta mucho. Quitar la
+  cuenta del desglose pone tres comprobaciones en rojo.
 - **LIB-7**, **LIB-10** a **LIB-13** y **LIB-N2** siguen
   sin prueba automática. Las de fusión (**LIB-11**, **LIB-12**) son las más
   fáciles de añadir: `applyCharMerges` es casi pura sobre `_charsRaw`.
