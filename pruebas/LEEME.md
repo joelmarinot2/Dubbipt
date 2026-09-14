@@ -41,6 +41,7 @@ alguien la abre sin conexión, y entonces falla sin ninguna explicación.
 | `banda.prueba.js` | Que en la banda rítmica ninguna palabra se pise con la de al lado y que ninguna deje de entrar en su instante. Con un canvas de mentira que apunta cada trazo. |
 | `base-talentos.prueba.js` | Que solo se pueda repartir a quien esté en la base de la empresa, que `ORIGINAL`, `TODOS` y `X` pasen siempre, y que sin base no se restrinja nada. |
 | `completados.prueba.js` | Cuándo se da un personaje por cerrado, que es lo único que decide si su tarjeta desaparece de la vista. Esconder uno sin resolver es lo caro: no se reparte y nadie se entera. |
+| `ocupacion-libreto.prueba.js` | Que la ocupación se vea dentro del libreto repartiendo, que NO se vea grabando, y que el contenido se corra a la izquierda sin dejar el libreto ilegible en pantallas estrechas. |
 | `callados.prueba.js` | El trinquete: que el número de `catch` que se comen el error **no suba nunca**. |
 
 ## Cómo están hechas
@@ -94,6 +95,7 @@ comprobaron rompiendo el código a propósito, una cosa a la vez:
 | Quitarle el fondo verde a la tarjeta verificada (FIN-9) | Sí — 1 comprobacion |
 | Dejar que crear el mismo talento dos veces lo duplique (BAS-12) | Sí — 5 comprobaciones |
 | Quitar la cuenta de lineas del libreto (LIB-14) | Sí — 3 comprobaciones |
+| Ensenar la ocupacion tambien en grabacion (OCU-3) | Sí — 3 comprobaciones |
 
 Las **dos de los cortes** no se detectaban con las pruebas iniciales: el vídeo
 de prueba era demasiado fácil y nada superaba el suelo salvo los cortes de

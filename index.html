@@ -2242,7 +2242,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.78.0-nube';
+const APP_VER_NUM = 'v10.79.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -10437,6 +10437,48 @@ body.light .blk .tx .wd.know{ color:#2a2540 !important; background:#FDE68A !impo
    del actor y no se pueden perder de vista porque pase el encendido por encima. */
 .blk .tx .wd.acc.kdone, .blk .tx .wd.prn.kdone, .blk .tx .wd.pr.kdone{ opacity:.62 !important; }
 `;
+/* El cajón de ocupación DENTRO del libreto. Va aparte de LIB_CSS porque solo
+   se inyecta en modo casting: en grabación no se mete ni una regla. */
+const LIB_OCU_CSS = `
+.locu{ position:fixed; top:var(--lhH,54px); bottom:0; width:min(320px,86vw);
+  background:var(--head); border-left:1px solid var(--card-b); z-index:60;
+  display:flex; flex-direction:column; transition:right .18s ease;
+  right:calc(-1 * min(320px,86vw)); font-family:'Inter',sans-serif; }
+.locu.abierto{ right:0; }
+.locu-tab{ position:absolute; left:-30px; top:14px; width:30px; padding:12px 0;
+  background:var(--head); border:1px solid var(--card-b); border-right:none;
+  border-radius:9px 0 0 9px; color:var(--dim); cursor:pointer; font:inherit;
+  font-size:11px; font-weight:700; letter-spacing:.06em; writing-mode:vertical-rl;
+  display:flex; align-items:center; justify-content:center; gap:7px; }
+.locu-tab:hover{ color:var(--ink); border-color:#22C55E; }
+.locu-tab-n{ background:#ff6b6b; color:#2a0b0b; border-radius:999px; padding:2px 5px;
+  font-size:10px; writing-mode:horizontal-tb; }
+.locu-in{ flex:1; min-height:0; overflow:auto; padding:12px 14px 22px; }
+.locu-head{ display:flex; align-items:center; justify-content:space-between; gap:8px;
+  cursor:pointer; margin-bottom:9px; }
+.locu-head b{ font-size:13.5px; color:var(--ink); }
+.locu-head span{ font-size:11.5px; color:var(--dim); }
+.locu-res{ font-size:12px; color:var(--dim); line-height:1.6; margin-bottom:12px; }
+.locu-al{ color:#ff6b6b; }
+.locu-vacio{ font-size:12.5px; color:var(--dim); line-height:1.6; }
+.locu-fila{ padding:9px 0; border-top:1px solid var(--card-b); }
+.locu-fila.con-choque .locu-nom{ color:#ff6b6b; }
+.locu-nom{ font-size:13px; font-weight:700; color:var(--ink); display:flex; gap:6px; align-items:center; }
+.locu-bdg{ color:#ff6b6b; }
+.locu-barra{ height:5px; background:rgba(127,127,127,.18); border-radius:999px; margin:6px 0 4px; overflow:hidden; }
+.locu-barra i{ display:block; height:100%; background:#22C55E; border-radius:999px; }
+.locu-num{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--dim); }
+.locu-pers{ display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+.locu-p{ background:rgba(127,127,127,.12); border-radius:7px; padding:3px 8px;
+  font-size:11px; color:var(--dim); cursor:pointer; }
+.locu-p:hover{ background:rgba(127,127,127,.25); color:var(--ink); }
+.locu-p.aqui{ background:rgba(34,197,94,.18); color:#4ADE80; }
+.locu-p b{ color:var(--ink); }
+.locu-ch{ color:#ff9b9b; font-size:11px; line-height:1.55; margin-top:6px; }
+/* El riel de páginas se aparta para no quedar debajo del cajón. */
+body.ocu-lib.deskchips .lchips{ right:min(320px,86vw); }
+`;
+
 const LIB_CSS = `
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--lhH:54px}
@@ -13149,6 +13191,125 @@ function fillCharSelect(){
   sel.innerHTML = '<option value="">— Resaltar personaje —</option>' +
     list.map(c=>'<option value="'+esc(c.key)+'"'+(c.key===cur?' selected':'')+'>'+esc(c.display)+' ('+c.totalInts+')</option>').join('');
 }
+/* ═══ LA OCUPACIÓN, DENTRO DEL LIBRETO ════════════════════════════════════
+
+   La ocupación —qué actor lleva cuántos personajes y cuántas líneas, y dónde
+   se pisa consigo mismo— vive en un cajón al costado de la pantalla principal.
+   Pero repartiendo se pasa el rato DENTRO del libreto, y ahí no llegaba: el
+   libreto es una capa a pantalla completa por encima de todo lo demás. Había
+   que cerrarlo, mirar, y volver a abrirlo.
+
+   Aquí se monta el mismo cajón dentro del libreto, con los MISMOS datos
+   -castOcupacion() y castChoques(), del padre-: no hay una segunda cuenta que
+   pueda decir otra cosa.
+
+   Solo en casting. En grabación la ocupación no pinta nada y el libreto tiene
+   que estar despejado. */
+function libOcupacion(){
+  if(typeof pop2 === 'undefined' || !pop2 || !pop2.doc) return;
+  const d = pop2.doc;
+  const cast = (typeof DDL_MODO !== 'undefined' && DDL_MODO === 'casting');
+  let caja = d.getElementById('lOcu');
+
+  if(!cast || !chars.length){
+    if(caja){ caja.remove(); }
+    d.body.classList.remove('ocu-lib');
+    const w = d.getElementById('lWrap'); if(w) w.style.paddingRight = '';
+    return;
+  }
+
+  if(!d.getElementById('lOcuCss')){
+    const st = d.createElement('style');
+    st.id = 'lOcuCss';
+    st.textContent = LIB_OCU_CSS;
+    d.head.appendChild(st);
+  }
+  if(!caja){
+    caja = d.createElement('div');
+    caja.id = 'lOcu';
+    d.body.appendChild(caja);
+  }
+  caja.className = 'locu' + (ocuAbierto ? ' abierto' : '');
+
+  const filas = castOcupacion();
+  const mapa = castChoques();
+  const nChoques = Object.values(mapa).reduce((n, x) => n + x.choques.length, 0);
+  const sinTal = chars.filter(c => !(c.talent && String(c.talent).trim())).length;
+  const totalInts = filas.reduce((n, e) => n + e.ints, 0);
+
+  // La pestaña se ve SIEMPRE, también plegado: un panel que se esconde del
+  // todo es un panel que nadie encuentra.
+  let html = '<button class="locu-tab" id="lOcuTab" title="'
+    + (ocuAbierto ? 'Plegar' : 'Ver la ocupación de talentos') + '">'
+    + '<span class="locu-tab-txt">Ocupación</span>'
+    + (nChoques ? '<span class="locu-tab-n">' + nChoques + '</span>' : '')
+    + '</button>'
+    + '<div class="locu-in"><div class="locu-head" id="lOcuHead">'
+    + '<b>Ocupación de talentos</b><span>plegar ›</span></div>'
+    + '<div class="locu-res">' + filas.length + ' talento' + (filas.length===1?'':'s')
+    + ' · ' + totalInts + ' líneas'
+    + (sinTal ? '<br>' + sinTal + ' personaje' + (sinTal===1?'':'s') + ' sin asignar' : '')
+    + (nChoques ? '<br><b class="locu-al">' + nChoques + ' choque' + (nChoques===1?'':'s')
+                + ' de reparto</b>' : '')
+    + '</div>';
+
+  if(!filas.length){
+    html += '<div class="locu-vacio">Todavía no has asignado ningún talento.</div>';
+  }else{
+    const max = filas[0].ints || 1;
+    html += '<div class="locu-lista">';
+    for(const e of filas){
+      const ch = mapa[castNorm(e.talento)];
+      html += '<div class="locu-fila' + (ch ? ' con-choque' : '') + '">'
+        + '<div class="locu-nom">' + esc(e.talento)
+        + (ch ? '<span class="locu-bdg">⚠</span>' : '') + '</div>'
+        + '<div class="locu-barra"><i style="width:'
+        + Math.max(3, Math.round(100*e.ints/max)) + '%"></i></div>'
+        + '<div class="locu-num">' + e.ints + ' líneas</div>'
+        + '<div class="locu-pers">' + e.personajes.map(p =>
+            '<span class="locu-p' + (p.key === pop2.key ? ' aqui' : '') + '" data-k="' + esc(p.key)
+            + '" title="Abrir el libreto de ' + esc(p.display) + '">'
+            + esc(p.display) + ' <b>' + p.ints + '</b></span>').join('')
+        + '</div>';
+      if(ch){
+        html += '<div class="locu-ch">' + ch.choques.map(x =>
+          '«' + esc(x.a) + '» y «' + esc(x.b) + '» a ' + x.dist + ' línea' + (x.dist===1?'':'s')
+          + (x.pagina != null ? ' · pág. ' + x.pagina : '')).join('<br>') + '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  caja.innerHTML = html;
+
+  /* El contenido del libreto se corre a la izquierda para que el cajón no lo
+     tape. En píxeles y con el ancho REAL medido, por lo mismo que en la
+     pantalla principal: dejarlo a la hoja de estilos no bastaba. Por debajo de
+     900 px no se corre nada — dejaría el libreto ilegible, y ahí es mejor que
+     el cajón se ponga encima. */
+  d.body.classList.toggle('ocu-lib', !!ocuAbierto);
+  const wrap = d.getElementById('lWrap');
+  if(wrap){
+    const w = caja.getBoundingClientRect().width || 300;
+    const cabe = (pop2.win && pop2.win.innerWidth ? pop2.win.innerWidth : 1200) > 900;
+    wrap.style.paddingRight = (ocuAbierto && cabe) ? Math.round(w + 12) + 'px' : '';
+  }
+
+  const alternar = ()=>{
+    ocuAbierto = !ocuAbierto;
+    try{ localStorage.setItem('ddl_ocu_abierto', ocuAbierto ? '1' : '0'); }catch(e){ /* no se recuerda */ }
+    libOcupacion();
+    try{ castPintarOcupacion(); }catch(e){ /* la de la pantalla principal */ }
+  };
+  const tab = caja.querySelector('#lOcuTab');
+  if(tab) tab.addEventListener('click', alternar);
+  const head = caja.querySelector('#lOcuHead');
+  if(head) head.addEventListener('click', alternar);
+  caja.querySelectorAll('.locu-p').forEach(el =>
+    el.addEventListener('click', ()=>{ try{ openPopup(el.dataset.k); }catch(e){ fallo('openPopup · index.html:libOcupacion', e); } }));
+}
+
 /* ═══ CUÁNTAS LÍNEAS TIENE ESTE PERSONAJE ═════════════════════════════════
 
    Las LÍNEAS son la unidad con la que se paga y con la que se cita a un actor
@@ -13198,6 +13359,7 @@ function renderLibretoChips(){
      que pasan todas las aperturas y todos los refrescos. */
   try{ libBarraCuenta(); }catch(e){ fallo('libBarraCuenta · index.html:12958', e); }
   try{ talBarraLibreto(); }catch(e){ fallo('talBarraLibreto · index.html:12959', e); }
+  try{ libOcupacion(); }catch(e){ fallo('libOcupacion · index.html:12960', e); }
   const box = pop2.doc.getElementById('lChips');
   if(!box) return;
   const c = pop2.key ? charIdx[pop2.key] : null;
