@@ -216,4 +216,63 @@ exports.pruebas = function(t){
   ] }];
   t.eq('con los números revueltos, no se reconoce',
        correr(desordenadas, {}).M.adDetect(false), false);
+
+  /* ── La cuenta del personaje abierto ──────────────────────────────────── */
+  t.seccion('14 · cuántas líneas tiene el personaje que estás leyendo');
+  /*
+   * Las LINEAS son la unidad con la que se paga y con la que se cita a un actor,
+   * asi que es el numero que mas se consulta. Y son una cosa distinta de los
+   * PARLAMENTOS -las cajas que se leen en pantalla-: un personaje con cuarenta
+   * parlamentos cortos puede tener sesenta lineas. Confundirlos sale caro, por
+   * eso salen los dos con su nombre.
+   */
+  const barra = { style:{}, innerHTML:'' };
+  const montarCuenta = (key, personajes, porClave) => {
+    const M2 = montar(
+      [['/* ═══ CUÁNTAS LÍNEAS TIENE ESTE PERSONAJE', 'function renderLibretoChips(){']],
+      ['libBarraCuenta'],
+      { pop2: { doc: { getElementById: (id) => (id === 'lCuenta' ? barra : null) }, key: key },
+        charIdx: personajes,
+        scriptByKey: porClave,
+        esc: (x) => String(x),
+        console: { warn: () => {}, log: () => {} } }
+    );
+    barra.style = {}; barra.innerHTML = '';
+    M2.libBarraCuenta();
+    return { visible: barra.style.display, texto: barra.innerHTML.replace(/<[^>]*>/g, '') };
+  };
+
+  const PERS = {
+    MARLON:  { display:'MARLON',  totalInts:62, pages:[{p:1},{p:2},{p:3}] },
+    LISA:    { display:'LISA',    totalInts:1,  pages:[{p:1}] },
+    PUBLICO: { display:'PÚBLICO', totalInts:14, pages:[{p:2}] }
+  };
+  const POR = { MARLON: new Array(47).fill(0), LISA: [0] };
+
+  const m = montarCuenta('MARLON', PERS, POR);
+  t.eq('se enseña', m.visible, 'flex');
+  t.ok('con su nombre', m.texto.includes('MARLON'));
+  t.ok('las líneas del desglose', m.texto.includes('62 líneas'),
+       'es el numero por el que se paga y por el que se cita a un actor');
+  t.ok('y los parlamentos que vas a leer', m.texto.includes('47 parlamentos'),
+       'son dos cosas distintas: confundirlas sale caro');
+  t.ok('con sus páginas', m.texto.includes('3 páginas'));
+
+  const l = montarCuenta('LISA', PERS, POR);
+  t.ok('en singular, «1 línea»', l.texto.includes('1 línea') && !l.texto.includes('1 líneas'));
+  t.ok('«1 parlamento»', l.texto.includes('1 parlamento') && !l.texto.includes('1 parlamentos'));
+  t.ok('y «1 página»', l.texto.includes('1 página') && !l.texto.includes('1 páginas'));
+
+  t.seccion('15 · un personaje sin parlamentos se dice, no se calla');
+  const p = montarCuenta('PUBLICO', PERS, POR);
+  t.ok('sale su cuenta del desglose', p.texto.includes('14 líneas'));
+  t.ok('pero cero parlamentos', p.texto.includes('0 parlamentos'));
+  t.ok('y se avisa', p.texto.includes('sin parlamentos en el libreto'),
+       'es el sintoma de LIB-N4 -la clave que no casa- y callarlo fue lo que hizo '
+       + 'que PUBLICO pasara desapercibido');
+
+  t.seccion('16 · con el libreto completo abierto, la barra no estorba');
+  const n = montarCuenta(null, PERS, POR);
+  t.eq('se esconde', n.visible, 'none');
+  t.eq('y se vacía', n.texto, '');
 };
