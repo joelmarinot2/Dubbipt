@@ -29,30 +29,36 @@ const RECORTES = [['/* ═══ PERSONAJES COMPLETADOS', 'window._cardFilter = 
 /* `_fila` es la fila de pestanas de mentira: se saca con una flecha porque
    montar() solo devuelve lo que se le pide por nombre. */
 const EXPORTA = ['castCompletado', 'castCuentas', 'castPintarPestanas', 'castSalirTarjeta',
-                 'verFila: () => _fila'];
+                 'verFila: () => _fila', 'verReloj: () => _reloj'];
 
 /**
  * Monta el modulo.
  * `gestos` son las claves de los personajes que en este capitulo solo hacen
  * gestos y todavia nadie ha mirado.
  */
-function correr(personajes, modo, gestos){
+function correr(personajes, modo, gestos, tarjeta, filtro){
   const pend = new Set(gestos || []);
   const fila = { style:{}, innerHTML:'', querySelectorAll: () => [] };
+  /* Reloj de mentira: castSalirTarjeta encadena dos esperas, y hay que poder
+     mirar la tarjeta ENTRE una y otra. `avanzar()` dispara lo que toque. */
+  const cola = [];
+  const reloj = { avanzar(){ const f = cola.shift(); if(f) f(); return cola.length; },
+                  hasta(){ let n = 0; while(cola.length && n < 10){ reloj.avanzar(); n++; } } };
   return montar(RECORTES, EXPORTA, {
     DDL_MODO: modo === undefined ? 'casting' : modo,
     chars: personajes,
     gestPendiente: (k) => pend.has(k),
     gestMapa: () => ({}),
     document: { getElementById: (id) => (id === 'filtrow' ? fila : null),
-                querySelector: () => null },
-    window: {},
+                querySelector: () => tarjeta || null },
+    window: { _cardFilter: filtro || 'pend' },   // la pestana en la que estas
     localStorage: { setItem(){}, getItem(){ return null; } },
     renderCards: () => {},
     fallo: () => {},
-    setTimeout: (f) => f(),
+    setTimeout: (f) => { cola.push(f); },
+    CSS: { escape: (x) => x },
     console: { warn: () => {}, log: () => {} },
-    _fila: fila
+    _fila: fila, _reloj: reloj
   });
 }
 
@@ -121,4 +127,47 @@ exports.pruebas = function(t){
   V.castPintarPestanas();
   t.eq('sin personajes tampoco se enseñan', V.verFila().style.display, 'none',
        'unas pestañas a cero antes de subir el guion son ruido');
+
+  t.seccion('7 · al guardar, la tarjeta se chulea en verde ANTES de irse');
+  /* Una tarjeta de mentira que solo sabe de sus clases. */
+  const clases = new Set();
+  const falsa = { classList: {
+    add(...cs){ cs.forEach(c => clases.add(c)); },
+    contains: (c) => clases.has(c) } };
+  const S = correr([], 'casting', [], falsa, 'pend');
+  let repintado = 0;
+  S.castSalirTarjeta('MARLON', () => repintado++);
+
+  t.ok('se chulea al momento', clases.has('chuleada'),
+       'el chulo confirma lo que acabas de pulsar: llega antes que nada más');
+  t.ok('y se pinta de cerrada', clases.has('listo'));
+  t.eq('todavía NO se ha ido', clases.has('saliendo'), false,
+       'irse antes de que se vea el chulo es lo mismo que no ponerlo');
+  t.eq('ni se ha repintado', repintado, 0);
+
+  S.verReloj().avanzar();                       // pasa el golpe del chulo
+  t.ok('ahora sí empieza a irse', clases.has('saliendo'));
+  t.eq('y sigue sin repintarse hasta acabar de irse', repintado, 0);
+
+  S.verReloj().avanzar();                       // pasa el desvanecido
+  t.eq('al final se repinta una vez', repintado, 1);
+
+  t.seccion('8 · en «Todos» la tarjeta se queda, pero se chulea igual');
+  const clases2 = new Set();
+  const falsa2 = { classList: { add(...cs){ cs.forEach(c => clases2.add(c)); },
+                                contains: (c) => clases2.has(c) } };
+  const T = correr([], 'casting', [], falsa2, 'all');
+  let repintado2 = 0;
+  T.castSalirTarjeta('MARLON', () => repintado2++);
+  t.ok('se chulea', clases2.has('chuleada'));
+  T.verReloj().hasta();
+  t.eq('pero NO se va', clases2.has('saliendo'), false,
+       'en «Todos» no hay adonde mandarla: irse sería hacerla desaparecer sin motivo');
+  t.eq('y se repinta', repintado2, 1);
+
+  t.seccion('9 · sin tarjeta en pantalla, se repinta y ya');
+  const N = correr([], 'casting', [], null, 'pend');
+  let repintado3 = 0;
+  N.castSalirTarjeta('NADIE', () => repintado3++);
+  t.eq('no se queda colgado esperando una animación que no existe', repintado3, 1);
 };

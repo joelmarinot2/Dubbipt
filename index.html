@@ -95,6 +95,21 @@ header p{font-size:13px;color:var(--ink-dim);margin-top:2px}
 /* Un personaje ya cerrado: el borde verde dice que no espera nada de nadie. */
 body.modo-casting .card.listo{border-color:rgba(34,197,94,.45)}
 body.modo-casting .card.listo .tal b{color:#4ADE80}
+/* ═══ El chulo verde ═══
+   Guardar un talento cierra el reparto de ese personaje, y eso tiene que verse
+   EN LA TARJETA, no solo en que se vaya de la lista. Un aviso flotante se lo
+   lleva el rabillo del ojo; una marca en el sitio donde acabas de escribir, no.
+   Es del reparto, no de la grabación: por eso no toca la casilla de páginas. */
+.card .okchk{display:none}
+body.modo-casting .card.listo .okchk{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:26px;height:26px;border-radius:50%;flex:none;
+  background:#22C55E;color:#06210f;font-size:15px;font-weight:800;line-height:1}
+/* Al guardar, el chulo entra con un golpe: confirma la acción antes de que la
+   tarjeta se marche a «Personajes completados». */
+body.modo-casting .card.chuleada .okchk{animation:chulo .38s cubic-bezier(.2,1.4,.4,1)}
+@keyframes chulo{ from{transform:scale(0);opacity:0} 60%{transform:scale(1.25)} to{transform:scale(1);opacity:1} }
+@media (prefers-reduced-motion:reduce){ body.modo-casting .card.chuleada .okchk{animation:none} }
 /* Al verificar, la tarjeta se apaga y se encoge antes de irse a su pestaña.
    Ver ADÓNDE se fue es la diferencia entre «ya está» y «¿se ha borrado?». */
 .card.saliendo{opacity:0;transform:scale(.94);pointer-events:none;
@@ -2201,7 +2216,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.74.0-nube';
+const APP_VER_NUM = 'v10.75.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4987,14 +5002,21 @@ function castPintarPestanas(){
   }));
 }
 
-/* Al verificar, la tarjeta no desaparece de golpe: se apaga y se encoge.
-   Ver ADÓNDE se fue lo que acabas de tocar es la diferencia entre «ya está» y
-   «¿se ha borrado?». */
+/* Al guardar o verificar, la tarjeta primero se CHULEA en verde y solo después
+   se va. El orden importa: el chulo confirma lo que acabas de hacer, y verlo
+   antes de que la tarjeta se marche es la diferencia entre «ya está» y «¿se ha
+   borrado?». Si estás en «Todos» o en «Personajes completados» no se va a
+   ninguna parte: el chulo se queda y ya. */
 function castSalirTarjeta(key, despues){
   const card = document.querySelector('.card[data-key="' + (window.CSS && CSS.escape ? CSS.escape(key) : key) + '"]');
-  if(!card || window._cardFilter === 'all' || window._cardFilter === 'ok'){ despues(); return; }
-  card.classList.add('saliendo');
-  setTimeout(despues, 260);
+  if(!card){ despues(); return; }
+  card.classList.add('listo', 'chuleada');
+  const sale = (window._cardFilter !== 'all' && window._cardFilter !== 'ok');
+  setTimeout(()=>{               // el golpe del chulo se ve entero, se vaya o no
+    if(!sale){ despues(); return; }
+    card.classList.add('saliendo');
+    setTimeout(despues, 260);
+  }, 420);
 }
 
 window._cardFilter = window._cardFilter || 'pend';
@@ -5053,6 +5075,8 @@ function renderCards(){
     card.innerHTML =
       // fila superior: N intervenciones + checkbox
       `<div class="top"><span class="ints-lab">${c.totalInts} intervenciones</span>`+
+        // el chulo verde del reparto: solo en casting, y solo cuando ya está cerrado
+        `<span class="okchk" title="Reparto terminado" aria-hidden="true">✓</span>`+
         `<button class="allbtn ${done?'on':''}" title="${done?'Desmarcar':'Marcar terminado'}" aria-label="${done?'Marcar sin terminar':'Marcar terminado'} ${esc(c.display)}">${done?'✓':''}</button></div>`+
       // timecode en cajita encima del nombre
       (tc0 ? `<div class="ctc">${esc(tc0)}</div>` : `<div class="ctc ctc-empty"></div>`)+
@@ -5175,13 +5199,18 @@ function renderCards(){
         try{ const raw = (window._charsRaw||[]).find(x=> x.key===c.key); if(raw){ raw.talent = val; raw.noRec = c.noRec; } }catch(e){}
         try{ castVerificar(c.key, true); }catch(e){}   // escrito a mano: verificado
         if(val) try{ castAvisarChoque(c.key); }catch(e){}
+        /* Guardar cierra el reparto de este personaje: la tarjeta se chulea en
+           verde AHÍ MISMO y, pasado el golpe, se va a «Personajes completados».
+           Se hace antes de subir a la nube: esperar a que responda el servidor
+           para dar la señal deja un silencio raro justo donde acabas de pulsar. */
+        if(val) castSalirTarjeta(c.key, ()=> renderCards());
+        else renderCards();
+        if(typeof DDL_UI!=='undefined') DDL_UI.toast(val ? '✓ ' + c.display + ' · ' + val : 'Talento borrado');
         // persistir en Supabase si hay episodio abierto
         try{
           if(typeof currentEp!=='undefined' && currentEp && currentEp.id && typeof epDataUpsert==='function')
             await epDataUpsert(currentEp.id, currentEp.showId);
-        }catch(e){ console.warn('save talent', e); }
-        renderCards();
-        if(typeof DDL_UI!=='undefined') DDL_UI.toast(val ? 'Talento asignado: '+val : 'Talento borrado');
+        }catch(e){ fallo('epDataUpsert · index.html:5085', e, 'puede que esto no se haya guardado en la nube'); }
         try{ castRegAnotarPronto(); }catch(e){}
       };
       card._guardarTal = () => save(true);   // para que el botón «Guardar» pueda llamarlo
