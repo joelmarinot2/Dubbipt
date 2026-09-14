@@ -99,7 +99,14 @@ body.modo-casting .card.listo .tal b{color:#4ADE80}
    Guardar un talento cierra el reparto de ese personaje, y eso tiene que verse
    EN LA TARJETA, no solo en que se vaya de la lista. Un aviso flotante se lo
    lleva el rabillo del ojo; una marca en el sitio donde acabas de escribir, no.
-   Es del reparto, no de la grabación: por eso no toca la casilla de páginas. */
+
+   UN SOLO CHULO POR TARJETA. La casilla de la derecha —marcar todas las páginas
+   como grabadas— es de GRABACIÓN, y en casting se quedaba ahí al lado del chulo
+   del reparto: dos casillas verdes, cada una de una cosa distinta, en la misma
+   esquina. Repartiendo no se marca nada como grabado, así que en casting esa
+   casilla no se enseña y el único chulo que ves es el del reparto. Al volver a
+   grabación está donde siempre. */
+body.modo-casting .card .allbtn{display:none}
 .card .okchk{display:none}
 body.modo-casting .card.listo .okchk{
   display:inline-flex;align-items:center;justify-content:center;
@@ -2216,7 +2223,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.75.0-nube';
+const APP_VER_NUM = 'v10.75.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
