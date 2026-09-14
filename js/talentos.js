@@ -312,6 +312,14 @@ function talPanel(){
     + (TAL.nombres.length ? '' : '<br><br><b>Mientras no haya base, no se restringe nada</b> y el '
         + 'campo de talento sigue siendo libre.')
     + '</div>'
+    + '<div class="io-tit">Añadir uno</div>'
+    + '<div class="io-rej" style="margin-bottom:12px">'
+    +   '<input id="talNuevo" type="text" placeholder="Nombre y apellido…" autocomplete="off" '
+    +     'style="flex:1;min-width:150px;background:#11131a;color:#e7ebf3;border:1px solid #2b3040;'
+    +     'border-radius:9px;padding:8px 10px;font-size:13px">'
+    +   '<button class="io-b" id="talMas">➕ Añadir</button>'
+    + '</div>'
+    + '<div class="io-tit">La lista entera</div>'
     + '<div class="io-rej" style="margin-bottom:12px">'
     +   '<button class="io-b" id="talIn">⬆ Importar del Excel</button>'
     +   (TAL.nombres.length ? '<button class="io-b" id="talFuera">🗑 Vaciar la base</button>' : '')
@@ -343,6 +351,28 @@ function talPanel(){
     const b2 = document.querySelector('#talOv #talBuscar');
     if(b2){ b2.focus(); try{ b2.setSelectionRange(pos, pos); }catch(e){ /* el cursor se va al final: da igual */ } }
   };
+
+  /* Añadir uno a mano. Importar el Excel entero REEMPLAZA la base; esto solo
+     suma, que es lo que hace falta cuando entra un actor nuevo a mitad de
+     temporada y nadie va a rehacer el archivo por una línea. */
+  {
+    const campo = ov.querySelector('#talNuevo');
+    const meter = async () => {
+      const v = campo.value.trim();
+      if(!v) return;
+      const r = talAnadir(v);
+      if(!r.ok){ castAviso('❌ ' + r.motivo); campo.focus(); return; }
+      await talGuardar();
+      castAviso(r.yaEstaba ? ('Ya estaba: ' + r.nombre)
+                           : ('🎭 Talento creado: ' + r.nombre + ' · ' + TAL.nombres.length + ' en la base'));
+      talFiltro = '';
+      talPanel();
+      const c2 = document.querySelector('#talOv #talNuevo'); if(c2) c2.focus();
+      try{ renderCards(); }catch(e){ /* no hay tarjetas que repintar */ }
+    };
+    ov.querySelector('#talMas').onclick = meter;
+    campo.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); meter(); } });
+  }
 
   ov.querySelector('#talIn').onclick = () => {
     let inp = document.getElementById('talFile');
@@ -444,9 +474,8 @@ function talBarraLibreto(){
     const v = talValidar(valor);
     if(!v.ok){
       inp.classList.add('mal');
-      castAviso('❌ ' + v.motivo
-        + (v.cerca && v.cerca.length ? ' · ¿querías ' + v.cerca.join(', ') + '?'
-                                     : ' · añádelo en «🎭 Base de talentos»'));
+      // el aviso trae el botón de crearlo: es aquí donde te enteras de que falta
+      talAvisarDesconocido(v, (nombre)=> guardar(nombre));
       try{ inp.focus(); inp.select(); }catch(e){ /* el campo ya no esta: el aviso ya salio */ }
       return false;
     }
@@ -504,4 +533,89 @@ async function talAsignar(key, valor){
   castAviso(val ? ('Talento asignado: ' + (c.display || key) + ' → ' + val)
                 : ('Talento quitado a ' + (c.display || key)));
   return true;
+}
+
+/* ── Crear un talento ─────────────────────────────────────────────────── */
+
+/**
+ * Mete un nombre nuevo en la base. Devuelve { ok, nombre, motivo, yaEstaba }.
+ *
+ * `nombre` vuelve como queda GUARDADO: si ya estaba escrito de otra manera
+ * -otras mayusculas, otra tilde-, se devuelve el que ya habia. Dos escrituras
+ * del mismo actor son un actor, no dos.
+ */
+function talAnadir(nombre){
+  const t = String(nombre == null ? '' : nombre).replace(/\s+/g, ' ').trim();
+  if(t.length < 2) return { ok:false, motivo:'Un nombre de al menos dos letras' };
+  if(talEsMarca(t))
+    return { ok:false, motivo:'«' + t + '» es una marca de producción, no un actor. '
+                             + 'Se puede escribir siempre, sin estar en la base.' };
+  if(!/\p{L}/u.test(t)) return { ok:false, motivo:'Un nombre lleva letras' };
+  const k = castNorm(t);
+  for(const n of TAL.nombres) if(castNorm(n) === k) return { ok:true, nombre:n, yaEstaba:true };
+  TAL.nombres.push(t);
+  TAL.nombres.sort((a, b) => a.localeCompare(b, 'es'));
+  TAL.claves.add(k);
+  TAL.ts = Date.now();
+  TAL.cargada = true;
+  try{ talPintarLista(); }catch(e){ /* sin sugerencias se escribe igual */ }
+  return { ok:true, nombre:t, yaEstaba:false };
+}
+
+/**
+ * Crear un talento preguntando antes, que es como debe hacerse desde el campo
+ * de reparto.
+ *
+ * La base existe para que una errata no parta a un actor en dos. Si crear uno
+ * fuera un clic sin mas, la errata pasaria a ser un clic: se escribe MARCELA
+ * BORDAS, no esta, se crea, y ya hay dos MARCELAS en la base para siempre. Por
+ * eso lo PARECIDO se ensena primero y bien visible: casi siempre la respuesta
+ * correcta es «no, queria ese otro».
+ *
+ * Devuelve el nombre ya guardado, o null si no se creo.
+ */
+async function talCrearPreguntando(nombre){
+  const t = String(nombre == null ? '' : nombre).replace(/\s+/g, ' ').trim();
+  const cerca = talCerca(t, 4);
+  let ok = true;
+  if(typeof DDL_UI !== 'undefined' && DDL_UI.confirmModal){
+    ok = await DDL_UI.confirmModal({
+      title: 'Crear el talento «' + t + '»',
+      body: cerca.length
+        ? 'Ojo: en la base ya hay alguien parecido. Si lo que pasa es que te has '
+          + 'equivocado al teclear, cancela y elige el de la lista — dos escrituras del '
+          + 'mismo actor lo parten en dos por toda la ocupación y los choques.'
+        : 'Se añade a la base de la empresa y podrás repartirlo en todos los programas.',
+      items: cerca.map(n => ({ label: n, meta: 'ya está en la base' })),
+      confirmLabel: 'Crear «' + t + '»',
+      cancelLabel: 'Cancelar',
+      danger: cerca.length > 0
+    });
+  }
+  if(!ok) return null;
+  const r = talAnadir(t);
+  if(!r.ok){ castAviso('❌ ' + r.motivo); return null; }
+  await talGuardar();
+  castAviso(r.yaEstaba ? ('Ya estaba en la base: ' + r.nombre)
+                       : ('🎭 Talento creado: ' + r.nombre + ' · ' + TAL.nombres.length + ' en la base'));
+  try{ if(document.getElementById('talOv')) talPanel(); }catch(e){ /* el panel ya no esta */ }
+  return r.nombre;
+}
+
+/**
+ * El aviso de «ese nombre no esta», con el boton para crearlo ahi mismo.
+ * Es el momento en que te enteras de que falta, asi que es donde tiene que
+ * poder arreglarse; mandarte al panel y volver es perder el hilo.
+ * `alCrear` se llama con el nombre ya guardado.
+ */
+function talAvisarDesconocido(v, alCrear){
+  const msg = v.motivo + (v.cerca && v.cerca.length ? ' · ¿querías ' + v.cerca.join(', ') + '?' : '');
+  if(typeof DDL_UI !== 'undefined' && DDL_UI.toast){
+    DDL_UI.toast(msg, { kind:'err', duration: 9000,
+      actionLabel: '➕ Crear talento',
+      onAction: async () => {
+        const nombre = await talCrearPreguntando(v.nombre);
+        if(nombre && typeof alCrear === 'function') alCrear(nombre);
+      } });
+  }else castAviso('❌ ' + msg);
 }

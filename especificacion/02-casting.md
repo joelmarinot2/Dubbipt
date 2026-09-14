@@ -77,6 +77,10 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **BAS-4** | Al rechazar un nombre se **ofrecen los parecidos** de la base. El listón es alto: una sugerencia que no es la buena estorba más que no sugerir nada. | ✅ |
 | **BAS-5** | `ORIGINAL`, `TODOS` y `X` se admiten **siempre**. No son actores: son marcas de producción. ORIGINAL es que no se dobla; TODOS, que lo graban todos; X, que ese parlamento no se hace. Por eso no entran en la base y no cuentan como carga de nadie (**CAST-22**). | ✅ |
 | **BAS-6** | `PRINCIPAL PHOTOGRAPHY`, `MAIN TITLE` y `BURNEDIN SUBS` no son personajes: son renglones de producción que **nunca se doblan**. Se marcan solos con `X` al entrar en casting. | ✅ |
+| **BAS-9** | Se pueden **crear talentos**, uno a uno, sin rehacer el Excel: entra un actor a mitad de temporada y nadie va a editar el archivo por una línea. Importar el Excel **reemplaza** la base; crear solo **suma**. | ✅ |
+| **BAS-10** | Se puede crear **desde el propio campo de reparto**, en el aviso de «no está en la base». Es ahí donde te enteras de que falta, así que es ahí donde tiene que poder arreglarse; mandarte al panel y volver es perder el hilo. | 👁 |
+| **BAS-11** | Crear **pregunta antes**, y si hay alguien parecido en la base lo enseña primero y bien visible. Si crear fuera un clic sin más, la errata pasaría a ser un clic: se escribe `MARCELA BORDAS`, no está, se crea, y ya hay dos MARCELAS para siempre. | 👁 |
+| **BAS-12** | Crear el mismo nombre dos veces **no lo duplica**: se devuelve el que ya había, con su escritura. `marcela borda` no es un actor nuevo. | ✅ |
 | **BAS-7** | La base se guarda **en el equipo** (vale para todos los programas) y **en la nube dentro del programa** (viaja con el trabajo). | 👁 |
 | **BAS-8** | Se puede repartir **desde el libreto abierto**, sin volver a las tarjetas: leyendo los parlamentos de un personaje es cuando se decide quién lo hace. Es el mismo camino que la tarjeta —deshacer, copia cruda, choques, registro y nube—, no una copia. | ✅ |
 
@@ -116,13 +120,16 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
   Equivocarse por exceso es lo caro, así que lo que se prueba es cuándo se da un
   personaje por cerrado. Dejar que un heredado sin verificar cuente como cerrado
   pone cuatro comprobaciones en rojo.
-- **BAS-1 a BAS-6** y **BAS-N1**, **BAS-N2**: `pruebas/base-talentos.prueba.js`, con
+- **BAS-1 a BAS-6**, **BAS-9**, **BAS-12** y **BAS-N1**, **BAS-N2**: `pruebas/base-talentos.prueba.js`, con
   los nombres de la base real que más guerra dan. La lectura del Excel se prueba
   con el XML de verdad —incluido un nombre partido en dos `<t>`, que es como Excel
   guarda una celda con formato dentro—. Quitar la restricción pone tres
   comprobaciones en rojo.
-- **BAS-8** y el resto, a mano en el navegador: importar los 291 nombres del Excel
-  de la empresa, repartir desde el libreto y ver que un nombre que no está se para.
+- **BAS-8**, **BAS-10**, **BAS-11** y el resto, a mano en el navegador: importar los
+  291 nombres del Excel de la empresa, repartir desde el libreto, ver que un nombre
+  que no está se para, crearlo desde el aviso, y comprobar que al escribir
+  `MARCELA BORDAS` la ventana enseña `MARCELA BORDA · ya está en la base` y que
+  cancelar deja la base intacta.
 - **CAST-15 a CAST-17** y **CAST-21 a CAST-23**: `pruebas/gestos.prueba.js` y
   `pruebas/ocupacion.prueba.js`.
 - El resto, a mano: abrir el 101 de un programa, repartir, abrir el 102 y

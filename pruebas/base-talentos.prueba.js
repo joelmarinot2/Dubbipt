@@ -22,11 +22,13 @@ exports.nombre = 'Base de talentos: solo se reparte a quien está registrado';
 const RECORTES = [
   ['function castNorm(t){', '/** El número final, si lo hay'],
   ['function castSimil(a, b){', '/* ── El registro, guardado por programa'],
-  ['const TAL = {', '/* ── La lista de sugerencias']
+  ['const TAL = {', '/* ── La lista de sugerencias'],
+  /* Solo `talAnadir`: lo de despues es la ventana de confirmacion, que es UI. */
+  ['/* ── Crear un talento', 'async function talCrearPreguntando']
 ];
 const EXPORTA = ['TAL', 'TAL_MARCAS', 'talEsMarca', 'talHayBase', 'talPoner', 'talValidar',
                  'talCerca', 'talSugerencias', 'talSiempreX', 'talMarcarSiempreX',
-                 'talLeerXlsx', 'castNorm'];
+                 'talLeerXlsx', 'talAnadir', 'castNorm'];
 
 /** Monta el modulo. `chars` son los personajes que ve `talMarcarSiempreX`. */
 function correr(opts){
@@ -164,4 +166,46 @@ exports.pruebas = function(t){
   t.eq('salen los tres nombres', leidos, ['ABRIL ARDILA', 'ANDRES MARIÑO', 'ZOE MENDEZ']);
   t.eq('un nombre partido en dos trozos se junta', leidos[1], 'ANDRES MARIÑO',
        'Excel parte el texto cuando lleva formato dentro de la misma celda');
+
+  t.seccion('10 · crear un talento');
+  const C2 = correr();
+  C2.talPoner(['MARCELA BORDA', 'HARI MORENO'], 'x.xlsx');
+
+  const r1 = C2.talAnadir('BETO SUR');
+  t.eq('entra en la base', r1.ok, true);
+  t.eq('con su nombre', r1.nombre, 'BETO SUR');
+  t.eq('y es nuevo', r1.yaEstaba, false);
+  t.eq('ahora son tres', C2.TAL.nombres.length, 3);
+  t.eq('y se admite al repartir', C2.talValidar('BETO SUR').ok, true,
+       'crearlo sin poder usarlo no sirve de nada');
+  t.eq('la lista queda ordenada', C2.TAL.nombres,
+       ['BETO SUR', 'HARI MORENO', 'MARCELA BORDA']);
+
+  t.seccion('11 · crear el mismo dos veces NO lo duplica');
+  const r2 = C2.talAnadir('marcela borda');
+  t.eq('se reconoce que ya estaba', r2.yaEstaba, true);
+  t.eq('y devuelve el que ya habia', r2.nombre, 'MARCELA BORDA',
+       'si entrara otra vez tendriamos dos MARCELAS, que es justo lo que la base evita');
+  t.eq('siguen siendo tres', C2.TAL.nombres.length, 3);
+  t.eq('una tilde de mas tampoco duplica', C2.talAnadir('HARI MORENO').yaEstaba, true);
+
+  t.seccion('12 · lo que NO se puede crear');
+  for(const m of ['ORIGINAL', 'TODOS', 'X']){
+    const r = C2.talAnadir(m);
+    t.eq('«' + m + '» no entra en la base', r.ok, false,
+         'dentro contaria como un actor con carga en la ocupacion');
+  }
+  t.eq('una letra suelta, no', C2.talAnadir('A').ok, false);
+  t.eq('vacio, no', C2.talAnadir('   ').ok, false);
+  t.eq('solo numeros, no', C2.talAnadir('12345').ok, false,
+       'un numero no es el nombre de nadie');
+  t.eq('y la base no ha crecido con ninguno', C2.TAL.nombres.length, 3);
+
+  t.seccion('13 · crear en una base vacia la enciende');
+  const V2 = correr();
+  t.eq('antes no restringe', V2.talHayBase(), false);
+  V2.talAnadir('ANA ROJAS');
+  t.eq('despues si', V2.talHayBase(), true);
+  t.eq('y ya rechaza a quien no este', V2.talValidar('OTRO CUALQUIERA').ok, false,
+       'crear el primero es lo que cierra la puerta: conviene saberlo');
 };
