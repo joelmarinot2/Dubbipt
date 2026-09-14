@@ -1,10 +1,10 @@
 // Service Worker · Dubbipt  (VERSION autogenerada en cada build)
-const VERSION = '2026-09-11T21:05';
+const VERSION = '2026-09-14T18:40';
 const CACHE   = 'dubbipt-' + VERSION;
 
 const SHELL = [
   './', './config.js', './manifest.json',
-  './js/cortes.js', './js/formatos.js', './js/adr.js', './js/sala.js',
+  './js/cortes.js', './js/formatos.js', './js/adr.js', './js/sala.js', './js/talentos.js',
   './icon-192.png', './icon-512.png', './icon-512-mask.png', './apple-touch-icon.png',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',
