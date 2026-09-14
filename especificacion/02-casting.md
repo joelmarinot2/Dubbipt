@@ -46,6 +46,11 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **CAST-21** | La ocupación cuenta, por actor, cuántos personajes lleva, cuántas líneas suma y en qué páginas. | ✅ |
 | **CAST-22** | Las casillas que **no son un actor** —`X`, `ORIGINAL`, `X ORIGINAL`, `TODOS`, `N/A`, `VOZ ORIGINAL`, `SIN DOBLAJE`— no cuentan como carga de nadie. Contadas, salían las primeras con cien líneas y tapaban a los actores de verdad. | ✅ |
 | **CAST-23** | Un nombre que solo se **parece** a una de esas palabras sigue siendo un actor: `MÁXIMO`, `ORIGINALES DE LA TORRE`, `TODOS SANTOS`. | ✅ |
+| **OCU-1** | La ocupación también está **dentro del libreto**, en un cajón al costado. Repartiendo se pasa el rato ahí dentro, y el libreto es una capa a pantalla completa: antes había que cerrarlo, mirar, y volver a abrirlo. | ✅ |
+| **OCU-2** | Son los **mismos datos** (`castOcupacion()`), no una segunda cuenta que pueda decir otra cosa. | ✅ |
+| **OCU-3** | Solo en **casting**. En grabación la ocupación no pinta nada y el libreto tiene que estar despejado. | ✅ |
+| **OCU-4** | Al abrirlo, **el contenido del libreto se corre a la izquierda** para que el cajón no lo tape; al plegarlo vuelve. Por debajo de **900 px** no se corre nada: dejaría el libreto ilegible y ahí es mejor que el cajón se ponga encima. | ✅ |
+| **OCU-5** | La pestaña se ve **siempre**, también plegado: un panel que se esconde del todo es un panel que nadie encuentra. Y el cajón abierto o cerrado es **el mismo estado** que el de la pantalla principal. | ✅ |
 | **CAST-24** | Un **choque** es el mismo actor haciendo dos personajes que hablan a menos de **4 líneas** de distancia. Se mide en líneas del libreto, no en páginas: dos personajes pueden compartir página y estar a treinta líneas, o estar en páginas distintas y hablar seguidos. | 👁 |
 | **CAST-25** | Un choque avisa y pinta las dos tarjetas en **rojo**. Un aviso por pareja, no por línea. | 👁 |
 
@@ -130,6 +135,9 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
   que no está se para, crearlo desde el aviso, y comprobar que al escribir
   `MARCELA BORDAS` la ventana enseña `MARCELA BORDA · ya está en la base` y que
   cancelar deja la base intacta.
+- **OCU-1 a OCU-5**: `pruebas/ocupacion-libreto.prueba.js`, con un documento de
+  libreto de mentira. Enseñarla también en grabación pone tres comprobaciones en
+  rojo.
 - **CAST-15 a CAST-17** y **CAST-21 a CAST-23**: `pruebas/gestos.prueba.js` y
   `pruebas/ocupacion.prueba.js`.
 - El resto, a mano: abrir el 101 de un programa, repartir, abrir el 102 y
