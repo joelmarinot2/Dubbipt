@@ -39,6 +39,7 @@ alguien la abre sin conexión, y entonces falla sin ninguna explicación.
 | `estudio.prueba.js` | Que el modo estudio se pueda encender sin haber abierto antes el libreto: el contenedor que no existe se crea y se vuelve a pedir. Vino de un informe de fallos de producción. |
 | `paneles.prueba.js` | Que los paneles de las herramientas de vídeo se vean con el libreto abierto, que es la única situación en la que se pueden abrir. Y que los avisos y las preguntas no se queden debajo de nada. |
 | `banda.prueba.js` | Que en la banda rítmica ninguna palabra se pise con la de al lado y que ninguna deje de entrar en su instante. Con un canvas de mentira que apunta cada trazo. |
+| `base-talentos.prueba.js` | Que solo se pueda repartir a quien esté en la base de la empresa, que `ORIGINAL`, `TODOS` y `X` pasen siempre, y que sin base no se restrinja nada. |
 | `callados.prueba.js` | El trinquete: que el número de `catch` que se comen el error **no suba nunca**. |
 
 ## Cómo están hechas
@@ -85,6 +86,7 @@ comprobaron rompiendo el código a propósito, una cosa a la vez:
 | Quitar `.modo-cap` de las excepciones de `ddlov` (EST-N2) | Sí — 5 comprobaciones |
 | Devolver la clave floja de `castClave` (CAST-N5) | Sí — 5 comprobaciones |
 | Dibujar las palabras de la banda sin estrechar (BAN-7) | Sí — 2 comprobaciones |
+| Dejar pasar un nombre que no está en la base (BAS-2) | Sí — 3 comprobaciones |
 
 Las **dos de los cortes** no se detectaban con las pruebas iniciales: el vídeo
 de prueba era demasiado fácil y nada superaba el suelo salvo los cortes de

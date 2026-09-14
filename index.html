@@ -759,6 +759,8 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .card .ctal-input{ width:100%; background:#0f1215; border:1px solid #22C55E; border-radius:9px;
   padding:9px 12px; color:#f2f3f5; font-family:'Inter',sans-serif; font-size:14px; outline:none; }
 .card .ctal-input::placeholder{ color:#6b7280; }
+/* Nombre que no esta en la base: se ve al momento, no solo en el aviso. */
+.card .ctal-input.ctal-mal{ border-color:#F472B6; background:#1a0f16; }
 .card .cline{ display:none; }
 .card .cbtn{ display:block; width:calc(100% + 36px); margin:14px -18px 0; padding:12px 18px;
   background:transparent; border:none; border-top:1px solid #1c1e22;
@@ -1829,6 +1831,7 @@ body.modo-casting #btnExport{ display:none !important; }
       <div class="ac-div" aria-hidden="true"></div>
       <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar entre grabación y casting">Modo</button>
       <button class="btnv sm" id="btnGestos" style="display:none" onclick="gestPanel()" title="Personajes que en este capitulo solo hacen gestos, sin una sola palabra">🎭 Solo gestos</button>
+      <button class="btnv sm" id="btnBaseTal" style="display:none" onclick="talPanel()" title="La lista de actores de la empresa: solo se puede repartir a quien este aqui">🎭 Base de talentos</button>
       <button class="btnv sm" id="btnMeta" style="display:none" onclick="castMetaPanel()" title="Fecha, género, tiempo, director, técnico y estudio del programa">Cabecera</button>
       <button class="btnv sm" id="btnDcast" style="display:none" onclick="dcPanel()" title="Sincronizar el casting con DublajeCast">⇄ DublajeCast</button>
       <button class="btnv sm" id="btnImpDes" style="display:none" onclick="imprimirDesglose()" title="Imprimir el desglose: una fila por personaje">🖨 Desglose</button>
@@ -2177,7 +2180,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.72.0-nube';
+const APP_VER_NUM = 'v10.73.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5022,19 +5025,44 @@ function renderCards(){
       inp.className = 'ctal-input';
       inp.type = 'text';
       inp.value = c.talent || '';
-      inp.placeholder = 'Nombre del talento…';
-      // catálogo de la empresa, si el desglose lo trae
-      try{ if(CAST_TALENTOS.length) inp.setAttribute('list','talList'); }catch(e){}
+      inp.placeholder = (typeof talHayBase==='function' && talHayBase())
+        ? 'Talento de la base…' : 'Nombre del talento…';
+      // la base de la empresa; si no hay, el catálogo que trajera el desglose
+      try{
+        if((typeof talHayBase==='function' && talHayBase()) || CAST_TALENTOS.length)
+          inp.setAttribute('list','talList');
+      }catch(e){}
       inp.setAttribute('aria-label', 'Talento para '+c.display);
       talDiv.appendChild(inp);
       inp.focus(); inp.select();
       cb.textContent = 'Guardar';
 
       let guardando = false;
-      const save = async ()=>{
+      const save = async (explicito)=>{
         if(guardando) return;     // clic y blur pueden llegar los dos
+        /* Solo se reparte a quien esté en la base. Un nombre que no está es casi
+           siempre una errata, y una errata parte a un actor en dos por toda la
+           ocupación, los choques y el registro del programa, sin avisar de nada.
+           Se para AQUÍ, que es donde se puede corregir, y se ofrecen los
+           parecidos en vez de dejarte adivinar. Sin base no se restringe. */
+        let val = inp.value.trim();
+        if(typeof talValidar === 'function'){
+          const v = talValidar(val);
+          if(!v.ok){
+            castAviso('❌ ' + v.motivo
+              + (v.cerca && v.cerca.length ? ' · ¿querías ' + v.cerca.join(', ') + '?'
+                                           : ' · añádelo en «🎭 Base de talentos»'));
+            if(explicito){
+              inp.classList.add('ctal-mal');
+              try{ inp.focus(); inp.select(); }catch(e){}
+            }else{
+              renderCards();                         // se deja como estaba
+            }
+            return;                                  // en ningún caso se guarda
+          }
+          val = v.nombre;                            // como está escrito en la base
+        }
         guardando = true;
-        const val = inp.value.trim();
         if(val !== (c.talent||'')){
           try{ castHistPush(castFoto([c.key]), (c.talent ? 'talento de ' : 'asignar talento a ') + c.display); }catch(e){}
         }
@@ -5054,9 +5082,13 @@ function renderCards(){
         if(typeof DDL_UI!=='undefined') DDL_UI.toast(val ? 'Talento asignado: '+val : 'Talento borrado');
         try{ castRegAnotarPronto(); }catch(e){}
       };
-      card._guardarTal = save;    // para que el botón «Guardar» pueda llamarlo
-      inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); save(); } if(e.key==='Escape'){ renderCards(); } });
-      inp.addEventListener('blur', ()=>{ setTimeout(()=>{ if(card.contains(document.activeElement)) return; save(); }, 120); });
+      card._guardarTal = () => save(true);   // para que el botón «Guardar» pueda llamarlo
+      inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); save(true); } if(e.key==='Escape'){ renderCards(); } });
+      /* Al salir del campo NO se devuelve el foco aunque el nombre no valga:
+         robarle el foco a donde acabas de pinchar es peor que el error. Se
+         avisa y se deja como estaba. Con Enter o con «Guardar» sí se queda
+         donde está, porque ahí sí estás corrigiéndolo. */
+      inp.addEventListener('blur', ()=>{ setTimeout(()=>{ if(card.contains(document.activeElement)) return; save(false); }, 120); });
     });
 
     box.appendChild(card);
@@ -6089,7 +6121,7 @@ function ponerModo(epId, m){
   if(bu){ bu.style.display = (m === 'casting') ? '' : 'none'; castPintarUndo(); }
   const bt = document.getElementById('btnTabla');
   if(bt) bt.style.display = (m === 'casting') ? '' : 'none';
-  for(const id of ['btnImpDes','btnImpPla','btnDcast','btnMeta','btnGestos']){
+  for(const id of ['btnImpDes','btnImpPla','btnDcast','btnMeta','btnGestos','btnBaseTal']){
     const b = document.getElementById(id);
     if(b) b.style.display = (m === 'casting') ? '' : 'none';
   }
@@ -6098,7 +6130,26 @@ function ponerModo(epId, m){
   try{ if(m === 'casting') plaOpen = true; renderPlanilla(); }catch(e){ fallo('renderPlanilla · index.html:6070', e); }
   try{ castPintarOcupacion(); }catch(e){}
   // continuidad: lo que ya se repartió en otros capítulos del programa
-  if(m === 'casting'){ try{ gestAvisar(); }catch(e){} try{ castHeredar(null); }catch(e){} }
+  if(m === 'casting'){
+    try{ gestAvisar(); }catch(e){}
+    /* La base primero: la herencia y el campo de talento la necesitan puesta.
+       Y de paso PRINCIPAL PHOTOGRAPHY, MAIN TITLE y BURNEDIN SUBS quedan
+       marcados con X, que es lo que les toca siempre. */
+    (async () => {
+      try{ await talCargar(); }catch(e){ fallo('talCargar · index.html:6131', e, 'la base de talentos no se ha podido cargar'); }
+      try{
+        const x = talMarcarSiempreX();
+        if(x.length){
+          renderCards();
+          castAviso('✖ ' + x.length + ' marcado' + (x.length===1?'':'s') + ' con X porque nunca se dobla'
+            + (x.length===1?'':'n') + ': ' + x.join(', '));
+          try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }
+          catch(e){ fallo('epDataUpsert · index.html:6138', e, 'puede que esto no se haya guardado en la nube'); }
+        }
+      }catch(e){ fallo('talMarcarSiempreX · index.html:6140', e); }
+      try{ await castHeredar(null); }catch(e){ fallo('castHeredar · index.html:6141', e); }
+    })();
+  }
   const bm = document.getElementById('btnModo');
   if(bm){ bm.style.display = ''; bm.textContent = (m === 'casting') ? 'Casting' : 'Grabación'; }
   if(m === 'casting') castCargarCatalogo();
@@ -10314,6 +10365,25 @@ body.finding .lfind{display:flex}
 body.deskchips.finding .lfind{ padding-right:100px; }
 body.haschips.finding  .lfind{ padding-left:100px; }
 #lFindClose{ font-weight:800; }
+/* Repartir sin salir del libreto. Estas leyendo los parlamentos del personaje,
+   que es EL momento en que sabes quien lo hace; volver a las tarjetas para
+   escribirlo rompe la lectura. Misma barra, mismo sitio que la de buscar. */
+.ltal{ align-items:center; gap:9px; padding:9px 13px; background:var(--head);
+  border-bottom:1px solid var(--card-b); position:sticky; top:var(--lhH,54px); z-index:40;
+  font-family:'Inter',sans-serif; flex-wrap:wrap }
+body.deskchips .ltal{ padding-right:100px; }
+body.haschips  .ltal{ padding-left:100px; }
+.ltal .lt-qui{ font-weight:700; font-size:13px; color:var(--pc,#5FC85A); flex:none;
+  max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.ltal .lt-et{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim,#8b8f97); flex:none }
+.ltal input{ flex:1; min-width:120px; background:var(--card); border:1px solid var(--card-b);
+  color:var(--ink); border-radius:9px; padding:8px 11px; font-size:13.5px; outline:none }
+.ltal input:focus{ border-color:var(--pc,#5FC85A) }
+.ltal input.mal{ border-color:#F472B6 }
+.ltal button{ flex:none; background:var(--card); border:1px solid var(--card-b); color:var(--ink);
+  border-radius:9px; padding:8px 12px; font-size:13px; font-weight:600; cursor:pointer }
+.ltal button.ok{ background:#22C55E; border-color:#22C55E; color:#06210f }
+.ltal .lt-marca{ font-size:12px; color:var(--dim,#8b8f97); flex:none }
 @media(max-width:560px){
   .lfind{ gap:5px; }
   .lfind button{ padding:8px 9px; }
@@ -10806,6 +10876,7 @@ function buildLibretoDoc(pc){
       <button id="lFindNext" title="Siguiente">▼</button>
       <button id="lFindClose" title="Cerrar">✕</button>
     </div>
+    <div class="ltal" id="lTal" style="display:none"></div>
     <div class="lchips" id="lChips"></div>
     <div class="ltools" id="lTools">
       <button id="tHide" style="text-align:center">${LIB_ICON.chevUp} Ocultar herramientas</button>
@@ -12903,6 +12974,10 @@ function fillCharSelect(){
 function renderLibretoChips(){
   if(!pop2 || !pop2.doc) return;
   try{ fillCharSelect(); }catch(e){}
+  /* La barra para repartir sin salir del libreto. Va aquí porque el documento
+     del iframe se reconstruye entero al abrirlo, y este es el único punto por
+     el que pasan todas las aperturas y todos los refrescos. */
+  try{ talBarraLibreto(); }catch(e){ fallo('talBarraLibreto · index.html:12958', e); }
   const box = pop2.doc.getElementById('lChips');
   if(!box) return;
   const c = pop2.key ? charIdx[pop2.key] : null;
@@ -17288,3 +17363,4 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/formatos.js"></script>
 <script src="./js/adr.js"></script>
 <script src="./js/sala.js"></script>
+<script src="./js/talentos.js"></script>
