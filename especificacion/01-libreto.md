@@ -18,8 +18,8 @@ El modelo es siempre el mismo:
 
 | | Regla | |
 |---|---|---|
-| **LIB-1** | La clave de un personaje (`key`) sale de `norm(nombre)`: sin tildes, sin apóstrofos, sin puntos, en mayúsculas y con los espacios colapsados. Así «O'BRIEN» y «OBRIEN», o «DR. KIM» y «DR KIM», son el mismo personaje. | 👁 |
-| **LIB-2** | El `display` conserva el nombre **tal como está escrito en el guion**. La clave es para casar; el display, para leer. | 👁 |
+| **LIB-1** | La clave de un personaje (`key`) sale de `norm(nombre)`: sin tildes, sin apóstrofos, sin puntos, en mayúsculas y con los espacios colapsados. Así «O'BRIEN» y «OBRIEN», o «DR. KIM» y «DR KIM», son el mismo personaje. **Todos** los caminos que crean personajes la usan: el desglose de Excel, el conteo por reglas del propio libreto, el escaneo del PDF y el lector de Word. | ✅ |
+| **LIB-2** | El `display` conserva el nombre **tal como está escrito en el guion**. La clave es para casar; el display, para leer. | ✅ |
 | **LIB-3** | `tcEff` es el timecode efectivo en **segundos de reloj**, con la hora del rollo incluida. Una línea sin timecode propio hereda el de la anterior (cascada). | ✅ |
 | **LIB-4** | Un timecode en el mismo renglón que el nombre del personaje es **el timecode de esa intervención**, nunca su primera línea de diálogo. | ✅ |
 | **LIB-5** | Un timecode al final de un renglón pertenece a la intervención que **empieza**, no a la que acaba. | ✅ |
@@ -39,6 +39,7 @@ El modelo es siempre el mismo:
 | **LIB-N1** | Nunca reconstruir `script` desde `pageData` si `pageData` está vacío y ya hay un `script` cargado. Un capítulo hidratado desde la nube no tiene páginas de PDF; reconstruir ahí **borraría el libreto**. | ✅ |
 | **LIB-N2** | Nunca pintar ni guardar en un capítulo las marcas del capítulo anterior. Al cambiar de capítulo de verdad, las marcas se tiran. | 👁 |
 | **LIB-N3** | Nunca dejar que un renglón mixto (timecode + texto) entre entero como diálogo. El timecode va a su casilla; solo lo que sobra es diálogo. Si no, se lee el timecode en voz alta. | ✅ |
+| **LIB-N4** | **Nunca crear un personaje con una clave sin normalizar.** Es el fallo más callado de todos: no hay error, la tarjeta existe y se puede abrir, y su libreto sale en blanco. Pasó con `PÚBLICO` en *The Wayans Bros* 101 — el desglose por reglas guardaba el nombre crudo del PDF y las marcas del libreto usaban `norm()`: sus 314 parlamentos no aparecieron por ninguna parte. Afecta a todo nombre con tilde o eñe. | ✅ |
 
 ## Cómo se demuestra
 
@@ -58,6 +59,7 @@ importan:
 |---|---|
 | Quitar la guarda de **LIB-N1** | `dio [], esperaba undefined`: el libreto bajado de la nube, borrado |
 | Bajar el umbral de **LIB-9** de 20 tomas a 6 | un libreto de doblaje secuestrado como audiodescripción |
+| Devolver la clave sin normalizar (**LIB-1**, **LIB-N4**) | `dio ["PÚBLICO","ANDRÉS","NIÑO"], esperaba []` |
 
 Y **a mano**, la comprobación de extremo a extremo que sigue mandando antes de
 una entrega: cargar un guion real, contar las intervenciones por personaje y
@@ -66,7 +68,12 @@ de cada personaje coincide.
 
 ## Sin resolver
 
-- **LIB-1**, **LIB-2**, **LIB-7**, **LIB-10** a **LIB-13** y **LIB-N2** siguen
+- **LIB-1**, **LIB-2** y **LIB-N4** ya están cerradas, en
+  `pruebas/acentos.prueba.js`: se comprueba que ninguna clave conserve un
+  carácter que `norm()` doblaría, y que el `display` sí conserve sus tildes.
+  Se cerraron a posteriori, después de que el fallo saliera con un capítulo
+  real.
+- **LIB-7**, **LIB-10** a **LIB-13** y **LIB-N2** siguen
   sin prueba automática. Las de fusión (**LIB-11**, **LIB-12**) son las más
   fáciles de añadir: `applyCharMerges` es casi pura sobre `_charsRaw`.
 - **LIB-8** y **LIB-9** son heurísticas con números elegidos a ojo (20 tomas,

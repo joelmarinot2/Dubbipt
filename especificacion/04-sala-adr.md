@@ -26,10 +26,21 @@ qué dijo el director.
 |---|---|---|
 | **BAN-1** | El texto se desplaza **de derecha a izquierda** contra una línea de sincronía fija, y cada palabra la cruza en su instante. | 👁 |
 | **BAN-2** | La línea se puede colocar (por defecto al **32 %** del ancho) y engrosar. | 👁 |
-| **BAN-3** | El cuerpo de letra **se encoge** para que la frase quepa en el tiempo que tiene. Es lo que permite leerla montada sobre la boca. | 👁 |
+| **BAN-3** | Cada palabra se **estrecha** para caber en el hueco que va hasta la siguiente. El **cuerpo de letra no cambia** de una palabra a otra —eso se lee fatal—: lo que cambia es el ancho, como en una banda rítmica de verdad, donde las letras se aprietan con la velocidad del habla. Suelo de legibilidad: el 25 %. | ✅ |
+| **BAN-7** | **Ninguna palabra se pisa con la de al lado, y ninguna deja de entrar en su instante.** Son las dos cosas a la vez, y era fácil cumplir solo una: dibujadas todas del mismo ancho desde su instante, una palabra larga dicha deprisa se comía a la siguiente («Peescaparon», «cuandpudieron», vistas en sala). | ✅ |
+| **BAN-8** | Las palabras se reparten sobre la ventana del **cue**, no sobre la del libreto a secas —igual que **SALA-9**—. Si no, una entrada corregida a mano mueve la banda de color del personaje y deja su texto repartido sobre el sitio viejo. | 👁 |
 | **BAN-4** | Un **carril por personaje**. Si dos hablan solapados —y en un diálogo se solapan constantemente— cada uno va por su altura. Un personaje conserva su carril mientras no se pise consigo mismo. | 👁 |
 | **BAN-5** | Los tiempos de palabra salen del mismo reparto que el karaoke, incluido el afinado con IA cuando está puesto. | 👁 |
 | **BAN-6** | Si el reparto de palabras devuelve un `NaN`, se **descarta el reparto entero** y se pinta la frase sin palabras sueltas. Un `NaN` vaciaba la banda completa sin decir nada. | 👁 |
+
+## Reglas · modo estudio
+
+| | Regla | |
+|---|---|---|
+| **EST-1** | El modo estudio parte la ventana del libreto en **dos columnas**: el panel de vídeo a la izquierda y el libreto a la derecha. Al apagarlo, el libreto vuelve a ocupar todo el ancho. | ✅ |
+| **EST-2** | Se puede encender **sin haber abierto antes el libreto incrustado**: si el contenedor no existe, se crea, y se vuelve a pedir antes de usarlo. | ✅ |
+| **EST-3** | Los paneles de las herramientas —sala, cues, formatos, planos— se abren desde botones que viven **dentro** del libreto, así que siempre con `body.ddlov` puesto. Tienen que **verse igual**. La lista de excepciones de esa regla va por **clase** (`.modo-cap`, `.ddl-encima`), no por identificador. | ✅ |
+| **EST-4** | Los avisos y las preguntas de confirmación se ven **por encima de todo**, también del libreto y del trackpad. Una pregunta que no se ve es un botón que no hace nada. | ✅ |
 
 ## Reglas · cues
 
@@ -53,6 +64,8 @@ qué dijo el director.
 |---|---|
 | **SALA-N1** | Nunca dibujar por encima de la imagen algo que capture el ratón. La capa de señalización no recibe clics. | 👁 |
 | **ADR-N1** | Nunca guardar en el cue lo que ya está en el libreto. Duplicarlo garantiza que un día no coincidan. | 👁 |
+| **EST-N2** | **Nunca ampliar una lista de excepciones por identificador.** Lo que nazca después queda fuera y nadie se entera: el elemento se crea entero y se le pone `display:none`. Así estuvieron los cuatro paneles de las herramientas de vídeo — se pulsaba el botón y no pasaba nada. Se exime por clase. | ✅ |
+| **EST-N1** | **Nunca usar un nodo del DOM que se pidió antes de existir.** Una variable que se leyó en null se queda en null aunque el nodo se cree dos líneas más abajo. Pasó en `studioToggleStrip`: el primer clic del día en «modo estudio», sin el libreto abierto, se caía con «Cannot read properties of null (reading 'style')». Lo contó el informe de fallos desde producción — que es exactamente para lo que está. | ✅ |
 | **ADR-N2** | Nunca dejar el vídeo alterado al terminar un análisis o un bucle: el volumen, la velocidad y la posición se devuelven como estaban. | 👁 |
 
 ## Cómo se demuestra
@@ -65,16 +78,30 @@ qué dijo el director.
 - Los carriles: tres personajes solapados salen en 0, 1 y 2, y el primero
   recupera su carril al volver.
 - Los cues, a mano: recorrer el ciclo de estados y ver subir el take.
+- **EST-1**, **EST-2** y **EST-N1**, en `pruebas/estudio.prueba.js`, con un
+  DOM de mentira: lo que se prueba no es el navegador, sino el **orden** en
+  que la función pide las cosas. Quitar la relectura del contenedor pone seis
+  comprobaciones en rojo.
+- **EST-3**, **EST-4** y **EST-N2**, en `pruebas/paneles.prueba.js`. No monta
+  un navegador: lee la regla de CSS que el código escribe y los overlays que el
+  código crea, y aplica la semántica de la regla a cada uno. Nada está escrito
+  dos veces, así que un panel nuevo entra solo en la prueba. Quitar `.modo-cap`
+  de las excepciones pone cinco comprobaciones en rojo.
 
 ## Sin resolver
 
+- **BAN-3** y **BAN-7**, en `pruebas/banda.prueba.js`, con un canvas de mentira
+  que apunta cada trazo con su posición y su ancho ya escalado. La geometría es
+  exacta porque el ancho de un carácter se fija en la prueba. Se comprueba el
+  caso que llegó de sala: ninguna palabra se pisa **y** cada una sigue cruzando
+  la línea en su instante. Quitar el estrechado pone dos comprobaciones en rojo.
 - **SALA-5**, los beeps, **no se han oído nunca en una prueba**. La lógica que
   decide cuándo suenan está escrita y revisada, pero nadie ha comprobado con un
   cronómetro que caen a −3, −2 y −1 s. Es lo primero que hay que verificar en
   sala.
-- Nada de la señalización tiene prueba automática. Se podría: `salaPintar` y
-  `salaBandaPintar` dibujan en un canvas, y en Node se puede usar un canvas de
-  mentira que apunte las llamadas. Con eso se cerrarían **SALA-1** a **SALA-4**
-  y **BAN-1** a **BAN-4**.
+- El canvas de mentira ya existe (`pruebas/banda.prueba.js`) y cerró **BAN-3** y
+  **BAN-7**. Con él se pueden cerrar también **SALA-1** a **SALA-4** y **BAN-1**,
+  **BAN-2** y **BAN-4**, que siguen abiertas: es medir posiciones, y la máquina
+  para medirlas ya está escrita.
 - La captura de fotogramas del vídeo real (`drawImage` sobre el `<video>`) no
   se ha podido comprobar: hace falta una ventana que se esté pintando.

@@ -46,3 +46,5 @@ temp/
 # no una regla del proyecto: no se comparte.
 .claude/settings.local.json
 .claude/worktrees/
+# launch.json lleva la ruta de node de ESTA maquina: es local, no del proyecto
+.claude/launch.json

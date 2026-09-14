@@ -1654,7 +1654,7 @@ body.modo-casting #btnExport{ display:none !important; }
 </style>
 <style>
 /* ===== DDL UI kit: toasts, confirm modal, skeleton, progreso ===== */
-#ddlToasts{ position:fixed; top:14px; right:14px; z-index:11000; display:flex; flex-direction:column; gap:8px; max-width:340px; }
+#ddlToasts{ position:fixed; top:14px; right:14px; z-index:2147482000; display:flex; flex-direction:column; gap:8px; max-width:340px; }
 .ddl-toast{ animation:ddlToastIn .2s ease-out; background:#191c20; border:1px solid #2c3036; border-left:3px solid #4ADE80; border-radius:8px;
   padding:11px 13px; display:flex; align-items:center; gap:10px; box-shadow:0 8px 24px rgba(0,0,0,.4); font-family:'Inter',sans-serif; }
 .ddl-toast.err{ border-left-color:#F472B6; }
@@ -1664,7 +1664,7 @@ body.modo-casting #btnExport{ display:none !important; }
 .ddl-toast .act:hover{ border-color:#4ADE80; color:#fff; }
 @keyframes ddlToastIn{ from{ transform:translateY(-10px); opacity:0 } to{ transform:translateY(0); opacity:1 } }
 
-#ddlConfirmOv{ position:fixed; inset:0; z-index:11500; background:rgba(8,9,11,.7); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+#ddlConfirmOv{ position:fixed; inset:0; z-index:2147482500; background:rgba(8,9,11,.7); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
   display:flex; align-items:center; justify-content:center; padding:20px; font-family:'Inter',sans-serif; }
 .ddl-confirm{ width:min(420px,94vw); background:#15171a; border:1px solid #2c3036; border-radius:12px; padding:22px; }
 .ddl-confirm .cf-head{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
@@ -2076,7 +2076,7 @@ const DDL_UI = (function(){
   function esc_(s){ return String(s).replace(/[&<>"]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
   function toastBox(){
     let b = document.getElementById('ddlToasts');
-    if(!b){ b = document.createElement('div'); b.id='ddlToasts'; b.setAttribute('role','status'); b.setAttribute('aria-live','polite'); document.body.appendChild(b); }
+    if(!b){ b = document.createElement('div'); b.id='ddlToasts'; b.className='ddl-encima'; b.setAttribute('role','status'); b.setAttribute('aria-live','polite'); document.body.appendChild(b); }
     return b;
   }
   // toast(msg, {kind:'ok'|'err', actionLabel, onAction, duration})
@@ -2102,7 +2102,7 @@ const DDL_UI = (function(){
     cfg = cfg || {};
     return new Promise((resolve)=>{
       const old = document.getElementById('ddlConfirmOv'); if(old) old.remove();
-      const ov = document.createElement('div'); ov.id='ddlConfirmOv';
+      const ov = document.createElement('div'); ov.id='ddlConfirmOv'; ov.className='ddl-encima';
       const itemsHtml = (cfg.items||[]).map(it=>
         `<div class="cf-item"><span>${esc_(it.label)}${it.meta?`<small>· ${esc_(it.meta)}</small>`:''}</span></div>`).join('');
       ov.innerHTML = `<div class="ddl-confirm" role="alertdialog" aria-modal="true">
@@ -2177,7 +2177,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.68.0-nube';
+const APP_VER_NUM = 'v10.72.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3660,15 +3660,25 @@ function desgloseByRules(){
     if(esNombre){
       const ints = contarIntervenciones(dial);
       if(ints>0){
-        if(!byName[name]){ byName[name] = { key:name, firstTC:tc, pages:{} }; order.push(name); }
-        byName[name].pages[page] = (byName[name].pages[page]||0) + ints;
+        /* La clave va NORMALIZADA, igual que en todos los demás caminos.
+           Aquí se guardaba el nombre crudo del PDF mientras las marcas del
+           libreto se guardan con norm(): PÚBLICO de un lado, PUBLICO del otro.
+           Cualquier nombre con tilde o eñe -PÚBLICO, ANDRÉS, NIÑO- se quedaba
+           sin un solo parlamento y sin ningún error: la tarjeta existía y su
+           libreto salía en blanco. El nombre con sus tildes se guarda aparte,
+           que es el que se enseña. */
+        const nk = norm(name);
+        if(nk){
+          if(!byName[nk]){ byName[nk] = { key:nk, display:name, firstTC:tc, pages:{} }; order.push(nk); }
+          byName[nk].pages[page] = (byName[nk].pages[page]||0) + ints;
+        }
       }
     }
     i = k;
   }
   if(!order.length) return false;
   chars = order.map(nm=>{ const c=byName[nm];
-    return { key:c.key, display:c.key, talent:'',
+    return { key:c.key, display:c.display || c.key, talent:'',
       pages:Object.keys(c.pages).map(p=>({p:+p, ints:c.pages[p]})).sort((a,b)=>a.p-b.p),
       totalInts:Object.values(c.pages).reduce((s,x)=>s+x,0),
       firstTC:c.firstTC, color:charColor(c.key), noRec:NO_REC.has(c.key) };
@@ -5881,9 +5891,18 @@ function castEsc(t){
   return String(t == null ? '' : t)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
-/** Nombre de personaje normalizado, para casar el libreto con el Excel. */
+/* Nombre de personaje normalizado, para casar el libreto con el Excel.
+ *
+ * Es EXACTAMENTE el mismo `castNorm` que usa la herencia de talentos. Antes era
+ * mas flojo -solo mayusculas y espacios- y ahi se perdian filas: el libreto
+ * escribe AMAR’S con la comilla curva y el Excel AMAR'S con la recta, o el
+ * libreto trae una tilde que el Excel no. La fila no se encontraba, el talento
+ * no se escribia en ninguna parte, y en el Excel quedaba una celda en blanco.
+ *
+ * Dos normalizadores para el mismo trabajo es la misma trampa que dejo a
+ * PUBLICO sin parlamentos (LIB-N4). Aqui hay UNO. */
 function castClave(t){
-  return String(t == null ? '' : t).replace(/\s+/g,' ').trim().toUpperCase();
+  return castNorm(t);
 }
 
 /** Del nombre de la hoja al archivo XML que la contiene dentro del ZIP. */
@@ -5983,12 +6002,20 @@ function castRellenar(buf, asign, meta){
   const personajes = castLeerColumna(xml, CAST_COL_PERSONAJE);
   const valores = {};
   const vistos = new Set();
+  /* Las filas del Excel que se van a quedar EN BLANCO. Es la queja que llego:
+     el desglose sale con la mitad de la columna vacia y la aplicacion no dice
+     ni una palabra. Una celda vacia puede ser dos cosas muy distintas -no hay
+     talento asignado, o lo hay y no se encontro la fila- y hasta ahora las dos
+     se veian igual. */
+  const enBlanco = [];
   for(const fila in personajes){
     const k = castClave(personajes[fila]);
     if(!k) continue;
     if(Object.prototype.hasOwnProperty.call(asign, k)){
       valores[+fila] = asign[k];
       vistos.add(k);
+    }else{
+      enBlanco.push(String(personajes[fila]).trim());
     }
   }
   const sinCasar = Object.keys(asign).filter(k => !vistos.has(k));
@@ -6000,7 +6027,8 @@ function castRellenar(buf, asign, meta){
   arch[ruta] = new TextEncoder().encode(xmlFinal);
   castForzarRecalculo(arch);   // que las demás hojas se enteren del cambio
   return { datos: fflate.zipSync(arch, { level: 6 }), puestos: r.puestos,
-           sinCasar: sinCasar, enExcel: Object.keys(personajes).length, cabecera: cabecera };
+           sinCasar: sinCasar, enBlanco: enBlanco,
+           enExcel: Object.keys(personajes).length, cabecera: cabecera };
 }
 
 /** Catálogo de talentos de la hoja TALENTOS, para autocompletar. */
@@ -8048,6 +8076,27 @@ async function castDescargar(){
            + (r.sinCasar.length > 6 ? ' y ' + (r.sinCasar.length-6) + ' más' : '');
     }
     castAviso(msg);
+    /* Y las celdas que se quedan VACÍAS, que era la queja: el desglose salía a
+       medias sin una palabra. Se separan los que están así a propósito —solo
+       gestos, pendientes de verificar— de los que sencillamente no tienen
+       talento puesto, porque la acción a tomar no es la misma. */
+    if(r.enBlanco.length){
+      const gesto = [], sinTal = [];
+      for(const nombre of r.enBlanco){
+        const k = castClave(nombre);
+        const c = Object.keys(charIdx).find(x => castClave(charIdx[x].display || x) === k);
+        let esGesto = false;
+        try{ esGesto = !!(c && gestPendiente(c)); }catch(e){}
+        (esGesto ? gesto : sinTal).push(nombre);
+      }
+      const trozos = [];
+      if(gesto.length) trozos.push('🎭 ' + gesto.length + ' por solo gestos sin verificar ('
+        + gesto.slice(0,4).join(', ') + (gesto.length>4 ? '…' : '') + ')');
+      if(sinTal.length) trozos.push('✎ ' + sinTal.length + ' sin talento asignado ('
+        + sinTal.slice(0,6).join(', ') + (sinTal.length>6 ? '…' : '') + ')');
+      castAviso('⚠️ ' + r.enBlanco.length + ' celda' + (r.enBlanco.length===1?'':'s')
+        + ' del Excel se quedan en blanco · ' + trozos.join(' · '));
+    }
   }catch(e){
     castAviso('❌ No se pudo generar el desglose: ' + (e.message || e));
   }finally{
@@ -12075,7 +12124,10 @@ async function reanalizarGuion(btn){
    renglones del PDF contienen ese nombre. Un botón lo copia entero, para poder
    pegarlo sin pasar por la consola del navegador. */
 function libDiagData(key){
-  const flat = (k)=> String(k||'').replace(/[^A-Z0-9]/g,'');
+  /* Se compara sobre el nombre YA normalizado. Sin esto, la Ú de PÚBLICO no
+     se doblaba a U: se caía entera, y el diagnóstico enseñaba «PBLICO» y «0
+     marcas», mandando a buscar un fallo de lectura del PDF que no existía. */
+  const flat = (k)=> latFold(norm(k)).replace(/[^A-Z0-9]/g,'');
   const objetivo = flat(key);
   const clavesBloques = [...new Set((script||[]).map(b=>b.key).filter(Boolean))];
   const casi = clavesBloques.filter(k=> flat(k).includes(objetivo) || objetivo.includes(flat(k)));
@@ -12127,7 +12179,7 @@ function libDiagHtml(key){
   // procesada que se guardó del capítulo. Decirlo cambia la accion a tomar.
   const deCopia = !(typeof pageData!=='undefined' && pageData && Object.keys(pageData).length);
   const sinParlamentos = Object.keys(charIdx||{}).filter(k=>{
-    const f=(x)=>String(x||'').replace(/[^A-Z0-9]/g,'');
+    const f=(x)=>latFold(norm(x)).replace(/[^A-Z0-9]/g,'');
     return !(script||[]).some(b=> b.key && f(b.key)===f(k));
   });
   return '<div class="ldiag" id="lDiag">'
@@ -13903,7 +13955,20 @@ function ddlOvSync(){
     if(!document.getElementById('ddlOvCss')){
       const st = document.createElement('style');
       st.id = 'ddlOvCss';
-      st.textContent = 'body.ddlov > *:not(#trackpad):not(#libInline):not(#tabChooser):not(#syncPop):not(#openLibPrompt):not(script):not(style){display:none !important}';
+      /* La lista de excepciones va por CLASE, no solo por identificador.
+         Iba solo por identificador, y todo lo que naciera despues quedaba
+         fuera sin que nadie se enterara: los paneles de las herramientas de
+         video -sala, cues, formatos, planos- se abrian con display:none, y
+         los botones que los abren viven DENTRO del libreto, asi que no habia
+         manera de verlos nunca. Los avisos y las preguntas de confirmacion,
+         igual: se pulsaba y no pasaba nada.
+         `.modo-cap` es la clase de TODAS las ventanas modales, y
+         `.ddl-encima` la de lo que tiene que verse por encima pase lo que
+         pase. Con eso, lo que venga manana ya esta cubierto. */
+      st.textContent = 'body.ddlov > *'
+        + ':not(#trackpad):not(#libInline):not(#tabChooser):not(#syncPop):not(#openLibPrompt)'
+        + ':not(.modo-cap):not(.ddl-encima):not(script):not(style)'
+        + '{display:none !important}';
       document.head.appendChild(st);
     }
     const tp = document.getElementById('trackpad');
@@ -15339,10 +15404,21 @@ function studioPlayPause(){
 }
 function studioToggleStrip(){
   if(!currentEp){ libMsg('Abre primero un capítulo'); return; }
-  const host = $('libInline');
-  if(!host || host.style.display==='none' || !pop2.doc){ try{ openLibretoInline(pop2.key||null); }catch(e){} }
+  /* `libInline` puede NO existir todavia: la primera vez que se entra en modo
+     estudio sin haber abierto antes el libreto incrustado, hay que crearlo. Y
+     entonces hay que VOLVER A PEDIRLO, porque el de arriba se leyo antes de que
+     existiera y se queda en null para siempre. Asi fue como un clic en «modo
+     estudio» reventaba con «Cannot read properties of null»: el panel se creaba
+     bien, `stLeft` pasaba la guarda, y el que faltaba era el contenedor. */
+  let host = $('libInline');
+  if(!host || host.style.display==='none' || !pop2.doc){
+    try{ openLibretoInline(pop2.key||null); }
+    catch(e){ fallo('openLibretoInline · index.html:15361', e, 'no se pudo abrir el libreto'); }
+    host = $('libInline');
+  }
   studioEnsureStrip();
   const left = $('stLeft'); if(!left) return;
+  if(!host){ libMsg('No se pudo abrir el libreto para el modo estudio'); return; }
   const show = left.style.display==='none';
   // cambio de capítulo: soltar el medio del anterior
   if(show && studio.epId && studio.epId!==currentEp.id){
