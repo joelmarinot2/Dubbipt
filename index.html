@@ -92,9 +92,28 @@ header p{font-size:13px;color:var(--ink-dim);margin-top:2px}
 #filtrow .fchip .fnum{font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:700;
   background:rgba(255,255,255,.07);border-radius:999px;padding:1px 7px;min-width:20px;text-align:center}
 #filtrow .fchip.on .fnum{background:rgba(34,197,94,.22);color:#4ADE80}
-/* Un personaje ya cerrado: el borde verde dice que no espera nada de nadie. */
-body.modo-casting .card.listo{border-color:rgba(34,197,94,.45)}
+/* ═══ Verificado: la tarjeta se pone VERDE ═══
+   Mismo lenguaje que el naranja de «heredado» y el rojo de «choque»: borde,
+   halo y la barrita de la izquierda. El verde se ve de un vistazo desde el otro
+   lado de la mesa, que es como se mira una lista de sesenta personajes.
+   Un CHOQUE manda por encima del verde: que un personaje esté repartido no
+   arregla que su actor haga otro papel cuatro líneas más allá, y pintarlo de
+   verde escondería el aviso justo cuando hay que verlo. */
+/* El `!important` no es capricho: `.card` trae `background:#111316 !important`
+   y sin él el verde no llega a pintarse. Es el mismo degradado que ya usa
+   `.card.done` en grabación, para que «terminado» se vea igual en los dos
+   modos y no haya que aprenderse dos verdes. */
+body.modo-casting .card.listo:not(.choque){
+  border-color:#22C55E !important;
+  background:linear-gradient(160deg,#0d2115,#0a1910) !important;
+  box-shadow:0 0 0 1px rgba(34,197,94,.35), 0 6px 18px rgba(34,197,94,.10);
+}
+body.modo-casting .card.listo:not(.choque)::before{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:4px;
+  background:#22C55E; border-radius:4px 0 0 4px;
+}
 body.modo-casting .card.listo .tal b{color:#4ADE80}
+body.modo-casting .card.listo .cname{color:#DCFCE7}
 /* ═══ El chulo verde ═══
    Guardar un talento cierra el reparto de ese personaje, y eso tiene que verse
    EN LA TARJETA, no solo en que se vaya de la lista. Un aviso flotante se lo
@@ -2223,7 +2242,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.75.1-nube';
+const APP_VER_NUM = 'v10.76.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
