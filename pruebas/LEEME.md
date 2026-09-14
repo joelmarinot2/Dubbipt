@@ -89,6 +89,7 @@ comprobaron rompiendo el código a propósito, una cosa a la vez:
 | Dibujar las palabras de la banda sin estrechar (BAN-7) | Sí — 2 comprobaciones |
 | Dejar pasar un nombre que no está en la base (BAS-2) | Sí — 3 comprobaciones |
 | Esconder un heredado sin verificar (FIN-N1) | Sí — 4 comprobaciones |
+| Mandar la tarjeta fuera sin chulearla antes (FIN-5, FIN-6) | Sí — 3 comprobaciones |
 
 Las **dos de los cortes** no se detectaban con las pruebas iniciales: el vídeo
 de prueba era demasiado fácil y nada superaba el suelo salvo los cortes de

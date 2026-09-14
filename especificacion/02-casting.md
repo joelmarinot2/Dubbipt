@@ -60,7 +60,9 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **FIN-2** | Al **verificar**, su tarjeta se apaga y pasa a la pestaña **Personajes completados**. Repartir sesenta personajes es ir tachando: con todos siempre a la vista, buscar al siguiente obliga a barrer los cuarenta ya hechos. | ✅ |
 | **FIN-3** | Tres pestañas con sus números: **Por repartir**, **Personajes completados** y **Todos**. Los dos primeros suman el tercero — nadie se queda fuera de las tres. | ✅ |
 | **FIN-4** | Las marcas de producción (`ORIGINAL`, `TODOS`, `X`) **cierran** el personaje: son una decisión tomada, no un hueco por rellenar. | ✅ |
-| **FIN-5** | La tarjeta no desaparece de golpe: se apaga y se encoge. Ver **adónde** fue lo que acabas de tocar es la diferencia entre «ya está» y «¿se ha borrado?». | 👁 |
+| **FIN-5** | Al **guardar** un talento, la tarjeta se **chulea en verde** en el sitio: un aviso flotante se lo lleva el rabillo del ojo, una marca donde acabas de escribir no. Es el chulo del REPARTO y no toca la casilla de páginas grabadas, que es otra cosa. | ✅ |
+| **FIN-6** | El orden es: **primero el chulo, después marcharse.** La tarjeta no desaparece de golpe —se chulea, se apaga y se encoge—. Irse antes de que se vea el chulo es lo mismo que no ponerlo. | ✅ |
+| **FIN-7** | En «Todos» y en «Personajes completados» la tarjeta **se chulea igual pero no se va**: ahí no hay adónde mandarla, y hacerla desaparecer sería perderla de vista sin motivo. | ✅ |
 
 ## Reglas · base de talentos
 
@@ -104,7 +106,10 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
   eñe, el punto de la abreviatura— y comprobando además que dos personajes
   distintos (`MAID 1` y `MAID 2`) siguen siendo distintos. Devolver la clave
   floja pone cinco comprobaciones en rojo.
-- **FIN-1 a FIN-4** y **FIN-N1**, **FIN-N2**: `pruebas/completados.prueba.js`.
+- **FIN-1 a FIN-7** y **FIN-N1**, **FIN-N2**: `pruebas/completados.prueba.js`.
+  El orden —chulo primero, marcharse después— se prueba con un reloj de mentira,
+  para poder mirar la tarjeta ENTRE una espera y la otra. Quitar el chulo pone
+  tres comprobaciones en rojo.
   Equivocarse por exceso es lo caro, así que lo que se prueba es cuándo se da un
   personaje por cerrado. Dejar que un heredado sin verificar cuente como cerrado
   pone cuatro comprobaciones en rojo.
