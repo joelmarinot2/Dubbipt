@@ -48,7 +48,7 @@ Y cada una lleva una marca de cómo está comprobada:
 | 👁 | Comprobada a mano, y se dice cómo. Nadie se enterará si mañana deja de cumplirse. |
 | ⚠️ | **Sin comprobar.** Es una intención, no un hecho. |
 
-Esa tercera columna es el mapa de lo que falta. Las ✅ son 351 comprobaciones
+Esa tercera columna es el mapa de lo que falta. Las ✅ son 355 comprobaciones
 hoy; las 👁 y las ⚠️ son la lista de trabajo.
 
 ## Reglas sobre las reglas

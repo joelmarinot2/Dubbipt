@@ -50,6 +50,7 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **OCU-2** | Son los **mismos datos** (`castOcupacion()`), no una segunda cuenta que pueda decir otra cosa. | ✅ |
 | **OCU-3** | Solo en **casting**. En grabación la ocupación no pinta nada y el libreto tiene que estar despejado. | ✅ |
 | **OCU-4** | Al abrirlo, **el contenido del libreto se corre a la izquierda** para que el cajón no lo tape; al plegarlo vuelve. Por debajo de **900 px** no se corre nada: dejaría el libreto ilegible y ahí es mejor que el cajón se ponga encima. | ✅ |
+| **OCU-6** | La pestaña del cajón y el **riel de páginas** se disputan el mismo borde derecho y **no pueden montarse**: plegado, la pestaña se aparta a la izquierda del riel; abierto, el riel se va al otro lado del cajón dejando hueco para la pestaña. | 👁 |
 | **OCU-5** | La pestaña se ve **siempre**, también plegado: un panel que se esconde del todo es un panel que nadie encuentra. Y el cajón abierto o cerrado es **el mismo estado** que el de la pantalla principal. | ✅ |
 | **CAST-24** | Un **choque** es el mismo actor haciendo dos personajes que hablan a menos de **4 líneas** de distancia. Se mide en líneas del libreto, no en páginas: dos personajes pueden compartir página y estar a treinta líneas, o estar en páginas distintas y hablar seguidos. | 👁 |
 | **CAST-25** | Un choque avisa y pinta las dos tarjetas en **rojo**. Un aviso por pareja, no por línea. | 👁 |

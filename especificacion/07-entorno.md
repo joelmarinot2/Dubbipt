@@ -27,6 +27,8 @@ saltárselas al probar significa probar otra aplicación.
 | **ENT-15** | Las pruebas **normalizan los finales de línea** antes de leer el código. Git convierte a CRLF al sacar los archivos en Windows, y varias marcas de recorte llevan un salto dentro: sin normalizar, el juego de pruebas se rompe entero para quien clone el repositorio. Se descubrió cuando un `checkout` de ida y vuelta hizo desaparecer 49 comprobaciones sin que nadie tocara el código. | ✅ |
 | **ENT-16** | El guardado automático (`herramientas/guardar.sh`, hook de fin de turno) **nunca commitea en `main`** y **nunca commitea con las pruebas en rojo**. Si el push falla, el commit se queda en local y se dice. | 👁 |
 
+| **ENT-17** | Las hojas de estilo del libreto viven dentro de **plantillas de JavaScript** (`LIB_CSS`, `LIB_OVERRIDE`, `LIB_OCU_CSS`). Un **acento grave** ahí dentro —aunque sea en un comentario de CSS— cierra la plantilla a media hoja y parte el archivo entero. El error sale en otro sitio, cien líneas más arriba. | ✅ |
+
 ## Nunca
 
 | | |

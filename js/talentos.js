@@ -456,9 +456,11 @@ function talBarraLibreto(){
   const tal = (c.talent && String(c.talent).trim()) || '';
   const marca = tal && talEsMarca(tal) ? (TAL_MARCAS[castNorm(tal)] || '') : '';
   barra.style.display = 'flex';
+  /* Sin el nombre del personaje: ya sale en la cuenta, a la izquierda de esta
+     misma banda. Repetirlo detrás de la palabra «Talento» hacía leer «TALENTO
+     MELODIE GODBY» como si el actor se llamara igual que el personaje. */
   barra.innerHTML =
       '<span class="lt-et">Talento</span>'
-    + '<span class="lt-qui">' + esc2(c.display || pop2.key) + '</span>'
     + '<input id="lTalIn" type="text" list="lTalList" autocomplete="off" '
     +   'placeholder="' + (talHayBase() ? 'Talento de la base…' : 'Nombre del talento…') + '" '
     +   'value="' + esc2(tal) + '" aria-label="Talento para ' + esc2(c.display || '') + '">'

@@ -227,11 +227,18 @@ exports.pruebas = function(t){
    * eso salen los dos con su nombre.
    */
   const barra = { style:{}, innerHTML:'' };
+  const banda = { getBoundingClientRect: () => ({ height: 34 }) };
+  const medidas = {};
   const montarCuenta = (key, personajes, porClave) => {
     const M2 = montar(
       [['/* ═══ CUÁNTAS LÍNEAS TIENE ESTE PERSONAJE', 'function renderLibretoChips(){']],
       ['libBarraCuenta'],
-      { pop2: { doc: { getElementById: (id) => (id === 'lCuenta' ? barra : null) }, key: key },
+      { pop2: { doc: {
+          getElementById: (id) => ({ lCuenta: barra, lBarras: banda })[id] || null,
+          /* libMedirBarras publica el alto de la banda aqui, para que la flecha
+             de ocultar la barra no se quede encima del nombre. */
+          documentElement: { style: { setProperty: (k, v) => { medidas[k] = v; } } }
+        }, key: key },
         charIdx: personajes,
         scriptByKey: porClave,
         esc: (x) => String(x),
@@ -239,7 +246,8 @@ exports.pruebas = function(t){
     );
     barra.style = {}; barra.innerHTML = '';
     M2.libBarraCuenta();
-    return { visible: barra.style.display, texto: barra.innerHTML.replace(/<[^>]*>/g, '') };
+    return { visible: barra.style.display, texto: barra.innerHTML.replace(/<[^>]*>/g, ''),
+             altoPublicado: medidas['--lbarsH'] };
   };
 
   const PERS = {
@@ -271,7 +279,14 @@ exports.pruebas = function(t){
        'es el sintoma de LIB-N4 -la clave que no casa- y callarlo fue lo que hizo '
        + 'que PUBLICO pasara desapercibido');
 
-  t.seccion('16 · con el libreto completo abierto, la barra no estorba');
+  t.seccion('16 · la banda dice cuánto ocupa, para que nada se le monte encima');
+  /* La flecha de ocultar la barra de herramientas va fija y se quedaba ENCIMA
+     del nombre del personaje. Ahora baja lo que mida la banda, que es una fila
+     o dos segun el ancho: por eso se mide en vez de ponerle un numero. */
+  t.eq('se publica el alto medido', m.altoPublicado, '34px',
+       'con un numero fijo la flecha se queda corta o larga, y encima del nombre');
+
+  t.seccion('17 · con el libreto completo abierto, la barra no estorba');
   const n = montarCuenta(null, PERS, POR);
   t.eq('se esconde', n.visible, 'none');
   t.eq('y se vacía', n.texto, '');

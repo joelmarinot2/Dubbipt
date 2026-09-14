@@ -2242,7 +2242,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.79.0-nube';
+const APP_VER_NUM = 'v10.79.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -10260,8 +10260,14 @@ body.light .lchips .pgchip{ color:#6b6786 !important; }
 body.light .ltoolhide{ background:#ffffff; color:#16a34a; border-color:#e2ddf2; }
 
 /* ─── Flecha para ocultar/mostrar la barra (reemplaza «expandir») ─── */
+/* Baja por debajo de la banda del personaje. El alto lo mide libBarraCuenta y
+   lo publica en --lbarsH: la banda tiene una fila o dos según quepa, así que un
+   número fijo aquí se quedaría corto o largo — y la flecha acababa encima del
+   nombre. (Sin acentos graves: esto es CSS dentro de una plantilla de JS, y un
+   acento grave la cerraría a media hoja de estilos.) */
 .ltoolhide{
-  position:fixed !important; top:var(--lhH,54px); left:50%; transform:translateX(-50%);
+  position:fixed !important; top:calc(var(--lhH,54px) + var(--lbarsH,0px));
+  left:50%; transform:translateX(-50%);
   z-index:17; width:48px; height:21px; display:grid !important; place-items:center;
   background:#111316; color:#4ADE80; border:1px solid #1c1e22; border-top:none;
   border-radius:0 0 12px 12px; padding:0 !important; cursor:pointer; transition:top .15s, background .12s;
@@ -10475,8 +10481,12 @@ const LIB_OCU_CSS = `
 .locu-p.aqui{ background:rgba(34,197,94,.18); color:#4ADE80; }
 .locu-p b{ color:var(--ink); }
 .locu-ch{ color:#ff9b9b; font-size:11px; line-height:1.55; margin-top:6px; }
-/* El riel de páginas se aparta para no quedar debajo del cajón. */
-body.ocu-lib.deskchips .lchips{ right:min(320px,86vw); }
+/* La pestaña y el riel de páginas se disputan el mismo borde derecho, y se
+   montaban uno encima del otro. Repartido:
+   · plegado — la pestaña se aparta a la izquierda del riel
+   · abierto — el riel se va al otro lado del cajón, con hueco para la pestaña */
+body.deskchips .locu:not(.abierto) .locu-tab{ left:-122px; }
+body.ocu-lib.deskchips .lchips{ right:calc(min(320px,86vw) + 36px); }
 `;
 
 const LIB_CSS = `
@@ -10570,14 +10580,23 @@ body.finding .lfind{display:flex}
 body.deskchips.finding .lfind{ padding-right:100px; }
 body.haschips.finding  .lfind{ padding-left:100px; }
 #lFindClose{ font-weight:800; }
+/* ═══ La banda del personaje abierto ═══
+   UNA sola banda con las dos cosas: quién es y cuánto tiene, y —repartiendo— su
+   talento. Eran dos filas apiladas y el nombre salía en las dos; peor aún, en la
+   segunda salía justo detrás de la palabra «Talento», así que «TALENTO MELODIE
+   GODBY» se leía como si el actor se llamara igual que el personaje. */
+.lbarras{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px;
+  background:var(--head); border-bottom:1px solid var(--card-b);
+  position:sticky; top:var(--lhH,54px); z-index:39; padding:7px 13px; }
+.lbarras:empty{ display:none }
+body.deskchips .lbarras{ padding-right:100px; }
+body.haschips  .lbarras{ padding-left:100px; }
 /* Cuántas líneas tiene el personaje que estás leyendo. Es el número por el que
    se paga y por el que se cita a un actor, así que tenerlo a la vista mientras
    lees su libreto ahorra volver a la tarjeta cada vez. */
-.lcuenta{ align-items:center; gap:10px; padding:7px 13px; background:var(--head);
-  border-bottom:1px solid var(--card-b); position:sticky; top:var(--lhH,54px); z-index:39;
-  font-family:'Inter',sans-serif; font-size:12.5px; color:var(--dim,#8b8f97); flex-wrap:wrap }
-body.deskchips .lcuenta{ padding-right:100px; }
-body.haschips  .lcuenta{ padding-left:100px; }
+.lcuenta{ align-items:center; gap:10px; padding:0; background:none; border:none;
+  position:static; font-family:'Inter',sans-serif; font-size:12.5px;
+  color:var(--dim,#8b8f97); flex-wrap:wrap }
 .lcuenta .lc-qui{ font-weight:700; font-size:13.5px; color:var(--pc,#5FC85A); flex:none;
   max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .lcuenta b{ color:var(--ink); font-family:'JetBrains Mono',monospace; font-size:13px }
@@ -10587,13 +10606,8 @@ body.haschips  .lcuenta{ padding-left:100px; }
 /* Repartir sin salir del libreto. Estas leyendo los parlamentos del personaje,
    que es EL momento en que sabes quien lo hace; volver a las tarjetas para
    escribirlo rompe la lectura. Misma barra, mismo sitio que la de buscar. */
-.ltal{ align-items:center; gap:9px; padding:9px 13px; background:var(--head);
-  border-bottom:1px solid var(--card-b); position:sticky; top:var(--lhH,54px); z-index:40;
-  font-family:'Inter',sans-serif; flex-wrap:wrap }
-body.deskchips .ltal{ padding-right:100px; }
-body.haschips  .ltal{ padding-left:100px; }
-.ltal .lt-qui{ font-weight:700; font-size:13px; color:var(--pc,#5FC85A); flex:none;
-  max-width:190px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.ltal{ align-items:center; gap:9px; padding:0; background:none; border:none;
+  position:static; font-family:'Inter',sans-serif; flex-wrap:wrap; flex:1; min-width:230px }
 .ltal .lt-et{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--dim,#8b8f97); flex:none }
 .ltal input{ flex:1; min-width:120px; background:var(--card); border:1px solid var(--card-b);
   color:var(--ink); border-radius:9px; padding:8px 11px; font-size:13.5px; outline:none }
@@ -11095,8 +11109,10 @@ function buildLibretoDoc(pc){
       <button id="lFindNext" title="Siguiente">▼</button>
       <button id="lFindClose" title="Cerrar">✕</button>
     </div>
-    <div class="lcuenta" id="lCuenta" style="display:none"></div>
-    <div class="ltal" id="lTal" style="display:none"></div>
+    <div class="lbarras" id="lBarras">
+      <div class="lcuenta" id="lCuenta" style="display:none"></div>
+      <div class="ltal" id="lTal" style="display:none"></div>
+    </div>
     <div class="lchips" id="lChips"></div>
     <div class="ltools" id="lTools">
       <button id="tHide" style="text-align:center">${LIB_ICON.chevUp} Ocultar herramientas</button>
@@ -13349,6 +13365,19 @@ function libBarraCuenta(){
     + (parlamentos === 0
         ? '<span class="lc-ojo">⚠ sin parlamentos en el libreto</span>'
         : '');
+  libMedirBarras();
+}
+
+/* Cuánto ocupa la banda del personaje, para que lo de debajo se aparte.
+   La flecha de ocultar la barra va fija y se quedaba ENCIMA del nombre; y la
+   banda mide una fila o dos según el ancho, así que el número no puede ser
+   fijo: se mide y se publica como `--lbarsH`. */
+function libMedirBarras(){
+  if(typeof pop2 === 'undefined' || !pop2 || !pop2.doc) return;
+  const d = pop2.doc;
+  const b = d.getElementById('lBarras');
+  const alto = b ? Math.round(b.getBoundingClientRect().height) : 0;
+  d.documentElement.style.setProperty('--lbarsH', alto + 'px');
 }
 
 function renderLibretoChips(){
@@ -13359,7 +13388,9 @@ function renderLibretoChips(){
      que pasan todas las aperturas y todos los refrescos. */
   try{ libBarraCuenta(); }catch(e){ fallo('libBarraCuenta · index.html:12958', e); }
   try{ talBarraLibreto(); }catch(e){ fallo('talBarraLibreto · index.html:12959', e); }
-  try{ libOcupacion(); }catch(e){ fallo('libOcupacion · index.html:12960', e); }
+  // se vuelve a medir DESPUÉS del talento: con él la banda puede pasar a dos filas
+  try{ libMedirBarras(); }catch(e){ fallo('libMedirBarras · index.html:12960', e); }
+  try{ libOcupacion(); }catch(e){ fallo('libOcupacion · index.html:12961', e); }
   const box = pop2.doc.getElementById('lChips');
   if(!box) return;
   const c = pop2.key ? charIdx[pop2.key] : null;
