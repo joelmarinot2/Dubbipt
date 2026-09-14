@@ -18,7 +18,11 @@
  * sus paginas grabadas- y mezclar las dos seria un lio.
  */
 'use strict';
-const { montar } = require('./ayuda');
+const fs = require('fs');
+const { montar, INDEX } = require('./ayuda');
+/* El chulo es CSS, y el CSS no sale en fuentes(): se lee el HTML aparte.
+   Los finales de linea se normalizan igual que alli (ENT-15). */
+const HTML = fs.readFileSync(INDEX, 'utf8').replace(/\r\n/g, '\n');
 
 exports.nombre = 'Personajes completados: cuándo desaparece una tarjeta';
 
@@ -170,4 +174,19 @@ exports.pruebas = function(t){
   let repintado3 = 0;
   N.castSalirTarjeta('NADIE', () => repintado3++);
   t.eq('no se queda colgado esperando una animación que no existe', repintado3, 1);
+
+  t.seccion('10 · un solo chulo por tarjeta');
+  /* La casilla de la derecha -marcar todas las paginas como grabadas- es de
+     GRABACION. En casting se quedaba al lado del chulo del reparto: dos
+     casillas verdes, cada una de una cosa distinta, en la misma esquina. */
+  t.ok('repartiendo, la casilla de paginas no se enseña',
+       HTML.includes('body.modo-casting .card .allbtn{display:none}'),
+       'si vuelve, vuelven los dos chulitos');
+  t.ok('el chulo del reparto está escondido por defecto',
+       HTML.includes('.card .okchk{display:none}'));
+  t.ok('y solo sale en casting y con el personaje cerrado',
+       HTML.includes('body.modo-casting .card.listo .okchk{'),
+       'sin la condicion de «listo» saldria en todas las tarjetas');
+  t.ok('la tarjeta lleva su hueco para el chulo',
+       HTML.includes('class="okchk"'));
 };
