@@ -63,6 +63,8 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **FIN-5** | Al **guardar** un talento, la tarjeta se **chulea en verde** en el sitio: un aviso flotante se lo lleva el rabillo del ojo, una marca donde acabas de escribir no. Es el chulo del REPARTO y no toca la casilla de páginas grabadas, que es otra cosa. | ✅ |
 | **FIN-6** | El orden es: **primero el chulo, después marcharse.** La tarjeta no desaparece de golpe —se chulea, se apaga y se encoge—. Irse antes de que se vea el chulo es lo mismo que no ponerlo. | ✅ |
 | **FIN-7** | En «Todos» y en «Personajes completados» la tarjeta **se chulea igual pero no se va**: ahí no hay adónde mandarla, y hacerla desaparecer sería perderla de vista sin motivo. | ✅ |
+| **FIN-9** | Al verificar, **la tarjeta entera se pone verde** —borde, fondo y la barrita de la izquierda—, con el mismo degradado que ya usa «terminado» en grabación: un solo verde que aprenderse. Es el mismo lenguaje que el naranja de heredado y el rojo de choque, y se ve de un vistazo en una lista de sesenta. | ✅ |
+| **FIN-10** | Un **choque manda por encima del verde**. Que un personaje esté repartido no arregla que su actor haga otro papel cuatro líneas más allá; pintarlo de verde escondería el aviso justo cuando hay que verlo. | ✅ |
 | **FIN-8** | **Un solo chulo por tarjeta.** La casilla de marcar todas las páginas como grabadas es de **grabación** y en casting no se enseña: repartiendo no se marca nada como grabado, y dos casillas verdes en la misma esquina —cada una de una cosa distinta— no se distinguen. Al volver a grabación está donde siempre. | ✅ |
 
 ## Reglas · base de talentos
@@ -107,7 +109,7 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
   eñe, el punto de la abreviatura— y comprobando además que dos personajes
   distintos (`MAID 1` y `MAID 2`) siguen siendo distintos. Devolver la clave
   floja pone cinco comprobaciones en rojo.
-- **FIN-1 a FIN-8** y **FIN-N1**, **FIN-N2**: `pruebas/completados.prueba.js`.
+- **FIN-1 a FIN-10** y **FIN-N1**, **FIN-N2**: `pruebas/completados.prueba.js`.
   El orden —chulo primero, marcharse después— se prueba con un reloj de mentira,
   para poder mirar la tarjeta ENTRE una espera y la otra. Quitar el chulo pone
   tres comprobaciones en rojo.

@@ -189,4 +189,20 @@ exports.pruebas = function(t){
        'sin la condicion de «listo» saldria en todas las tarjetas');
   t.ok('la tarjeta lleva su hueco para el chulo',
        HTML.includes('class="okchk"'));
+
+  t.seccion('11 · verificado = tarjeta VERDE');
+  const verde = (HTML.match(/body\.modo-casting \.card\.listo:not\(\.choque\)\{[^}]*\}/) || [''])[0];
+  t.ok('la tarjeta cerrada se pinta de verde', !!verde, 'sin esto solo cambia el borde');
+  t.ok('con el borde verde', verde.includes('border-color:#22C55E'));
+  t.ok('y con el fondo verde', verde.includes('background:linear-gradient(160deg,#0d2115,#0a1910)'),
+       'es el mismo degradado que ya usa .card.done en grabacion: un solo verde que aprender');
+  t.ok('con !important, que `.card` lo lleva y si no el verde no llega a pintarse',
+       verde.includes('!important'));
+  t.ok('la barrita de la izquierda tambien',
+       HTML.includes('body.modo-casting .card.listo:not(.choque)::before'));
+
+  t.seccion('12 · un CHOQUE manda por encima del verde');
+  t.ok('el verde se excluye cuando hay choque', verde.includes(':not(.choque)'),
+       'que un personaje este repartido no arregla que su actor haga otro papel '
+       + 'cuatro lineas mas alla: pintarlo de verde esconderia el aviso');
 };
