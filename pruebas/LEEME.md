@@ -98,6 +98,7 @@ comprobaron rompiendo el código a propósito, una cosa a la vez:
 | Ensenar la ocupacion tambien en grabacion (OCU-3) | Sí — 3 comprobaciones |
 | Dejar el cajon estrecho a 320 px, tapando el libreto (OCU-7) | Sí — 1 comprobacion |
 | Un acento grave en un comentario de CSS dentro de una plantilla (ENT-17) | Sí — 1 comprobacion |
+| Devolver la flecha a la altura de la cabecera, sobre la banda (LIB-18) | Sí — 1 comprobacion |
 
 Las **dos de los cortes** no se detectaban con las pruebas iniciales: el vídeo
 de prueba era demasiado fácil y nada superaba el suelo salvo los cortes de

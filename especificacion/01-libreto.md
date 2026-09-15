@@ -37,7 +37,7 @@ El modelo es siempre el mismo:
 | **LIB-16** | Si el personaje **no tiene ni un parlamento** en el libreto, se dice ahí mismo. Es el síntoma de **LIB-N4** —la clave que no casa— y callarlo fue lo que hizo que `PÚBLICO` pasara desapercibido. | ✅ |
 
 | **LIB-17** | La cuenta y el talento van en **una sola banda**, y el nombre del personaje sale **una vez**. Eran dos filas apiladas con el nombre repetido; en la segunda caía justo detrás de la palabra «Talento», y «TALENTO MELODIE GODBY» se leía como si el actor se llamara igual que el personaje. | ✅ |
-| **LIB-18** | La banda **publica su alto** (`--lbarsH`) para que lo que va fijo debajo se aparte. Tiene una fila o dos según el ancho, así que un número fijo se queda corto o largo — y la flecha de ocultar la barra acababa encima del nombre. | ✅ |
+| **LIB-18** | La banda **publica su alto** (`--lbarsH`) y **todo lo que va fijo arranca debajo**: la flecha de ocultar la barra, el riel de páginas y la pestaña de Ocupación. Tiene una fila o dos según el ancho, así que un número fijo se queda corto o largo — la flecha acababa sobre el nombre, la banda se comía el «PÁG.» del riel, y la pestaña tapaba el botón de quitar el talento. | ✅ |
 
 ## Nunca
 
