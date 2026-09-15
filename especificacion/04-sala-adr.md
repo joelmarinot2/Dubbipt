@@ -90,6 +90,7 @@ qué dijo el director.
 | **SALA-N1** | Nunca dibujar por encima de la imagen algo que capture el ratón. La capa de señalización no recibe clics. | 👁 |
 | **ADR-N1** | Nunca guardar en el cue lo que ya está en el libreto. Duplicarlo garantiza que un día no coincidan. | 👁 |
 | **EST-N2** | **Nunca ampliar una lista de excepciones por identificador.** Lo que nazca después queda fuera y nadie se entera: el elemento se crea entero y se le pone `display:none`. Así estuvieron los cuatro paneles de las herramientas de vídeo — se pulsaba el botón y no pasaba nada. Se exime por clase. | ✅ |
+| **EST-N3** | **Nunca colgar de body una pantalla sin eximirla de la regla de ddlov.** Volvio a pasar con la pantalla de marcar el recuadro del contador: nacio sin clase y desde sala se reporto que «se coloca abajo del libreto y no deja elegir». La prueba no lo vio porque miraba una lista escrita a mano de cuatro paneles. Ahora se buscan **todas** las pantallas del codigo y ninguna nueva puede nacer escondida. | ✅ |
 | **EST-N1** | **Nunca usar un nodo del DOM que se pidió antes de existir.** Una variable que se leyó en null se queda en null aunque el nodo se cree dos líneas más abajo. Pasó en `studioToggleStrip`: el primer clic del día en «modo estudio», sin el libreto abierto, se caía con «Cannot read properties of null (reading 'style')». Lo contó el informe de fallos desde producción — que es exactamente para lo que está. | ✅ |
 | **ADR-N2** | Nunca dejar el vídeo alterado al terminar un análisis o un bucle: el volumen, la velocidad y la posición se devuelven como estaban. | 👁 |
 
@@ -134,6 +135,15 @@ qué dijo el director.
 - Lo que **no** está probado contra la realidad: no se ha leído nunca un Pro
   Tools de verdad, ni una ventana compartida de verdad. El ruido simulado es
   por píxel; la compresión de compartir pantalla trabaja por bloques.
+- **EST-N3**, en la seccion 6 de `pruebas/paneles.prueba.js`: no hay lista de
+  pantallas que mirar. Se busca cada `document.body.appendChild` del codigo que
+  se despliega, se averigua su etiqueta, su identificador y sus clases, y se le
+  aplica la regla. Lo que ya estaba escondido esta apuntado por su nombre para
+  que la prueba pueda decir lo unico que importa: que no aparezca ninguno nuevo.
+  Quitarle la clase a la pantalla del recuadro pone dos comprobaciones en rojo.
+  Buscandolas asi se encontraron ademas dos que llevaban tiempo rotas: el aviso
+  de fallo y el karaoke, los dos invisibles justo con el libreto abierto, que es
+  cuando hacen falta.
 
 ## Sin resolver
 

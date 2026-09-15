@@ -753,6 +753,12 @@ function tcpMarcarRect(){
   if(!TCP.video){ castAviso('❌ Primero comparte la ventana'); return; }
   const ov = document.createElement('div');
   ov.id = 'tcpRectOv';
+  /* `ddl-encima` NO es decoracion: con el libreto abierto, `body.ddlov`
+     esconde todo hijo de body que no esté exento, y esto nacia sin clase. El
+     sintoma que llego de sala: «la opcion de elegir recuadro se coloca abajo
+     del libreto y no deja elegir». Es EST-N2 otra vez, y esta vez la culpa es
+     de acordarse del panel y olvidarse de esta pantalla. */
+  ov.className = 'ddl-encima';
   ov.style.cssText = 'position:fixed;inset:0;z-index:2147483600;background:#07060f;'
     + 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px';
   ov.innerHTML = '<div style="color:#e7ebf3;font-family:Inter,sans-serif;font-size:14px;text-align:center">'

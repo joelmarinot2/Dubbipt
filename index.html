@@ -2020,6 +2020,10 @@ function falloPintar(){
         if(!b){
           b = document.createElement('button');
           b.id = 'falloAviso';
+          /* Sin esto, con el libreto abierto el aviso de fallo nace invisible: el
+             programa se rompe y no te enteras, que es justo lo contrario de lo
+             que hace este boton. EST-N2. */
+          b.className = 'ddl-encima';
           b.type = 'button';
           b.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:99998;'
             + 'background:#2a1113;color:#F87171;border:1px solid #F87171;border-radius:999px;'
@@ -2242,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.83.0-nube';
+const APP_VER_NUM = 'v10.84.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -17101,6 +17105,10 @@ function karWinPanel(){
   if(!host){
     host = document.createElement('div');
     host.id = 'karPanel';
+    /* El karaoke va ENCIMA del video del estudio, y el estudio solo existe con
+       el libreto abierto, o sea con body.ddlov puesto: sin exencion, esta
+       red de seguridad nacia escondida justo cuando toca usarla. EST-N2. */
+    host.className = 'ddl-encima';
     host.style.cssText = 'position:fixed;left:50%;bottom:40px;transform:translateX(-50%);'
       + 'width:min(880px,92vw);height:210px;z-index:2147483000;border-radius:12px;overflow:hidden;'
       + 'box-shadow:0 18px 50px rgba(0,0,0,.6);border:1px solid #2b2358;resize:both;min-width:320px;min-height:120px';

@@ -111,4 +111,104 @@ exports.pruebas = function(t){
   t.ok('los avisos, por encima', z('#ddlToasts') > 99999, 'z-index ' + z('#ddlToasts'));
   t.ok('la pregunta, por encima', z('#ddlConfirmOv') > 99999, 'z-index ' + z('#ddlConfirmOv'));
   t.ok('los paneles, por encima', z('.modo-cap') > 99999, 'z-index ' + z('.modo-cap'));
+
+  /* ── 6 · ninguna pantalla NUEVA puede nacer invisible ──────────────────
+     Las secciones de arriba miran cuatro paneles escritos a mano. Eso no basta,
+     y se vio: `tcpMarcarRect` —la pantalla para marcar el recuadro del contador
+     de Pro Tools— nacio sin clase, `body.ddlov` la escondio, y desde sala se
+     reporto que «la opcion de elegir recuadro se coloca abajo del libreto y no
+     deja elegir». La prueba no se entero porque la pantalla no estaba en la
+     lista, aunque el comentario de arriba presumiera de lo contrario.
+
+     Asi que aqui NO hay lista de lo que hay que mirar: se busca en todo el
+     codigo que se despliega cada cosa que se cuelga de `body`, se averigua su
+     etiqueta, su identificador y sus clases, y se le aplica la regla.
+
+     Lo que si hay es una lista de lo que YA estaba escondido el dia que se
+     escribio esto. No son necesariamente fallos: casi todos son ayudantes
+     invisibles a proposito -enlaces de descarga, campos para copiar- o
+     dialogos que se abren desde la barra de arriba, que con el libreto abierto
+     tampoco se ve. Estan apuntados para que la prueba pueda decir lo unico que
+     de verdad importa: que no aparezca NINGUNO NUEVO. */
+  t.seccion('6 · ninguna pantalla nueva nace invisible');
+
+  const colgadosDeBody = () => {
+    const re = /document\.body\.appendChild\(\s*([A-Za-z_$][\w$]*)\s*\)/g;
+    const out = [];
+    let m;
+    while((m = re.exec(TODO))){
+      const v = m[1];
+      const antes = TODO.slice(Math.max(0, m.index - 6000), m.index);
+      const cre = new RegExp('(?:^|[^.\\w])' + v + '\\s*=\\s*document\\.createElement\\([\'"]([a-z]+)[\'"]\\)', 'g');
+      let c = null, mm;
+      while((mm = cre.exec(antes))) c = mm;
+      const trozo = c ? antes.slice(c.index) : '';
+      const id  = (trozo.match(new RegExp(v + '\\.id\\s*=\\s*[\'"]([^\'"]+)')) || [])[1] || '';
+      const cls = (trozo.match(new RegExp(v + '\\.className\\s*=\\s*[\'"]([^\'"]+)')) || [])[1] || '';
+      const add = [...trozo.matchAll(new RegExp(v + '\\.classList\\.add\\([\'"]([^\'"]+)', 'g'))].map(x => x[1]);
+      out.push({ etiqueta: c ? c[1] : '?', id: id,
+                 clases: cls.split(/\s+/).concat(add).filter(Boolean),
+                 firma: (c ? c[1] : '?') + '#' + (id || '·' + v) });
+    }
+    return out;
+  };
+
+  const todos = colgadosDeBody();
+  t.ok('encuentra las pantallas del código, no una lista escrita a mano',
+       todos.length > 40, 'solo ha encontrado ' + todos.length);
+
+  const escondidos = todos.filter(el => seEsconde(el, exs)).map(el => el.firma);
+
+  /* Lo que ya estaba escondido. Si arreglas alguno, quítalo de aquí. */
+  const YA_LO_ESTABAN = [
+    'textarea#·ta',
+    'div#ddlmWsOv',
+    'div#wsPickOv',
+    'div#wsRenOv',
+    'div#sPick',
+    'div#rolePick',
+    'div#pwdOv',
+    'div#pwdOv',
+    'div#mgOv',
+    'div#·ov',
+    'div#taskPanel',
+    'a#·a',
+    'div#dlgOv',
+    'iframe#impFrame',
+    'datalist#talList',
+    'a#·a',
+    'div#acctOv',
+    'div#drvOv',
+    'div#ddlmOv',
+    'div#ddlmOv',
+    'div#tutOv',
+    'div#ddlmOv',
+    'button#floatCtl',
+    'div#onlinePop',
+    'div#acctsOv',
+    'a#·a',
+    'datalist#talList',
+    'input#talFile'
+  ];
+
+  const pendiente = YA_LO_ESTABAN.slice();
+  const nuevos = [];
+  for(const f of escondidos){
+    const i = pendiente.indexOf(f);
+    if(i < 0) nuevos.push(f); else pendiente.splice(i, 1);
+  }
+  t.eq('no hay ninguna pantalla nueva que el libreto esconda', nuevos.join(', '), '',
+       'nace con `display:none` en cuanto el libreto está abierto, y quien la abra '
+       + 'verá que su botón no hace nada. Ponle la clase `.modo-cap` si es una '
+       + 'ventana modal, o `.ddl-encima` si tiene que verse pase lo que pase.');
+
+  /* Y las que SI tenian que verse, una por una y por su nombre: las de los
+     paneles de herramientas y las dos pantallas del timecode de Pro Tools. */
+  const porId = (id) => todos.find(el => el.id === id);
+  for(const id of ['salaOv', 'adrOv', 'ioOv', 'cortesOv', 'talOv', 'metaOv', 'gestOv',
+                   'falloOv', 'ddlConfirmOv', 'tcpOv', 'tcpRectOv']){
+    const el = porId(id);
+    t.ok('#' + id + ' se ve con el libreto abierto', !!el && !seEsconde(el, exs),
+         el ? 'está escondido' : 'ya no existe: revisa esta prueba');
+  }
 };
