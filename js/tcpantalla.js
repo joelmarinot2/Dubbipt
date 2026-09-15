@@ -511,14 +511,52 @@ function tcpSoltar(){
   TCP.video = null;
 }
 
-async function tcpCompartir(){
+/**
+ * Espera al PRIMER FOTOGRAMA de verdad. Hace falta: `play()` vuelve antes de
+ * que llegue imagen, y hasta entonces videoWidth vale 0 y tcpFoto devuelve
+ * null. El sintoma era «no llega la captura» con la ventana ya compartida.
+ */
+function tcpPrimerFotograma(v, ms){
+  return new Promise(resolve => {
+    const t0 = Date.now();
+    const mira = () => {
+      if(v.videoWidth > 0 && v.videoHeight > 0) return resolve(true);
+      if(Date.now() - t0 > (ms || 4000)) return resolve(false);
+      setTimeout(mira, 80);
+    };
+    mira();
+  });
+}
+
+/**
+ * Comparte la pantalla o una ventana. Devuelve { ok, motivo }: NO vale
+ * devolver solo false, porque entonces cancelar el dialogo, no dar permiso y
+ * quedarse sin imagen se ven todos igual —o sea, no se ven—, y quien lo usa no
+ * sabe si ha hecho algo mal.
+ *
+ * `pantallaEntera` es una PREFERENCIA que se le pasa al navegador para que abra
+ * el dialogo ya en la pestaña de pantallas. Hace falta para el Big Counter de
+ * Pro Tools: es una ventana flotante y el selector de Windows solo lista
+ * ventanas principales, asi que ahi NO aparece y hay que compartir la pantalla
+ * entera. (El contador de la ventana de edicion si esta dentro de una ventana
+ * que se puede elegir.)
+ */
+async function tcpCompartir(pantallaEntera){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia)
+    return { ok: false, motivo: 'Este navegador no sabe compartir pantalla · hace falta Chrome o Edge' };
   try{
-    const st = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
+    const v0 = { frameRate: 30 };
+    if(pantallaEntera) v0.displaySurface = 'monitor';
+    const st = await navigator.mediaDevices.getDisplayMedia({ video: v0, audio: false });
     tcpSoltar();
     TCP.stream = st;
     const v = document.createElement('video');
     v.srcObject = st; v.muted = true; v.playsInline = true;
     try{ await v.play(); }catch(e){ /* algunos navegadores no lo necesitan */ }
+    if(!await tcpPrimerFotograma(v)){
+      try{ st.getTracks().forEach(t => t.stop()); }catch(e){ /* ya estaba suelto */ }
+      return { ok: false, motivo: 'Se compartió, pero no llega imagen · prueba a compartir otra vez' };
+    }
     TCP.video = v;
     st.getVideoTracks().forEach(t => t.addEventListener('ended', () => {
       tcpParar();
@@ -527,8 +565,15 @@ async function tcpCompartir(){
       catch(e){ /* el aviso es un extra: lo que importa ya se ha hecho, que es parar */ }
       try{ tcpPintarEstado(); }catch(e){ /* el panel no está abierto: nada que repintar */ }
     }));
-    return true;
-  }catch(e){ return false; }
+    return { ok: true, motivo: '' };
+  }catch(e){
+    const n = (e && e.name) || '';
+    if(n === 'NotAllowedError')
+      return { ok: false, motivo: 'No se compartió nada · hay que elegir la pantalla y darle a Compartir' };
+    if(n === 'NotFoundError' || n === 'NotReadableError')
+      return { ok: false, motivo: 'El sistema no deja leer esa pantalla · prueba con otra' };
+    return { ok: false, motivo: 'No se pudo compartir' + ((e && e.message) ? ' · ' + e.message : '') };
+  }
 }
 
 /* ── Lo que se recuerda ────────────────────────────────────────────────── */
@@ -600,9 +645,19 @@ function tcpPanel(){
     +   'aquí. Se comparte su ventana, se marca <b>una vez</b> el recuadro del contador grande y '
     +   'Dubbipt lo lee quince veces por segundo.<br><br>No hay que instalar nada ni hace falta '
     +   'ningún cable. Hace falta <b>Chrome o Edge</b>, y que el contador se vea en pantalla.</div>'
-    + nPaso('la ventana')
+    + nPaso('qué se comparte')
+    /* Las DOS rutas, dichas antes de elegir. El Big Counter de Pro Tools es una
+       ventana flotante y el selector de Windows solo lista ventanas
+       principales: ahí no sale, y quien lo busca se queda atascado sin saber
+       por qué —pasó—. Así que se dice cuál es cuál. */
+    + '<div class="meta-nota">El <b>Big Counter</b> es una ventana flotante y <b>no aparece</b> en la '
+    +   'lista de ventanas de Windows. Para usarlo hay que compartir la <b>pantalla entera</b>, y '
+    +   'dejarlo quieto donde esté.<br><br>Si prefieres compartir solo la ventana de Pro Tools, vale '
+    +   'igual: usa entonces el contador de la <b>barra de transporte</b> de la ventana de edición. Se '
+    +   'lee igual de bien aunque sea más pequeño.</div>'
     + '<div class="io-rej" style="margin-bottom:12px">'
-    +   '<button class="io-b" id="tcpVer">🖥 ' + (TCP.video ? 'Volver a compartir' : 'Compartir la ventana de Pro Tools') + '</button>'
+    +   '<button class="io-b" id="tcpVerPant">🖥 Compartir la pantalla entera</button>'
+    +   '<button class="io-b" id="tcpVer">🗔 Compartir solo una ventana</button>'
     +   (TCP.video ? '<button class="io-b" id="tcpRect">⬚ Marcar el contador</button>' : '')
     + '</div>'
     + (TCP.video
@@ -645,13 +700,18 @@ function tcpPanel(){
   ov.querySelector('#tcpCerrar').onclick = cerrar;
   ov.addEventListener('click', e => { if(e.target === ov) cerrar(); });
 
-  ov.querySelector('#tcpVer').onclick = async () => {
-    if(await tcpCompartir()){
-      castAviso(TCP.rect ? 'Ventana compartida · el recuadro de antes sigue valiendo'
-                         : 'Ventana compartida · ahora marca el contador');
-      tcpPanel();
-    }
+  /* Un fallo al compartir TIENE que decirse. Antes se devolvía false a secas y
+     quien cancelaba, o no daba permiso, o se quedaba sin imagen, veía
+     exactamente lo mismo: nada. */
+  const compartir = async (pantallaEntera) => {
+    const r = await tcpCompartir(pantallaEntera);
+    if(!r.ok){ castAviso('❌ ' + r.motivo); return; }
+    castAviso(TCP.rect ? 'Compartido · el recuadro de antes sigue valiendo'
+                       : 'Compartido · ahora marca el recuadro del contador');
+    tcpPanel();
   };
+  ov.querySelector('#tcpVerPant').onclick = () => compartir(true);
+  ov.querySelector('#tcpVer').onclick = () => compartir(false);
   const br = ov.querySelector('#tcpRect');
   if(br) br.onclick = () => { cerrar(); tcpMarcarRect(); };
 
@@ -698,7 +758,15 @@ function tcpMarcarRect(){
   ov.innerHTML = '<div style="color:#e7ebf3;font-family:Inter,sans-serif;font-size:14px;text-align:center">'
     + 'Arrastra un recuadro sobre el <b>contador grande de Pro Tools</b>.<br>'
     + '<span style="color:#8892a6;font-size:12.5px">Solo las cifras: sin la etiqueta ni los bordes.</span></div>'
-    + '<div id="tcpLienzo" style="position:relative;max-width:94vw;max-height:76vh"></div>'
+    + '<div id="tcpLienzo" style="position:relative;max-width:94vw;max-height:66vh"></div>'
+    /* La lupa. Compartiendo la pantalla entera el contador queda diminuto sobre
+       el lienzo y no hay manera de saber si se ha cogido bien; aqui se ve
+       aumentado y con la cuenta de cifras, que es el dato que decide. */
+    + '<div id="tcpLupaCaja" style="display:none;flex-direction:column;align-items:center;gap:6px">'
+    +   '<canvas id="tcpLupa" style="image-rendering:pixelated;border:1px solid #2b3040;'
+    +     'border-radius:6px;background:#0b0d12;max-width:90vw"></canvas>'
+    +   '<div id="tcpCuenta" style="font-family:Inter,sans-serif;font-size:13px"></div>'
+    + '</div>'
     + '<div style="display:flex;gap:9px">'
     +   '<button id="tcpRectNo" class="modo-op dud-b">Cancelar</button>'
     +   '<button id="tcpRectOk" class="modo-op dud-b dud-ok">Usar este recuadro</button></div>';
@@ -745,7 +813,41 @@ function tcpMarcarRect(){
     marco.style.width = Math.round(w * rc.width) + 'px';
     marco.style.height = Math.round(h * rc.height) + 'px';
   });
-  cv.addEventListener('pointerup', () => { a = null; });
+  /**
+   * Enseña aumentado lo que se ha cogido, y dice cuantas cifras ve ahi. Es la
+   * unica manera de saber si el recuadro esta bien antes de darle a usarlo:
+   * con la pantalla entera compartida, en el lienzo el contador es un sello.
+   */
+  const lupa = () => {
+    if(!sel || sel.w <= 0 || sel.h <= 0) return;
+    const caja2 = ov.querySelector('#tcpLupaCaja');
+    const lc = ov.querySelector('#tcpLupa');
+    const cuenta = ov.querySelector('#tcpCuenta');
+    const sx = Math.round(sel.x * cv.width), sy = Math.round(sel.y * cv.height);
+    const sw = Math.max(1, Math.round(sel.w * cv.width)), sh = Math.max(1, Math.round(sel.h * cv.height));
+    const k = Math.max(1, Math.min(6, Math.floor(620 / sw)));
+    lc.width = sw * k; lc.height = sh * k;
+    const lg = lc.getContext('2d');
+    lg.imageSmoothingEnabled = false;
+    try{ lg.drawImage(cv, sx, sy, sw, sh, 0, 0, lc.width, lc.height); }
+    catch(e){ /* el recuadro se ha salido del lienzo: no se enseña nada */ }
+    caja2.style.display = 'flex';
+    /* Se mide sobre el recuadro de verdad, con el mismo codigo que leera
+       despues: no vale enseñar una cosa y medir otra. */
+    const antes = TCP.rect;
+    TCP.rect = sel;
+    let n = 0;
+    try{ const f = tcpFoto(); n = f ? tcpGrupos(f).length : 0; }
+    catch(e){ /* sin imagen todavia: se queda en cero y lo dice */ }
+    TCP.rect = antes;
+    const bien = (n === 11 || n === 8);
+    cuenta.innerHTML = bien
+      ? '<b style="color:#4ADE80">✓ veo las ocho cifras</b>'
+      : '<b style="color:#F59E0B">Aquí veo ' + n + ' trozos y tienen que ser 8 cifras'
+        + (n > 11 ? ' — coge solo las cifras, sin la etiqueta ni el borde' : '')
+        + (n < 8 ? ' — coge el contador entero, de la primera cifra a la última' : '') + '</b>';
+  };
+  cv.addEventListener('pointerup', () => { a = null; lupa(); });
 
   const fin = () => { pintando = false; ov.remove(); };
   ov.querySelector('#tcpRectNo').onclick = () => { fin(); tcpPanel(); };

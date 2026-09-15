@@ -30,6 +30,14 @@ const almacen = {
   removeItem: (k) => { delete guardado[k]; }
 };
 
+/* Un navegador de mentira: lo justo para probar el camino de compartir. */
+let videoQueSale = () => ({ play: async () => {}, videoWidth: 0, videoHeight: 0 });
+const doc = { createElement: (q) => (q === 'video' ? videoQueSale() : {}) };
+let restriccionesPedidas = null;
+const nav = { mediaDevices: { getDisplayMedia: null } };
+const pista = () => ({ addEventListener: () => {}, stop: () => {} });
+const arroyo = () => ({ getVideoTracks: () => [pista()], getTracks: () => [pista()] });
+
 const M = montar(
   [['const TCP_W = 12', '/* ── El panel ──']],
   ['TCP', 'TCP_TOL', 'TCP_SEGUIDAS', 'tcpTexto', 'tcpSegundos', 'tcpFaltan',
@@ -37,8 +45,9 @@ const M = montar(
    'tcpGrupos', 'tcpFilas', 'tcpLayout', 'tcpCelda', 'tcpParecido', 'tcpCasar',
    'tcpLeerUna', 'tcpEnsenar', 'tcpAprender', 'tcpActivo', 'tcpParar', 'tcpGuardar',
    'ponFoto: (f) => { tcpFoto = f; }',
+   'tcpCompartir', 'tcpPrimerFotograma', 'tcpSoltar',
    'ponLeer: (f) => { tcpLeerUna = f; }'],
-  { performance: perf, localStorage: almacen, document: undefined }
+  { performance: perf, localStorage: almacen, document: doc, navigator: nav }
 );
 const TCP = M.TCP;
 
@@ -100,7 +109,7 @@ function pantalla(txt, opt){
   return { g: g, w: W, h: H };
 }
 
-exports.pruebas = function(t){
+exports.pruebas = async function(t){
 
 /* ── 1 · timecode y segundos ───────────────────────────────────────────── */
 t.seccion('1 · timecode y segundos');
@@ -367,4 +376,58 @@ t.seccion('12 · el seguimiento cuelga de Pro Tools, no del video');
     sw2.indexOf('tcpParar') > 0);
 }
 
+
+/* ── 13 · compartir: que se pueda, y que si no, lo diga ────────────────── */
+t.seccion('13 · compartir: que se pueda, y que si no, lo diga');
+{
+  /* El Big Counter de Pro Tools es una ventana FLOTANTE y Windows no la lista
+     entre las ventanas compartibles. Por eso hay que poder pedir la pantalla
+     entera, y por eso un fallo al compartir tiene que decirse: antes se
+     devolvia false a secas y cancelar no se distinguia de no tener imagen. */
+  nav.mediaDevices.getDisplayMedia = async (c) => { restriccionesPedidas = c; return arroyo(); };
+  videoQueSale = () => ({ play: async () => {}, videoWidth: 1920, videoHeight: 1080 });
+
+  const r1 = await M.tcpCompartir(true);
+  t.ok('compartiendo la pantalla entera, sale bien', r1.ok, r1.motivo);
+  t.eq('y se le pide al navegador la pantalla, no una ventana',
+    restriccionesPedidas.video.displaySurface, 'monitor');
+
+  await M.tcpCompartir(false);
+  t.eq('pidiendo una ventana, no se le impone la pantalla',
+    restriccionesPedidas.video.displaySurface, undefined);
+
+  nav.mediaDevices.getDisplayMedia = async () => { const e = new Error('no'); e.name = 'NotAllowedError'; throw e; };
+  const r2 = await M.tcpCompartir(false);
+  t.ok('si se cancela, no sale bien', !r2.ok);
+  t.ok('y dice por que, en vez de callarse', /elegir la pantalla/.test(r2.motivo), r2.motivo);
+
+  nav.mediaDevices.getDisplayMedia = async () => { throw new Error('vaya'); };
+  const r3 = await M.tcpCompartir(false);
+  t.ok('cualquier otro fallo tambien se cuenta', !r3.ok && r3.motivo.length > 10, r3.motivo);
+
+  const sinNada = nav.mediaDevices;
+  nav.mediaDevices = null;
+  const r4 = await M.tcpCompartir(false);
+  t.ok('y si el navegador no sabe compartir, lo dice',
+    !r4.ok && /Chrome o Edge/.test(r4.motivo), r4.motivo);
+  nav.mediaDevices = sinNada;
+
+  /* Esto es lo que se veia como «no llega la captura» con la ventana ya
+     compartida: play() vuelve antes de que haya imagen, videoWidth vale 0 y
+     la foto sale nula. Ahora se espera al primer fotograma de verdad. */
+  const lento = { videoWidth: 0, videoHeight: 0 };
+  setTimeout(() => { lento.videoWidth = 1280; lento.videoHeight = 720; }, 150);
+  t.ok('espera al primer fotograma de verdad', await M.tcpPrimerFotograma(lento, 2000));
+
+  const nuncaLlega = { videoWidth: 0, videoHeight: 0 };
+  t.ok('y si no llega nunca, se rinde en vez de colgarse',
+    !(await M.tcpPrimerFotograma(nuncaLlega, 250)));
+
+  nav.mediaDevices.getDisplayMedia = async () => arroyo();
+  videoQueSale = () => ({ play: async () => {}, videoWidth: 0, videoHeight: 0 });
+  const r5 = await M.tcpCompartir(false);
+  t.ok('compartido pero sin imagen no cuenta como compartido', !r5.ok, r5.motivo);
+  t.ok('y lo dice con esas palabras', /no llega imagen/.test(r5.motivo), r5.motivo);
+  M.tcpSoltar();
+}
 };
