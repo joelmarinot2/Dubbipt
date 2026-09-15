@@ -29,6 +29,8 @@ saltárselas al probar significa probar otra aplicación.
 
 | **ENT-17** | Las hojas de estilo del libreto viven dentro de **plantillas de JavaScript** (`LIB_CSS`, `LIB_OVERRIDE`, `LIB_OCU_CSS`). Un **acento grave** ahí dentro —aunque sea en un comentario de CSS— cierra la plantilla a media hoja y parte el archivo entero. El error sale en otro sitio, cien líneas más arriba. | ✅ |
 
+| **ENT-18** | Las **transiciones de CSS no avanzan** si la pestaña no se está pintando, igual que `requestAnimationFrame` (**ENT-N4**). Por eso el estado final se fija también en píxeles desde el código: la animación es adorno, la posición no. Costó media hora de medidas contradictorias en un panel oculto. | 👁 |
+
 ## Nunca
 
 | | |

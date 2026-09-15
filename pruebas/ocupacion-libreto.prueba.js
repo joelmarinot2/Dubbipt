@@ -138,14 +138,36 @@ exports.pruebas = function(t){
   t.ok('pero el cajón sigue ahí, plegado', B._caja.innerHTML.includes('lOcuTab'),
        'la pestaña tiene que verse para poder volver a abrirlo');
 
-  t.seccion('6 · en una pantalla estrecha NO se corre nada');
+  t.seccion('6 · en una pantalla estrecha, el cajón ocupa TODO el ancho');
+  /* A 560 px un cajon de 320 tapaba 320 -el 57 % del libreto- y dejaba el texto
+     cortado por la mitad. Media cosa no sirve: o se lee el libreto, o se mira
+     la ocupacion. */
   const E = correr({ chars: CHARS, filas: FILAS, abierto: true, ancho: 700 });
   E.libOcupacion();
-  t.eq('el contenido se queda entero', E._wrap.style.paddingRight, '',
-       'correrlo dejaría el libreto ilegible: ahí es mejor que el cajón se ponga encima');
-  t.eq('aunque el cajón sí esté abierto', E._body.classList.contains('ocu-lib'), true);
+  t.eq('se hace tan ancho como el libreto', E._caja.style.width, '700px',
+       'un cajon a medias deja el texto cortado por la mitad');
+  t.eq('y se pega al borde', E._caja.style.right, '0px');
+  t.eq('el contenido NO se corre', E._wrap.style.paddingRight, '',
+       'no hay adonde correrlo: la hoja lo tapa entero');
+  t.eq('pero se marca el cuerpo igual', E._body.classList.contains('ocu-lib'), true);
 
-  t.seccion('7 · un choque se ve desde aquí');
+  t.seccion('7 · cerrado, el cajón se va fuera de la pantalla');
+  const EC = correr({ chars: CHARS, filas: FILAS, abierto: false, ancho: 700 });
+  EC.libOcupacion();
+  t.eq('estrecho: se aparta su ancho entero', EC._caja.style.right, '-700px',
+       'si se quedara a medias taparia el libreto sin que nadie lo hubiera pedido');
+  const AC = correr({ chars: CHARS, filas: FILAS, abierto: false, ancho: 1400 });
+  AC.libOcupacion();
+  t.eq('ancho: se aparta los 320 del cajon', AC._caja.style.right, '-320px');
+  t.eq('y no se le toca el ancho', AC._caja.style.width, '');
+
+  t.seccion('8 · la posición se pone en píxeles, no se deja a la hoja de estilos');
+  /* Le paso lo mismo al cajon de la pantalla principal: la regla de CSS aplica
+     y el elemento se queda donde estaba. Se fija desde aqui, medido. */
+  t.ok('hay una posicion en linea', !!AC._caja.style.right,
+       'dejarla al CSS no basta en este documento: comprobado');
+
+  t.seccion('9 · un choque se ve desde aquí');
   const CH = correr({ chars: CHARS, filas: FILAS, abierto: true,
     choques: { 'HARI MORENO': { choques: [{ a:'MARLON', b:'SHAWN', dist:2, pagina:4 }] } } });
   CH.libOcupacion();

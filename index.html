@@ -2242,7 +2242,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.79.1-nube';
+const APP_VER_NUM = 'v10.79.2-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -10446,6 +10446,10 @@ body.light .blk .tx .wd.know{ color:#2a2540 !important; background:#FDE68A !impo
 /* El cajón de ocupación DENTRO del libreto. Va aparte de LIB_CSS porque solo
    se inyecta en modo casting: en grabación no se mete ni una regla. */
 const LIB_OCU_CSS = `
+/* Se posiciona con right, no con transform: el translateX no llegaba a
+   aplicarse aquí y el cajón se quedaba encima del libreto con la clase quitada.
+   Medido, no supuesto. (Sin acentos graves: esto es CSS dentro de una plantilla
+   de JavaScript, ENT-17.) */
 .locu{ position:fixed; top:var(--lhH,54px); bottom:0; width:min(320px,86vw);
   background:var(--head); border-left:1px solid var(--card-b); z-index:60;
   display:flex; flex-direction:column; transition:right .18s ease;
@@ -10486,7 +10490,31 @@ const LIB_OCU_CSS = `
    · plegado — la pestaña se aparta a la izquierda del riel
    · abierto — el riel se va al otro lado del cajón, con hueco para la pestaña */
 body.deskchips .locu:not(.abierto) .locu-tab{ left:-122px; }
-body.ocu-lib.deskchips .lchips{ right:calc(min(320px,86vw) + 36px); }
+@media (min-width:901px){
+  body.ocu-lib.deskchips .lchips{ right:calc(min(320px,86vw) + 36px); }
+}
+
+/* ── Pantalla estrecha: hoja de ancho completo ─────────────────────────────
+   A 560 px un cajón de 320 tapaba 320 —el 57 % del libreto— y dejaba el texto
+   cortado por la mitad; encima, el riel de páginas se venía al centro de la
+   lectura. Media cosa no sirve: o se lee el libreto, o se mira la ocupación.
+   Aquí la ocupación ocupa todo y se cierra por la cabecera. */
+@media (max-width:900px){
+  /* El ancho y el borde, aquí; la POSICIÓN la pone libOcupacion en píxeles.
+     Dejarla a la hoja de estilos no basta: la regla aplica y el elemento se
+     queda donde estaba. Le pasó igual al cajón de la pantalla principal y se
+     resolvió del mismo modo. */
+  .locu{ width:100%; border-left:none; }
+  /* Abierta, la pestaña sobra: se cierra desde la cabecera, que es lo que se
+     está mirando. Dejarla encima del listado solo tapa nombres. */
+  .locu.abierto .locu-tab{ display:none; }
+  .locu-head{ position:sticky; top:-12px; background:var(--head); z-index:2;
+    padding:10px 0; margin:-12px 0 6px; border-bottom:1px solid var(--card-b); }
+  .locu-head span{ border:1px solid var(--card-b); border-radius:9px;
+    padding:6px 12px; color:var(--ink); font-weight:600; }
+  /* El riel de páginas se queda donde estaba: la hoja lo tapa entero. */
+  body.ocu-lib.deskchips .lchips{ right:0; }
+}
 `;
 
 const LIB_CSS = `
@@ -13247,6 +13275,21 @@ function libOcupacion(){
   }
   caja.className = 'locu' + (ocuAbierto ? ' abierto' : '');
 
+  /* La POSICIÓN se fija aquí, en píxeles y con el ancho REAL medido. Dejarla a
+     la hoja de estilos no basta: la regla aplica y el elemento se queda donde
+     estaba — comprobado, ni siquiera forzándolo por estilo en línea. Al cajón
+     de la pantalla principal le pasó lo mismo y se resolvió igual.
+
+     En pantalla estrecha el cajón pasa a ocupar TODO el ancho: a 560 px uno de
+     320 tapaba el 57 % del libreto y dejaba el texto cortado por la mitad.
+     Media cosa no sirve: o se lee el libreto, o se mira la ocupación. */
+  const anchoLib = (pop2.win && pop2.win.innerWidth) ? pop2.win.innerWidth : 1200;
+  const estrecho = anchoLib <= 900;
+  caja.style.width = estrecho ? (anchoLib + 'px') : '';
+  const ancho = estrecho ? anchoLib : (caja.getBoundingClientRect().width || 320);
+  caja.style.left = 'auto';
+  caja.style.right = ocuAbierto ? '0px' : (-Math.round(ancho)) + 'px';
+
   const filas = castOcupacion();
   const mapa = castChoques();
   const nChoques = Object.values(mapa).reduce((n, x) => n + x.choques.length, 0);
@@ -13261,7 +13304,7 @@ function libOcupacion(){
     + (nChoques ? '<span class="locu-tab-n">' + nChoques + '</span>' : '')
     + '</button>'
     + '<div class="locu-in"><div class="locu-head" id="lOcuHead">'
-    + '<b>Ocupación de talentos</b><span>plegar ›</span></div>'
+    + '<b>Ocupación de talentos</b><span>✕ cerrar</span></div>'
     + '<div class="locu-res">' + filas.length + ' talento' + (filas.length===1?'':'s')
     + ' · ' + totalInts + ' líneas'
     + (sinTal ? '<br>' + sinTal + ' personaje' + (sinTal===1?'':'s') + ' sin asignar' : '')
