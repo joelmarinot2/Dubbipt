@@ -44,7 +44,8 @@ const GUION = [B('NILA', 10, 1), B('BABU', 14, 1), B('NILA', 20, 2)];
 /* `stCurBlock` va ANTES del bloque de seguimiento en el archivo: dos recortes,
    en ese orden. */
 const R_SEGUIR = [['function stCurBlock(t){', '/* ═══ EL LIBRETO SIGUE AL VÍDEO'],
-                  ['/* ═══ EL LIBRETO SIGUE AL VÍDEO', 'function studioTick(forzado){']];
+                  ['/* ═══ EL LIBRETO SIGUE AL VÍDEO', 'function studioTick(forzado){'],
+                  ['function studioTick(forzado){', '/* ═══ KARAOKE ═══']];
 
 /**
  * Monta el seguimiento con un libreto de mentira.
@@ -56,7 +57,14 @@ function conSeguir(opts){
   const movidos = [];
   const avisos = [];
   const pintados = opts.pintados || [0, 1, 2];
+  const casilla = { checked: opts.seguir !== false };
+  const boton = { clases: new Set(opts.seguir === false ? [] : ['on']), atrib: {}, title: '',
+    classList: { toggle: (c, v) => { if(v) boton.clases.add(c); else boton.clases.delete(c); },
+                 contains: (c) => boton.clases.has(c) },
+    setAttribute: (k, v) => { boton.atrib[k] = v; } };
+  const _guardado = {};
   const doc = {
+    getElementById: (id) => (id === 'lSeguir' ? boton : null),
     querySelector: (sel) => {
       const m = /data-si="(\d+)"/.exec(sel);
       const i = m ? +m[1] : -1;
@@ -65,9 +73,20 @@ function conSeguir(opts){
     },
     querySelectorAll: () => []
   };
-  const M = montar(R_SEGUIR, ['stSeguirOn', 'studioSeguirLibreto', 'studioAvisarFueraDeAlcance',
-                              'stCurBlock', 'verAvisado: () => _stFueraAvisado'], {
-    $: (id) => (id === 'stFollow' ? { checked: opts.seguir !== false } : null),
+  const M = montar(R_SEGUIR, ['stSeguirOn', 'stSeguirPoner', 'libPintarSeguir', 'SEG',
+                              'studioSeguirLibreto', 'studioAvisarFueraDeAlcance',
+                              'stCurBlock', 'verAvisado: () => _stFueraAvisado',
+                              'verGuardado: () => _guardado', 'studioTick'], {
+    /* El seguimiento ya no vive en una casilla de la tira de video: es un
+       estado propio que se recuerda entre sesiones. Se enciende y se apaga
+       por ahi. */
+    localStorage: { getItem: () => (opts.seguir === false ? '0' : '1'),
+                    setItem: (k, v) => { _guardado[k] = v; } },
+    $: (id) => (id === 'stFollow' ? casilla : null),
+    studioEl: () => opts.video || null,
+    studioTc0: () => 0,
+    studioStripOn: () => !!opts.tiraAbierta,
+    stFmt: () => '', stFmtTC: () => '', stDrawWave: () => {}, adrRepintar: () => {},
     pop2: { doc: doc, scopeAll: opts.scopeAll !== false,
             _interact: opts.hace != null ? (1000 - opts.hace) : 0 },
     performance: { now: () => 1000 },
@@ -81,6 +100,7 @@ function conSeguir(opts){
     console: { warn: () => {}, log: () => {} }
   });
   M._movidos = movidos; M._avisos = avisos;
+  M._casilla = casilla; M._boton = boton; M._guardado = _guardado;
   return M;
 }
 
@@ -177,4 +197,71 @@ exports.pruebas = function(t){
        'los mensajes de posición llegan veinte por segundo');
   D.libAvisarDesajuste('una-tercera');
   t.eq('pero un desajuste NUEVO sí se dice', av.length, 2);
+
+  t.seccion('14 · el interruptor vive en la barra del libreto, no en la tira del vídeo');
+  /*
+   * El seguimiento vivia en el `checked` de una casilla de la tira de video. Al
+   * plegar la tira -que es lo que se hace para leer con el libreto entero- el
+   * estado se iba con ella y el libreto dejaba de seguir. Ahora es un estado
+   * propio, se recuerda entre sesiones, y los dos mandos ensenan lo mismo.
+   */
+  const I = conSeguir({ hace: 99999 });
+  t.eq('arranca encendido', I.stSeguirOn(), true,
+       'seguir al timecode es lo que se quiere el 99 % de las veces');
+
+  I.stSeguirPoner(false);
+  t.eq('se apaga', I.stSeguirOn(), false);
+  t.eq('se recuerda para la proxima sesion', I._guardado['ddl_seguir'], '0');
+  t.eq('la casilla de la tira se entera', I._casilla.checked, false,
+       'dos mandos que digan cosas distintas son peor que uno solo');
+  t.eq('y el boton de la barra se apaga', I._boton.classList.contains('on'), false);
+  t.eq('con su estado para quien no ve el color', I._boton.atrib['aria-pressed'], 'false');
+
+  I.stSeguirPoner(true);
+  t.eq('se enciende', I.stSeguirOn(), true);
+  t.eq('se recuerda', I._guardado['ddl_seguir'], '1');
+  t.eq('la casilla tambien', I._casilla.checked, true);
+  t.ok('y el boton se pinta encendido', I._boton.classList.contains('on'));
+  /* Y lo que de verdad importa: al encenderlo el libreto se coloca YA, sin
+     esperar al siguiente parlamento -que puede ser medio minuto mirando otra
+     pagina-. Se mira el efecto, no la llamada. */
+  const K = conSeguir({ hace: 99999, tiraAbierta: false,
+                        video: { currentTime: 14, duration: 100, paused: false } });
+  K.stSeguirPoner(false);
+  const antes = K._movidos.length;
+  K.stSeguirPoner(true);
+  t.ok('al encenderlo, el libreto se coloca YA', K._movidos.length > antes,
+       'esperar al siguiente parlamento puede ser medio minuto mirando otra pagina');
+
+  t.seccion('15 · apagarlo no coloca nada');
+  const J = conSeguir({ hace: 99999, tiraAbierta: false,
+                        video: { currentTime: 14, duration: 100, paused: false } });
+  J.stSeguirPoner(false);
+  t.eq('sin tocar el libreto', J._movidos.length, 0,
+       'apagar el seguimiento es justo pedir que deje de moverse');
+
+  t.seccion('16 · el libreto sigue aunque la tira de vídeo esté plegada');
+  /*
+   * ESTA es la que faltaba. studioTick salia por la puerta de atras si la tira
+   * estaba plegada, asi que el seguimiento moria en cuanto se recogia el panel
+   * -que es justo lo que se hace para leer con el libreto entero-. Se descubrio
+   * rompiendolo a proposito y viendo que ninguna prueba se quejaba.
+   */
+  const conTick = (tiraAbierta) => {
+    const M = conSeguir({ hace: 99999, tiraAbierta: tiraAbierta,
+                          video: { currentTime: 14, duration: 100, paused: false } });
+    /* El contador de tics es del stSeguirPoner de mentira; aqui se mira lo que
+       de verdad importa: si el libreto se ha movido. */
+    M.studioTick(false);
+    return M._movidos.map(x => x.si);
+  };
+  t.eq('con la tira abierta se mueve', conTick(true), [1]);
+  t.eq('y PLEGADA tambien', conTick(false), [1],
+       'recoger el panel de video no puede apagar el seguimiento: es lo que se hace para leer');
+
+  t.seccion('17 · sin vídeo cargado no hay timecode al que seguir');
+  const SV = conSeguir({ hace: 99999, tiraAbierta: true, video: null });
+  SV.studioTick(false);
+  t.eq('no se mueve nada', SV._movidos.length, 0,
+       'y sobre todo: no revienta');
 };

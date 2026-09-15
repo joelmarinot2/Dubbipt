@@ -2242,7 +2242,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.80.0-nube';
+const APP_VER_NUM = 'v10.81.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -10545,6 +10545,14 @@ body{background:var(--bg);color:var(--ink)}
 .lh button.lbk{background:linear-gradient(135deg,#5FC85A,#4CB84C);color:#160f33;border:none;font-weight:700;padding:7px 14px;margin-right:4px;box-shadow:0 4px 14px rgba(124,92,224,.45)}
 .lh button.lbk:hover{filter:brightness(1.06)}
 .lh button.on{background:#4ADE80;color:#0b2413;border-color:transparent;font-weight:700}
+/* El botón de seguir, por identificador y sin ambigüedad: encendido tiene que
+   verse encendido de un vistazo desde la mesa, y con la regla por clase salía
+   un verde translúcido que no se distinguía de apagado. Medido en el
+   navegador, no supuesto. */
+#lSeguir{ gap:6px }
+#lSeguir.on{ background:#22C55E !important; color:#06210f !important;
+  border-color:#22C55E !important; font-weight:700 !important }
+#lSeguir:not(.on){ opacity:.72 }
 .lh .goto{display:flex;align-items:center;gap:4px}
 .lh .goto input{width:52px;background:var(--bg);border:1px solid var(--card-b);color:var(--ink);
   border-radius:7px;padding:5px 7px;font-size:12px;font-family:ui-monospace,monospace;text-align:center}
@@ -11022,6 +11030,10 @@ async function libEmptyAction(what, silent){
    18px, stroke=currentColor, heredan el color del botón. */
 const LIB_SVG = (p, sw)=> '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="'+(sw||2)+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+p+'</svg>';
 const LIB_ICON = {
+  /* Una marca sobre la línea de tiempo: «dónde estamos». La primera versión era
+     una flecha bajando hasta una raya y se leía como DESCARGAR, que es lo que
+     significa ese dibujo en todas partes. */
+  seguir   : LIB_SVG('<path d="M3 16h18"/><circle cx="12" cy="10" r="3"/><path d="M12 13v3"/>'),
   scopeOne : LIB_SVG('<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.5-6 8-6s8 2 8 6"/>'),                 // 👤 solo este personaje
   scopeAll : LIB_SVG('<path d="M12 5.5C10 4 7 4 4 5v13c3-1 6-1 8 .5 2-1.5 5-1.5 8-.5V5c-3-1-6-1-8 .5z"/><path d="M12 6v13"/>'), // 📖 todo el libreto
   sun      : LIB_SVG('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
@@ -11125,6 +11137,7 @@ function buildLibretoDoc(pc){
       <button id="lFontDn" title="Letra del personaje más pequeña" aria-label="Reducir tamaño de letra">A−</button>
       <button id="lFontUp" title="Letra del personaje más grande" aria-label="Aumentar tamaño de letra">A+</button>
       <button id="lVid" title="Video Estudio: video/audio del capítulo" aria-label="Abrir Video Estudio">${LIB_ICON.video}<span>Video</span></button>
+      <button id="lSeguir" class="${SEG.on?'on':''}" aria-pressed="${SEG.on?'true':'false'}" title="El libreto se coloca solo en el parlamento que suena" aria-label="Que el libreto siga al timecode">${LIB_ICON.seguir}<span>Seguir</span></button>
       <button id="lTablet" title="Modo tablet: herramientas de marcación" aria-label="Activar modo tablet con herramientas de marcación">${LIB_ICON.edit}</button>
       ${(DEVROLE==='tablet') ? '<button id="lTpad" title="Pasar al trackpad: controlar el libreto del escritorio" aria-label="Pasar al modo trackpad">'+LIB_ICON.sliders+'</button>' : ''}
       <button id="lFind" title="Buscar en el libreto" aria-label="Buscar en el libreto">${LIB_ICON.search}</button>
@@ -11450,6 +11463,12 @@ function buildLibretoDoc(pc){
     });
   }
   d.getElementById('lVid').addEventListener('click', ()=>{ try{ studioToggleStrip(); }catch(e){} });
+  /* El seguimiento NO abre el vídeo: es un interruptor aparte, y por eso está
+     en la barra del libreto y no dentro de la tira. */
+  d.getElementById('lSeguir').addEventListener('click', ()=>{
+    try{ stSeguirPoner(!stSeguirOn()); }catch(e){ fallo('stSeguirPoner · index.html:lSeguir', e); }
+  });
+  try{ libPintarSeguir(); }catch(e){ /* se pinta al abrir el libreto */ }
   // ✏️ herramientas: efecto visible SIEMPRE. En rol tablet el libreto trae el
   // cajón de herramientas (haschips) y las .mtools de las cajas están ocultas
   // por diseño — antes este botón solo alternaba una clase invisible y parecía
@@ -16201,7 +16220,78 @@ function stCurBlock(t){
    Y si el parlamento que suena no está en pantalla porque tienes abierto un
    solo personaje, se dice —con el botón para abrir el libreto entero—: antes
    no pasaba nada y parecía que el seguimiento estaba roto. */
-function stSeguirOn(){ const c = $('stFollow'); return !!(c && c.checked); }
+/* El seguimiento es un ESTADO, no una casilla.
+   Vivía en el `checked` de un control de la tira de vídeo, así que al plegar la
+   tira el estado se iba con ella y el libreto dejaba de seguir. Ahora vive
+   aquí, se recuerda entre sesiones, y tanto el botón de la barra del libreto
+   como la casilla de la tira son dos maneras de mirar lo mismo. */
+const SEG = { on: (function(){
+  try{ return localStorage.getItem('ddl_seguir') !== '0'; }catch(e){ return true; }
+})() };
+
+function stSeguirOn(){ return !!SEG.on; }
+
+/** Enciende o apaga el seguimiento, y deja los dos mandos de acuerdo. */
+function stSeguirPoner(on){
+  SEG.on = !!on;
+  try{ localStorage.setItem('ddl_seguir', SEG.on ? '1' : '0'); }catch(e){ /* no se recuerda */ }
+  try{ const c = $('stFollow'); if(c) c.checked = SEG.on; }catch(e){ /* la tira no está */ }
+  try{ libPintarSeguir(); }catch(e){ /* el libreto no está abierto */ }
+  if(SEG.on){
+    // encenderlo tiene que COLOCAR el libreto ya, no esperar al siguiente parlamento
+    try{ studioTick(true); }catch(e){ /* sin vídeo cargado no hay dónde colocarse */ }
+  }
+}
+
+/** Pinta el botón de la barra del libreto según esté encendido o no. */
+function libPintarSeguir(){
+  if(typeof pop2 === 'undefined' || !pop2 || !pop2.doc) return;
+  const b = pop2.doc.getElementById('lSeguir');
+  if(!b) return;
+  b.classList.toggle('on', !!SEG.on);
+  b.setAttribute('aria-pressed', SEG.on ? 'true' : 'false');
+  /* El color se pone AQUÍ, no en la hoja de estilos. La barra del libreto tiene
+     reglas con !important para todos sus botones, y ni un selector por
+     identificador con !important las gana: comprobado midiendo en el navegador,
+     salía un verde translúcido idéntico al de apagado. */
+  try{
+    const S = b.style;
+    /* Forma de pastilla. La barra mete a TODOS sus botones en un círculo de
+       34 px con !important, así que un botón con texto se le sale la etiqueta
+       por debajo — se vio en pantalla. Es el mismo remedio que ya llevaba el
+       botón «Ajustado». */
+    S.setProperty('width', 'auto', 'important');
+    S.setProperty('height', '34px', 'important');
+    S.setProperty('padding', '0 12px', 'important');
+    S.setProperty('border-radius', '99px', 'important');
+    S.setProperty('display', 'inline-flex', 'important');
+    S.setProperty('align-items', 'center', 'important');
+    S.setProperty('gap', '6px', 'important');
+    S.setProperty('white-space', 'nowrap', 'important');
+    S.setProperty('font-size', '12.5px', 'important');
+    S.setProperty('flex', '0 0 auto', 'important');
+    /* Encendido va OSCURO con la letra verde, no verde sobre verde: la barra del
+       libreto es verde en modo grabación y un botón verde encima desaparece.
+       En oscuro contrasta en los dos temas, que es lo que se pide de un
+       interruptor que hay que ver de un vistazo desde la mesa. */
+    if(SEG.on){
+      S.setProperty('background', 'rgba(0,0,0,.55)', 'important');
+      S.setProperty('color', '#4ADE80', 'important');
+      S.setProperty('border-color', 'transparent', 'important');
+      S.setProperty('font-weight', '700', 'important');
+      S.setProperty('opacity', '1', 'important');
+    }else{
+      S.setProperty('background', 'transparent', 'important');
+      S.setProperty('color', 'inherit', 'important');
+      S.setProperty('border-color', 'currentColor', 'important');
+      S.setProperty('font-weight', '500', 'important');
+      S.setProperty('opacity', '.6', 'important');
+    }
+  }catch(e){ /* sin color, queda el aria-pressed y el texto */ }
+  b.title = SEG.on
+    ? 'El libreto se coloca solo en el parlamento que suena · pulsa para dejar de seguir'
+    : 'El libreto no sigue al timecode · pulsa para que se coloque solo';
+}
 
 function studioSeguirLibreto(bi, forzado){
   if(!stSeguirOn() || bi == null || bi < 0) return;
@@ -16238,9 +16328,14 @@ function studioAvisarFueraDeAlcance(bi){
 }
 
 function studioTick(forzado){
-  if(!studioStripOn()) return;
+  /* El SEGUIMIENTO no depende de que la tira de vídeo esté desplegada.
+     Antes esto salía aquí mismo si la tira estaba plegada, así que el libreto
+     dejaba de seguir al timecode en cuanto se recogía el panel — justo lo que
+     se hace para leer con el libreto entero. Lo que necesita la tira a la vista
+     es lo de más abajo: el reloj del transporte y la onda. */
   const el = studioEl(); if(!el || !el.duration) return;
-  const t = el.currentTime + studioTc0() + (+$('stOff').value||0)/10;
+  const aj = $('stOff');                      // puede no existir: la tira se crea aparte
+  const t = el.currentTime + studioTc0() + ((aj ? +aj.value : 0) || 0)/10;
   const bi = stCurBlock(t);
   if(bi!==studio.cur){
     studio.cur = bi;
@@ -16258,13 +16353,15 @@ function studioTick(forzado){
     // mismo parlamento pero se ha saltado: recolocar igual
     studioSeguirLibreto(bi, true);
   }
+  // de aquí abajo, solo lo que se PINTA en la tira: si está plegada, sobra
+  if(!studioStripOn()) return;
   // reloj del transporte + timecode del libreto
   try{
     const tt = $('tpTime');
     if(tt) tt.innerHTML = '<b>'+stFmt(el.currentTime)+'</b> / '+stFmt(el.duration||0);
     const tc = $('tpTC');
     if(tc) tc.textContent = '⏱ '+stFmtTC(t);
-  }catch(e){}
+  }catch(e){ /* la tira se acaba de plegar: nada que refrescar */ }
   stDrawWave();
   try{ adrRepintar(); }catch(e){ fallo('adrRepintar · index.html:15504', e); }
 }
