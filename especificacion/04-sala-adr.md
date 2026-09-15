@@ -37,6 +37,9 @@ qué dijo el director.
 
 | | Regla | |
 |---|---|---|
+| **EST-5** | El libreto **sigue al vídeo**: el timecode manda y el parlamento que suena se marca y se coloca en pantalla. También con el vídeo **parado** y al **saltar**, aunque caiga en el mismo parlamento —arrastrar la barra buscando un momento y que el libreto no se mueva era la mitad del trabajo perdida. | ✅ |
+| **EST-6** | Mientras una persona mueve el libreto con la mano, el vídeo **no se lo quita** durante un par de segundos. Sin eso es imposible adelantarse a leer. Pero un **salto** del vídeo sí manda: si salto a propósito, quiero ir ahí. | ✅ |
+| **EST-7** | Si el parlamento que suena **no está en pantalla** —hay un solo personaje abierto— se dice por quién va el vídeo, con el botón para abrir el libreto entero. Antes no pasaba nada y parecía que el seguimiento estaba roto. Una vez por personaje. | ✅ |
 | **EST-1** | El modo estudio parte la ventana del libreto en **dos columnas**: el panel de vídeo a la izquierda y el libreto a la derecha. Al apagarlo, el libreto vuelve a ocupar todo el ancho. | ✅ |
 | **EST-2** | Se puede encender **sin haber abierto antes el libreto incrustado**: si el contenedor no existe, se crea, y se vuelve a pedir antes de usarlo. | ✅ |
 | **EST-3** | Los paneles de las herramientas —sala, cues, formatos, planos— se abren desde botones que viven **dentro** del libreto, así que siempre con `body.ddlov` puesto. Tienen que **verse igual**. La lista de excepciones de esa regla va por **clase** (`.modo-cap`, `.ddl-encima`), no por identificador. | ✅ |

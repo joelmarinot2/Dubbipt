@@ -2242,7 +2242,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.79.3-nube';
+const APP_VER_NUM = 'v10.80.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -11620,6 +11620,74 @@ function buildLibretoDoc(pc){
     }catch(e){}
   }, {passive:true});
 }
+/* ═══ ¿LOS DOS DISPOSITIVOS VEN EL MISMO LIBRETO? ═════════════════════════
+
+   La sincronía viaja por ÍNDICE de intervención, que es idéntico en la tablet
+   y en el escritorio... siempre que los dos tengan el MISMO libreto. Y eso no
+   estaba comprobado en ninguna parte.
+
+   Basta con que uno lo tenga de una copia guardada vieja y el otro lo haya
+   vuelto a analizar —o que uno abriera el capítulo con una versión anterior de
+   Dubbipt— para que el índice 300 sea una intervención en cada aparato. El
+   síntoma que se ve es que las páginas no coinciden: cada uno va por su sitio y
+   no hay manera de entender por qué.
+
+   La huella resume el libreto en una cadena corta: cuántas intervenciones, de
+   quién, con qué timecode y en qué página. Dos aparatos con la misma huella ven
+   lo mismo. Con huellas distintas, seguir mandándose posiciones es mentir, así
+   que se dice y se ofrece ponerse al día. */
+function libHuella(){
+  try{
+    if(typeof script === 'undefined' || !script || !script.length) return '';
+    let h = 0;
+    for(let i = 0; i < script.length; i++){
+      const b = script[i] || {};
+      const s = (b.key || '') + '|' + (b.tcEff == null ? '' : b.tcEff)
+              + '|' + (b.page == null ? '' : b.page);
+      for(let j = 0; j < s.length; j++) h = (h * 31 + s.charCodeAt(j)) | 0;
+    }
+    return script.length + ':' + (h >>> 0).toString(36);
+  }catch(e){ return ''; }
+}
+
+/* Se avisa UNA vez por pareja de huellas: repetirlo veinte veces por segundo
+   —que es a lo que llegan los mensajes de scroll— sería insoportable. */
+let _libDesajuste = '';
+function libAvisarDesajuste(suya){
+  const mia = libHuella();
+  const par = mia + '≠' + suya;
+  if(_libDesajuste === par) return;
+  _libDesajuste = par;
+  const msg = 'Los dos dispositivos NO tienen el mismo libreto, por eso las páginas no coinciden';
+  if(typeof DDL_UI !== 'undefined' && DDL_UI.toast)
+    DDL_UI.toast(msg, { kind:'err', duration: 12000, actionLabel: '⟳ Ponerme al día',
+      onAction: ()=>{ libRecargarDeLaNube(); } });
+  else libMsg('⚠️ ' + msg);
+}
+
+/** Vuelve a traer el capítulo de la nube. Es lo que hace falta cuando este
+    aparato se quedó con una copia vieja del libreto. */
+async function libRecargarDeLaNube(){
+  if(typeof currentEp === 'undefined' || !currentEp || !currentEp.id) return false;
+  try{
+    const { data:d } = await sb.from('episode_data').select('data').eq('ep_id', currentEp.id).maybeSingle();
+    if(!(d && d.data && d.data.script && d.data.script.length)){
+      libMsg('⚠️ En la nube no hay libreto guardado de este capítulo');
+      return false;
+    }
+    const key = (pop2 && pop2.key !== undefined) ? pop2.key : null;
+    hydrateEpisode(Object.assign({ _epId: currentEp.id }, d.data));
+    if(typeof loadCloudMarks === 'function') await loadCloudMarks();
+    if(pop2 && pop2.doc){ pop2.key = key; pop2._hiVi = null; renderLibretoBlocks(); renderLibretoChips(); }
+    _libDesajuste = '';
+    if(typeof DDL_UI !== 'undefined' && DDL_UI.toast) DDL_UI.toast('Libreto al día');
+    return true;
+  }catch(e){
+    fallo('libRecargarDeLaNube · index.html:libRecargarDeLaNube', e, 'el libreto no se ha podido actualizar');
+    return false;
+  }
+}
+
 // qué intervención (índice GLOBAL de script) está arriba del visor y en qué fracción.
 // Usamos el índice de script — idéntico en tablet y PC — para que jamás se descuadre.
 // posición actual: lectura DIRECTA del DOM, sin caché — siempre exacta
@@ -14929,7 +14997,11 @@ function onRemotePos(p){
 function syncSendScroll(pos){
   if(!sync.isOn || !sync.channel) return;
   if(typeof isTalent==='function' && isTalent()) return;   // tablet actor: el scroll lo manda el director
-  syncEmit('scroll', pos, true);       // {b,f} — no se encola
+  /* La huella del libreto viaja con la posición: es lo único que permite al
+     otro lado saber si el índice que le mando significa lo mismo en su
+     pantalla. Sin ella, dos libretos distintos se sincronizan a ciegas. */
+  try{ pos.hu = libHuella(); }catch(e){ /* sin huella se sigue como antes */ }
+  syncEmit('scroll', pos, true);       // {si,f,hu} — no se encola
 }
 function resolveTargetPx(p){
   if(!pop2 || !pop2.els || !pop2.blockEls || !pop2.blockMap) return null;
@@ -14958,6 +15030,11 @@ function onRemoteScroll(p){
   if(typeof TP!=='undefined' && TP.on) return;   // modo trackpad: no soy libreto
   if(sync._lastNavAt && (performance.now() - sync._lastNavAt) < 8000) return;   // el trackpad manda: pausar el motor de posición
   if(!p || p.from===sync.meId) return;
+  /* Si el otro no tiene MI mismo libreto, su índice de intervención no significa
+     lo mismo en mi pantalla: se dice, en vez de llevarme a un sitio cualquiera.
+     Es la causa de «las páginas no coinciden». La posición se sigue aplicando
+     —es lo más parecido que hay— pero ya sabiendo que no es de fiar. */
+  try{ if(p.hu && p.hu !== libHuella()) libAvisarDesajuste(p.hu); }catch(e){ /* sin huella, como antes */ }
   if(p.si!=null) sync._lastRemotePos = { si:p.si, f:p.f||0, at:performance.now() };   // para la vista 🎥
   if(performance.now() - (pop2._interact||0) < 600) return;   // mi mano manda: el otro me sigue
   const target = resolveTargetPx(p);
@@ -15671,7 +15748,7 @@ function studioEnsureStrip(){
     +'<label title="Ajuste fino de sincronía">ajuste <input id="stOff" type="range" min="-30" max="30" value="0" style="width:60px;vertical-align:middle"><span id="stOffV">0.0</span>s</label>'
     +'<button id="stAuto" class="st-btn">⚡ Marcar pausas</button>'
     +'<button id="stClear" class="st-btn ghost" title="Quitar todas las marcas de pausa">🧹</button>'
-    +'<label class="st-chk"><input type="checkbox" id="stFollow" checked> seguir</label>'
+    +'<label class="st-chk" title="El libreto se coloca solo en el parlamento que suena, tambien con el video parado y al saltar"><input type="checkbox" id="stFollow" checked> ↓ el libreto sigue al video</label>'
     +'<label class="st-chk" title="Ver ritmo (caracteres/segundo) de cada línea"><input type="checkbox" id="stCps"> ritmo c/s</label>'
     +'<span style="opacity:.55;flex-basis:100%">tecla <b>P</b> = pausa al vuelo · clic en el ⏱ de una línea = saltar el video ahí</span>';
 
@@ -15924,7 +16001,13 @@ function studioWireStrip(){
     const el = $(id);
     el.addEventListener('timeupdate', studioTick);
     el.addEventListener('play', ()=>{ try{ salaAudio(); salaArrancar(); }catch(e){} });
-    el.addEventListener('seeked', ()=>{ SALA.beepHecho = -1; });
+    el.addEventListener('seeked', ()=>{
+      SALA.beepHecho = -1;
+      /* Saltar en el video recoloca el libreto AUNQUE este parado y aunque
+         caiga en el mismo parlamento. Arrastrar la barra buscando un momento
+         y que el libreto no se mueva era la mitad del trabajo perdida. */
+      try{ studioTick(true); }catch(e){ fallo('studioTick · index.html:seeked', e); }
+    });
     // el karaoke necesita su propio bucle por fotograma mientras suena
     el.addEventListener('play', karArrancar);
     el.addEventListener('seeked', function(){ if(kar.on) karPintar(el.currentTime + studioTc0() + studioFine()); });
@@ -16100,20 +16183,80 @@ function stCurBlock(t){
     if(b.tcEff!=null && b.tcEff<=t) best=i; else if(b.tcEff!=null && b.tcEff>t) break; }
   return best;
 }
-function studioTick(){
+/* ═══ EL LIBRETO SIGUE AL VÍDEO ══════════════════════════════════════════
+
+   El timecode del vídeo manda: el parlamento que suena se marca y el libreto
+   se coloca en él. Es lo que hace un ayudante de dirección pasando páginas, y
+   es lo que hace que se pueda trabajar con una mano en el transporte.
+
+   Tres cosas que antes no hacía y son justo las que se usan:
+
+   · Seguir también con el vídeo PARADO. Arrastrar la barra para buscar un
+     momento y que el libreto no se mueva es la mitad del trabajo perdida.
+   · Seguir al SALTAR, aunque el parlamento sea el mismo: al volver atrás
+     treinta segundos dentro de una parrafada, el libreto se quedaba quieto.
+   · Callarse mientras TÚ mueves el libreto. Si acabas de tocarlo con la mano,
+     el vídeo no te lo quita durante un par de segundos.
+
+   Y si el parlamento que suena no está en pantalla porque tienes abierto un
+   solo personaje, se dice —con el botón para abrir el libreto entero—: antes
+   no pasaba nada y parecía que el seguimiento estaba roto. */
+function stSeguirOn(){ const c = $('stFollow'); return !!(c && c.checked); }
+
+function studioSeguirLibreto(bi, forzado){
+  if(!stSeguirOn() || bi == null || bi < 0) return;
+  const doc = pop2 && pop2.doc; if(!doc) return;
+  /* Mi mano manda: si acabo de mover el libreto, el vídeo no me lo quita.
+     Sin esto es imposible adelantarse a leer mientras corre el vídeo. */
+  if(!forzado && (performance.now() - (pop2._interact || 0)) < 2500) return;
+  const node = doc.querySelector('.blk[data-si="' + bi + '"]');
+  if(!node){ studioAvisarFueraDeAlcance(bi); return; }
+  try{ node.scrollIntoView({ block:'center', behavior: forzado ? 'auto' : 'smooth' }); }catch(e){}
+}
+
+/* El parlamento que suena no está pintado: con un personaje abierto, el libreto
+   solo trae sus intervenciones. Se avisa UNA vez por personaje —repetirlo en
+   cada salto sería insoportable— y con el botón para verlo entero. */
+let _stFueraAvisado = '';
+function studioAvisarFueraDeAlcance(bi){
+  try{
+    if(pop2.scopeAll) return;                 // ya está entero: no hay nada que decir
+    const b = script[bi]; if(!b) return;
+    const quien = (b.key && charIdx[b.key] ? charIdx[b.key].display : b.key) || 'otro personaje';
+    if(_stFueraAvisado === quien) return;
+    _stFueraAvisado = quien;
+    if(typeof DDL_UI !== 'undefined' && DDL_UI.toast)
+      DDL_UI.toast('El vídeo va por ' + quien + ', que no está en este libreto',
+        { kind:'err', duration: 7000, actionLabel: 'Ver el libreto entero',
+          onAction: ()=>{ try{
+            pop2.scopeAll = true;
+            renderLibretoBlocks(); renderLibretoChips();
+            if(typeof syncSendTool === 'function') syncSendTool('scope', true);
+            studioSeguirLibreto(studio.cur, true);
+          }catch(e){ fallo('ver el libreto entero · index.html:studioAvisarFueraDeAlcance', e); } } });
+  }catch(e){ /* el aviso no puede tirar el seguimiento */ }
+}
+
+function studioTick(forzado){
   if(!studioStripOn()) return;
   const el = studioEl(); if(!el || !el.duration) return;
   const t = el.currentTime + studioTc0() + (+$('stOff').value||0)/10;
   const bi = stCurBlock(t);
   if(bi!==studio.cur){
     studio.cur = bi;
+    _stFueraAvisado = '';                      // personaje nuevo: se puede volver a avisar
     try{
-      const doc = pop2.doc; if(!doc) return;
-      doc.querySelectorAll('.blk.stcur').forEach(x=>x.classList.remove('stcur'));
-      const node = doc.querySelector('.blk[data-si="'+bi+'"]');
-      if(node){ node.classList.add('stcur');
-        if($('stFollow') && $('stFollow').checked && !el.paused) node.scrollIntoView({ block:'center', behavior:'smooth' }); }
-    }catch(e){}
+      const doc = pop2.doc;
+      if(doc){
+        doc.querySelectorAll('.blk.stcur').forEach(x=>x.classList.remove('stcur'));
+        const node = doc.querySelector('.blk[data-si="'+bi+'"]');
+        if(node) node.classList.add('stcur');
+      }
+    }catch(e){ /* sin libreto abierto no hay nada que marcar */ }
+    studioSeguirLibreto(bi, !!forzado);
+  }else if(forzado){
+    // mismo parlamento pero se ha saltado: recolocar igual
+    studioSeguirLibreto(bi, true);
   }
   // reloj del transporte + timecode del libreto
   try{
