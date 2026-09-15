@@ -17,6 +17,10 @@ que dos personas trabajando a la vez no se borren el trabajo.
 | **SYN-6** | Al cambiar de capítulo, el modo estudio arranca apagado: no se arrastra el vídeo del anterior. | 👁 |
 | **SYN-7** | Todo lo que llega de la nube se trata como **datos de fuera**: se sanea antes de concatenarlo en HTML o de compararlo. Lo pudo escribir otro cliente, o una versión más nueva de la aplicación. | 👁 |
 
+| **SYN-8** | La posición del libreto viaja por **índice de intervención**, no por píxeles ni por página: el índice es el mismo en la tablet y en el escritorio aunque tengan otro tamaño de letra o otro ancho de caja. | 👁 |
+| **SYN-9** | Con la posición viaja una **huella del libreto** —cuántas intervenciones, de quién, con qué timecode y en qué página—. Sin ella, dos aparatos con libretos distintos se sincronizan a ciegas: el índice 300 es una intervención en cada uno y lo único que se ve es que **las páginas no coinciden**. | ✅ |
+| **SYN-10** | Si las huellas no casan **se dice, con el botón de ponerse al día**, y una sola vez por pareja de huellas: los mensajes de posición llegan a veinte por segundo. | ✅ |
+
 ## Reglas · el puente con DublajeCast
 
 | | Regla | |
@@ -34,9 +38,16 @@ que dos personas trabajando a la vez no se borren el trabajo.
 | **SYN-N1** | **Nunca escribir en la base de datos de otra aplicación sin condición de revisión.** Una escritura ciega puede borrar el trabajo de una tarde de otra persona. | 👁 |
 | **SYN-N2** | Nunca entrar en la cuenta de otro servicio en nombre del usuario ni guardar sus credenciales. La contraseña se teclea en su formulario y la sesión la gestiona su propio cliente. | — |
 | **SYN-N3** | Nunca confiar en el color, el número o el texto que venga guardado: el color se recalcula siempre. | 👁 |
+| **SYN-N5** | **Nunca dar por hecho que el otro aparato tiene el mismo libreto solo porque es el mismo capítulo.** Basta con que uno venga de una copia guardada vieja —o que lo abriera con una versión anterior— para que los índices signifiquen cosas distintas. | ✅ |
 | **SYN-N4** | Nunca guardar un capítulo vacío encima de uno que tiene contenido. Si no hay libreto en memoria, no se guarda. | 👁 |
 
 ## Cómo se demuestra
+
+- **SYN-9**, **SYN-10** y **SYN-N5**: `pruebas/seguir.prueba.js`. Se comprueba que
+  la huella cambia ante **cualquier** diferencia que descoloque los índices —una
+  intervención de más o de menos, otro personaje, otro timecode, otra página, el
+  mismo libreto en otro orden—. Dejar la página fuera de la huella pone una
+  comprobación en rojo.
 
 **A mano**, y con una limitación importante que conviene tener escrita: el
 puente con DublajeCast **nunca se ha probado contra sus datos reales**. No he

@@ -42,6 +42,7 @@ alguien la abre sin conexión, y entonces falla sin ninguna explicación.
 | `base-talentos.prueba.js` | Que solo se pueda repartir a quien esté en la base de la empresa, que `ORIGINAL`, `TODOS` y `X` pasen siempre, y que sin base no se restrinja nada. |
 | `completados.prueba.js` | Cuándo se da un personaje por cerrado, que es lo único que decide si su tarjeta desaparece de la vista. Esconder uno sin resolver es lo caro: no se reparte y nadie se entera. |
 | `ocupacion-libreto.prueba.js` | Que la ocupación se vea dentro del libreto repartiendo, que NO se vea grabando, y que el contenido se corra a la izquierda sin dejar el libreto ilegible en pantallas estrechas. |
+| `seguir.prueba.js` | Que el libreto siga al vídeo —también parado y al saltar— sin quitarle el libreto de las manos a quien lo está moviendo. Y que la tablet y el escritorio se den cuenta de que NO tienen el mismo libreto, que es por lo que las páginas no coinciden. |
 | `callados.prueba.js` | El trinquete: que el número de `catch` que se comen el error **no suba nunca**. |
 
 ## Cómo están hechas
@@ -99,6 +100,8 @@ comprobaron rompiendo el código a propósito, una cosa a la vez:
 | Dejar el cajon estrecho a 320 px, tapando el libreto (OCU-7) | Sí — 1 comprobacion |
 | Un acento grave en un comentario de CSS dentro de una plantilla (ENT-17) | Sí — 1 comprobacion |
 | Devolver la flecha a la altura de la cabecera, sobre la banda (LIB-18) | Sí — 1 comprobacion |
+| Que el video le quite el libreto de las manos al que lo mueve (EST-6) | Sí — 2 comprobaciones |
+| Dejar la pagina fuera de la huella del libreto (SYN-9) | Sí — 1 comprobacion |
 
 Las **dos de los cortes** no se detectaban con las pruebas iniciales: el vídeo
 de prueba era demasiado fácil y nada superaba el suelo salvo los cortes de
