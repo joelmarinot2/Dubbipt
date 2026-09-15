@@ -326,4 +326,36 @@ exports.pruebas = function(t){
     t.eq(nombre + ' no lleva ningun acento grave dentro', cuantos, 0,
          cuantos ? (linea + ' — cierra la hoja de estilos a la mitad y parte el archivo') : '');
   }
+
+  t.seccion('19 · nada se monta encima de la banda del personaje');
+  /*
+   * La banda se mete entre la barra de herramientas y el libreto, y todo lo que
+   * iba pegado a la altura de la cabecera se le quedaba encima: la flecha de
+   * ocultar la barra, sobre el nombre; el riel de paginas, tapado por la banda
+   * hasta comerse el «PAG.»; y la pestana de Ocupacion, sobre el boton de
+   * quitar el talento. Los tres arrancan ahora DEBAJO, sumando --lbarsH.
+   */
+  /* El mismo selector aparece varias veces -`body.light .ltoolhide`, un
+     `.lchips` que solo pone display-, asi que se busca la regla que de verdad
+     coloca el `top`, no la primera que aparezca. */
+  const bajo = (sel) => {
+    let i = -1, n = 0;
+    while((i = HTML.indexOf(sel, i + 1)) >= 0 && n++ < 20){
+      const bloque = HTML.slice(i, HTML.indexOf('}', i));
+      const j = bloque.indexOf('top:');
+      if(j >= 0) return bloque.slice(j, bloque.indexOf(';', j));
+    }
+    return '(ninguna regla de ' + sel + ' pone top)';
+  };
+  t.ok('la flecha de ocultar la barra baja',
+       bajo('.ltoolhide{').includes('var(--lbarsH'),
+       'se quedaba encima del nombre del personaje');
+  t.ok('el riel de paginas baja',
+       bajo('body.deskchips .lchips{').includes('var(--lbarsH'),
+       'la banda le pasaba por encima y se comia el «PAG.»');
+  t.ok('y tambien con el riel a la izquierda',
+       bajo('body.haschips .lchips{').includes('var(--lbarsH'));
+  t.ok('la pestana de Ocupacion baja',
+       bajo('.locu-tab{').includes('var(--lbarsH'),
+       'caia sobre el boton de quitar el talento');
 };

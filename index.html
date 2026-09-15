@@ -2242,7 +2242,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.79.2-nube';
+const APP_VER_NUM = 'v10.79.3-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -10455,7 +10455,11 @@ const LIB_OCU_CSS = `
   display:flex; flex-direction:column; transition:right .18s ease;
   right:calc(-1 * min(320px,86vw)); font-family:'Inter',sans-serif; }
 .locu.abierto{ right:0; }
-.locu-tab{ position:absolute; left:-30px; top:14px; width:30px; padding:12px 0;
+/* La pestaña baja por debajo de la banda del personaje. Arriba del todo caía
+   justo encima de la fila del talento y tapaba el botón de quitar: el cajón
+   empieza a la altura de la cabecera, que es donde va la banda. */
+.locu-tab{ position:absolute; left:-30px; top:calc(var(--lbarsH,0px) + 14px);
+  width:30px; padding:12px 0;
   background:var(--head); border:1px solid var(--card-b); border-right:none;
   border-radius:9px 0 0 9px; color:var(--dim); cursor:pointer; font:inherit;
   font-size:11px; font-weight:700; letter-spacing:.06em; writing-mode:vertical-rl;
@@ -10705,7 +10709,9 @@ body.haschips .lchips .ctabs{display:flex;gap:4px;position:sticky;top:0;backgrou
   color:#08240f;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;cursor:pointer;
   box-shadow:0 8px 24px rgba(74,222,128,.35)}
 /* ---- escritorio: páginas a la DERECHA en la misma ventana ---- */
-body.deskchips .lchips{position:fixed;right:0;top:var(--lhH,54px);bottom:0;width:88px;display:flex;
+/* El riel arranca DEBAJO de la banda del personaje: empezaba a la altura de
+   la cabecera y la banda le pasaba por encima, comiendose el «PAG.». */
+body.deskchips .lchips{position:fixed;right:0;top:calc(var(--lhH,54px) + var(--lbarsH,0px));bottom:0;width:88px;display:flex;
   flex-direction:column;align-items:stretch;overflow-y:auto;overflow-x:hidden;
   border-left:1px solid var(--card-b);border-bottom:none;z-index:15}
 body.deskchips .lchips .pgchip{text-align:center}
@@ -10727,7 +10733,7 @@ body.haschips .lh .goto, body.haschips .lh #lScope, body.haschips .lh #lTheme,
 body.haschips .lh #lTablet, body.haschips .lh #lTp, body.haschips .lh #lEye,
 body.haschips .lh #lFontDn, body.haschips .lh #lFontUp, body.haschips .lh #lPron, body.haschips .lh #lClean, body.haschips .lh #lFind, body.haschips .lh #lPip{display:none}
 body.haschips .lfind{position:fixed;left:0;right:0;top:0;z-index:40}
-body.haschips .lchips{position:fixed;left:0;top:var(--lhH,54px);bottom:0;width:88px;display:flex;
+body.haschips .lchips{position:fixed;left:0;top:calc(var(--lhH,54px) + var(--lbarsH,0px));bottom:0;width:88px;display:flex;
   flex-direction:column;align-items:stretch;overflow-y:auto;overflow-x:hidden;
   border-right:1px solid var(--card-b);border-bottom:none;z-index:15;transition:transform .2s}
 body.haschips.lclosed .lchips{transform:translateX(-100%)}
