@@ -2242,7 +2242,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.81.0-nube';
+const APP_VER_NUM = 'v10.82.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -11466,7 +11466,15 @@ function buildLibretoDoc(pc){
   /* El seguimiento NO abre el vídeo: es un interruptor aparte, y por eso está
      en la barra del libreto y no dentro de la tira. */
   d.getElementById('lSeguir').addEventListener('click', ()=>{
-    try{ stSeguirPoner(!stSeguirOn()); }catch(e){ fallo('stSeguirPoner · index.html:lSeguir', e); }
+    try{
+      if(stSeguirOn()){ stSeguirPoner(false); return; }
+      /* Encender NO es solo bajar un interruptor: hay que volver a compartir la
+         ventana de Pro Tools, porque el navegador no deja recordar ese permiso
+         de una sesión a otra. Por eso al encender se abre el panel, que es
+         donde se comparte y donde se arranca. */
+      if(typeof tcpPanel === 'function') tcpPanel();
+      else stSeguirPoner(true);
+    }catch(e){ fallo('stSeguirPoner · index.html:lSeguir', e); }
   });
   try{ libPintarSeguir(); }catch(e){ /* se pinta al abrir el libreto */ }
   // ✏️ herramientas: efecto visible SIEMPRE. En rol tablet el libreto trae el
@@ -16233,7 +16241,16 @@ function stSeguirOn(){ return !!SEG.on; }
 
 /** Enciende o apaga el seguimiento, y deja los dos mandos de acuerdo. */
 function stSeguirPoner(on){
+  const antes = SEG.on;
   SEG.on = !!on;
+  /* Apagar el seguimiento suelta también la lectura de Pro Tools: si no, se
+     quedaría leyendo la pantalla quince veces por segundo para nada. No se
+     repite la llamada porque SEG.on ya está en false cuando tcpParar avisa de
+     vuelta, y entonces `antes` vale false. */
+  if(antes && !SEG.on){
+    try{ if(typeof tcpParar === 'function' && typeof TCP !== 'undefined' && TCP.on) tcpParar(); }
+    catch(e){ /* sin Pro Tools conectado no hay nada que soltar */ }
+  }
   try{ localStorage.setItem('ddl_seguir', SEG.on ? '1' : '0'); }catch(e){ /* no se recuerda */ }
   try{ const c = $('stFollow'); if(c) c.checked = SEG.on; }catch(e){ /* la tira no está */ }
   try{ libPintarSeguir(); }catch(e){ /* el libreto no está abierto */ }
@@ -16288,9 +16305,19 @@ function libPintarSeguir(){
       S.setProperty('opacity', '.6', 'important');
     }
   }catch(e){ /* sin color, queda el aria-pressed y el texto */ }
-  b.title = SEG.on
-    ? 'El libreto se coloca solo en el parlamento que suena · pulsa para dejar de seguir'
-    : 'El libreto no sigue al timecode · pulsa para que se coloque solo';
+  /* De qué reloj está colgado, escrito en el propio botón. Sin esto no hay
+     manera de saber desde la mesa si el libreto va con Pro Tools o con el vídeo
+     de aquí, y son cosas muy distintas: pasó ya que se diera por hecho que iba
+     con Pro Tools cuando en realidad seguía al vídeo. */
+  const pt = (typeof tcpActivo === 'function') && tcpActivo();
+  try{
+    const sp = b.querySelector('span');
+    if(sp) sp.textContent = SEG.on ? (pt ? 'Seguir · PT' : 'Seguir · vídeo') : 'Seguir';
+  }catch(e){ /* el botón se pinta sin etiqueta: queda el icono */ }
+  b.title = !SEG.on
+    ? 'El libreto no sigue a ningún reloj · pulsa para engancharlo al contador de Pro Tools'
+    : (pt ? 'El libreto va con el contador de Pro Tools · pulsa para soltarlo'
+          : 'El libreto va con el vídeo de aquí, no hay Pro Tools leyendo · pulsa para soltarlo');
 }
 
 function studioSeguirLibreto(bi, forzado){
@@ -16333,9 +16360,19 @@ function studioTick(forzado){
      dejaba de seguir al timecode en cuanto se recogía el panel — justo lo que
      se hace para leer con el libreto entero. Lo que necesita la tira a la vista
      es lo de más abajo: el reloj del transporte y la onda. */
-  const el = studioEl(); if(!el || !el.duration) return;
+  const el = studioEl();
   const aj = $('stOff');                      // puede no existir: la tira se crea aparte
-  const t = el.currentTime + studioTc0() + ((aj ? +aj.value : 0) || 0)/10;
+  /* DE DÓNDE SALE EL RELOJ. El seguimiento va enganchado al contador de Pro
+     Tools —el reloj que manda en la sala—, no al vídeo ni al audio que se
+     suban aquí. Pro Tools ya da el timecode entero y trae su propio ajuste
+     fino, así que ni se le suma el desplazamiento del vídeo (studioTc0) ni el
+     ajuste de la tira: eso es del vídeo.
+     El vídeo de aquí solo lleva el reloj cuando no hay Pro Tools leyendo, para
+     que el libreto siga sirviendo a quien trabaje sin sala. */
+  const pt = (typeof tcpFuente === 'function') ? tcpFuente() : null;
+  const t = (pt != null) ? pt
+          : ((el && el.duration) ? el.currentTime + studioTc0() + ((aj ? +aj.value : 0) || 0)/10 : null);
+  if(t == null) return;
   const bi = stCurBlock(t);
   if(bi!==studio.cur){
     studio.cur = bi;
@@ -16355,6 +16392,10 @@ function studioTick(forzado){
   }
   // de aquí abajo, solo lo que se PINTA en la tira: si está plegada, sobra
   if(!studioStripOn()) return;
+  /* El reloj del transporte y la onda son del VÍDEO. Siguiendo a Pro Tools
+     puede no haber vídeo cargado: entonces no hay transporte que pintar, pero
+     el libreto ya se ha colocado ahí arriba, que es lo que importa. */
+  if(!el || !el.duration){ try{ tcpPintarEstado(); }catch(e){ /* sin Pro Tools no hay reloj que enseñar */ } return; }
   // reloj del transporte + timecode del libreto
   try{
     const tt = $('tpTime');
@@ -18066,3 +18107,4 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/adr.js"></script>
 <script src="./js/sala.js"></script>
 <script src="./js/talentos.js"></script>
+<script src="./js/tcpantalla.js"></script>

@@ -37,7 +37,7 @@ qué dijo el director.
 
 | | Regla | |
 |---|---|---|
-| **EST-5** | El libreto **sigue al vídeo**: el timecode manda y el parlamento que suena se marca y se coloca en pantalla. También con el vídeo **parado** y al **saltar**, aunque caiga en el mismo parlamento —arrastrar la barra buscando un momento y que el libreto no se mueva era la mitad del trabajo perdida. | ✅ |
+| **EST-5** | El libreto **sigue al timecode** (ver PT-1: el reloj lo lleva Pro Tools, y el vídeo de aquí solo cuando no hay Pro Tools leyendo): el timecode manda y el parlamento que suena se marca y se coloca en pantalla. También con el vídeo **parado** y al **saltar**, aunque caiga en el mismo parlamento —arrastrar la barra buscando un momento y que el libreto no se mueva era la mitad del trabajo perdida. | ✅ |
 | **EST-6** | Mientras una persona mueve el libreto con la mano, el vídeo **no se lo quita** durante un par de segundos. Sin eso es imposible adelantarse a leer. Pero un **salto** del vídeo sí manda: si salto a propósito, quiero ir ahí. | ✅ |
 | **EST-8** | El seguimiento es un **estado propio**, con su botón en la barra del libreto, y se recuerda entre sesiones. Vivía en una casilla dentro de la tira de vídeo: al plegar la tira —que es justo lo que se hace para leer con el libreto entero— el libreto dejaba de seguir. | ✅ |
 | **EST-9** | Encenderlo **coloca el libreto ya**, sin esperar al siguiente parlamento, que puede ser medio minuto mirando otra página. | ✅ |
@@ -63,6 +63,25 @@ qué dijo el director.
 | **ADR-9** | El vigilante del bucle va con **temporizador**, no con `requestAnimationFrame`: rAF no se dispara si la pestaña no está pintando, y entonces el bucle se salía del cue sin volver. | 👁 |
 | **ADR-10** | La **hoja de ADR** se agrupa por talento, con TC de entrada y salida, duración, take, estado, notas y los totales de tiempo de cada uno y del capítulo. | 👁 |
 | **ADR-11** | Lo que llega de la nube se **sanea** antes de usarlo: el estado tiene que ser uno de los cinco, el take un número positivo, las notas texto acotado. | 👁 |
+
+## Reglas · timecode de Pro Tools
+
+| | Regla | |
+|---|---|---|
+| **PT-1** | El botón **Seguir** cuelga del **contador de Pro Tools**, no del vídeo ni del audio que se suban a Dubbipt. Pro Tools es el reloj que manda en la sala; lo de aquí es material de consulta. El vídeo lleva el reloj **solo** si no hay Pro Tools leyendo, y entonces el botón lo dice: pone «Seguir · vídeo» en vez de «Seguir · PT». | ✅ |
+| **PT-2** | El timecode se lee **de la pantalla**: se comparte la ventana de Pro Tools y se marca una vez el recuadro del contador grande. Sin instalar nada, sin cables y **sin MIDI** — se descartó a petición. | ✅ |
+| **PT-3** | **El reloj no es la lectura.** Se engancha una vez y a partir de ahí cuenta solo con el reloj del navegador. Una lectura solo se acepta si **cuadra** con lo que el reloj ya predecía; la que no cuadra se tira. Esto es lo que hace viable leer una pantalla. | ✅ |
+| **PT-4** | Si **varias** lecturas seguidas no cuadran pero coinciden **entre sí** sobre una misma recta —parado o a tiempo real—, es que han saltado en Pro Tools, y ahí sí se vuelve a enganchar. Se busca el **grupo mayor** que caiga en una recta, no que encajen todas: con la mitad de las lecturas malas, exigir que encajen todas no engancha nunca. | ✅ |
+| **PT-5** | El reparto de las ocho cifras se calcula **una vez**, al enseñárselas, y se reutiliza. Calcularlo en cada fotograma era el fallo gordo: una partición mala estropea las ocho cifras a la vez. | ✅ |
+| **PT-6** | Las casillas se cuelgan de una **rejilla** anclada en los dos puntos, no del centro de la tinta de cada cifra. Un **1** solo pinta su palo derecho, así que su centro de tinta cae medio dígito a la derecha: colocando por la tinta, cualquier timecode con un 1 salía torcido. | ✅ |
+| **PT-7** | El recuadro y las cifras aprendidas **se recuerdan** entre sesiones. La ventana compartida no se puede recordar —el navegador no deja—, así que cada sesión hay que volver a compartirla, pero **nada más**. Por eso el botón Seguir abre el panel en vez de encenderse a secas. | ✅ |
+| **PT-8** | Pro Tools **parado** deja el reloj quieto; no sigue corriendo solo. Se distingue por el **ritmo** de las lecturas aceptadas, no por creerse una sola. | ✅ |
+| **PT-9** | Con Pro Tools llevando el reloj, el libreto se coloca **aunque no haya vídeo cargado**. El reloj del transporte y la onda son del vídeo y entonces no se pintan; el libreto sí. | ✅ |
+
+| | |
+|---|---|
+| **PT-N1** | **Nunca mover el libreto con una lectura suelta.** Es la diferencia entre esto y lo que se descartó la vez pasada: leyendo a pelo, el libreto daba saltos absurdos una vez de cada dos. | ✅ |
+| **PT-N2** | **Nunca dar por hecho de qué reloj cuelga el libreto.** Va escrito en el propio botón —«Seguir · PT» o «Seguir · vídeo»—, porque desde la mesa no hay otra manera de saberlo y son cosas muy distintas. | 👁 |
 
 ## Nunca
 
@@ -97,6 +116,24 @@ qué dijo el director.
   código crea, y aplica la semántica de la regla a cada uno. Nada está escrito
   dos veces, así que un panel nuevo entra solo en la prueba. Quitar `.modo-cap`
   de las excepciones pone cinco comprobaciones en rojo.
+- **PT-1** a **PT-9**, en `pruebas/tcpantalla.prueba.js`. Las cifras se dibujan
+  en la propia prueba como un contador de siete segmentos, así que el
+  reconocimiento se prueba entero sin navegador. La sección 8 es la que
+  justifica el diseño: simula una sesión con **la mitad de las lecturas
+  inventadas** y exige que el reloj no se separe ni un fotograma del timecode
+  de verdad. Seis mutaciones comprobadas: aceptar cualquier lectura pone seis
+  comprobaciones en rojo; bastar una sola para creerse un salto, dos; colocar
+  las casillas por el centro de la tinta, dos; trocear por la media de la
+  columna, once; no distinguir parado de rodando, tres; y dar prioridad al
+  vídeo sobre Pro Tools, una.
+- El reconocimiento, además, **medido en un navegador de verdad** contra texto
+  pintado con una fuente real y capturado como vídeo: 200 de 200 timecodes al
+  azar. Y con degradaciones: ruido de compresión ±26, 100 %; contraste bajo,
+  100 %; contador de 32 px, 100 %; cifras oscuras sobre fondo blanco, 100 %;
+  fuente de ancho variable, 93 % —el contador de Pro Tools es de paso fijo—.
+- Lo que **no** está probado contra la realidad: no se ha leído nunca un Pro
+  Tools de verdad, ni una ventana compartida de verdad. El ruido simulado es
+  por píxel; la compresión de compartir pantalla trabaja por bloques.
 
 ## Sin resolver
 
