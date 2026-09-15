@@ -49,7 +49,9 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **OCU-1** | La ocupación también está **dentro del libreto**, en un cajón al costado. Repartiendo se pasa el rato ahí dentro, y el libreto es una capa a pantalla completa: antes había que cerrarlo, mirar, y volver a abrirlo. | ✅ |
 | **OCU-2** | Son los **mismos datos** (`castOcupacion()`), no una segunda cuenta que pueda decir otra cosa. | ✅ |
 | **OCU-3** | Solo en **casting**. En grabación la ocupación no pinta nada y el libreto tiene que estar despejado. | ✅ |
-| **OCU-4** | Al abrirlo, **el contenido del libreto se corre a la izquierda** para que el cajón no lo tape; al plegarlo vuelve. Por debajo de **900 px** no se corre nada: dejaría el libreto ilegible y ahí es mejor que el cajón se ponga encima. | ✅ |
+| **OCU-4** | Al abrirlo, **el contenido del libreto se corre a la izquierda** para que el cajón no lo tape; al plegarlo vuelve. | ✅ |
+| **OCU-7** | Por debajo de **900 px** el cajón pasa a ocupar **todo el ancho** y el contenido no se corre. A 560 px uno de 320 tapaba el 57 % del libreto y dejaba el texto cortado por la mitad: media cosa no sirve, o se lee el libreto o se mira la ocupación. | ✅ |
+| **OCU-8** | La **posición se fija en píxeles desde el código**, no se deja a la hoja de estilos: la regla aplica y el elemento se queda donde estaba. Le pasó igual al cajón de la pantalla principal. | ✅ |
 | **OCU-6** | La pestaña del cajón y el **riel de páginas** se disputan el mismo borde derecho y **no pueden montarse**: plegado, la pestaña se aparta a la izquierda del riel; abierto, el riel se va al otro lado del cajón dejando hueco para la pestaña. | 👁 |
 | **OCU-5** | La pestaña se ve **siempre**, también plegado: un panel que se esconde del todo es un panel que nadie encuentra. Y el cajón abierto o cerrado es **el mismo estado** que el de la pantalla principal. | ✅ |
 | **CAST-24** | Un **choque** es el mismo actor haciendo dos personajes que hablan a menos de **4 líneas** de distancia. Se mide en líneas del libreto, no en páginas: dos personajes pueden compartir página y estar a treinta líneas, o estar en páginas distintas y hablar seguidos. | 👁 |
@@ -136,7 +138,7 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
   que no está se para, crearlo desde el aviso, y comprobar que al escribir
   `MARCELA BORDAS` la ventana enseña `MARCELA BORDA · ya está en la base` y que
   cancelar deja la base intacta.
-- **OCU-1 a OCU-5**: `pruebas/ocupacion-libreto.prueba.js`, con un documento de
+- **OCU-1 a OCU-8**: `pruebas/ocupacion-libreto.prueba.js`, con un documento de
   libreto de mentira. Enseñarla también en grabación pone tres comprobaciones en
   rojo.
 - **CAST-15 a CAST-17** y **CAST-21 a CAST-23**: `pruebas/gestos.prueba.js` y

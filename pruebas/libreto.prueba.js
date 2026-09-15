@@ -14,7 +14,12 @@
  * estado del anterior.
  */
 'use strict';
-const { montar } = require('./ayuda');
+const fs = require('fs');
+const { montar, INDEX } = require('./ayuda');
+/* Las hojas de estilo del libreto son CSS dentro de plantillas de JS, y eso
+   no sale en fuentes(): se lee el HTML aparte. Los finales de linea se
+   normalizan igual que alli (ENT-15). */
+const HTML = fs.readFileSync(INDEX, 'utf8').replace(/\r\n/g, '\n');
 
 exports.nombre = 'El libreto: de las páginas a las intervenciones';
 
@@ -290,4 +295,35 @@ exports.pruebas = function(t){
   const n = montarCuenta(null, PERS, POR);
   t.eq('se esconde', n.visible, 'none');
   t.eq('y se vacía', n.texto, '');
+
+  t.seccion('18 · ninguna hoja de estilo lleva un acento grave dentro');
+  /*
+   * LIB_CSS, LIB_OVERRIDE y LIB_OCU_CSS son CSS dentro de PLANTILLAS de
+   * JavaScript. Un acento grave ahi dentro -aunque sea en un comentario de
+   * CSS- cierra la plantilla a media hoja y parte el archivo entero, con el
+   * error saliendo cien lineas mas arriba, en un sitio que no tiene nada que
+   * ver (ENT-17).
+   *
+   * La comprobacion de sintaxis ya lo caza, pero dice «Invalid left-hand side
+   * expression» y senala otra linea. Esto dice cual es y por que.
+   *
+   * Pico dos veces el mismo dia, la segunda escribiendo el comentario que
+   * explicaba la primera. Una regla escrita no basta.
+   */
+  const G = String.fromCharCode(96);
+  for(const nombre of ['LIB_CSS', 'LIB_OVERRIDE', 'LIB_OCU_CSS']){
+    const i = HTML.indexOf('const ' + nombre + ' = ' + G);
+    t.ok(nombre + ' existe', i >= 0);
+    if(i < 0) continue;
+    const desde = i + ('const ' + nombre + ' = ' + G).length;
+    const hasta = HTML.indexOf('\n' + G + ';', desde);
+    t.ok(nombre + ' se cierra', hasta > desde);
+    if(hasta < 0) continue;
+    const dentro = HTML.slice(desde, hasta);
+    const cuantos = dentro.split(G).length - 1;
+    const linea = cuantos ? ('renglon «'
+      + dentro.slice(0, dentro.indexOf(G)).split('\n').pop().trim().slice(0, 50) + '…»') : '';
+    t.eq(nombre + ' no lleva ningun acento grave dentro', cuantos, 0,
+         cuantos ? (linea + ' — cierra la hoja de estilos a la mitad y parte el archivo') : '');
+  }
 };
