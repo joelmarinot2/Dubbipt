@@ -39,6 +39,9 @@ qué dijo el director.
 |---|---|---|
 | **EST-5** | El libreto **sigue al vídeo**: el timecode manda y el parlamento que suena se marca y se coloca en pantalla. También con el vídeo **parado** y al **saltar**, aunque caiga en el mismo parlamento —arrastrar la barra buscando un momento y que el libreto no se mueva era la mitad del trabajo perdida. | ✅ |
 | **EST-6** | Mientras una persona mueve el libreto con la mano, el vídeo **no se lo quita** durante un par de segundos. Sin eso es imposible adelantarse a leer. Pero un **salto** del vídeo sí manda: si salto a propósito, quiero ir ahí. | ✅ |
+| **EST-8** | El seguimiento es un **estado propio**, con su botón en la barra del libreto, y se recuerda entre sesiones. Vivía en una casilla dentro de la tira de vídeo: al plegar la tira —que es justo lo que se hace para leer con el libreto entero— el libreto dejaba de seguir. | ✅ |
+| **EST-9** | Encenderlo **coloca el libreto ya**, sin esperar al siguiente parlamento, que puede ser medio minuto mirando otra página. | ✅ |
+| **EST-10** | El botón **no abre el vídeo**: es un interruptor aparte. Y encendido va **oscuro con la letra verde**, no verde: la barra del libreto es verde en modo grabación y un botón verde encima desaparece. | 👁 |
 | **EST-7** | Si el parlamento que suena **no está en pantalla** —hay un solo personaje abierto— se dice por quién va el vídeo, con el botón para abrir el libreto entero. Antes no pasaba nada y parecía que el seguimiento estaba roto. Una vez por personaje. | ✅ |
 | **EST-1** | El modo estudio parte la ventana del libreto en **dos columnas**: el panel de vídeo a la izquierda y el libreto a la derecha. Al apagarlo, el libreto vuelve a ocupar todo el ancho. | ✅ |
 | **EST-2** | Se puede encender **sin haber abierto antes el libreto incrustado**: si el contenedor no existe, se crea, y se vuelve a pedir antes de usarlo. | ✅ |
@@ -80,6 +83,10 @@ qué dijo el director.
   **Nada de esto está automatizado.**
 - Los carriles: tres personajes solapados salen en 0, 1 y 2, y el primero
   recupera su carril al volver.
+- **EST-5** a **EST-9**: `pruebas/seguir.prueba.js`. Quitar la guarda de la mano
+  pone dos comprobaciones en rojo; volver a atar el seguimiento a que la tira de
+  vídeo esté desplegada, una — y esa prueba se escribió justo después de romperlo a
+  propósito y ver que ninguna se quejaba.
 - Los cues, a mano: recorrer el ciclo de estados y ver subir el take.
 - **EST-1**, **EST-2** y **EST-N1**, en `pruebas/estudio.prueba.js`, con un
   DOM de mentira: lo que se prueba no es el navegador, sino el **orden** en

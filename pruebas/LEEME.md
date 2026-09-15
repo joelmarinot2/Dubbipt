@@ -102,6 +102,7 @@ comprobaron rompiendo el código a propósito, una cosa a la vez:
 | Devolver la flecha a la altura de la cabecera, sobre la banda (LIB-18) | Sí — 1 comprobacion |
 | Que el video le quite el libreto de las manos al que lo mueve (EST-6) | Sí — 2 comprobaciones |
 | Dejar la pagina fuera de la huella del libreto (SYN-9) | Sí — 1 comprobacion |
+| Atar otra vez el seguimiento a la tira de video (EST-8) | Sí — 1 comprobacion |
 
 Las **dos de los cortes** no se detectaban con las pruebas iniciales: el vídeo
 de prueba era demasiado fácil y nada superaba el suelo salvo los cortes de
