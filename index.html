@@ -2246,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.92.0-nube';
+const APP_VER_NUM = 'v10.93.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -6185,6 +6185,32 @@ function castGemeloArchivo(key){
 }
 
 /**
+ * Pone al dia TODAS las filas de archivo que se quedaron sin actor.
+ *
+ * Copiar el talento al asignarlo no basta: quien ya tenia el capitulo repartido
+ * de antes no vuelve a tocar ninguna tarjeta, asi que al exportar las filas de
+ * archivo seguian saliendo en blanco. Eso es lo que llego de sala -un desglose
+ * con actor en todas las filas MENOS en las que acaban en (ARCHIVO)-.
+ * Se llama antes de exportar, que es cuando importa.
+ * Devuelve los nombres de las filas que ha rellenado.
+ */
+function castArchivoAlDia(){
+  const hechos = [];
+  try{
+    if(typeof charIdx === 'undefined') return hechos;
+    for(const k in charIdx){
+      const c = charIdx[k]; if(!c) continue;
+      /* Que el talento esté vacío ya lo mira castCopiarAlArchivo, y aquí NO se
+         repite: repetirlo no cambia nada y deja una rama que ninguna prueba
+         puede distinguir de la otra. Se vio mutándola. */
+      const q = castCopiarAlArchivo(k, String(c.talent == null ? '' : c.talent).trim());
+      if(q) hechos.push(q);
+    }
+  }catch(e){ fallo('castArchivoAlDia · index.html', e); }
+  return hechos;
+}
+
+/**
  * Copia el talento a la otra cara del personaje. Devuelve su nombre si lo ha
  * copiado, o null. No pisa nada: solo rellena la que esta vacia.
  */
@@ -7837,6 +7863,72 @@ function castLeerCasting(buf){
   return out;
 }
 
+/* ── Diagnóstico de la exportación ─────────────────────────────────────────
+   La misma idea que el del libreto, que resolvió dos fallos que yo no podía
+   ver desde fuera. El programa cuenta QUÉ archivo ha rellenado y CÓMO ha
+   quedado, fila por fila, y eso se copia y se pega.
+   Hace falta porque desde fuera se ven exactamente igual tres cosas muy
+   distintas: que no se escriba nada, que se escriba en el desglose de OTRO
+   capítulo, y que se escriba bien y se esté mirando la hoja equivocada. */
+function castDiagExport(fuente, asign, r){
+  const arch = fflate.unzipSync(new Uint8Array(r.datos));
+  const xml  = new TextDecoder().decode(arch[castHojaXml(arch, CAST_HOJA)]);
+  const nom  = castLeerColumna(xml, CAST_COL_PERSONAJE);
+  /* Con castLeerColumnaTexto, no con castLeerColumna: el actor se escribe como
+     texto en línea y el otro solo mira el <v>, así que daría todo vacío. */
+  const act  = castLeerColumnaTexto(arch, xml, CAST_COL_ACTOR);
+  const filas = Object.keys(nom).map(Number).sort((a, b) => a - b)
+    .filter(f => String(nom[f] || '').trim() && !/^\d+$/.test(String(nom[f]).trim()));
+  const vacias = filas.filter(f => !act[f]);
+  return {
+    version: APP_VER_NUM,
+    capitulo: (typeof currentEp !== 'undefined' && currentEp && currentEp.name) || '',
+    archivoQueSeHaRellenado: fuente.nombre,
+    esElFormatoComunDeOtroCapitulo: !!fuente.comun,
+    hojaDeLaQueSalenLosPersonajes: (window._deskSheet || ''),
+    hojaDondeSeEscribeElActor: CAST_HOJA,
+    columnaPersonaje: CAST_COL_PERSONAJE,
+    columnaActor: CAST_COL_ACTOR,
+    personajesEnLaAplicacion: Object.keys(charIdx || {}).length,
+    talentosAsignados: Object.keys(asign || {}).length,
+    filasDePersonajeEnElExcel: filas.length,
+    celdasEscritas: r.puestos,
+    filasSinActor: vacias.length,
+    sinSitioEnElExcel: (r.sinCasar || []).slice(0, 20),
+    comoHaQuedado: filas.slice(0, 25).map(f =>
+      (act[f] ? '✓ ' : '✗ ') + 'f' + f + '  ' + nom[f] + '  →  ' + (act[f] || '(vacío)'))
+  };
+}
+
+/** Enseña el diagnóstico con un botón para copiarlo entero. */
+function castDiagPanel(d){
+  const viejo = document.getElementById('cdiagOv'); if(viejo) viejo.remove();
+  const txt = JSON.stringify(d, null, 1);
+  const ov = document.createElement('div');
+  ov.id = 'cdiagOv'; ov.className = 'modo-cap';
+  ov.innerHTML = '<div class="modo-caja" style="max-width:660px;text-align:left">'
+    + '<div class="modo-tit">Qué ha pasado al exportar</div>'
+    + '<div class="modo-sub" style="margin-bottom:10px">'
+    +   (d.esElFormatoComunDeOtroCapitulo
+          ? 'Se ha rellenado el <b>formato común del programa</b>, que es el de otro capítulo.'
+          : 'Se ha rellenado «' + esc(d.archivoQueSeHaRellenado) + '».')
+    + '</div>'
+    + '<pre style="max-height:46vh;overflow:auto;background:#0b0d12;border:1px solid #2b3040;'
+    +   'border-radius:9px;padding:11px;font-size:11.5px;line-height:1.45;white-space:pre-wrap;'
+    +   'word-break:break-word">' + esc(txt) + '</pre>'
+    + '<div class="dud-btns">'
+    +   '<button class="modo-op dud-b" id="cdiagCerrar">Cerrar</button>'
+    +   '<button class="modo-op dud-b dud-ok" id="cdiagCopiar">Copiar el diagnóstico</button>'
+    + '</div></div>';
+  document.body.appendChild(ov);
+  ov.querySelector('#cdiagCerrar').onclick = () => ov.remove();
+  ov.addEventListener('click', e => { if(e.target === ov) ov.remove(); });
+  ov.querySelector('#cdiagCopiar').onclick = async () => {
+    try{ await navigator.clipboard.writeText(txt); castAviso('Copiado · pégalo donde lo pidan'); }
+    catch(e){ castAviso('❌ No se pudo copiar: selecciónalo a mano'); }
+  };
+}
+
 /** Igual que castLeerColumna, pero resolviendo el texto compartido.
     La columna del personaje son fórmulas y su <v> ya es el texto; la del actor
     puede ser texto compartido (t="s") y entonces el <v> es un ÍNDICE. Leerlo
@@ -8361,6 +8453,17 @@ async function castDescargar(){
     if(typeof fflate === 'undefined'){ castAviso('❌ Falta la librería de ZIP: recarga la página'); return; }
     if(btn){ btn.disabled = true; btn.textContent = '⏳ Generando…'; }
 
+    /* Antes de nada, las filas de archivo que se quedaron sin actor. Quien ya
+       tenía el capítulo repartido de antes no vuelve a tocar una tarjeta, así
+       que copiarlo solo al asignar no le sirve de nada: hay que mirarlo aquí,
+       que es cuando se escribe el Excel. */
+    const alDia = castArchivoAlDia();
+    if(alDia.length){
+      try{ renderCards(); }catch(e){ fallo('renderCards · index.html:castDescargar', e); }
+      try{ DDL_UI.toast(alDia.length + ' filas de archivo han tomado el actor de su personaje',
+             { duration: 5500 }); }catch(e){ /* el aviso es un extra */ }
+    }
+
     // El casting sale de las tarjetas: personaje → talento
     const asign = {};
     let n = 0;
@@ -8422,6 +8525,20 @@ async function castDescargar(){
       msg = '✅ ' + r.puestos + ' de ' + n + ' talentos escritos en «' + fuente.nombre + '»';
     }
     msg += (r.cabecera ? ' · cabecera con ' + r.cabecera + ' datos' : ' · ⚠️ sin cabecera: rellénala en «Cabecera»');
+
+    /* El diagnóstico, siempre a mano. Se abre SOLO cuando algo no cuadra -se
+       rellenó el común, quedó algún talento sin fila, o alguna fila de
+       personaje se quedó sin actor-, porque esos tres casos se ven idénticos
+       desde fuera y adivinarlos cuesta días. */
+    let diag = null;
+    try{ diag = castDiagExport(fuente, asign, r); }
+    catch(e){ fallo('castDiagExport · index.html:castDescargar', e); }
+    if(diag && (diag.esElFormatoComunDeOtroCapitulo || diag.sinSitioEnElExcel.length || diag.filasSinActor)){
+      try{ castDiagPanel(diag); }catch(e){ fallo('castDiagPanel · index.html:castDescargar', e); }
+    }else if(diag){
+      try{ DDL_UI.toast('Desglose descargado', { duration: 6000, actionLabel: 'Ver qué se ha escrito',
+             onAction: () => { try{ castDiagPanel(diag); }catch(e){} } }); }catch(e){}
+    }
     castAviso(msg);
     /* Y las celdas que se quedan VACÍAS, que era la queja: el desglose salía a
        medias sin una palabra. Se separan los que están así a propósito —solo

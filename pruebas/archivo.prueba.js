@@ -32,11 +32,11 @@ function conReparto(personajes){
   const charIdx = {};
   for(const p of personajes) charIdx[p.key] = Object.assign({ talent: '' }, p);
   const M = montar(RECORTES,
-    ['castClave', 'castGemeloArchivo', 'castCopiarAlArchivo',
+    ['castClave', 'castGemeloArchivo', 'castCopiarAlArchivo', 'castArchivoAlDia',
      'castSinArchivo', 'castEsArchivo'],
     { charIdx: charIdx,
       NO_REC: new Set(['X', 'ORIGINAL']),
-      castVerificar: () => {},
+      castVerificar: () => {}, fallo: () => {},
       window: {},
       console: { warn: () => {}, log: () => {} } });
   return { M: M, charIdx: charIdx };
@@ -145,7 +145,52 @@ exports.pruebas = function(t){
        (TODO.match(/castFoto\(gem \? \[key, gem\] : \[key\]\)/g) || []).length, 2,
        'si la foto solo guarda uno, Ctrl+Z deja al otro con el actor puesto');
 
-  t.seccion('8 · no se rellena a ciegas el desglose de otro capítulo');
+  t.seccion('8 · al exportar se ponen al día TODAS las filas de archivo');
+  /* Copiar el talento al asignarlo no basta, y es lo que llego de sala: quien
+     ya tenia el capitulo repartido de ANTES no vuelve a tocar una tarjeta, asi
+     que al exportar sus filas de archivo seguian saliendo en blanco.
+     El caso real: un desglose con actor en todas las filas MENOS en las que
+     acaban en (ARCHIVO). */
+  {
+    const g = conReparto(REPARTO);
+    g.charIdx['MARK PEYTON'].talent = 'JUAN PABLO SALGADO';
+    g.charIdx['DRA TRACY FANARA'].talent = 'ANI SANCHEZ';
+    g.charIdx['REED TIMMER (ARCHIVO)'].talent = '';      // sin gemelo: se queda
+    const hechas = g.M.castArchivoAlDia();
+    t.eq('pone al día las dos que tenían gemelo', hechas.length, 2);
+    t.eq('MARK PEYTON (ARCHIVO) toma su actor',
+         g.charIdx['MARK PEYTON (ARCHIVO)'].talent, 'JUAN PABLO SALGADO');
+    t.eq('y DRA. TRACY FANARA (ARCHIVO) el suyo',
+         g.charIdx['DRA TRACY FANARA (ARCHIVO)'].talent, 'ANI SANCHEZ');
+    t.eq('el que solo existe en archivo se queda como estaba',
+         g.charIdx['REED TIMMER (ARCHIVO)'].talent, '',
+         'esos se reparten a mano: inventarles un actor sería peor');
+
+    // y no toca lo que ya tenía actor puesto
+    const h = conReparto(REPARTO);
+    h.charIdx['MARK PEYTON'].talent = 'JUAN PABLO SALGADO';
+    h.charIdx['MARK PEYTON (ARCHIVO)'].talent = 'OTRO ACTOR';
+    t.eq('no pisa al que ya tenía el suyo', h.M.castArchivoAlDia().length, 0);
+    t.eq('y se queda el que había',
+         h.charIdx['MARK PEYTON (ARCHIVO)'].talent, 'OTRO ACTOR');
+
+    /* Un personaje sin la casilla puesta -ni siquiera vacía- no puede acabar
+       con el actor «undefined» escrito en el Excel. Suena tonto y es
+       exactamente lo que pasa al convertir a texto sin mirar. */
+    const i2 = conReparto(REPARTO);
+    delete i2.charIdx['MARK PEYTON'].talent;
+    i2.M.castArchivoAlDia();
+    t.eq('un personaje sin talento no escribe «undefined» en su fila de archivo',
+         i2.charIdx['MARK PEYTON (ARCHIVO)'].talent, '');
+
+    t.ok('y se hace ANTES de exportar, no solo al asignar',
+         /const alDia = castArchivoAlDia\(\);[\s\S]{0,400}?const asign = \{\};/
+           .test(require('./ayuda').fuentes().map(x => x.src).join('\n')),
+         'si solo se hiciera al asignar, quien ya tenía el capítulo repartido '
+         + 'seguiría exportando las filas de archivo en blanco');
+  }
+
+  t.seccion('9 · no se rellena a ciegas el desglose de otro capítulo');
   /* Si este capitulo no tiene su propio desglose, Dubbipt cae en el formato
      COMUN del programa, que es el de otro capitulo: le faltan los personajes
      que solo salen aqui. El resultado es un documento de facturacion
