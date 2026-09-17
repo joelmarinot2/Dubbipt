@@ -508,7 +508,10 @@ async function talAsignar(key, valor){
   if(!c) return false;
   const val = String(valor == null ? '' : valor).trim();
   if(val === (c.talent || '')) return true;
-  try{ castHistPush(castFoto([key]), (c.talent ? 'talento de ' : 'asignar talento a ') + (c.display || key)); }catch(e){ /* sin deshacer, pero el reparto se hace */ }
+  /* El gemelo de archivo entra en la foto del deshacer: si se le copia el
+     talento, Ctrl+Z tiene que devolver los dos a la vez. */
+  const gem = (typeof castGemeloArchivo === 'function') ? castGemeloArchivo(key) : null;
+  try{ castHistPush(castFoto(gem ? [key, gem] : [key]), (c.talent ? 'talento de ' : 'asignar talento a ') + (c.display || key)); }catch(e){ /* sin deshacer, pero el reparto se hace */ }
   c.talent = val;
   try{ c.noRec = NO_REC.has(norm(val)); }catch(e){ c.noRec = false; }
   try{
@@ -516,6 +519,11 @@ async function talAsignar(key, valor){
     if(raw){ raw.talent = val; raw.noRec = c.noRec; }
   }catch(e){ fallo('talAsignar · js/talentos.js:482', e, 'el talento puede perderse al reabrir el capitulo'); }
   try{ castVerificar(key, true); }catch(e){ /* se queda en naranja: es solo el aviso */ }   // escrito a mano
+  /* «MARK PEYTON (ARCHIVO)» es la misma persona: se le pone el mismo actor si
+     su casilla esta vacia. Si no, esa fila del desglose sale en blanco. */
+  let copiado = null;
+  try{ copiado = castCopiarAlArchivo(key, val); }catch(e){ /* sin gemelo, nada que copiar */ }
+  if(copiado) try{ castAviso('También se ha puesto en ' + copiado); }catch(e){ /* el aviso es un extra */ }
   if(val) try{ castAvisarChoque(key); }catch(e){ /* el choque se vuelve a mirar al repintar */ }
   /* Asignar a mano deja el personaje cerrado, asi que su tarjeta se va a
      «Personajes completados». Se apaga primero: ver adonde fue lo que acabas

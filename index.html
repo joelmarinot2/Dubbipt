@@ -2246,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.90.0-nube';
+const APP_VER_NUM = 'v10.91.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4983,10 +4983,15 @@ async function removeChar(key){
 async function assignTalent(key, val){
   const c = charIdx[key]; if(!c) return;
   val = (val||'').trim();
-  try{ castHistPush(castFoto([key]), (c.talent ? 'talento de ' : 'asignar talento a ') + c.display); }catch(e){}
+  /* El gemelo de archivo entra en la foto del deshacer: si se le copia el
+     talento, Ctrl+Z tiene que devolver los dos a la vez. */
+  const gem = castGemeloArchivo(key);
+  try{ castHistPush(castFoto(gem ? [key, gem] : [key]), (c.talent ? 'talento de ' : 'asignar talento a ') + c.display); }catch(e){}
   c.talent = val; c.noRec = NO_REC.has(norm(val));
   try{ const raw=(window._charsRaw||[]).find(x=>x.key===key); if(raw){ raw.talent=val; raw.noRec=c.noRec; } }catch(e){}
   try{ castVerificar(key, true); }catch(e){}   // escrito a mano: ya está verificado
+  const copiado = castCopiarAlArchivo(key, val);
+  if(copiado) try{ DDL_UI.toast('También se ha puesto en ' + copiado, { duration: 4500 }); }catch(e){ /* el aviso es un extra */ }
   try{ renderCards(); }catch(e){ fallo('renderCards · index.html:4865', e); }
   if(val) try{ castAvisarChoque(key); }catch(e){}
   if(typeof currentEp!=='undefined' && currentEp && currentEp.id){
@@ -6148,6 +6153,57 @@ function castEsc(t){
  * PUBLICO sin parlamentos (LIB-N4). Aqui hay UNO. */
 function castClave(t){
   return castNorm(t);
+}
+
+/* «MARK PEYTON» y «MARK PEYTON (ARCHIVO)» son la MISMA persona en pantalla. El
+   desglose las separa a proposito -el material de archivo se factura aparte y
+   lleva su propia cuenta de lineas-, pero el actor es el mismo, y tener que
+   asignarlo dos veces se olvida: la fila de archivo salia en blanco en el
+   desglose. Llego de sala con un capitulo que traia ONCE personajes asi.
+   Solo se RELLENA lo que esta vacio. Un talento puesto a mano no se pisa nunca,
+   porque a veces el archivo lo dobla otro. */
+const CAST_ARCHIVO_RE = /\s*\(\s*ARCHIVO\s*\)\s*$/i;
+function castSinArchivo(t){ return String(t == null ? '' : t).replace(CAST_ARCHIVO_RE, '').trim(); }
+function castEsArchivo(t){ return CAST_ARCHIVO_RE.test(String(t == null ? '' : t)); }
+
+/** La otra cara del mismo personaje, si el desglose la trae. */
+function castGemeloArchivo(key){
+  try{
+    if(typeof charIdx === 'undefined') return null;
+    const c = charIdx[key]; if(!c) return null;
+    const mio = c.display || key;
+    const base = castSinArchivo(mio);
+    if(!base) return null;
+    const busco = castClave(castEsArchivo(mio) ? base : (base + ' (ARCHIVO)'));
+    if(!busco) return null;
+    for(const k in charIdx){
+      if(k === key) continue;
+      if(castClave(charIdx[k].display || k) === busco) return k;
+    }
+  }catch(e){ /* sin desglose cargado no hay gemelo que buscar */ }
+  return null;
+}
+
+/**
+ * Copia el talento a la otra cara del personaje. Devuelve su nombre si lo ha
+ * copiado, o null. No pisa nada: solo rellena la que esta vacia.
+ */
+function castCopiarAlArchivo(key, val){
+  try{
+    if(!val) return null;
+    const g = castGemeloArchivo(key);
+    if(!g) return null;
+    const otro = charIdx[g];
+    if(!otro || String(otro.talent || '').trim()) return null;
+    otro.talent = val;
+    try{ otro.noRec = NO_REC.has(norm(val)); }catch(e){ otro.noRec = false; }
+    try{
+      const raw = (window._charsRaw || []).find(x => x.key === g);
+      if(raw){ raw.talent = val; raw.noRec = otro.noRec; raw.heredado = false; }
+    }catch(e){ /* se perderia al reabrir, pero el reparto ya esta hecho */ }
+    try{ castVerificar(g, true); }catch(e){ /* se queda en naranja: es solo el aviso */ }
+    return otro.display || g;
+  }catch(e){ return null; }
 }
 
 /** Del nombre de la hoja al archivo XML que la contiene dentro del ZIP. */

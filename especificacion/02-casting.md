@@ -59,6 +59,7 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 
 | **CAST-26** | Al escribir el desglose, el nombre del personaje se casa con la fila del Excel usando **la misma clave** que la herencia (`castNorm`): sin tildes, sin apostrofos, sin puntos. | ✅ |
 | **CAST-27** | Cada celda de la columna del actor que se quede **en blanco** se dice, y se dice **por qué**: o el personaje es de solo gestos sin verificar, o no tiene talento asignado. Las dos cosas se ven igual en el Excel y no se arreglan igual. | ✅ |
+| **CAST-28** | El **material de archivo comparte el actor** del personaje. El desglose separa «MARK PEYTON» de «MARK PEYTON (ARCHIVO)» a propósito —el archivo se factura aparte y lleva su propia cuenta de líneas—, pero en pantalla es **la misma persona**: al repartir una, la otra se rellena sola y se dice en pantalla a quién se le ha copiado. Llegó de sala un capítulo con **once** personajes duplicados así; al que se le olvidaba uno, esa fila salía en blanco en el desglose. **Nunca se pisa** un talento puesto a mano —a veces el archivo lo dobla otro— y vaciar una casilla no arrastra a la otra, porque vaciar es corregir, no repartir. Los personajes que **solo** existen en versión archivo se reparten a mano como cualquiera. | ✅ |
 
 ## Reglas · personajes completados
 
