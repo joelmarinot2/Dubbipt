@@ -2246,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.91.0-nube';
+const APP_VER_NUM = 'v10.92.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8373,7 +8373,27 @@ async function castDescargar(){
     }
     if(!n){ castAviso('No hay ningún talento asignado todavía'); return; }
 
-    const buf = await castBufferOriginal();
+    /* QUÉ archivo se va a rellenar. Si este capítulo no tiene su propio
+       desglose, Dubbipt cae en el formato COMÚN del programa, que es el de otro
+       capítulo: le faltan los personajes que solo salen aquí y trae de más los
+       que aquí no están. El resultado es un documento de facturación
+       equivocado, y hasta ahora eso solo se avisaba con una etiqueta amarilla
+       en una esquina, facilísima de no ver. Se pregunta. */
+    const fuente = await castFuente();
+    if(fuente.comun){
+      const sigo = await DDL_UI.confirmModal({
+        title: 'Este capítulo no tiene su propio desglose',
+        body: 'Se rellenaría «' + fuente.nombre + '», que es el formato común del programa '
+            + '—el de otro capítulo—. Los personajes que solo salen en este no tienen fila '
+            + 'donde ponerse, y su talento no se escribiría en ningún sitio.\n\n'
+            + 'Lo que toca es subir el desglose de ESTE capítulo.',
+        confirmLabel: 'Rellenar el común igual',
+        cancelLabel: 'Mejor no',
+        danger: true
+      });
+      if(!sigo){ castAviso('Sube el desglose de este capítulo y vuelve a intentarlo'); return; }
+    }
+    const buf = fuente.buf;
     const meta = await castMetaCargar(LDB.showId || (currentEp && currentEp.showId));
     const r = castRellenar(buf, asign, meta);
 
@@ -8387,14 +8407,21 @@ async function castDescargar(){
     a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
 
-    let msg = '✅ ' + r.puestos + ' de ' + n + ' talentos escritos en el desglose'
-      + (r.cabecera ? ' · cabecera con ' + r.cabecera + ' datos' : ' · ⚠️ sin cabecera: rellénala en «Cabecera»');
+    /* Si hay talentos que no han encontrado fila, ESO es la noticia y va
+       delante. Antes el mensaje empezaba por «✅ N escritos» y el aviso venía
+       detrás de dos datos más: un desglose al que le faltan actores se lee como
+       si hubiera salido bien. */
+    let msg;
     if(r.sinCasar.length){
-      // Aviso honesto: si un personaje del libreto no está en el Excel, su
-      // talento NO se ha escrito en ningún sitio. Callarlo seria peor.
-      msg += ' · ⚠️ sin sitio en el Excel: ' + r.sinCasar.slice(0,6).join(', ')
-           + (r.sinCasar.length > 6 ? ' y ' + (r.sinCasar.length-6) + ' más' : '');
+      msg = '⚠️ ' + r.sinCasar.length + ' de ' + n + ' talentos NO tienen fila en este Excel'
+          + ' (' + r.sinCasar.slice(0,6).join(', ')
+          + (r.sinCasar.length > 6 ? ' y ' + (r.sinCasar.length-6) + ' más' : '') + ')'
+          + ' · sí se escribieron ' + r.puestos
+          + ' · ¿es este el desglose de este capítulo? Se rellenó «' + fuente.nombre + '»';
+    }else{
+      msg = '✅ ' + r.puestos + ' de ' + n + ' talentos escritos en «' + fuente.nombre + '»';
     }
+    msg += (r.cabecera ? ' · cabecera con ' + r.cabecera + ' datos' : ' · ⚠️ sin cabecera: rellénala en «Cabecera»');
     castAviso(msg);
     /* Y las celdas que se quedan VACÍAS, que era la queja: el desglose salía a
        medias sin una palabra. Se separan los que están así a propósito —solo

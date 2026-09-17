@@ -144,4 +144,20 @@ exports.pruebas = function(t){
   t.eq('el deshacer se lleva a los dos por delante, en los dos caminos',
        (TODO.match(/castFoto\(gem \? \[key, gem\] : \[key\]\)/g) || []).length, 2,
        'si la foto solo guarda uno, Ctrl+Z deja al otro con el actor puesto');
+
+  t.seccion('8 · no se rellena a ciegas el desglose de otro capítulo');
+  /* Si este capitulo no tiene su propio desglose, Dubbipt cae en el formato
+     COMUN del programa, que es el de otro capitulo: le faltan los personajes
+     que solo salen aqui. El resultado es un documento de facturacion
+     equivocado, y eso solo se avisaba con una etiqueta amarilla en una esquina.
+     Ahora se pregunta antes de descargar. */
+  t.ok('se pregunta antes de rellenar el formato común',
+       /if\(fuente\.comun\)\{[\s\S]{0,400}?confirmModal\(/.test(TODO),
+       'sin esto se descarga un desglose de otro capítulo sin decir nada');
+  t.ok('y se dice qué archivo se ha rellenado, en el mensaje del final',
+       /escritos en «' \+ fuente\.nombre \+ '»/.test(TODO));
+  t.ok('los talentos sin fila van DELANTE, no detrás de los buenos',
+       /msg = '⚠️ ' \+ r\.sinCasar\.length \+ ' de ' \+ n \+ ' talentos NO tienen fila/.test(TODO),
+       'empezando por «✅ N escritos», un desglose al que le faltan actores se '
+       + 'lee como si hubiera salido bien');
 };
