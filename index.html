@@ -2246,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.84.0-nube';
+const APP_VER_NUM = 'v10.85.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4079,6 +4079,21 @@ const CUE_RE = /^(?:V\s*\.?\s*O|O\s*\.?\s*S|O\s*\.?\s*C|OFF|ON|CONT\s*['’`]?\s
    ((VO), (OFF), [CONT'D]) y timecodes. Si no queda nada, es una cabecera.
    Antes cualquiera de esas colas vetaba la cabecera y el personaje del
    desglose no llegaba nunca al libreto. */
+/* ¿Lo que va entre parentesis detras del nombre es una ACOTACION?
+   Antes la regla era «vale si esta TODO en mayusculas», y eso es arbitrario:
+   escrito (ARCHIVO) la cabecera se aceptaba y escrito (Archivo) se vetaba, con
+   lo que el personaje desaparecia del libreto sin una sola pista. Llego de
+   sala: TESTIGO, con «TESTIGO (Archivo)» en el guion, salia con cero
+   parlamentos.
+   Lo que de verdad distingue una acotacion no es el tamaño de la letra, es que
+   sea CORTA y no una frase: (Archivo), (susurrando), (camara de seguridad). Una
+   oracion entre parentesis -«(que ya sabemos que miente, por cierto)»- no es
+   una acotacion, es narracion, y ese renglon no es una cabecera. */
+function esAcotacion(t){
+  if(!t) return false;
+  if(/[.!?¡¿]/.test(t)) return false;                // lleva puntuacion de frase
+  return t.split(/\s+/).filter(Boolean).length <= 4; // y es corta
+}
 function headerTail(after){
   let s = String(after||'').trim(), prev = null;
   while(s && s !== prev){
@@ -4089,7 +4104,7 @@ function headerTail(after){
     const par = s.match(/^[([{]([^)\]}]*)[)\]}]/);                     // acotación entre paréntesis
     if(par){
       const inner = par[1].trim();
-      if(inner === '' || CUE_RE.test(inner) || inner === inner.toUpperCase()){ s = s.slice(par[0].length); continue; }
+      if(inner === '' || CUE_RE.test(inner) || esAcotacion(inner)){ s = s.slice(par[0].length); continue; }
     }
     const bare = s.match(/^[A-Za-z.'’\s]{1,14}?(?=$|[\s.,;:\-–—/|([])/);  // acotación sin paréntesis
     if(bare && CUE_RE.test(bare[0].trim())){ s = s.slice(bare[0].length); continue; }

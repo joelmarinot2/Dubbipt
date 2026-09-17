@@ -38,6 +38,7 @@ El modelo es siempre el mismo:
 
 | **LIB-17** | La cuenta y el talento van en **una sola banda**, y el nombre del personaje sale **una vez**. Eran dos filas apiladas con el nombre repetido; en la segunda caía justo detrás de la palabra «Talento», y «TALENTO MELODIE GODBY» se leía como si el actor se llamara igual que el personaje. | ✅ |
 | **LIB-18** | La banda **publica su alto** (`--lbarsH`) y **todo lo que va fijo arranca debajo**: la flecha de ocultar la barra, el riel de páginas y la pestaña de Ocupación. Tiene una fila o dos según el ancho, así que un número fijo se queda corto o largo — la flecha acababa sobre el nombre, la banda se comía el «PÁG.» del riel, y la pestaña tapaba el botón de quitar el talento. | ✅ |
+| **LIB-19** | La **acotación** que cuelga del nombre no veta la cabecera, se escriba como se escriba. Antes solo se retiraban los paréntesis vacíos, los de la lista conocida y los que fueran **todo mayúsculas**: escrito (ARCHIVO) el personaje aparecía y escrito (Archivo) desaparecía del libreto sin una sola pista. Llegó de sala con TESTIGO, que salía con cero parlamentos. Lo que separa una acotación de la narración no es el tamaño de la letra: es que sea **corta** —hasta cuatro palabras— y **sin puntuación de frase**. | ✅ |
 
 ## Nunca
 

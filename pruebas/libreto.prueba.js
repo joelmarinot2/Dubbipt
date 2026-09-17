@@ -16,6 +16,9 @@
 'use strict';
 const fs = require('fs');
 const { montar, INDEX } = require('./ayuda');
+/* Todo el codigo que se despliega, para comprobar que scanPdf sigue
+   apoyandose en headerTail para vetar o aceptar una cabecera. */
+const TODO_EL_CODIGO = require('./ayuda').fuentes().map(f => f.src).join('\n');
 /* Las hojas de estilo del libreto son CSS dentro de plantillas de JS, y eso
    no sale en fuentes(): se lee el HTML aparte. Los finales de linea se
    normalizan igual que alli (ENT-15). */
@@ -358,4 +361,56 @@ exports.pruebas = function(t){
   t.ok('la pestana de Ocupacion baja',
        bajo('.locu-tab{').includes('var(--lbarsH'),
        'caia sobre el boton de quitar el talento');
+
+  /* ── 20 · la acotación que cuelga del nombre no puede vetar la cabecera ──
+     Llegado de sala: el personaje TESTIGO salia con CERO parlamentos. En el PDF
+     sus cabeceras ponen «TESTIGO (Archivo)» -metraje de archivo, una acotacion
+     de lo mas normal en documental-, y esa coletilla vetaba la cabecera entera.
+
+     Lo raro del fallo era la ARBITRARIEDAD: escrito «(ARCHIVO)» funcionaba y
+     escrito «(Archivo)» no, porque solo se retiraban los parentesis vacios, los
+     de la lista de acotaciones conocidas y los que fueran TODO mayusculas. Un
+     guionista no tiene por que saber eso, y el sintoma que se ve es que un
+     personaje desaparece del libreto sin explicacion. */
+  t.seccion('20 · la acotación que cuelga del nombre no veta la cabecera');
+  const H = correr([{ lines: [], marks: [] }]).M.headerTail;
+
+  t.eq('«(Archivo)» se retira', H(' (Archivo)'), '',
+       'es LO QUE LLEGO DE SALA: con esto sin retirar, TESTIGO se queda sin un '
+       + 'solo parlamento en todo el libreto');
+  t.eq('y en mayúsculas seguía funcionando', H(' (ARCHIVO)'), '');
+  t.eq('y en minúsculas también', H(' (archivo)'), '');
+  t.eq('una acotación de las conocidas, igual', H(' (V.O.)'), '');
+  t.eq('una acotación cualquiera, también', H(' (susurrando)'), '');
+  t.eq('de varias palabras, también', H(' (cámara de seguridad)'), '');
+  t.eq('un paréntesis vacío no estorba', H(' ()'), '');
+  t.eq('el timecode tampoco', H('  01:02:03:04'), '');
+  t.eq('ni la puntuación suelta', H(' .-'), '');
+  t.eq('ni dos acotaciones seguidas', H(' (Archivo) (OFF)'), '');
+
+  /* Y lo que NO puede pasar: que por retirar acotaciones se trague el dialogo.
+     Si detras del nombre hay texto, ese renglon no es una cabecera limpia y
+     headerTail tiene que devolverlo para que quien decide lo vea. */
+  t.eq('el diálogo NO se retira', H(' Yo estaba ahí cuando pasó'), 'Yo estaba ahí cuando pasó');
+  t.eq('los dos puntos y su diálogo, tampoco', H(': Hola'), ': Hola');
+  t.eq('tras la acotación, el diálogo sigue estando',
+       H(' (Archivo) Yo estaba ahí'), 'Yo estaba ahí',
+       'si esto volviera vacío, cualquier renglón de narración pasaría por cabecera');
+  /* Las dos señales que separan una acotación de la narración, cada una con su
+     caso propio: si comparten caso, una puede desaparecer sin que nadie note
+     que ya no protege nada —pasó al escribir esto, y tres mutaciones se
+     colaron sin poner ni una comprobación en rojo—. */
+  t.eq('pasadas cuatro palabras ya no es una acotación',
+       H(' (que ya sabemos que miente) responde'),
+       '(que ya sabemos que miente) responde',
+       'esta lleva cinco y NO tiene puntuación de frase: aquí solo decide el largo');
+  t.eq('con puntuación de frase tampoco, aunque sea corta',
+       H(' (¿de verdad?) responde'), '(¿de verdad?) responde',
+       'esta lleva dos palabras: aquí solo decide la puntuación');
+
+  /* Que el veto de scanPdf siga apoyandose en esto: si algun dia deja de
+     usarlo, estas comprobaciones dejarian de proteger nada sin avisar. */
+  t.ok('scanPdf sigue decidiendo el veto con headerTail',
+       /const tail = headerTail\(after\)/.test(TODO_EL_CODIGO),
+       'si ya no lo usa, esta sección no está protegiendo la cabecera de nadie');
 };
