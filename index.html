@@ -2246,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.88.0-nube';
+const APP_VER_NUM = 'v10.89.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -11495,11 +11495,21 @@ function buildLibretoDoc(pc){
     try{
       const lh = d.querySelector('.lh');
       const h = (d.body.classList.contains('toolhidden') || !lh) ? 0 : Math.round(lh.getBoundingClientRect().height);
+      // solo si cambia: ahora lo llama también un observador, en cada cambio
+      if(d.documentElement.style.getPropertyValue('--lhH') === h+'px') return;
       d.documentElement.style.setProperty('--lhH', h+'px');
-    }catch(e){}
+    }catch(e){ /* sin documento no hay barra que medir */ }
   }
   libSyncHeadH();
   try{ pop2.win.addEventListener('resize', libSyncHeadH); }catch(e){}
+  /* La barra se parte en MÁS FILAS cuando se estrecha el hueco del libreto, y
+     eso pasa SIN que la ventana cambie de tamaño: basta con abrir el cajón de
+     Ocupación, que le quita 320 px de ancho de golpe. El `resize` no se entera,
+     así que --lhH se quedaba viejo y el cajón —y su pestaña— arrancaban donde
+     estaría la barra si tuviera una sola fila: encima de ella. Llegó de sala,
+     con el cajón de Ocupación abierto y la pestaña sobre los botones. */
+  try{ libVigilarAlto(pop2.win, d.querySelector('.lh'), libSyncHeadH); }
+  catch(e){ /* sin observador queda el resize, como antes */ }
   // el zoom se recalcula al cambiar el tamaño de la ventana
   try{ pop2.win.addEventListener('resize', ()=>{ try{ libApplyZoom(); }catch(e){} }); }catch(e){}
   setTimeout(libSyncHeadH, 60); setTimeout(libSyncHeadH, 300);
@@ -13628,6 +13638,25 @@ function libMedirBarras(){
  * Se vigila el ELEMENTO, no la ventana: así también cuenta un nombre de talento
  * largo que hace saltar la fila sin que cambie el ancho.
  */
+/**
+ * Vuelve a llamar a `fn` cada vez que `el` cambie de tamaño. Devuelve el
+ * observador para poder soltarlo, o null si este navegador no lo trae.
+ *
+ * Lo que se vigila es el ELEMENTO, no la ventana, y esa es toda la gracia: en
+ * el libreto hay dos cosas que cambian de alto SIN que la ventana cambie de
+ * tamaño —la banda salta de fila con un nombre de talento largo, y la barra de
+ * herramientas se parte en más filas cuando el cajón de Ocupación le quita 320
+ * píxeles de ancho—. Un oyente de `resize` no se entera de ninguna de las dos.
+ */
+function libVigilarAlto(win, el, fn){
+  try{
+    if(!win || !el || !win.ResizeObserver) return null;
+    const ro = new win.ResizeObserver(()=>{ try{ fn(); }catch(e){ /* medir no rompe nada */ } });
+    ro.observe(el);
+    return ro;
+  }catch(e){ return null; }
+}
+
 function libVigilarBarras(){
   try{
     if(typeof pop2 === 'undefined' || !pop2 || !pop2.win || !pop2.doc) return;
@@ -13649,11 +13678,7 @@ function libVigilarBarras(){
     pop2._resBarras = remedir;
     try{ pop2.win.addEventListener('resize', pop2._resBarras); }catch(e){ /* sin ventana propia */ }
 
-    const b = pop2.doc.getElementById('lBarras');
-    const RO = pop2.win.ResizeObserver;
-    if(!b || !RO) return;
-    pop2._obsBarras = new RO(remedir);
-    pop2._obsBarras.observe(b);
+    pop2._obsBarras = libVigilarAlto(pop2.win, pop2.doc.getElementById('lBarras'), remedir);
   }catch(e){ /* sin observador se sigue midiendo al pintar, como antes */ }
 }
 

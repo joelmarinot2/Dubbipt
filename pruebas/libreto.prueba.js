@@ -525,4 +525,57 @@ exports.pruebas = function(t){
          'nadie llama a libVigilarBarras: la banda se mediría solo al pintar, '
          + 'que es justo el fallo que llegó de sala');
   }
+
+  /* ── 22 · la barra de herramientas también cambia de alto sola ───────────
+     Segunda captura de sala, con el cajón de Ocupación ABIERTO: la pestaña
+     encima de los botones de la barra. La barra se parte en MÁS FILAS cuando
+     se estrecha el hueco del libreto, y abrir ese cajón le quita 320 px de
+     ancho de golpe — sin que la ventana cambie de tamaño, así que el oyente de
+     `resize` que ya había no se entera. --lhH se quedaba en el alto de una
+     barra de una fila y el cajón entero arrancaba ahí, encima de ella. */
+  t.seccion('22 · la barra de herramientas también cambia de alto sola');
+  {
+    const M3 = montar([['function libMedirBarras(){', 'function renderLibretoChips(){']],
+                      ['libVigilarAlto'], { pop2: null, fallo: () => {} });
+
+    const vigilados = [];
+    function ROFalso(fn){ this.fn = fn; }
+    ROFalso.prototype.observe = function(el){ vigilados.push({ el: el, fn: this.fn }); };
+    ROFalso.prototype.disconnect = function(){};
+    const barra = { es: 'la barra' };
+    let llamadas = 0;
+
+    const ro = M3.libVigilarAlto({ ResizeObserver: ROFalso }, barra, () => { llamadas++; });
+    t.ok('devuelve el observador, para poder soltarlo', !!ro);
+    t.ok('y vigila lo que se le ha dado', vigilados.length === 1 && vigilados[0].el === barra);
+    vigilados[0].fn();
+    t.eq('al avisar, vuelve a medir', llamadas, 1);
+
+    t.eq('sin ResizeObserver devuelve null, y ya está',
+         M3.libVigilarAlto({}, barra, () => {}), null,
+         'en un navegador sin observador queda el aviso de la ventana');
+    t.eq('sin elemento, tampoco se inventa nada',
+         M3.libVigilarAlto({ ResizeObserver: ROFalso }, null, () => {}), null);
+
+    /* Una medición que se rompa no puede llevarse por delante el observador:
+       dejaría de avisar para siempre y el fallo volvería en silencio. */
+    const ro2 = M3.libVigilarAlto({ ResizeObserver: ROFalso }, barra, () => { throw new Error('ups'); });
+    let reventó = false;
+    try{ vigilados[vigilados.length - 1].fn(); }catch(e){ reventó = true; }
+    t.ok('una medición rota no tumba el observador', !reventó && !!ro2);
+
+    /* Y que la barra quede vigilada de verdad. Esto no se puede montar aparte
+       -vive dentro del armado del libreto-, así que se comprueba en el código
+       que se despliega. */
+    t.ok('la barra de herramientas queda vigilada',
+         /libVigilarAlto\(pop2\.win, d\.querySelector\('\.lh'\), libSyncHeadH\)/.test(TODO_EL_CODIGO),
+         'sin esto, abrir el cajón de Ocupación parte la barra en más filas y '
+         + 'nadie vuelve a medirla: el cajón arranca encima de ella');
+    t.ok('y la banda también, por la misma vía',
+         /pop2\._obsBarras = libVigilarAlto\(pop2\.win/.test(TODO_EL_CODIGO));
+    t.ok('el alto de la barra solo se escribe si ha cambiado',
+         /getPropertyValue\('--lhH'\) === h\+'px'\) return;/.test(TODO_EL_CODIGO),
+         'ahora lo llama un observador en cada cambio: reescribirlo siempre '
+         + 'sería tocar el DOM para nada');
+  }
 };
