@@ -2246,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.89.0-nube';
+const APP_VER_NUM = 'v10.90.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -12633,9 +12633,33 @@ function libDiagData(key){
      estaba a cero. El caso que llego de sala es peor y era invisible: GRAFICA
      tenia parlamentos -unas cabeceras si se reconocian- y otras no, asi que no
      saltaba ningun aviso y lo unico que se veia era que faltaba texto.
-     Solo cuentan los renglones que EMPIEZAN por el nombre (tras un timecode, si
-     lo hay): el nombre dentro del dialogo -«y entonces JOE dijo»- no es una
-     cabecera que se haya perdido, y contarlo daria una alarma falsa. */
+     No basta con que el renglon EMPIECE por el nombre. Se probo asi y daba
+     alarmas falsas en personajes que estaban perfectos: un personaje nombra a
+     otro constantemente, y muchas veces al principio del renglon.
+
+         Valerie (valeri), (GESTO) / cuando te miro a los ojos, yo...
+
+     Eso es dialogo, no una cabecera perdida. Asi que se pregunta con LA MISMA
+     REGLA que usa el lector del PDF: el nombre en mayusculas -o seguido de dos
+     puntos- y detras solo relleno, o los dos puntos y lo que se dice. */
+  const pareceCabecera = (t) => {
+    let cuerpo = t;
+    try{ const lt = leadTC(cuerpo); if(lt && lt.rest) cuerpo = lt.rest; }
+    catch(e){ /* sin timecode delante */ }
+    const ns = normSameLen(cuerpo);
+    if(!flat(ns).startsWith(objetivo)) return false;
+    // donde acaba el nombre dentro del texto de verdad
+    let vistas = 0, fin = 0;
+    for(let i = 0; i < ns.length; i++){
+      if(LETTER.test(ns[i])){ vistas++; if(vistas === objetivo.length){ fin = i + 1; break; } }
+    }
+    if(!fin) return false;
+    const nombre = cuerpo.slice(0, fin);
+    const cola = headerTail(cuerpo.slice(fin));
+    const dosPuntos = /^[:：]/.test(cola);
+    return (nombre === nombre.toUpperCase() || dosPuntos) && (cola === '' || dosPuntos);
+  };
+
   const malos = [], buenos = [];
   try{
     for(const p in pageData){
@@ -12645,9 +12669,12 @@ function libDiagData(key){
         .map(mk => mk.lineIdx));
       pd.lines.forEach((l, li)=>{
         const t = (l.text||'').trim(); if(!t) return;
-        let cuerpo = t;
-        try{ const lt = leadTC(cuerpo); if(lt && lt.rest) cuerpo = lt.rest; }catch(e){ /* sin timecode delante */ }
-        if(!flat(normSameLen(cuerpo)).startsWith(objetivo)) return;
+        /* El try va POR RENGLÓN, no alrededor de todo: con uno solo fuera, el
+           diagnóstico entero se quedaba en blanco y decía «ninguno», que es
+           peor que no decir nada. Pasó montándolo en una prueba. */
+        let es = false;
+        try{ es = pareceCabecera(t); }catch(e){ /* ese renglón no se sabe leer */ }
+        if(!es) return;
         (conMarca.has(li) ? buenos : malos).push('p.'+p+'  '+t.slice(0,110));
       });
     }

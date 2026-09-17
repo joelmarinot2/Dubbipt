@@ -16,6 +16,9 @@ exports.nombre = 'Cuando a un personaje le falta texto, el libreto dice cuál y 
 const RECORTES = [
   ['function norm(s){', 'function esc(s){'],
   ['const LAT_STROKE = {', 'const CUE_RE'],
+  /* headerTail: el diagnostico pregunta con la MISMA regla que el lector del
+     PDF para no confundir dialogo con una cabecera perdida. */
+  ['const CUE_RE', 'function headIsAllName(t){'],
   ['const TC_CORE_RE', 'function segsFromRange(line, from, to){'],
   ['function libDiagData(key){', 'function libDiagHtml(key, dHecho){']
 ];
@@ -60,7 +63,48 @@ exports.pruebas = function(t){
   t.ok('la que va bien sale como buena',
        d.renglonesDelPdf.some(r => /^✓/.test(r) && /p\.1/.test(r)));
 
-  t.seccion('2 · el nombre dentro del diálogo NO es una cabecera perdida');
+  t.seccion('2 · el diálogo que EMPIEZA por el nombre no es una cabecera perdida');
+  /* Llego de sala, con VALERIE: 32 cabeceras reconocidas, ninguna perdida, y
+     aun asi saltaba el aviso. Estos dos renglones son suyos, copiados del
+     guion: el personaje esta nombrando a otro, con su pronunciacion al lado.
+     Empiezan por el nombre y NO son cabeceras. */
+  const VAL = { VALERIE: { display: 'VALERIE' } };
+  const dv = diag('VALERIE', [
+    { lines: [
+        'Valerie (váleri)... Valerie (váleri)... Valerie (váleri). / (GESTO) / Siéntate...',
+        'Valerie (váleri), (GESTO) / cuando te miro a los ojos, yo... / (GESTO) /'
+      ], marks: [] },
+    { lines: ['VALERIE', 'Hola.'], marks: [{ key: 'VALERIE', lineIdx: 0 }] }
+  ], { charIdx: VAL, script: [{ key: 'VALERIE' }] });
+  t.eq('ninguna cabecera perdida', dv.cabecerasSinReconocer, 0,
+       'con esto en 2 saltaba el aviso en un personaje que estaba perfecto · '
+       + JSON.stringify(dv.renglonesDelPdf));
+  t.eq('y la de verdad sí cuenta', dv.cabecerasReconocidas, 1);
+
+  /* Las dos señales que lo deciden, cada una con su caso propio: los renglones
+     de arriba fallan por las DOS a la vez -van en minúsculas Y llevan diálogo
+     detrás-, así que con ellos solos cualquiera de las dos podía desaparecer
+     sin que nada se pusiera rojo. Se vio mutando. */
+  const soloMinusculas = diag('VALERIE', [
+    { lines: ['Valerie'], marks: [] }                      // limpio detrás, pero en minúsculas
+  ], { charIdx: VAL, script: [{ key: 'VALERIE' }] });
+  t.eq('en minúsculas y sin dos puntos, no es cabecera', soloMinusculas.cabecerasSinReconocer, 0,
+       'una palabra suelta de diálogo no puede disparar el aviso');
+
+  const soloCola = diag('VALERIE', [
+    { lines: ['VALERIE Y LANCE SE MIRAN.'], marks: [] }    // en mayúsculas, pero sigue la frase
+  ], { charIdx: VAL, script: [{ key: 'VALERIE' }] });
+  t.eq('en mayúsculas pero con la frase detrás, tampoco', soloCola.cabecerasSinReconocer, 0,
+       'eso es una acotación, no la cabecera de nadie');
+
+  const conDosPuntos = diag('VALERIE', [
+    { lines: ['Valerie: Hola.'], marks: [] }               // minúsculas, pero con dos puntos
+  ], { charIdx: VAL, script: [{ key: 'VALERIE' }] });
+  t.eq('en minúsculas CON dos puntos, sí es cabecera', conDosPuntos.cabecerasSinReconocer, 1,
+       'hay guiones que escriben el nombre así, y el lector del PDF los acepta: '
+       + 'el aviso tiene que mirar con la misma regla');
+
+  t.seccion('3 · el nombre en medio del diálogo, tampoco');
   /* Si se contara cualquier renglon que MENCIONA el nombre, cada vez que un
      personaje nombra a otro saltaria una alarma falsa y el aviso dejaria de
      significar nada. Solo cuentan los renglones que EMPIEZAN por el nombre. */
@@ -70,13 +114,13 @@ exports.pruebas = function(t){
   t.eq('ninguna cabecera perdida', d2.cabecerasSinReconocer, 0);
   t.eq('ni reconocida', d2.cabecerasReconocidas, 0);
 
-  t.seccion('3 · con el timecode delante, sigue siendo una cabecera');
+  t.seccion('4 · con el timecode delante, sigue siendo una cabecera');
   const d3 = diag('GRAFICA', [
     { lines: ['01:05:53 GRÁFICA', 'DISFRUTA A LO GRANDE'], marks: [] }
   ], { charIdx: CH, script: BLK });
   t.eq('la ve, aunque lleve el timecode pegado delante', d3.cabecerasSinReconocer, 1);
 
-  t.seccion('4 · el acento no cambia nada');
+  t.seccion('5 · el acento no cambia nada');
   const d4 = diag('GRAFICA', [
     { lines: ['GRAFICA', 'sin tilde'], marks: [] },
     { lines: ['GRÁFICA', 'con tilde'], marks: [] }
@@ -85,7 +129,7 @@ exports.pruebas = function(t){
        'el desglose escribe GRAFICA y el guion GRÁFICA: si el acento contara, '
        + 'el aviso no vería la mitad de los renglones');
 
-  t.seccion('5 · si todo va bien, no hay nada que avisar');
+  t.seccion('6 · si todo va bien, no hay nada que avisar');
   const d5 = diag('GRAFICA', [
     { lines: ['GRÁFICA', 'HOLA'], marks: [{ key: 'GRAFICA', lineIdx: 0 }] }
   ], { charIdx: CH, script: BLK });
@@ -94,7 +138,7 @@ exports.pruebas = function(t){
        + 'el personaje está entero');
   t.eq('y una reconocida', d5.cabecerasReconocidas, 1);
 
-  t.seccion('6 · el aviso sale también cuando el personaje tiene parlamentos');
+  t.seccion('7 · el aviso sale también cuando el personaje tiene parlamentos');
   /* La condicion que decide si se enseña el panel. Antes era `!mineCount` a
      secas -solo con cero parlamentos-, y por eso el caso de GRAFICA era mudo. */
   const TODO = require('./ayuda').fuentes().map(f => f.src).join('\n');
