@@ -2246,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.93.0-nube';
+const APP_VER_NUM = 'v10.94.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -6185,6 +6185,32 @@ function castGemeloArchivo(key){
 }
 
 /**
+ * ¿Qué personaje del reparto le toca a esta fila del Excel? Devuelve la clave
+ * del reparto, o null si esa fila se queda sin nadie.
+ *
+ * El nombre de la fila y el del personaje pueden diferir SOLO en el «(ARCHIVO)»
+ * del final, y entonces son la misma persona. Llegó de sala así: el guion
+ * escribe «TESTIGO» y el desglose trae la fila «TESTIGO (ARCHIVO)», con lo que
+ * DIECISÉIS personajes de veintiocho no encontraban dónde ponerse y su actor no
+ * se escribía en ningún sitio. De doce filas escritas de treinta y nueve.
+ *
+ * Se prueba primero el nombre EXACTO: si el Excel trae las dos filas y la
+ * aplicación los dos personajes, cada uno va al suyo y nadie se pisa. El
+ * emparejamiento por archivo solo entra cuando el exacto no existe.
+ */
+function castQuienVaEnLaFila(nombreDeLaFila, asign){
+  const tiene = (k) => !!(k && Object.prototype.hasOwnProperty.call(asign, k));
+  const k = castClave(nombreDeLaFila);
+  if(!k) return null;
+  if(tiene(k)) return k;
+  const base = castClave(castSinArchivo(nombreDeLaFila));   // la fila es la de archivo…
+  if(base !== k && tiene(base)) return base;
+  const arch = castClave(nombreDeLaFila + ' (ARCHIVO)');    // …o al revés
+  if(tiene(arch)) return arch;
+  return null;
+}
+
+/**
  * Pone al dia TODAS las filas de archivo que se quedaron sin actor.
  *
  * Copiar el talento al asignarlo no basta: quien ya tenia el capitulo repartido
@@ -6336,14 +6362,11 @@ function castRellenar(buf, asign, meta){
      se veian igual. */
   const enBlanco = [];
   for(const fila in personajes){
-    const k = castClave(personajes[fila]);
-    if(!k) continue;
-    if(Object.prototype.hasOwnProperty.call(asign, k)){
-      valores[+fila] = asign[k];
-      vistos.add(k);
-    }else{
-      enBlanco.push(String(personajes[fila]).trim());
-    }
+    const bruto = personajes[fila];
+    if(!castClave(bruto)) continue;
+    const usa = castQuienVaEnLaFila(bruto, asign);
+    if(usa){ valores[+fila] = asign[usa]; vistos.add(usa); }
+    else enBlanco.push(String(bruto).trim());
   }
   const sinCasar = Object.keys(asign).filter(k => !vistos.has(k));
 

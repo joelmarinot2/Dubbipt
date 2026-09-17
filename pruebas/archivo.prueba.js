@@ -32,7 +32,7 @@ function conReparto(personajes){
   const charIdx = {};
   for(const p of personajes) charIdx[p.key] = Object.assign({ talent: '' }, p);
   const M = montar(RECORTES,
-    ['castClave', 'castGemeloArchivo', 'castCopiarAlArchivo', 'castArchivoAlDia',
+    ['castClave', 'castGemeloArchivo', 'castCopiarAlArchivo', 'castArchivoAlDia', 'castQuienVaEnLaFila',
      'castSinArchivo', 'castEsArchivo'],
     { charIdx: charIdx,
       NO_REC: new Set(['X', 'ORIGINAL']),
@@ -190,7 +190,44 @@ exports.pruebas = function(t){
          + 'seguiría exportando las filas de archivo en blanco');
   }
 
-  t.seccion('9 · no se rellena a ciegas el desglose de otro capítulo');
+  t.seccion('9 · la fila del Excel encuentra a su personaje aunque lleve (ARCHIVO)');
+  /* EL caso que llego de sala, con el diagnostico delante: 28 personajes en la
+     aplicacion -sacados del guion, todos SIN (ARCHIVO)- contra 39 filas en el
+     Excel, muchas CON (ARCHIVO). Dieciseis no encontraban su fila y se
+     escribian doce celdas de treinta y nueve. */
+  {
+    const M = conReparto(REPARTO).M;
+    const quien = (fila, asign) => M.castQuienVaEnLaFila(fila, asign);
+
+    const app = {};                                   // lo que hay en la aplicacion
+    app[M.castClave('TESTIGO')] = 'ANDRES PALACIO';
+    t.eq('la fila de archivo toma el actor de su personaje',
+         quien('TESTIGO (ARCHIVO)', app), M.castClave('TESTIGO'),
+         'es lo que fallaba: el guion dice TESTIGO y el Excel dice TESTIGO (ARCHIVO)');
+    t.eq('y la fila normal, también', quien('TESTIGO', app), M.castClave('TESTIGO'));
+    t.eq('quien no está no se inventa', quien('OTRO CUALQUIERA', app), null);
+
+    /* Y al reves: la aplicacion tiene el de archivo y el Excel la fila normal. */
+    const app2 = {};
+    app2[M.castClave('TESTIGO (ARCHIVO)')] = 'ANI SANCHEZ';
+    t.eq('también al revés', quien('TESTIGO', app2), M.castClave('TESTIGO (ARCHIVO)'));
+
+    /* Lo que NO puede pasar: que teniendo los dos, se crucen. El exacto manda. */
+    const app3 = {};
+    app3[M.castClave('MARK PEYTON')] = 'JUAN PABLO SALGADO';
+    app3[M.castClave('MARK PEYTON (ARCHIVO)')] = 'OTRO ACTOR';
+    t.eq('con los dos en la aplicación, cada fila va a la suya',
+         quien('MARK PEYTON', app3), M.castClave('MARK PEYTON'));
+    t.eq('y la de archivo a la de archivo',
+         quien('MARK PEYTON (ARCHIVO)', app3), M.castClave('MARK PEYTON (ARCHIVO)'),
+         'si el exacto no mandara, los dos actores se cruzarían');
+
+    t.ok('y castRellenar pregunta por aquí',
+         /const usa = castQuienVaEnLaFila\(bruto, asign\);/
+           .test(require('./ayuda').fuentes().map(x => x.src).join('\n')));
+  }
+
+  t.seccion('10 · no se rellena a ciegas el desglose de otro capítulo');
   /* Si este capitulo no tiene su propio desglose, Dubbipt cae en el formato
      COMUN del programa, que es el de otro capitulo: le faltan los personajes
      que solo salen aqui. El resultado es un documento de facturacion
