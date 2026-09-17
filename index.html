@@ -2246,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.86.0-nube';
+const APP_VER_NUM = 'v10.87.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4334,6 +4334,37 @@ async function scanPdf(){
       });
     }
     marks.sort((a,b)=> a.lineIdx-b.lineIdx || a.at-b.at);
+    /* DOS CABECERAS PEGADAS: la segunda no es una cabecera, es el TEXTO de la
+       primera. En estos guiones cada intervención es timecode, nombre y debajo
+       lo que se dice, así que un nombre justo debajo de otro nombre —sin una
+       sola línea de diálogo en medio— no puede ser alguien que habla.
+       Llegó de sala con los rótulos. GRÁFICA es el personaje que lee lo que
+       sale escrito en pantalla, y lo que sale escrito suele ser justamente un
+       nombre:
+           01:05:21
+           GRÁFICA
+           GORDA NAN            ← el rótulo… y también un personaje del reparto
+           MAMÁ DE BIG JOHN
+       GORDA NAN se reconocía como cabecera nueva, se llevaba el renglón, y
+       GRÁFICA se quedaba con la caja VACÍA — además de colgarle a GORDA NAN un
+       parlamento que no dice. Pasaba en casi todos los rótulos del capítulo,
+       porque casi todos llevan un nombre dentro.
+       Solo cuenta si la cabecera de arriba se queda SIN NADA detrás: si lleva
+       su diálogo en el mismo renglón («JOE: hola»), la de abajo es de verdad.
+       Y se encadena: bajo un rótulo puede haber varios nombres seguidos. */
+    {
+      const buenas = [];
+      let vaciaEn = -99;
+      for(const m of marks){
+        const l = lines[m.lineIdx];
+        if(m.lineIdx === vaciaEn + 1){ vaciaEn = m.lineIdx; continue; }
+        buenas.push(m);
+        const cola = l ? headerTail(l.text.slice((m.at||0) + (m.len||0))) : '';
+        vaciaEn = (cola === '') ? m.lineIdx : -99;
+      }
+      marks.length = 0;
+      for(const m of buenas) marks.push(m);
+    }
     // asignar a cada intervención el último timecode visto en el flujo de líneas
     let lastTC = null;
     lines.forEach((line,li)=>{
