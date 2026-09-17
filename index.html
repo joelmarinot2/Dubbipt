@@ -2246,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.85.0-nube';
+const APP_VER_NUM = 'v10.86.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -12586,20 +12586,33 @@ function libDiagData(key){
   const objetivo = flat(key);
   const clavesBloques = [...new Set((script||[]).map(b=>b.key).filter(Boolean))];
   const casi = clavesBloques.filter(k=> flat(k).includes(objetivo) || objetivo.includes(flat(k)));
-  const renglones = [];
+  /* Los renglones del PDF donde ese nombre ENCABEZA el parlamento, separando
+     los que se reconocieron como cabecera de los que no.
+     Antes se listaban todos juntos, y eso solo servia cuando el personaje
+     estaba a cero. El caso que llego de sala es peor y era invisible: GRAFICA
+     tenia parlamentos -unas cabeceras si se reconocian- y otras no, asi que no
+     saltaba ningun aviso y lo unico que se veia era que faltaba texto.
+     Solo cuentan los renglones que EMPIEZAN por el nombre (tras un timecode, si
+     lo hay): el nombre dentro del dialogo -«y entonces JOE dijo»- no es una
+     cabecera que se haya perdido, y contarlo daria una alarma falsa. */
+  const malos = [], buenos = [];
   try{
     for(const p in pageData){
       const pd = pageData[p]; if(!pd || !pd.lines) continue;
-      for(const l of pd.lines){
-        const t = (l.text||'').trim();
-        if(t && flat(normSameLen(t)).includes(objetivo)){
-          renglones.push('p.'+p+'  '+t.slice(0,110));
-          if(renglones.length >= 8) break;
-        }
-      }
-      if(renglones.length >= 8) break;
+      const conMarca = new Set((pd.marks||[])
+        .filter(mk => mk && mk.key && flat(mk.key) === objetivo)
+        .map(mk => mk.lineIdx));
+      pd.lines.forEach((l, li)=>{
+        const t = (l.text||'').trim(); if(!t) return;
+        let cuerpo = t;
+        try{ const lt = leadTC(cuerpo); if(lt && lt.rest) cuerpo = lt.rest; }catch(e){ /* sin timecode delante */ }
+        if(!flat(normSameLen(cuerpo)).startsWith(objetivo)) return;
+        (conMarca.has(li) ? buenos : malos).push('p.'+p+'  '+t.slice(0,110));
+      });
     }
-  }catch(e){}
+  }catch(e){ /* sin paginas en memoria no hay renglones que enseñar */ }
+  const renglones = malos.slice(0, 10).map(x => '✗ SIN RECONOCER · ' + x)
+    .concat(buenos.slice(0, Math.max(2, 12 - Math.min(10, malos.length))).map(x => '✓ ' + x));
   // MARCAS: lo que el escaneo del PDF reconocio como cabecera, ANTES de armar
   // los parlamentos. Si hay marcas suyas pero ningun parlamento, el fallo esta
   // entre los dos pasos y no en el reconocimiento del nombre.
@@ -12624,11 +12637,17 @@ function libDiagData(key){
     clavesDeMarcas: [...clavesMarcas].slice(0, 40),
     clavesDeParlamentos: clavesBloques.slice(0, 40),
     totalParlamentos: (script||[]).length,
+    cabecerasReconocidas: buenos.length,
+    cabecerasSinReconocer: malos.length,
     renglonesDelPdf: renglones
   };
 }
-function libDiagHtml(key){
-  const d = libDiagData(key);
+function libDiagHtml(key, dHecho){
+  const d = dHecho || libDiagData(key);
+  /* Dos averias distintas, y el aviso tiene que decir cual es: o el personaje
+     no tiene NI UN parlamento, o tiene unos cuantos y se han perdido otros.
+     La segunda no avisaba de nada. */
+  const aMedias = d.cabecerasSinReconocer > 0 && (d.cabecerasReconocidas > 0 || d.marcasDetectadasParaEl > 0);
   const li = (a)=> a.length ? a.map(x=>'<li>'+esc(String(x))+'</li>').join('') : '<li class="no">(ninguno)</li>';
   // Sin páginas en memoria el libreto NO viene del PDF, sino de la copia ya
   // procesada que se guardó del capítulo. Decirlo cambia la accion a tomar.
@@ -12638,8 +12657,14 @@ function libDiagHtml(key){
     return !(script||[]).some(b=> b.key && f(b.key)===f(k));
   });
   return '<div class="ldiag" id="lDiag">'
-    + '<b>Este personaje no tiene parlamentos en el libreto</b>'
-    + '<p>El desglose lo registró como <code>'+esc(d.desglose)+'</code>, pero ningún parlamento quedó marcado con ese nombre.</p>'
+    + (aMedias
+        ? '<b>A este personaje le faltan parlamentos</b>'
+          + '<p>En el guion hay <b>'+d.cabecerasSinReconocer+'</b> renglones que empiezan por '
+          + '<code>'+esc(d.desglose)+'</code> y <b>no</b> se reconocieron como cabecera, frente a '
+          + '<b>'+d.cabecerasReconocidas+'</b> que sí. Abajo salen marcados: lo que venga detrás de '
+          + 'esos nombres no ha llegado al libreto.</p>'
+        : '<b>Este personaje no tiene parlamentos en el libreto</b>'
+          + '<p>El desglose lo registró como <code>'+esc(d.desglose)+'</code>, pero ningún parlamento quedó marcado con ese nombre.</p>')
     + (deCopia
         ? '<p><b>El libreto que ves viene de la copia guardada del capítulo</b>, no de leer el PDF. '
           + 'Si se procesó con una versión anterior de Dubbipt, los personajes que aquella no sabía leer '
@@ -12716,8 +12741,16 @@ function renderLibretoBlocks(){
       + '</div>'
       + '</div>');
   });
-  // libreto vacio para este personaje: explicar por que, en vez de dejarlo en blanco
-  if(key && charIdx[key] && !mineCount){ try{ html.unshift(libDiagHtml(key)); }catch(e){} }
+  /* Explicar por que falta texto, en vez de dejarlo en blanco. Y no solo cuando
+     NO HAY NADA: tambien cuando hay parlamentos pero se han perdido cabeceras.
+     Ese caso -el de GRAFICA, que llego de sala- no avisaba de nada, y lo unico
+     que se veia era que faltaba un parlamento sin saber por que ni cual. */
+  if(key && charIdx[key]){
+    try{
+      const d = libDiagData(key);
+      if(!mineCount || d.cabecerasSinReconocer > 0) html.unshift(libDiagHtml(key, d));
+    }catch(e){ fallo('libDiag · index.html:renderLibretoBlocks', e); }
+  }
   /* PINTADO PROGRESIVO: antes todo el guion se insertaba en un solo innerHTML
      (un capítulo largo = miles de .blk de golpe → tirones en la tablet).
      Ahora: primeras 120 cajas al instante y el resto por tandas en reposo,
