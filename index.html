@@ -2246,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.87.0-nube';
+const APP_VER_NUM = 'v10.88.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -13604,7 +13604,57 @@ function libMedirBarras(){
   const d = pop2.doc;
   const b = d.getElementById('lBarras');
   const alto = b ? Math.round(b.getBoundingClientRect().height) : 0;
+  /* Solo se escribe si CAMBIA: esto lo llama ahora un observador, y reescribir
+     la variable en cada vuelta sería tocar el DOM para nada. */
+  if(d.documentElement.style.getPropertyValue('--lbarsH') === alto + 'px') return;
   d.documentElement.style.setProperty('--lbarsH', alto + 'px');
+}
+
+/**
+ * Vigila la banda para volver a medirla cuando cambie de alto.
+ *
+ * La banda mide UNA FILA O DOS SEGUN EL ANCHO, y eso cambia sin que nadie
+ * vuelva a pintarla: basta con estrechar la ventana, abrir el libreto en media
+ * pantalla, o que acabe de cargar la tipografía. Se medía solo al pintar, así
+ * que el valor se quedaba viejo y todo lo que cuelga de él -la pestaña de
+ * Ocupación, la flecha de ocultar la barra, el riel de páginas- se quedaba
+ * ARRIBA, encima de la banda.
+ *
+ * Llegó de sala: la pestaña de Ocupación tapando el botón de guardar el
+ * talento. Medido: abierto a 1000 px la banda ocupa 45 px y la variable dice
+ * 45; estrechado a 430 pasa a ocupar 64 y la variable sigue diciendo 45, así
+ * que la pestaña arranca en el 113 cuando la banda acaba en el 118.
+ *
+ * Se vigila el ELEMENTO, no la ventana: así también cuenta un nombre de talento
+ * largo que hace saltar la fila sin que cambie el ancho.
+ */
+function libVigilarBarras(){
+  try{
+    if(typeof pop2 === 'undefined' || !pop2 || !pop2.win || !pop2.doc) return;
+    if(pop2._obsBarras){
+      try{ pop2._obsBarras.disconnect(); }catch(e){ /* el documento ya no está */ }
+      pop2._obsBarras = null;
+    }
+    const remedir = ()=>{ try{ libMedirBarras(); }catch(e){ /* midiendo no se rompe nada */ } };
+
+    /* DOS vías, a propósito. El observador es la buena: cuenta también un nombre
+       de talento largo que hace saltar la fila sin que cambie el ancho. Pero no
+       todos los navegadores lo traen, y medir es tan barato -y solo escribe
+       cuando el alto CAMBIA- que no hay motivo para colgarlo todo de una sola
+       vía. Con el aviso de la ventana basta para el caso que llegó de sala, que
+       es abrir el libreto en media pantalla. */
+    if(pop2._resBarras){
+      try{ pop2.win.removeEventListener('resize', pop2._resBarras); }catch(e){ /* otra ventana */ }
+    }
+    pop2._resBarras = remedir;
+    try{ pop2.win.addEventListener('resize', pop2._resBarras); }catch(e){ /* sin ventana propia */ }
+
+    const b = pop2.doc.getElementById('lBarras');
+    const RO = pop2.win.ResizeObserver;
+    if(!b || !RO) return;
+    pop2._obsBarras = new RO(remedir);
+    pop2._obsBarras.observe(b);
+  }catch(e){ /* sin observador se sigue midiendo al pintar, como antes */ }
 }
 
 function renderLibretoChips(){
@@ -13617,6 +13667,8 @@ function renderLibretoChips(){
   try{ talBarraLibreto(); }catch(e){ fallo('talBarraLibreto · index.html:12959', e); }
   // se vuelve a medir DESPUÉS del talento: con él la banda puede pasar a dos filas
   try{ libMedirBarras(); }catch(e){ fallo('libMedirBarras · index.html:12960', e); }
+  // …y se queda vigilada, porque el alto cambia con el ancho de la ventana
+  try{ libVigilarBarras(); }catch(e){ fallo('libVigilarBarras · index.html:renderLibretoChips', e); }
   try{ libOcupacion(); }catch(e){ fallo('libOcupacion · index.html:12961', e); }
   const box = pop2.doc.getElementById('lChips');
   if(!box) return;

@@ -245,7 +245,13 @@ exports.pruebas = function(t){
           getElementById: (id) => ({ lCuenta: barra, lBarras: banda })[id] || null,
           /* libMedirBarras publica el alto de la banda aqui, para que la flecha
              de ocultar la barra no se quede encima del nombre. */
-          documentElement: { style: { setProperty: (k, v) => { medidas[k] = v; } } }
+          documentElement: { style: {
+            setProperty: (k, v) => { medidas[k] = v; },
+            /* libMedirBarras lo consulta para no reescribir la variable cuando
+               no ha cambiado: ahora lo llama un observador en cada cambio de
+               tamaño, y tocar el DOM en cada vuelta sobra. */
+            getPropertyValue: (k) => medidas[k] || ''
+          } }
         }, key: key },
         charIdx: personajes,
         scriptByKey: porClave,
@@ -413,4 +419,110 @@ exports.pruebas = function(t){
   t.ok('scanPdf sigue decidiendo el veto con headerTail',
        /const tail = headerTail\(after\)/.test(TODO_EL_CODIGO),
        'si ya no lo usa, esta sección no está protegiendo la cabecera de nadie');
+
+  /* ── 21 · la banda se vuelve a medir cuando cambia de alto ───────────────
+     Llego de sala: la pestaña de Ocupacion tapando el boton de guardar el
+     talento. La banda mide UNA FILA O DOS segun el ancho, y eso cambia sin que
+     nadie la vuelva a pintar -al estrechar la ventana, al abrir el libreto en
+     media pantalla, o cuando acaba de cargar la tipografia-. Se medía solo al
+     pintar, asi que el valor se quedaba viejo y todo lo que cuelga de el se
+     quedaba ARRIBA, encima de la banda.
+     Medido en un navegador con el CSS de verdad: a 1000 px la banda ocupa 45 y
+     la variable dice 45; estrechada a 430 pasa a ocupar 64 y la variable sigue
+     diciendo 45, con lo que la pestaña arranca en el 113 y la banda no acaba
+     hasta el 118. */
+  t.seccion('21 · la banda se vuelve a medir cuando cambia de alto');
+  {
+    /* Un libreto de mentira: una banda cuyo alto se puede cambiar a mano y un
+       ResizeObserver que guarda a quien vigila y deja dispararlo. */
+    let alto = 45;
+    const vars = {};
+    const raiz = { style: {
+      setProperty: (k, v) => { vars[k] = v; },
+      getPropertyValue: (k) => vars[k] || ''
+    } };
+    const banda = { getBoundingClientRect: () => ({ height: alto }) };
+    const vigilados = [];
+    let sueltos = 0;
+    function ROFalso(fn){ this.fn = fn; }
+    ROFalso.prototype.observe = function(el){ vigilados.push({ el: el, fn: this.fn }); };
+    ROFalso.prototype.disconnect = function(){ sueltos++; };
+    const oyentes = [];
+    let quitados = 0;
+    const pop2 = {
+      win: {
+        ResizeObserver: ROFalso,
+        addEventListener: (ev, fn) => { oyentes.push({ ev: ev, fn: fn }); },
+        removeEventListener: () => { quitados++; }
+      },
+      doc: { documentElement: raiz, getElementById: (id) => (id === 'lBarras' ? banda : null) }
+    };
+    const ctx = { pop2: pop2 };
+    const M2 = montar([['function libMedirBarras(){', 'function renderLibretoChips(){']],
+                      ['libMedirBarras', 'libVigilarBarras'], ctx);
+
+    M2.libMedirBarras();
+    t.eq('abierta ancha, la banda mide una fila', vars['--lbarsH'], '45px');
+
+    M2.libVigilarBarras();
+    t.eq('y queda vigilada', vigilados.length, 1);
+    /* Con t.eq NO vale: compara objetos por su JSON, y estos dos solo tienen
+       funciones dentro, así que los dos salen «{}» y cualquier cosa pasaría.
+       Se comprobó mutando: vigilar otro elemento no ponía nada en rojo. */
+    t.ok('se vigila la banda, no la ventana', vigilados[0].el === banda,
+         'vigilando la ventana no contaría un nombre de talento largo, que hace '
+         + 'saltar la fila sin que cambie el ancho');
+
+    // se estrecha: la banda pasa a dos filas sin que nadie la vuelva a pintar
+    alto = 64;
+    t.eq('antes de avisar, la variable sigue diciendo lo de antes', vars['--lbarsH'], '45px');
+    vigilados[0].fn();
+    t.eq('el observador la vuelve a medir', vars['--lbarsH'], '64px',
+         'es LO QUE LLEGÓ DE SALA: sin esto, la pestaña de Ocupación se queda '
+         + 'encima del botón de Guardar');
+
+    // volver a pintar no deja dos observadores colgando
+    M2.libVigilarBarras();
+    t.eq('al volver a pintar se suelta el anterior', sueltos, 1);
+    t.eq('y solo queda uno vigilando', vigilados.length, 2,
+         'el segundo observe() es el nuevo; el viejo se ha soltado');
+
+    // sin cambios no se toca el DOM
+    const antes = vars['--lbarsH'];
+    raiz.style.setProperty = () => { t.ok('no se reescribe si no ha cambiado', false,
+                                          'tocar el DOM en cada vuelta del observador'); };
+    M2.libMedirBarras();
+    raiz.style.setProperty = (k, v) => { vars[k] = v; };
+    t.eq('y la variable se queda como estaba', vars['--lbarsH'], antes);
+
+    /* La segunda vía: el aviso de la ventana. El observador es el bueno, pero
+       no todos los navegadores lo traen y el caso que llegó de sala —abrir el
+       libreto en media pantalla— lo cubre igual un resize. No se comprobó en un
+       navegador que el observador dispare: el panel de pruebas no pinta y ahí
+       no entrega avisos (ENT-18), así que se sostiene sobre las dos. */
+    t.eq('también se escucha el cambio de tamaño de la ventana',
+         oyentes.filter(o => o.ev === 'resize').length, 2,
+         'dos porque libVigilarBarras se ha llamado dos veces');
+    alto = 80;
+    oyentes[oyentes.length - 1].fn();
+    t.eq('y al avisar, vuelve a medir', vars['--lbarsH'], '80px');
+    t.ok('al volver a pintar se quita el oyente viejo', quitados >= 1,
+         'si no, cada render deja uno más colgando');
+
+    // sin ResizeObserver no se rompe nada: queda el aviso de la ventana
+    const winBueno = pop2.win;
+    pop2.win = { addEventListener: () => {}, removeEventListener: () => {} };
+    let reventó = false;
+    try{ M2.libVigilarBarras(); }catch(e){ reventó = true; }
+    t.ok('sin observador en el navegador, ni se queja', !reventó);
+    pop2.win = winBueno;
+
+    /* Y que alguien lo llame de verdad: todo lo de arriba lo dispara la prueba
+       a mano, así que si nadie lo enchufa al pintar el libreto, no vigila nada
+       y estas comprobaciones no protegen nada. */
+    t.ok('el libreto lo pone a vigilar al pintarse',
+         /renderLibretoChips[\s\S]{0,2000}?libVigilarBarras\(\)/.test(TODO_EL_CODIGO),
+         'nadie llama a libVigilarBarras: la banda se mediría solo al pintar, '
+         + 'que es justo el fallo que llegó de sala');
+  }
 };
