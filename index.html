@@ -2246,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.94.0-nube';
+const APP_VER_NUM = 'v10.95.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3799,6 +3799,163 @@ function docxCue(text){
   return { name:head.trim(), rest };
 }
 
+/* ═══ GUION DE WORD EN TABLA ═══════════════════════════════════════════════
+   La otra forma de guion en Word, y la que llegó de sala: una tabla de TRES
+   columnas —timecode, personaje, lo que dice—, un renglón por subtítulo.
+
+       00:14:21,000 │ Xu Shaojie │ Son números de estafas. No los llame.
+       00:14:23,240 │            │ Mire el folleto
+       00:14:28,799 │            │ y lo hablamos en privado.
+       00:14:33,639 │ Xu Shaojie │ Abuela,                    ← empieza otro
+
+   Las tres reglas, dichas por quien lo usa:
+     · la segunda columna manda: con nombre empieza un parlamento nuevo, y
+       vacía es el MISMO personaje que venía hablando;
+     · las filas sin timecode Y sin personaje cuyo primer párrafo es el nombre
+       de un personaje son RÓTULOS —«Chodzong / Hija mayor de Tubten»—, no
+       continuación de nadie: van a GRÁFICA, que es quien los lee;
+     · una LÍNEA son doce palabras, que es como se cuenta para facturar.
+
+   El lector de Word que ya había busca nombres en MAYÚSCULAS al principio del
+   renglón. Con este guion no encontraba ni un personaje: los nombres van en
+   minúsculas y en su propia casilla. */
+
+const DOCX_GRAFICA = 'GRÁFICA';
+
+/**
+ * El timecode de estos guiones viene con MILISEGUNDOS y coma —00:01:56,159—,
+ * que es como los escriben los subtítulos, no con fotogramas.
+ * El motor de timecodes de la casa no lo acepta (devuelve nada) y por el otro
+ * camino se deja los milisegundos; y 159 ms son cuatro fotogramas, de sobra
+ * para que el libreto se coloque tarde. Aquí se leen enteros.
+ */
+function docxTC(t){
+  const s = String(t == null ? '' : t).trim();
+  const m = s.match(/^(\d{1,2})[:;.](\d{2})[:;.](\d{2})[,.](\d{1,3})$/);
+  if(m) return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) + (+String(m[4]).padEnd(3, '0')) / 1000;
+  return strictTC(s);
+}
+
+/** Las doce palabras que hacen una línea. Mínimo una: un «(RÍE)» también se graba. */
+function docxLineas(texto){
+  const n = String(texto || '').split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(n / 12));
+}
+
+/** Las filas de las tablas del documento, con sus párrafos por casilla. */
+function docxFilas(div){
+  const out = [];
+  div.querySelectorAll('tr').forEach(tr => {
+    const celdas = [...tr.querySelectorAll('td,th')].map(td => {
+      const ps = [...td.querySelectorAll('p,div')].map(p => (p.textContent || '').replace(/\s+/g,' ').trim())
+                   .filter(Boolean);
+      if(ps.length) return ps;
+      const t = (td.textContent || '').replace(/\s+/g,' ').trim();
+      return t ? [t] : [];
+    });
+    if(celdas.length >= 3) out.push({
+      tc: (celdas[0][0] || '').trim(),
+      quien: (celdas[1].join(' ') || '').trim(),
+      parrafos: celdas[2]
+    });
+  });
+  return out;
+}
+
+/**
+ * ¿Es un RÓTULO y no la continuación de quien hablaba?
+ *
+ * Los dos se ven igual por fuera —sin timecode y sin personaje—, y confundirlos
+ * cuesta caro en las dos direcciones: un rótulo metido en el parlamento anterior
+ * le mete al actor un texto que no dice, y una continuación tratada como rótulo
+ * parte la frase en dos. Lo que los separa es que el rótulo empieza nombrando a
+ * un personaje del propio guion y sigue con su descripción.
+ *
+ * La canción de las Chicas también viene sin timecode y sin personaje, y es
+ * continuación: un solo párrafo, y no empieza por el nombre de nadie.
+ */
+function docxEsRotulo(fila, nombres){
+  if(fila.tc || fila.quien) return false;
+  if(!fila.parrafos.length) return false;
+  return nombres.has(norm(fila.parrafos[0]));
+}
+
+/** Arma el libreto de un guion de Word en tabla. Devuelve false si no lo es. */
+function docxDeTabla(div, name){
+  const filas = docxFilas(div);
+  /* ¿Es esto un guion, o una tabla de portada? Lo que lo dice no es cuánta
+     gente hable —un tramo corto puede tener un solo personaje— sino que la
+     primera columna sean TIMECODES: una tabla de créditos o de tiempos no los
+     tiene. En el guion que llegó de sala lo son 1046 de 1116.
+     Importa acertar: devolver true de más se lleva por delante el lector de
+     siempre, el de los nombres en MAYÚSCULAS, que ni se llega a probar. */
+  const conTC = filas.filter(f => f.tc && docxTC(f.tc) != null).length;
+  const conNombre = filas.filter(f => f.quien).length;
+  if(filas.length < 4 || !conNombre || conTC < filas.length / 2) return false;
+
+  const nombres = new Set(filas.filter(f => f.quien).map(f => norm(f.quien)));
+
+  pdfDoc = null; pdfName = name; lastPdfBuf = null; xlsFileName = null;
+  pageData = {}; occByChar = {}; charMarks = {}; tcIndex = [];
+  script = []; scriptByKey = {};
+  const byKey = {};
+  let cur = null, clen = 0;
+
+  const abrir = (display, tcSec, pag) => {
+    const key = norm(display);
+    cur = { idx: script.length, key: key, display: key, tcSec: tcSec, page: pag, lines: [] };
+    script.push(cur);
+    (scriptByKey[key] = scriptByKey[key] || []).push(cur.idx);
+    return cur;
+  };
+
+  for(const f of filas){
+    const texto = f.parrafos.join(' ').trim();
+    if(!texto && !f.quien) continue;
+    clen += texto.length + 1;
+    const pag = Math.max(1, Math.ceil(clen / 1800));
+    const tcSec = f.tc ? docxTC(f.tc) : null;
+
+    if(docxEsRotulo(f, nombres)){
+      /* El rótulo es de GRÁFICA, no de quien venía hablando. Y corta: lo que
+         venga detrás sin nombre es del personaje de antes, no del rótulo. */
+      const antes = cur;
+      const g = abrir(DOCX_GRAFICA, tcSec, pag);
+      g.lines.push(...f.parrafos);
+      cur = antes;
+      continue;
+    }
+    if(f.quien) abrir(f.quien, tcSec, pag);
+    if(!cur) abrir(f.quien || DOCX_GRAFICA, tcSec, pag);
+    if(cur.tcSec == null && tcSec != null) cur.tcSec = tcSec;
+    if(texto) cur.lines.push(texto);
+  }
+
+  /* Las líneas se cuentan AL FINAL, con el parlamento ya entero: doce palabras
+     cada una. Contarlas fila a fila daría una línea por subtítulo, que es otra
+     cosa y bastante más cara. */
+  for(const b of script){
+    const n = docxLineas(b.lines.join(' '));
+    const c = byKey[b.key] || (byKey[b.key] = { key: b.key, pages: {}, total: 0 });
+    c.pages[b.page] = (c.pages[b.page] || 0) + n;
+    c.total += n;
+  }
+
+  chars = Object.values(byKey).map(c => ({
+    key: c.key, display: c.key, talent: '',
+    pages: Object.keys(c.pages).map(p => ({ p: +p, ints: c.pages[p] })).sort((a, b) => a.p - b.p),
+    totalInts: c.total, color: charColor(c.key), noRec: NO_REC.has(c.key)
+  })).sort((a, b) => b.totalInts - a.totalInts || a.display.localeCompare(b.display, 'es'));
+  charIdx = {}; chars.forEach(c => charIdx[c.key] = c);
+  window._charsRaw = chars.map(c => ({ ...c, pages: c.pages.map(p => ({ ...p })) }));
+
+  let lastTC = 0;
+  for(const b of script){ if(b.tcSec != null) lastTC = b.tcSec; b.tcEff = (b.tcSec != null ? b.tcSec : lastTC); }
+  numPages = script.length ? script[script.length - 1].page : 1;
+  window._script = script; window._adFormat = false;
+  return true;
+}
+
 // Cargar un guion en Word (.docx): extrae texto, detecta personajes y arma el
 // libreto. Sin PDF no hay página renderizada (ni teleprompter por página), pero
 // el desglose y el libreto continuo funcionan igual.
@@ -3810,6 +3967,19 @@ async function loadDocx(buf, name){
     if(typeof mammoth === 'undefined') throw new Error('Falta la librería mammoth');
     const { value:html } = await mammoth.convertToHtml({ arrayBuffer: buf });
     const div = document.createElement('div'); div.innerHTML = html;
+    /* Primero se prueba el guion EN TABLA, que es el que llegó de sala. Si no
+       lo es, se sigue con el de siempre: nombres en MAYÚSCULAS al principio del
+       renglón. Los dos son guiones de Word y no hay manera de saber cuál te van
+       a mandar, así que se miran los dos. */
+    if(docxDeTabla(div, name)){
+      if(!chars.length) libMsg('No se detectaron personajes en la tabla del guion.');
+      loadProgress();
+      if(typeof loadUI === 'function') loadUI();
+      rebuild();
+      if(pop.key) updatePopup();
+      $('loading').classList.remove('show'); DDL_UI.progressReset();
+      return;
+    }
     const rows = []; let clen = 0;
     div.querySelectorAll('p,h1,h2,h3,li').forEach(el=>{
       const t = (el.textContent||'').replace(/\s+/g,' ').trim();
