@@ -2246,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.95.0-nube';
+const APP_VER_NUM = 'v10.96.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -13074,6 +13074,33 @@ function libDiagData(key){
   }catch(e){ /* sin paginas en memoria no hay renglones que enseñar */ }
   const renglones = malos.slice(0, 10).map(x => '✗ SIN RECONOCER · ' + x)
     .concat(buenos.slice(0, Math.max(2, 12 - Math.min(10, malos.length))).map(x => '✓ ' + x));
+
+  /* Y si no hay NI UNA cabecera candidata, el aviso se queda mudo justo cuando
+     más falta hace: el personaje está a cero y no hay por dónde empezar.
+     Llegó de sala con PAL TOBIAS —un nombre noruego, Pål—: veintiséis de
+     veintisiete personajes bien y ese sin un solo renglón que enseñar.
+     Entonces se buscan los renglones que se le PARECEN, por alguna palabra
+     larga de su nombre, y se enseñan TAL CUAL vienen del PDF. Si el lector
+     escupe la Å como otra cosa, ahí se ve; y si el nombre no está escrito así
+     en el guion, también. */
+  const parecidos = [];
+  if(!malos.length && !buenos.length){
+    const palabras = String(key || '').split(/\s+/).map(w => flat(w)).filter(w => w.length >= 4);
+    try{
+      for(const p in pageData){
+        const pd = pageData[p]; if(!pd || !pd.lines) continue;
+        for(const l of pd.lines){
+          const t = (l.text || '').trim();
+          if(!t || t.length > 90) continue;
+          const f = flat(normSameLen(t));
+          if(!palabras.some(w => f.includes(w))) continue;
+          parecidos.push('p.' + p + '  ' + t.slice(0, 110));
+          if(parecidos.length >= 10) break;
+        }
+        if(parecidos.length >= 10) break;
+      }
+    }catch(e){ /* sin páginas en memoria no hay nada que buscar */ }
+  }
   // MARCAS: lo que el escaneo del PDF reconocio como cabecera, ANTES de armar
   // los parlamentos. Si hay marcas suyas pero ningun parlamento, el fallo esta
   // entre los dos pasos y no en el reconocimiento del nombre.
@@ -13100,7 +13127,15 @@ function libDiagData(key){
     totalParlamentos: (script||[]).length,
     cabecerasReconocidas: buenos.length,
     cabecerasSinReconocer: malos.length,
-    renglonesDelPdf: renglones
+    renglonesDelPdf: renglones,
+    renglonesParecidos: parecidos,
+    /* Las letras EXACTAS del renglón que más se le parece. Un nombre con Å, Ø o
+       Æ puede salir del PDF convertido en otra cosa, y a simple vista los dos
+       renglones se ven idénticos. Aquí no. */
+    letrasDelMasParecido: parecidos.length
+      ? [...parecidos[0].replace(/^p\.\d+\s+/, '').slice(0, 26)]
+          .map(c => c + '=' + c.codePointAt(0)).join(' ')
+      : ''
   };
 }
 function libDiagHtml(key, dHecho){
@@ -13137,6 +13172,24 @@ function libDiagHtml(key, dHecho){
           + li(sinParlamentos.filter(k=>k!==key).slice(0,10)) + '</ul></div>'
         : '')
     + '<div class="ld-sec">Renglones del PDF donde aparece ese nombre<ul>'+li(d.renglonesDelPdf)+'</ul></div>'
+    /* Ni una cabecera candidata: se enseña lo que MÁS SE LE PARECE y sus
+       letras exactas. Sin esto el aviso salía con la lista vacía y no había
+       por dónde seguir. */
+    + (!d.renglonesDelPdf.length && d.renglonesParecidos && d.renglonesParecidos.length
+        ? '<div class="ld-sec"><b>Su nombre no encabeza ningún renglón.</b> Estos se le parecen, '
+          + 'copiados tal cual del guion:<ul>' + li(d.renglonesParecidos) + '</ul>'
+          + (d.letrasDelMasParecido
+              ? '<div class="meta-nota">Letra por letra, el primero: <code>'
+                + esc(d.letrasDelMasParecido) + '</code><br>Si una letra con tilde o trazo '
+                + '—Å, Ø, Æ— sale con otro número del que esperas, el nombre no puede casar '
+                + 'aunque a la vista sea el mismo.</div>'
+              : '')
+          + '</div>'
+        : '')
+    + (!d.renglonesDelPdf.length && !(d.renglonesParecidos || []).length
+        ? '<div class="ld-sec"><b>Ese nombre no aparece en el guion</b>, ni entero ni parecido. '
+          + 'O el desglose lo escribe de otra manera, o este personaje no habla en este capítulo.</div>'
+        : '')
     + '<div class="ld-sec">Cabeceras suyas reconocidas en el PDF: <b style="color:#FBBF24">'+d.marcasDetectadasParaEl+'</b></div>'
     + '<div class="ld-sec">Nombres con los que SÍ hay parlamentos<ul>'+li(d.clavesDeParlamentos.slice(0,12))+'</ul></div>'
     + '<button class="ld-copy" id="lDiagCopy">Copiar diagnóstico</button>'

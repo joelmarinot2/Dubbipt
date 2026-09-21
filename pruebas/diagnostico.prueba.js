@@ -138,7 +138,49 @@ exports.pruebas = function(t){
        + 'el personaje está entero');
   t.eq('y una reconocida', d5.cabecerasReconocidas, 1);
 
-  t.seccion('7 · el aviso sale también cuando el personaje tiene parlamentos');
+  t.seccion('7 · a cero y sin una sola cabecera: se enseña lo que se le parece');
+  /* Llego de sala con PAL TOBIAS -un nombre noruego, Pål-: veintiseis de
+     veintisiete personajes bien y ese a cero, con la lista de renglones
+     VACIA. El aviso se quedaba mudo justo cuando mas falta hace.
+     Aqui se simula lo que se sospecha: que el lector del PDF escupe la Å
+     como otra cosa, asi que el nombre no casa y a la vista los dos renglones
+     parecen el mismo. */
+  const NOR = { 'PAL TOBIAS': { display: 'PÅL TOBIAS' } };
+  const dn = diag('PAL TOBIAS', [
+    { lines: ['01:00:10', 'PL TOBIAS', 'Hei, hvordan går det?', 'THEA', 'Bra.'],
+      marks: [{ key: 'THEA', lineIdx: 3 }] }
+  ], { charIdx: NOR, script: [{ key: 'THEA' }] });
+
+  t.eq('no se inventa una cabecera perdida', dn.cabecerasSinReconocer, 0,
+       'el renglón no dice su nombre: decir que se ha perdido una cabecera sería mentir');
+  t.eq('ni una reconocida', dn.cabecerasReconocidas, 0);
+  t.ok('pero enseña el renglón que se le parece',
+       dn.renglonesParecidos.some(r => /PL TOBIAS/.test(r)),
+       JSON.stringify(dn.renglonesParecidos));
+  t.ok('y las letras exactas, para ver cuál falla',
+       /P=80/.test(dn.letrasDelMasParecido) && /L=76/.test(dn.letrasDelMasParecido),
+       dn.letrasDelMasParecido);
+  t.ok('el diálogo de otro personaje no se cuela',
+       !dn.renglonesParecidos.some(r => /Bra\./.test(r)),
+       JSON.stringify(dn.renglonesParecidos));
+
+  /* Y si el nombre esta bien escrito, no hay «parecidos» que enseñar: la lista
+     normal ya dice lo que hay que decir. */
+  const dok = diag('PAL TOBIAS', [
+    { lines: ['PAL TOBIAS', 'Hei.'], marks: [] }
+  ], { charIdx: NOR, script: [] });
+  t.eq('con el nombre bien escrito sale como cabecera perdida', dok.cabecerasSinReconocer, 1);
+  t.eq('y entonces no se buscan parecidos', dok.renglonesParecidos.length, 0,
+       'enseñar las dos listas a la vez sería ruido');
+
+  /* Un personaje que sencillamente no sale en el guion: tampoco hay parecidos,
+     y eso TAMBIEN es una respuesta. */
+  const dno = diag('PAL TOBIAS', [
+    { lines: ['THEA', 'Bra.'], marks: [] }
+  ], { charIdx: NOR, script: [] });
+  t.eq('si no aparece de ninguna forma, no se inventa nada', dno.renglonesParecidos.length, 0);
+
+  t.seccion('8 · el aviso sale también cuando el personaje tiene parlamentos');
   /* La condicion que decide si se enseña el panel. Antes era `!mineCount` a
      secas -solo con cero parlamentos-, y por eso el caso de GRAFICA era mudo. */
   const TODO = require('./ayuda').fuentes().map(f => f.src).join('\n');
