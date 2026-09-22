@@ -62,6 +62,7 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **CAST-28** | El **material de archivo comparte el actor** del personaje. El desglose separa «MARK PEYTON» de «MARK PEYTON (ARCHIVO)» a propósito —el archivo se factura aparte y lleva su propia cuenta de líneas—, pero en pantalla es **la misma persona**: al repartir una, la otra se rellena sola y se dice en pantalla a quién se le ha copiado. Llegó de sala un capítulo con **once** personajes duplicados así; al que se le olvidaba uno, esa fila salía en blanco en el desglose. **Nunca se pisa** un talento puesto a mano —a veces el archivo lo dobla otro— y vaciar una casilla no arrastra a la otra, porque vaciar es corregir, no repartir. Los personajes que **solo** existen en versión archivo se reparten a mano como cualquiera. | ✅ |
 | **CAST-29** | Las filas de archivo se ponen al día **al exportar**, no solo al asignar. Copiarlo en el momento de repartir no le sirve de nada a quien ya tenía el capítulo repartido de antes: no vuelve a tocar una tarjeta, y sus filas de archivo seguían saliendo en blanco. Ése fue el caso que llegó de sala — un desglose con actor en todas las filas **menos** en las que acaban en (ARCHIVO). Y el mismo capítulo, al exportarlo, se pone al día solo: once filas. | ✅ |
 | **CAST-30** | Al escribir el Excel, una fila **encuentra a su personaje aunque los nombres difieran solo en el «(ARCHIVO)» del final**, en los dos sentidos. Llegó de sala con el diagnóstico delante: 28 personajes en la aplicación —sacados del guion, todos sin el sufijo— contra 39 filas en el Excel, muchas con él; dieciséis no encontraban dónde ponerse y se escribían **12 celdas de 39**. Manda siempre el nombre **exacto**: si el Excel trae las dos filas y la aplicación los dos personajes, cada uno va a la suya y no se cruzan. | ✅ |
+| **CAST-31** | El panel del diagnóstico de la exportación **se abre solo cuando algo no cuadra**, y «falta repartir» no es eso. Una fila del Excel se queda en blanco por dos razones que no se parecen: porque a ese personaje **todavía no se le ha puesto nadie** —el curso normal del trabajo— o porque la aplicación **sí tenía** su talento y la celda salió vacía —eso sí es una pérdida—. Solo la segunda abre el panel. Llegó de sala con el 101 de «100 days of deception»: 63 personajes, 62 repartidos, 63 filas, 62 escritas, ni un talento sin sitio, y el panel abriéndose como si hubiera fallado. La condición miraba `filasSinActor` a secas, así que saltaba con un solo personaje sin repartir: prácticamente siempre. El volcado sigue diciendo cuántas filas están sin actor, porque es un dato útil, y añade **cuántas lo están teniendo talento**, que es la cifra que decide. | ✅ |
 
 ## Reglas · personajes completados
 
@@ -146,6 +147,10 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
   rojo.
 - **CAST-15 a CAST-17** y **CAST-21 a CAST-23**: `pruebas/gestos.prueba.js` y
   `pruebas/ocupacion.prueba.js`.
+- **CAST-31**: `pruebas/aviso-export.prueba.js`, con el tramo del desglose que
+  llegó de sala. Cada señal lleva su caso propio, porque juntas se tapaban unas
+  a otras; siete mutaciones comprobadas en rojo, incluida la de volver a mirar
+  `filasSinActor`.
 - El resto, a mano: abrir el 101 de un programa, repartir, abrir el 102 y
   comprobar que hereda en naranja.
 

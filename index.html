@@ -2246,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.96.0-nube';
+const APP_VER_NUM = 'v10.97.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8063,6 +8063,28 @@ function castLeerCasting(buf){
    Hace falta porque desde fuera se ven exactamente igual tres cosas muy
    distintas: que no se escriba nada, que se escriba en el desglose de OTRO
    capítulo, y que se escriba bien y se esté mirando la hoja equivocada. */
+/** De las filas en blanco, las que NO deberían estarlo: la aplicación tenía un
+    talento para ese personaje y aun así la celda salió vacía. Una fila en
+    blanco porque a ese personaje todavía no se le ha puesto nadie es el curso
+    normal del trabajo, no una avería. */
+function castFilasVaciasConTalento(nom, act, filas, asign){
+  return filas.filter(f => {
+    if(act[f]) return false;                                    // tiene actor, nada que ver
+    const k = castQuienVaEnLaFila(String(nom[f] == null ? '' : nom[f]), asign || {});
+    return !!(k && asign[k]);
+  });
+}
+
+/** Si el panel se abre solo o no. Tres cosas que desde fuera se ven idénticas:
+    se rellenó el común de otro capítulo, un talento no encontró su fila, o una
+    fila se quedó vacía TENIENDO talento. Que falte por asignar no cuenta. */
+function castDiagHayAveria(d){
+  if(!d) return false;
+  return !!(d.esElFormatoComunDeOtroCapitulo
+            || (d.sinSitioEnElExcel || []).length
+            || (d.filasVaciasTeniendoTalento || []).length);
+}
+
 function castDiagExport(fuente, asign, r){
   const arch = fflate.unzipSync(new Uint8Array(r.datos));
   const xml  = new TextDecoder().decode(arch[castHojaXml(arch, CAST_HOJA)]);
@@ -8087,6 +8109,10 @@ function castDiagExport(fuente, asign, r){
     filasDePersonajeEnElExcel: filas.length,
     celdasEscritas: r.puestos,
     filasSinActor: vacias.length,
+    /* Y de esas, las que son de verdad un fallo. Si sale 0, las filas en blanco
+       son personajes a los que aún no se les ha puesto nadie. */
+    filasVaciasTeniendoTalento: castFilasVaciasConTalento(nom, act, filas, asign)
+      .slice(0, 20).map(f => 'f' + f + '  ' + nom[f]),
     sinSitioEnElExcel: (r.sinCasar || []).slice(0, 20),
     comoHaQuedado: filas.slice(0, 25).map(f =>
       (act[f] ? '✓ ' : '✗ ') + 'f' + f + '  ' + nom[f] + '  →  ' + (act[f] || '(vacío)'))
@@ -8720,13 +8746,16 @@ async function castDescargar(){
     msg += (r.cabecera ? ' · cabecera con ' + r.cabecera + ' datos' : ' · ⚠️ sin cabecera: rellénala en «Cabecera»');
 
     /* El diagnóstico, siempre a mano. Se abre SOLO cuando algo no cuadra -se
-       rellenó el común, quedó algún talento sin fila, o alguna fila de
-       personaje se quedó sin actor-, porque esos tres casos se ven idénticos
-       desde fuera y adivinarlos cuesta días. */
+       rellenó el común, quedó algún talento sin fila, o alguna fila se quedó
+       vacía TENIENDO talento-, porque esos tres casos se ven idénticos desde
+       fuera y adivinarlos cuesta días.
+       Antes miraba `filasSinActor` a secas y saltaba en 62 de 63 asignados: que
+       falte por repartir no es una avería, y el aviso que salta siempre deja de
+       querer decir nada. */
     let diag = null;
     try{ diag = castDiagExport(fuente, asign, r); }
     catch(e){ fallo('castDiagExport · index.html:castDescargar', e); }
-    if(diag && (diag.esElFormatoComunDeOtroCapitulo || diag.sinSitioEnElExcel.length || diag.filasSinActor)){
+    if(castDiagHayAveria(diag)){
       try{ castDiagPanel(diag); }catch(e){ fallo('castDiagPanel · index.html:castDescargar', e); }
     }else if(diag){
       try{ DDL_UI.toast('Desglose descargado', { duration: 6000, actionLabel: 'Ver qué se ha escrito',
