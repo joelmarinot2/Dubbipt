@@ -43,7 +43,7 @@ en [`01-libreto.md`](01-libreto.md), de **QC-1** a **QC-7**.
 | **PDF-18** | Cada fila lleva un **círculo vacío** a la derecha para marcar a mano cuando la corrección queda resuelta, y el pie lo explica. Un llamado de actores **no** lo lleva: no se resuelve corrección a corrección. | ✅ |
 | **PDF-19** | La pastilla del tipo **nunca es más alta que la fila** ni manda sobre su alto, y se alinea con el **primer renglón** del comentario, no con el centro del párrafo. Medida a ojo se salía por abajo, se metía en la fila siguiente y el nombre del tipo salía **cortado por la mitad**. | ✅ |
 | **PDF-20** | Al convertir un informe ajeno, si **no trae** columna de tipo se **deduce del comentario** y se añade; si **sí la trae**, se respeta la suya. Deducir no cambia el texto —el comentario sigue intacto— pero es una lectura nuestra, así que no se pone encima de la de otro. | ✅ |
-| **PDF-21** | La hoja va en **gris muy claro** con las tarjetas en **blanco**: es lo que separa la tabla del papel y lo que hace que se lea como una ficha y no como un listado. La tarjeta de la tabla se rellena **fila a fila**, porque su borde se traza al final y por dentro se vería el gris. | ✅ |
+| **PDF-21** | La hoja va **completamente en blanco**. La tabla se ve como tarjeta por su **borde**, no por contraste de fondo: un gris a toda página se lleva tinta en cada copia y en una impresora mediocre sale sucio. La tarjeta se sigue rellenando **fila a fila**, porque su borde se traza al final. | ✅ |
 
 ## Nunca
 

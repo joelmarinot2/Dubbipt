@@ -25,7 +25,10 @@ const QCPDF_COLOR = {
   borde:   [235, 235, 240],      // #EBEBF0
   cabeza:  [250, 250, 252],      // #FAFAFC
   tarjeta: [255, 255, 255],
-  hoja:    [245, 245, 247],      // #F5F5F7 · la hoja, para que la tarjeta se vea
+  /* La hoja, blanca. La tarjeta se ve por su borde, no por contraste de
+     fondo: un gris de fondo a toda página se lleva tinta en cada copia y en
+     una impresora mediocre sale sucio. */
+  hoja:    [255, 255, 255],
   plano:   false                 // con color: las pastillas van de su color
 };
 const QCPDF_GRIS = {
@@ -36,7 +39,7 @@ const QCPDF_GRIS = {
   borde:   [218, 218, 218],      // #DADADA
   cabeza:  [242, 242, 242],      // #F2F2F2
   tarjeta: [255, 255, 255],
-  hoja:    [248, 248, 248],
+  hoja:    [255, 255, 255],
   /* Sin color: un informe impreso en blanco y negro con pastillas de color
      saca cuatro grises que no se distinguen, y entonces el tipo no dice nada. */
   plano:   true
