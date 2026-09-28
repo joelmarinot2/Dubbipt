@@ -32,8 +32,8 @@ function conReparto(personajes){
   const charIdx = {};
   for(const p of personajes) charIdx[p.key] = Object.assign({ talent: '' }, p);
   const M = montar(RECORTES,
-    ['castClave', 'castGemeloArchivo', 'castCopiarAlArchivo', 'castArchivoAlDia', 'castQuienVaEnLaFila',
-     'castSinArchivo', 'castEsArchivo'],
+    ['castClave', 'castGemelosDe', 'castCopiarAGemelos', 'castGemelosAlDia', 'castQuienVaEnLaFila',
+     'castSinSufijo', 'castEsGemelo'],
     { charIdx: charIdx,
       NO_REC: new Set(['X', 'ORIGINAL']),
       castVerificar: () => {}, fallo: () => {},
@@ -57,22 +57,22 @@ exports.pruebas = function(t){
   t.seccion('1 · quién es la otra cara del mismo personaje');
   const a = conReparto(REPARTO);
   t.eq('del normal al de archivo',
-       a.M.castGemeloArchivo('MARK PEYTON'), 'MARK PEYTON (ARCHIVO)');
+       a.M.castGemelosDe('MARK PEYTON').join(' y '), 'MARK PEYTON (ARCHIVO)');
   t.eq('y del de archivo al normal',
-       a.M.castGemeloArchivo('MARK PEYTON (ARCHIVO)'), 'MARK PEYTON');
+       a.M.castGemelosDe('MARK PEYTON (ARCHIVO)').join(' y '), 'MARK PEYTON');
   t.eq('con el punto de la abreviatura en medio, igual',
-       a.M.castGemeloArchivo('DRA TRACY FANARA'), 'DRA TRACY FANARA (ARCHIVO)',
+       a.M.castGemelosDe('DRA TRACY FANARA').join(' y '), 'DRA TRACY FANARA (ARCHIVO)',
        'el desglose escribe «DRA. TRACY FANARA» y la clave va sin el punto');
   t.eq('un personaje que solo existe en archivo no tiene gemelo',
-       a.M.castGemeloArchivo('REED TIMMER (ARCHIVO)'), null,
+       a.M.castGemelosDe('REED TIMMER (ARCHIVO)').length, 0,
        'en ese capítulo son dieciséis, y se reparten a mano como cualquiera');
   t.eq('y uno que nunca sale de archivo, tampoco',
-       a.M.castGemeloArchivo('JONATHAN PETRAMALA'), null);
-  t.eq('un personaje que no existe no revienta', a.M.castGemeloArchivo('NADIE'), null);
+       a.M.castGemelosDe('JONATHAN PETRAMALA').length, 0);
+  t.eq('un personaje que no existe no revienta', a.M.castGemelosDe('NADIE').length, 0);
 
   t.seccion('2 · el actor se copia a la fila de archivo');
   const b = conReparto(REPARTO);
-  const quien = b.M.castCopiarAlArchivo('MARK PEYTON', 'SERGIO GARZON');
+  const quien = b.M.castCopiarAGemelos('MARK PEYTON', 'SERGIO GARZON').join(' y ');
   t.eq('dice a quién se lo ha copiado', quien, 'MARK PEYTON (ARCHIVO)',
        'hay que decirlo: si no, el actor aparece en una fila que nadie ha tocado');
   t.eq('y la fila de archivo ya lo tiene',
@@ -85,8 +85,8 @@ exports.pruebas = function(t){
      pisarlo seria peor que no copiar nada. */
   const c = conReparto(REPARTO);
   c.charIdx['MARK PEYTON (ARCHIVO)'].talent = 'JUAN D PEREZ';
-  const r = c.M.castCopiarAlArchivo('MARK PEYTON', 'SERGIO GARZON');
-  t.eq('no copia nada', r, null);
+  const r = c.M.castCopiarAGemelos('MARK PEYTON', 'SERGIO GARZON');
+  t.eq('no copia nada', r.length, 0);
   t.eq('y el que había se queda',
        c.charIdx['MARK PEYTON (ARCHIVO)'].talent, 'JUAN D PEREZ');
 
@@ -94,9 +94,9 @@ exports.pruebas = function(t){
   /* Vaciar una casilla es una correccion, no un reparto: si vaciarla borrase
      tambien la otra, se perderia trabajo sin haberlo pedido. */
   const d = conReparto(REPARTO);
-  d.M.castCopiarAlArchivo('MARK PEYTON', 'SERGIO GARZON');
-  const r2 = d.M.castCopiarAlArchivo('MARK PEYTON', '');
-  t.eq('no hace nada', r2, null);
+  d.M.castCopiarAGemelos('MARK PEYTON', 'SERGIO GARZON');
+  const r2 = d.M.castCopiarAGemelos('MARK PEYTON', '');
+  t.eq('no hace nada', r2.length, 0);
   t.eq('y el de archivo conserva el suyo',
        d.charIdx['MARK PEYTON (ARCHIVO)'].talent, 'SERGIO GARZON');
   /* Y con la casilla de archivo VACÍA, que es el caso que de verdad separa
@@ -105,29 +105,29 @@ exports.pruebas = function(t){
      pusiera rojo. Se vio mutando. */
   const d2 = conReparto(REPARTO);
   t.eq('vaciar con la otra vacía tampoco hace nada',
-       d2.M.castCopiarAlArchivo('MARK PEYTON', ''), null,
+       d2.M.castCopiarAGemelos('MARK PEYTON', '').length, 0,
        'si dijera que ha copiado, saldría un aviso de que se ha puesto un actor '
        + 'en una fila donde no se ha puesto nada');
 
   t.seccion('5 · también al revés: del archivo al normal');
   const e = conReparto(REPARTO);
-  const q = e.M.castCopiarAlArchivo('MARK PEYTON (ARCHIVO)', 'PAULA TORRES');
-  t.eq('se lo copia al normal', q, 'MARK PEYTON');
+  const q = e.M.castCopiarAGemelos('MARK PEYTON (ARCHIVO)', 'PAULA TORRES');
+  t.eq('se lo copia al normal', q.join(' y '), 'MARK PEYTON');
   t.eq('y lo tiene', e.charIdx['MARK PEYTON'].talent, 'PAULA TORRES');
 
   t.seccion('6 · cómo se reconoce el archivo');
   const f = conReparto(REPARTO).M;
-  t.eq('se quita del nombre', f.castSinArchivo('MARK PEYTON (ARCHIVO)'), 'MARK PEYTON');
-  t.eq('en minúsculas también', f.castSinArchivo('Mark Peyton (Archivo)'), 'Mark Peyton');
-  t.eq('con espacios de más, también', f.castSinArchivo('MARK PEYTON ( ARCHIVO )'), 'MARK PEYTON');
-  t.eq('un nombre normal se queda como está', f.castSinArchivo('MARK PEYTON'), 'MARK PEYTON');
-  t.ok('lo reconoce', f.castEsArchivo('MARK PEYTON (ARCHIVO)'));
-  t.ok('y no se inventa lo que no hay', !f.castEsArchivo('MARK PEYTON'));
+  t.eq('se quita del nombre', f.castSinSufijo('MARK PEYTON (ARCHIVO)'), 'MARK PEYTON');
+  t.eq('en minúsculas también', f.castSinSufijo('Mark Peyton (Archivo)'), 'Mark Peyton');
+  t.eq('con espacios de más, también', f.castSinSufijo('MARK PEYTON ( ARCHIVO )'), 'MARK PEYTON');
+  t.eq('un nombre normal se queda como está', f.castSinSufijo('MARK PEYTON'), 'MARK PEYTON');
+  t.ok('lo reconoce', f.castEsGemelo('MARK PEYTON (ARCHIVO)'));
+  t.ok('y no se inventa lo que no hay', !f.castEsGemelo('MARK PEYTON'));
   /* Solo AL FINAL: un personaje que se llame «ARCHIVO DE PRENSA» no es material
      de archivo de nadie. */
-  t.ok('solo cuenta al final del nombre', !f.castEsArchivo('(ARCHIVO) MARK PEYTON'));
+  t.ok('solo cuenta al final del nombre', !f.castEsGemelo('(ARCHIVO) MARK PEYTON'));
   t.eq('y no se come un paréntesis cualquiera',
-       f.castSinArchivo('HOMBRE 1 (GRITA)'), 'HOMBRE 1 (GRITA)');
+       f.castSinSufijo('HOMBRE 1 (GRITA)'), 'HOMBRE 1 (GRITA)');
 
   t.seccion('7 · los dos caminos de asignar lo hacen');
   /* La tarjeta y la barra del libreto son dos funciones distintas. Que una lo
@@ -135,14 +135,14 @@ exports.pruebas = function(t){
      talAsignar: «tener dos caminos garantiza que un dia uno se olvide». */
   const TODO = require('./ayuda').fuentes().map(x => x.src).join('\n');
   t.ok('la tabla de casting copia al archivo',
-       /async function assignTalent[\s\S]{0,1200}?castCopiarAlArchivo\(key, val\)/.test(TODO));
+       /async function assignTalent[\s\S]{0,1200}?castCopiarAGemelos\(key, val\)/.test(TODO));
   t.ok('y la barra del libreto, también',
-       /async function talAsignar[\s\S]{0,1800}?castCopiarAlArchivo\(key, val\)/.test(TODO));
+       /async function talAsignar[\s\S]{0,1800}?castCopiarAGemelos\(key, val\)/.test(TODO));
   /* En los DOS caminos, no en uno. Contando ocurrencias y no con un test a
      secas: con `.test()` bastaba con que quedara en un archivo, y la mutación
      de quitarlo del otro no ponía nada en rojo. */
   t.eq('el deshacer se lleva a los dos por delante, en los dos caminos',
-       (TODO.match(/castFoto\(gem \? \[key, gem\] : \[key\]\)/g) || []).length, 2,
+       (TODO.match(/castFoto\(\[key\]\.concat\(gems\)\)/g) || []).length, 2,
        'si la foto solo guarda uno, Ctrl+Z deja al otro con el actor puesto');
 
   t.seccion('8 · al exportar se ponen al día TODAS las filas de archivo');
@@ -156,7 +156,7 @@ exports.pruebas = function(t){
     g.charIdx['MARK PEYTON'].talent = 'JUAN PABLO SALGADO';
     g.charIdx['DRA TRACY FANARA'].talent = 'ANI SANCHEZ';
     g.charIdx['REED TIMMER (ARCHIVO)'].talent = '';      // sin gemelo: se queda
-    const hechas = g.M.castArchivoAlDia();
+    const hechas = g.M.castGemelosAlDia();
     t.eq('pone al día las dos que tenían gemelo', hechas.length, 2);
     t.eq('MARK PEYTON (ARCHIVO) toma su actor',
          g.charIdx['MARK PEYTON (ARCHIVO)'].talent, 'JUAN PABLO SALGADO');
@@ -170,7 +170,7 @@ exports.pruebas = function(t){
     const h = conReparto(REPARTO);
     h.charIdx['MARK PEYTON'].talent = 'JUAN PABLO SALGADO';
     h.charIdx['MARK PEYTON (ARCHIVO)'].talent = 'OTRO ACTOR';
-    t.eq('no pisa al que ya tenía el suyo', h.M.castArchivoAlDia().length, 0);
+    t.eq('no pisa al que ya tenía el suyo', h.M.castGemelosAlDia().length, 0);
     t.eq('y se queda el que había',
          h.charIdx['MARK PEYTON (ARCHIVO)'].talent, 'OTRO ACTOR');
 
@@ -179,12 +179,12 @@ exports.pruebas = function(t){
        exactamente lo que pasa al convertir a texto sin mirar. */
     const i2 = conReparto(REPARTO);
     delete i2.charIdx['MARK PEYTON'].talent;
-    i2.M.castArchivoAlDia();
+    i2.M.castGemelosAlDia();
     t.eq('un personaje sin talento no escribe «undefined» en su fila de archivo',
          i2.charIdx['MARK PEYTON (ARCHIVO)'].talent, '');
 
     t.ok('y se hace ANTES de exportar, no solo al asignar',
-         /const alDia = castArchivoAlDia\(\);[\s\S]{0,400}?const asign = \{\};/
+         /const alDia = castGemelosAlDia\(\);[\s\S]{0,900}?const asign = \{\};/
            .test(require('./ayuda').fuentes().map(x => x.src).join('\n')),
          'si solo se hiciera al asignar, quien ya tenía el capítulo repartido '
          + 'seguiría exportando las filas de archivo en blanco');
@@ -227,7 +227,102 @@ exports.pruebas = function(t){
            .test(require('./ayuda').fuentes().map(x => x.src).join('\n')));
   }
 
-  t.seccion('10 · no se rellena a ciegas el desglose de otro capítulo');
+  t.seccion('11 · la voz en off, (VO), es la misma persona');
+  /* Llego de sala «DES FINAL TABLE_101_COMPLETO.xlsm»: 22 filas en blanco de
+     75, y TODAS con (VO). No hubo que preguntar la regla, la dijo el propio
+     Excel: de las NUEVE filas (VO) que si estaban rellenas, las nueve llevaban
+     exactamente el mismo actor que su personaje base. Nueve de nueve.
+     Los nombres de abajo son de ese capitulo. */
+  {
+    const VOZ = [
+      { key: 'HENRI',            display: 'HENRI' },
+      { key: 'HENRI (VO)',       display: 'HENRI (VO)' },
+      { key: 'SEUNG-HYO',        display: 'SEUNG-HYO' },
+      { key: 'SEUNG-HYO (VO)',   display: 'SEUNG-HYO (VO)' },
+      /* Trece de estos no tienen base en el Excel: solo existe la fila (VO), y
+         esos se reparten a mano como cualquiera. */
+      { key: 'ONLINE COMMENTER 1A (VO)', display: 'ONLINE COMMENTER 1A (VO)' }
+    ];
+    const v = conReparto(VOZ);
+    t.eq('del normal a la voz en off',
+         v.M.castGemelosDe('HENRI').join(' y '), 'HENRI (VO)');
+    t.eq('y de la voz en off al normal',
+         v.M.castGemelosDe('HENRI (VO)').join(' y '), 'HENRI');
+    t.eq('el que solo existe como (VO) no tiene gemelo',
+         v.M.castGemelosDe('ONLINE COMMENTER 1A (VO)').length, 0,
+         'en ese capítulo son trece, y se reparten a mano');
+
+    v.charIdx['HENRI'].talent = 'MIGUEL PRADA';
+    v.charIdx['SEUNG-HYO'].talent = 'ANDRES PALACIO';
+    const hechas = v.M.castGemelosAlDia();
+    t.eq('al exportar se ponen al día las dos', hechas.length, 2, hechas.join(' · '));
+    t.eq('HENRI (VO) toma el actor de HENRI',
+         v.charIdx['HENRI (VO)'].talent, 'MIGUEL PRADA',
+         'es la fila que salía en blanco en el desglose de FINAL TABLE');
+    t.eq('y SEUNG-HYO (VO) el suyo',
+         v.charIdx['SEUNG-HYO (VO)'].talent, 'ANDRES PALACIO');
+    t.eq('al que no tiene base no se le inventa nada',
+         v.charIdx['ONLINE COMMENTER 1A (VO)'].talent, '');
+
+    /* Tampoco a la voz en off se le pisa un actor puesto a mano: a veces la
+       dobla otro, igual que el archivo. */
+    const v2 = conReparto(VOZ);
+    v2.charIdx['HENRI'].talent = 'MIGUEL PRADA';
+    v2.charIdx['HENRI (VO)'].talent = 'OTRO ACTOR';
+    t.eq('no se pisa el puesto a mano', v2.M.castGemelosAlDia().length, 0);
+    t.eq('y se queda el que había', v2.charIdx['HENRI (VO)'].talent, 'OTRO ACTOR');
+
+    t.seccion('11b · cómo se reconoce la voz en off');
+    const w = conReparto(VOZ).M;
+    t.eq('se quita del nombre', w.castSinSufijo('HENRI (VO)'), 'HENRI');
+    t.eq('con puntos, también', w.castSinSufijo('HENRI (V.O.)'), 'HENRI',
+         'los desgloses lo escriben de las dos formas');
+    t.eq('en minúsculas, también', w.castSinSufijo('Henri (vo)'), 'Henri');
+    t.eq('con espacios de más, también', w.castSinSufijo('HENRI ( VO )'), 'HENRI');
+    t.ok('lo reconoce', w.castEsGemelo('HENRI (VO)'));
+    t.ok('solo al final del nombre', !w.castEsGemelo('(VO) HENRI'));
+    /* Y lo que NO es: un personaje que se llame «VOZ» o cuyo nombre acabe en
+       otro parentesis no es la voz en off de nadie. */
+    t.ok('un paréntesis cualquiera no cuenta', !w.castEsGemelo('HOMBRE 1 (GRITA)'));
+    t.ok('ni una palabra que empiece por VO', !w.castEsGemelo('HENRI (VOZ DE NIÑO)'),
+         'si contara, se le copiaría el actor de HENRI a un personaje distinto');
+
+    t.seccion('11c · la fila (VO) del Excel encuentra a su personaje');
+    const M2 = conReparto(VOZ).M;
+    const app = {};
+    app[M2.castClave('HENRI')] = 'MIGUEL PRADA';
+    t.eq('la fila (VO) toma el actor de su personaje',
+         M2.castQuienVaEnLaFila('HENRI (VO)', app), M2.castClave('HENRI'));
+    const app2 = {};
+    app2[M2.castClave('HENRI (VO)')] = 'MIGUEL PRADA';
+    t.eq('y al revés, también',
+         M2.castQuienVaEnLaFila('HENRI', app2), M2.castClave('HENRI (VO)'));
+    /* Con los dos en la aplicacion, el exacto manda y no se cruzan. */
+    const app3 = {};
+    app3[M2.castClave('HENRI')] = 'MIGUEL PRADA';
+    app3[M2.castClave('HENRI (VO)')] = 'OTRA ACTRIZ';
+    t.eq('con los dos, cada fila va a la suya',
+         M2.castQuienVaEnLaFila('HENRI (VO)', app3), M2.castClave('HENRI (VO)'));
+
+    t.seccion('11d · un personaje puede tener archivo Y voz en off');
+    /* Con el gemelo suelto se rellenaba solo el primero que apareciera, y el
+       otro seguia en blanco sin que nada lo dijera. */
+    const DOS = [
+      { key: 'SAN',           display: 'SAN' },
+      { key: 'SAN (VO)',      display: 'SAN (VO)' },
+      { key: 'SAN (ARCHIVO)', display: 'SAN (ARCHIVO)' }
+    ];
+    const z = conReparto(DOS);
+    t.eq('se le ven los dos gemelos', z.M.castGemelosDe('SAN').length, 2,
+         z.M.castGemelosDe('SAN').join(' · '));
+    z.charIdx['SAN'].talent = 'EDWARD PINEDA';
+    t.eq('y se rellenan los dos', z.M.castGemelosAlDia().length, 2);
+    t.eq('la voz en off', z.charIdx['SAN (VO)'].talent, 'EDWARD PINEDA');
+    t.eq('y el archivo', z.charIdx['SAN (ARCHIVO)'].talent, 'EDWARD PINEDA',
+         'rellenar solo uno deja la otra fila en blanco sin decirlo');
+  }
+
+  t.seccion('12 · no se rellena a ciegas el desglose de otro capítulo');
   /* Si este capitulo no tiene su propio desglose, Dubbipt cae en el formato
      COMUN del programa, que es el de otro capitulo: le faltan los personajes
      que solo salen aqui. El resultado es un documento de facturacion

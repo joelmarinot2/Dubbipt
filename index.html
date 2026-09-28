@@ -2294,7 +2294,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.0.1-nube';
+const APP_VER_NUM = 'v11.1.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5689,15 +5689,15 @@ async function removeChar(key){
 async function assignTalent(key, val){
   const c = charIdx[key]; if(!c) return;
   val = (val||'').trim();
-  /* El gemelo de archivo entra en la foto del deshacer: si se le copia el
-     talento, Ctrl+Z tiene que devolver los dos a la vez. */
-  const gem = castGemeloArchivo(key);
-  try{ castHistPush(castFoto(gem ? [key, gem] : [key]), (c.talent ? 'talento de ' : 'asignar talento a ') + c.display); }catch(e){}
+  /* Los gemelos -archivo y voz en off- entran en la foto del deshacer: si se
+     les copia el talento, Ctrl+Z tiene que devolverlos todos a la vez. */
+  const gems = castGemelosDe(key);
+  try{ castHistPush(castFoto([key].concat(gems)), (c.talent ? 'talento de ' : 'asignar talento a ') + c.display); }catch(e){}
   c.talent = val; c.noRec = NO_REC.has(norm(val));
   try{ const raw=(window._charsRaw||[]).find(x=>x.key===key); if(raw){ raw.talent=val; raw.noRec=c.noRec; } }catch(e){}
   try{ castVerificar(key, true); }catch(e){}   // escrito a mano: ya está verificado
-  const copiado = castCopiarAlArchivo(key, val);
-  if(copiado) try{ DDL_UI.toast('También se ha puesto en ' + copiado, { duration: 4500 }); }catch(e){ /* el aviso es un extra */ }
+  const copiados = castCopiarAGemelos(key, val);
+  if(copiados.length) try{ DDL_UI.toast('También se ha puesto en ' + copiados.join(' y '), { duration: 4500 }); }catch(e){ /* el aviso es un extra */ }
   try{ renderCards(); }catch(e){ fallo('renderCards · index.html:4865', e); }
   if(val) try{ castAvisarChoque(key); }catch(e){}
   if(typeof currentEp!=='undefined' && currentEp && currentEp.id){
@@ -6863,107 +6863,145 @@ function castClave(t){
   return castNorm(t);
 }
 
-/* «MARK PEYTON» y «MARK PEYTON (ARCHIVO)» son la MISMA persona en pantalla. El
-   desglose las separa a proposito -el material de archivo se factura aparte y
-   lleva su propia cuenta de lineas-, pero el actor es el mismo, y tener que
-   asignarlo dos veces se olvida: la fila de archivo salia en blanco en el
-   desglose. Llego de sala con un capitulo que traia ONCE personajes asi.
-   Solo se RELLENA lo que esta vacio. Un talento puesto a mano no se pisa nunca,
-   porque a veces el archivo lo dobla otro. */
-const CAST_ARCHIVO_RE = /\s*\(\s*ARCHIVO\s*\)\s*$/i;
-function castSinArchivo(t){ return String(t == null ? '' : t).replace(CAST_ARCHIVO_RE, '').trim(); }
-function castEsArchivo(t){ return CAST_ARCHIVO_RE.test(String(t == null ? '' : t)); }
+/* «MARK PEYTON», «MARK PEYTON (ARCHIVO)» y «HENRI (VO)» son la MISMA persona en
+   pantalla. El desglose las separa a proposito -el material de archivo se
+   factura aparte y lleva su propia cuenta de lineas, y la voz en off igual-,
+   pero el actor es el mismo, y tener que asignarlo dos veces se olvida: esas
+   filas salian en blanco en el desglose.
 
-/** La otra cara del mismo personaje, si el desglose la trae. */
-function castGemeloArchivo(key){
+   Llego de sala dos veces. Primero con (ARCHIVO): un capitulo con ONCE
+   personajes asi. Y despues con (VO), en «FINAL TABLE 101»: 22 filas en blanco
+   de 75, TODAS con (VO). Ahi quedo demostrada la regla sin tener que
+   preguntarla: de las nueve filas (VO) que SI estaban rellenas, las nueve
+   llevaban exactamente el mismo actor que su personaje base. Nueve de nueve,
+   cero distintas.
+
+   Un personaje puede tener MAS DE UN gemelo -su archivo y su voz en off-, asi
+   que se rellenan todos, no el primero que aparezca.
+
+   Solo se RELLENA lo que esta vacio. Un talento puesto a mano no se pisa nunca,
+   porque a veces el archivo o la voz en off los dobla otro. */
+const CAST_SUFIJOS = [
+  { et: 'ARCHIVO', re: /\s*\(\s*ARCHIVO\s*\)\s*$/i },
+  /* Con y sin puntos: los desgloses lo escriben «(VO)» y «(V.O.)». */
+  { et: 'VO',      re: /\s*\(\s*V\s*\.?\s*O\s*\.?\s*\)\s*$/i }
+];
+
+/** El sufijo que lleva este nombre, si lleva alguno. */
+function castSufijoDe(t){
+  const s = String(t == null ? '' : t);
+  return CAST_SUFIJOS.find(x => x.re.test(s)) || null;
+}
+/** El nombre sin su sufijo. Si no lleva ninguno, se devuelve igual. */
+function castSinSufijo(t){
+  const s = String(t == null ? '' : t);
+  const x = castSufijoDe(s);
+  return (x ? s.replace(x.re, '') : s).trim();
+}
+function castEsGemelo(t){ return !!castSufijoDe(t); }
+
+/** Las otras caras del mismo personaje que el desglose traiga. Puede haber más
+    de una: su archivo y su voz en off. */
+function castGemelosDe(key){
+  const fuera = [];
   try{
-    if(typeof charIdx === 'undefined') return null;
-    const c = charIdx[key]; if(!c) return null;
+    if(typeof charIdx === 'undefined') return fuera;
+    const c = charIdx[key]; if(!c) return fuera;
     const mio = c.display || key;
-    const base = castSinArchivo(mio);
-    if(!base) return null;
-    const busco = castClave(castEsArchivo(mio) ? base : (base + ' (ARCHIVO)'));
-    if(!busco) return null;
+    const base = castSinSufijo(mio);
+    if(!base) return fuera;
+    /* Si yo llevo sufijo, mi gemelo es el nombre pelado; si no lo llevo, lo son
+       todos los nombres con sufijo. */
+    const busco = castEsGemelo(mio)
+      ? [castClave(base)]
+      : CAST_SUFIJOS.map(x => castClave(base + ' (' + x.et + ')'));
     for(const k in charIdx){
       if(k === key) continue;
-      if(castClave(charIdx[k].display || k) === busco) return k;
+      const suyo = castClave(charIdx[k].display || k);
+      if(busco.indexOf(suyo) >= 0) fuera.push(k);
     }
-  }catch(e){ /* sin desglose cargado no hay gemelo que buscar */ }
-  return null;
+  }catch(e){ /* sin desglose cargado no hay gemelos que buscar */ }
+  return fuera;
 }
 
 /**
  * ¿Qué personaje del reparto le toca a esta fila del Excel? Devuelve la clave
  * del reparto, o null si esa fila se queda sin nadie.
  *
- * El nombre de la fila y el del personaje pueden diferir SOLO en el «(ARCHIVO)»
- * del final, y entonces son la misma persona. Llegó de sala así: el guion
- * escribe «TESTIGO» y el desglose trae la fila «TESTIGO (ARCHIVO)», con lo que
- * DIECISÉIS personajes de veintiocho no encontraban dónde ponerse y su actor no
- * se escribía en ningún sitio. De doce filas escritas de treinta y nueve.
+ * El nombre de la fila y el del personaje pueden diferir SOLO en el sufijo del
+ * final —«(ARCHIVO)», «(VO)»—, y entonces son la misma persona. Llegó de sala
+ * así: el guion escribe «TESTIGO» y el desglose trae la fila «TESTIGO
+ * (ARCHIVO)», con lo que DIECISÉIS personajes de veintiocho no encontraban
+ * dónde ponerse y su actor no se escribía en ningún sitio. De doce filas
+ * escritas de treinta y nueve.
  *
  * Se prueba primero el nombre EXACTO: si el Excel trae las dos filas y la
  * aplicación los dos personajes, cada uno va al suyo y nadie se pisa. El
- * emparejamiento por archivo solo entra cuando el exacto no existe.
+ * emparejamiento por sufijo solo entra cuando el exacto no existe.
  */
 function castQuienVaEnLaFila(nombreDeLaFila, asign){
   const tiene = (k) => !!(k && Object.prototype.hasOwnProperty.call(asign, k));
   const k = castClave(nombreDeLaFila);
   if(!k) return null;
   if(tiene(k)) return k;
-  const base = castClave(castSinArchivo(nombreDeLaFila));   // la fila es la de archivo…
+  const base = castClave(castSinSufijo(nombreDeLaFila));    // la fila lleva sufijo…
   if(base !== k && tiene(base)) return base;
-  const arch = castClave(nombreDeLaFila + ' (ARCHIVO)');    // …o al revés
-  if(tiene(arch)) return arch;
+  for(const x of CAST_SUFIJOS){                              // …o al revés
+    const con = castClave(nombreDeLaFila + ' (' + x.et + ')');
+    if(con !== k && tiene(con)) return con;
+  }
   return null;
 }
 
 /**
- * Pone al dia TODAS las filas de archivo que se quedaron sin actor.
+ * Pone al dia TODAS las filas de gemelo que se quedaron sin actor.
  *
  * Copiar el talento al asignarlo no basta: quien ya tenia el capitulo repartido
- * de antes no vuelve a tocar ninguna tarjeta, asi que al exportar las filas de
- * archivo seguian saliendo en blanco. Eso es lo que llego de sala -un desglose
- * con actor en todas las filas MENOS en las que acaban en (ARCHIVO)-.
+ * de antes no vuelve a tocar ninguna tarjeta, asi que al exportar esas filas
+ * seguian saliendo en blanco. Eso es lo que llego de sala las dos veces -un
+ * desglose con actor en todas las filas MENOS en las que acaban en (ARCHIVO), y
+ * despues otro igual con (VO)-.
  * Se llama antes de exportar, que es cuando importa.
  * Devuelve los nombres de las filas que ha rellenado.
  */
-function castArchivoAlDia(){
+function castGemelosAlDia(){
   const hechos = [];
   try{
     if(typeof charIdx === 'undefined') return hechos;
     for(const k in charIdx){
       const c = charIdx[k]; if(!c) continue;
-      /* Que el talento esté vacío ya lo mira castCopiarAlArchivo, y aquí NO se
+      /* Que el talento esté vacío ya lo mira castCopiarAGemelos, y aquí NO se
          repite: repetirlo no cambia nada y deja una rama que ninguna prueba
          puede distinguir de la otra. Se vio mutándola. */
-      const q = castCopiarAlArchivo(k, String(c.talent == null ? '' : c.talent).trim());
-      if(q) hechos.push(q);
+      for(const q of castCopiarAGemelos(k, String(c.talent == null ? '' : c.talent).trim()))
+        hechos.push(q);
     }
-  }catch(e){ fallo('castArchivoAlDia · index.html', e); }
+  }catch(e){ fallo('castGemelosAlDia · index.html', e); }
   return hechos;
 }
 
 /**
- * Copia el talento a la otra cara del personaje. Devuelve su nombre si lo ha
- * copiado, o null. No pisa nada: solo rellena la que esta vacia.
+ * Copia el talento a las otras caras del personaje. Devuelve los nombres de
+ * las que ha rellenado. No pisa nada: solo rellena las que estan vacias.
  */
-function castCopiarAlArchivo(key, val){
+function castCopiarAGemelos(key, val){
+  const hechos = [];
   try{
-    if(!val) return null;
-    const g = castGemeloArchivo(key);
-    if(!g) return null;
-    const otro = charIdx[g];
-    if(!otro || String(otro.talent || '').trim()) return null;
-    otro.talent = val;
-    try{ otro.noRec = NO_REC.has(norm(val)); }catch(e){ otro.noRec = false; }
-    try{
-      const raw = (window._charsRaw || []).find(x => x.key === g);
-      if(raw){ raw.talent = val; raw.noRec = otro.noRec; raw.heredado = false; }
-    }catch(e){ /* se perderia al reabrir, pero el reparto ya esta hecho */ }
-    try{ castVerificar(g, true); }catch(e){ /* se queda en naranja: es solo el aviso */ }
-    return otro.display || g;
-  }catch(e){ return null; }
+    if(!val) return hechos;
+    for(const g of castGemelosDe(key)){
+      const otro = charIdx[g];
+      if(!otro || String(otro.talent || '').trim()) continue;
+      otro.talent = val;
+      try{ otro.noRec = NO_REC.has(norm(val)); }catch(e){ otro.noRec = false; }
+      try{
+        const raw = (window._charsRaw || []).find(x => x.key === g);
+        if(raw){ raw.talent = val; raw.noRec = otro.noRec; raw.heredado = false; }
+      }catch(e){ /* se perderia al reabrir, pero el reparto ya esta hecho */ }
+      try{ castVerificar(g, true); }catch(e){ /* se queda en naranja: es solo el aviso */ }
+      hechos.push(otro.display || g);
+    }
+  }catch(e){ /* lo que se haya copiado ya esta puesto */ }
+  return hechos;
 }
 
 /** Del nombre de la hoja al archivo XML que la contiene dentro del ZIP. */
@@ -9210,14 +9248,16 @@ async function castDescargar(){
     if(typeof fflate === 'undefined'){ castAviso('❌ Falta la librería de ZIP: recarga la página'); return; }
     if(btn){ btn.disabled = true; btn.textContent = '⏳ Generando…'; }
 
-    /* Antes de nada, las filas de archivo que se quedaron sin actor. Quien ya
-       tenía el capítulo repartido de antes no vuelve a tocar una tarjeta, así
-       que copiarlo solo al asignar no le sirve de nada: hay que mirarlo aquí,
-       que es cuando se escribe el Excel. */
-    const alDia = castArchivoAlDia();
+    /* Antes de nada, las filas de gemelo -(ARCHIVO), (VO)- que se quedaron sin
+       actor. Quien ya tenía el capítulo repartido de antes no vuelve a tocar
+       una tarjeta, así que copiarlo solo al asignar no le sirve de nada: hay
+       que mirarlo aquí, que es cuando se escribe el Excel. */
+    const alDia = castGemelosAlDia();
     if(alDia.length){
       try{ renderCards(); }catch(e){ fallo('renderCards · index.html:castDescargar', e); }
-      try{ DDL_UI.toast(alDia.length + ' filas de archivo han tomado el actor de su personaje',
+      try{ DDL_UI.toast(alDia.length + ' fila' + (alDia.length === 1 ? '' : 's')
+             + ' han tomado el actor de su personaje: ' + alDia.slice(0, 3).join(', ')
+             + (alDia.length > 3 ? ' y ' + (alDia.length - 3) + ' más' : ''),
              { duration: 5500 }); }catch(e){ /* el aviso es un extra */ }
     }
 
