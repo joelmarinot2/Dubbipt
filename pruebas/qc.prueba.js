@@ -18,7 +18,9 @@ exports.nombre = 'QC: las correcciones del capítulo, y de quién son';
 const RECORTES = [
   ['/* ═══ QC · CONTROL DE CALIDAD', '/** El panel de las correcciones']
 ];
-const EXPORTA = ['qcNum', 'qcDatos', 'qcSanUna', 'qcCargar', 'qcParaGuardar', 'qcOrden', 'qcApuntar',
+const EXPORTA = ['QC_TIPOS', 'QC_TIPO_POR_DEFECTO', 'qcTipo', 'qcTipoSugerido', 'qcCuentaTipos',
+                 'qcMeta', 'qcMetaCargar', 'qcMetaParaGuardar',
+                 'qcNum', 'qcDatos', 'qcSanUna', 'qcCargar', 'qcParaGuardar', 'qcOrden', 'qcApuntar',
                  'qcQuitar', 'qcMarcar', 'qcPendientes', 'qcLeerTC', 'QC_TOPE',
                  'verVentana: () => window'];
 
@@ -152,6 +154,74 @@ exports.pruebas = function(t){
        'mandar la corrección al minuto cero por un dedazo es peor que no cambiarla');
   t.eq('sin nada donde caer, nulo', M.qcLeerTC('lo que sea', null), null);
 
+  t.seccion('9b · el tipo de corrección: se sugiere y manda quien apunta');
+  /* Los cuatro tipos piden acciones distintas del estudio: con Falta hay que
+     volver a llamar al actor y con Pegar basta un take que ya existe. */
+  const MT = armar();
+  t.eq('«Falta el take. Pegar.» es Pegar', MT.qcTipoSugerido('Falta el take. Pegar.'), 'pegar',
+       'gana la acción que hay que hacer, no la palabra con la que empieza la frase');
+  t.eq('pero «Falta el take.» es Falta', MT.qcTipoSugerido('Falta el take.'), 'falta',
+       'las dos frases empiezan igual y piden cosas distintas: por eso se sugiere, no se decide');
+  t.eq('«Cambiar por: …» es Cambiar', MT.qcTipoSugerido('Cambiar por: «Mike el blanquito».'), 'cambiar');
+  t.eq('«Faltan gritos.» es Falta', MT.qcTipoSugerido('Faltan gritos.'), 'falta');
+  t.eq('«Mejorar vocalización.» es Ajuste', MT.qcTipoSugerido('Mejorar vocalización.'), 'ajuste');
+  t.eq('y lo que no encaja también', MT.qcTipoSugerido('cualquier cosa'), 'ajuste',
+       'Ajuste es el más inofensivo: no convoca a nadie');
+
+  /* Manda quien apunta: si elige un tipo, se guarda el suyo. */
+  const elegido = MT.qcApuntar(10, 'A', 'Falta el take. Pegar.', 0, 'falta');
+  t.eq('el tipo elegido a mano gana a la sugerencia', elegido.tipo, 'falta');
+  const sugerido = MT.qcApuntar(20, 'A', 'Falta el take. Pegar.', 1);
+  t.eq('y sin elegir, se sugiere', sugerido.tipo, 'pegar');
+
+  const raro = MT.qcApuntar(30, 'A', 'x', 2, 'loquesea');
+  t.eq('un tipo que no existe cae al de por defecto', raro.tipo, 'ajuste',
+       'guardarlo a medias dejaría una corrección sin etiqueta en el informe');
+
+  /* El botón de guardar tiene que pasar el tipo SOLO si se eligió a mano. Si
+     le pasa siempre el suyo, la sugerencia queda muerta: el borrador nace en
+     «Ajuste» y todo se guardaría como Ajuste. Se mira en el código porque el
+     panel no se prueba, y es justo donde se rompería sin que nada avisara. */
+  const FUENTE = require('./ayuda').fuentes().map(f => f.src).join('\n');
+  t.ok('y el panel solo manda el tipo cuando se ha elegido a mano',
+       /qcApuntar\(seg, b\.quien, b\.texto, b\.si, \(b\.tipoManual \? b\.tipo : null\)\)/.test(FUENTE),
+       'pasarle siempre `b.tipo` dejaría la sugerencia muerta: todo saldría Ajuste');
+  t.ok('y se marca como elegido a mano al pulsar', /tipoManual = true/.test(FUENTE));
+
+  t.seccion('9c · los contadores de arriba del informe');
+  const MC = armar();
+  MC.qcApuntar(1, 'A', 'Falta gesto.', 0);
+  MC.qcApuntar(2, 'A', 'Faltan gritos.', 1);
+  MC.qcApuntar(3, 'A', 'Cambiar por: otra cosa.', 2);
+  const cuenta = {};
+  MC.qcCuentaTipos().forEach(x => { cuenta[x.k] = x.n; });
+  t.eq('dos faltas', cuenta.falta, 2, JSON.stringify(MC.qcCuentaTipos()));
+  t.eq('un cambiar', cuenta.cambiar, 1);
+  t.ok('y los que no tienen ninguna no salen', !('pegar' in cuenta) && !('ajuste' in cuenta),
+       'una pastilla en cero no dice nada y quita sitio');
+  t.eq('sin correcciones, ninguna pastilla', armar().qcCuentaTipos().length, 0);
+  t.ok('cada tipo lleva su color', MT.QC_TIPOS.every(x => /^#[0-9A-Fa-f]{6}$/.test(x.hex)
+        && Array.isArray(x.rgb) && x.rgb.length === 3),
+       JSON.stringify(MT.QC_TIPOS.map(x => x.hex)));
+
+  t.seccion('9d · quién revisa y qué estudio hace los cambios');
+  /* Es un documento que se entrega: sin nombre no se sabe a quién preguntar y
+     sin estudio no se sabe quién tiene que arreglarlo. */
+  const MM = armar();
+  t.eq('empiezan vacíos', MM.qcMeta().revisor + '|' + MM.qcMeta().estudio, '|');
+  t.eq('sin nada, no se sube nada', MM.qcMetaParaGuardar(), null,
+       'dos cadenas vacías en cada capítulo engordan el registro sin decir nada');
+  MM.qcMetaCargar({ revisor: '  Pamela H  ', estudio: 'Estudio Bogotá' });
+  t.eq('se limpian los espacios', MM.qcMeta().revisor, 'Pamela H');
+  t.eq('y se guarda el estudio', MM.qcMetaParaGuardar().estudio, 'Estudio Bogotá');
+  t.eq('con solo uno de los dos, también se sube',
+       armar().qcMetaCargar({ revisor: 'Pamela H' }) && armar().qcMetaCargar({ revisor: 'x' }).revisor, 'x');
+  MM.qcMetaCargar({ revisor: 'x'.repeat(500) });
+  t.ok('un nombre larguísimo se acota', MM.qcMeta().revisor.length <= 90,
+       String(MM.qcMeta().revisor.length));
+  MM.qcMetaCargar('no soy un objeto');
+  t.eq('y lo que no es un objeto no rompe nada', MM.qcMeta().revisor, '');
+
   t.seccion('10 · el cotejo automático NO apunta correcciones');
   /* La frontera. `cotejarTodo` escribe en `_cotejo`, que es «sospecha», y nunca
      en `_qc`, que es «lo que firmo». Si un dia alguien cruza esa linea, el
@@ -168,7 +238,12 @@ exports.pruebas = function(t){
   t.eq('se guardan en los dos sitios donde se sube el capítulo',
        (TODO.match(/qc: qcParaGuardar\(\)/g) || []).length, 2,
        'hay dos caminos de subida; si solo se toca uno, se pierden según cómo guardes');
+  t.eq('y los dos nombres, en los mismos dos sitios',
+       (TODO.match(/qcMeta: qcMetaParaGuardar\(\)/g) || []).length, 2);
   t.ok('y se cargan al abrirlo', /qcCargar\(d\.qc\)/.test(TODO));
+  t.ok('los nombres también, con el último escrito de respaldo',
+       /qcMetaCargar\(d\.qcMeta \|\| qcMetaUltima\(\)\)/.test(TODO),
+       'casi siempre revisa la misma persona: volver a teclearlo en cada capítulo sobra');
 
   t.seccion('12 · el audio del programa llega al reconocedor');
   /* `karIaPreparar` lee `studio.dlgUrl` y ese campo no lo escribia NADIE, asi

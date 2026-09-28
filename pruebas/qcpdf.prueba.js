@@ -28,13 +28,24 @@ const RECORTES = [
 const EXPORTA = ['QCPDF_HOJA', 'QCPDF_PASOS', 'qcpdfAnchos', 'qcpdfParrafos',
                  'qcpdfRenglones', 'qcpdfDatosSesion', 'qcpdfCabecera', 'qcpdfColumnaDe',
                  'qcpdfLeerInforme', 'qcpdfEsLlamado', 'qcpdfPorTurno',
-                 'qcpdfPintaColumna', 'qcpdfDeInforme', 'qcpdfDeCorrecciones'];
+                 'qcpdfPintaColumna', 'qcpdfDeInforme', 'qcpdfDeCorrecciones',
+                 'qcpdfTipoDe', 'qcpdfClaveTipo', 'qcpdfFechaHoy'];
+
+/* Los tipos y el que los sugiere viven en index.html -son de QC, no del
+   dibujo-, asi que aqui se pasan como los pasa el navegador. Se recortan del
+   mismo sitio para que no haya dos tablas que puedan separarse. */
+const QC = montar([['/* Los cuatro tipos de corrección', '/** Cuántas quedan por resolver']],
+                  ['QC_TIPOS', 'QC_TIPO_POR_DEFECTO', 'qcTipo', 'qcTipoSugerido', 'qcCuentaTipos'],
+                  { window: {}, qcDatos: () => [], console: { warn: () => {}, log: () => {} } });
 
 const M = montar(RECORTES, EXPORTA, {
   window: {}, document: {}, pdfjsLib: null, URL: {},
   esc: (s) => String(s == null ? '' : s),
   fallo: () => {},
   qcTC: (s) => (s == null ? '' : 'TC' + s),
+  QC_TIPOS: QC.QC_TIPOS,
+  qcTipoSugerido: QC.qcTipoSugerido,
+  qcCuentaTipos: QC.qcCuentaTipos,
   console: { warn: () => {}, log: () => {} }
 });
 
@@ -221,15 +232,92 @@ exports.pruebas = function(t){
   t.eq('y no se repiten si ya venían', yaLas.columnas.length, 4,
        JSON.stringify(yaLas.columnas.map(c => c.et)));
 
-  t.seccion('15 · un informe de QC no se agrupa ni gana columnas');
+  t.seccion('15 · un informe de QC no se agrupa, y gana el tipo y el círculo');
   const qc = M.qcpdfDeInforme({ columnas:['#','Location','Name','Comments'],
-                                filas:[['1','01:00:01:00','A','uno']], tarjetas:[], nombre:'QC 101.pdf' }, {});
-  t.eq('cuatro columnas, las del original', qc.columnas.length, 4);
+                                filas:[['1','01:00:01:00','A','Falta el take. Pegar.']],
+                                tarjetas:[], nombre:'QC 101.pdf' }, {});
+  const qets = qc.columnas.map(c => c.et);
+  t.eq('las cuatro del original siguen', qets.slice(0, 4).join(' '), '# Location Name Comments',
+       'una columna que no reconozco no se tira: cada estudio pone las suyas');
+  t.eq('y se le añade el tipo', qets[4], 'Tipo');
+  t.eq('y el círculo, sin nombre de columna', qets[5], '');
+  t.eq('el círculo es una marca, no texto', qc.columnas[5].clase, 'marca');
+  t.eq('y llega vacío, para marcarlo a mano', qc.filas[0][5], '',
+       'con algo escrito dentro no se puede marcar, y eso es para lo que está');
+  t.eq('no se agrupa por turnos', qc.filas.filter(f => f && f.grupo).length, 0);
   t.eq('su etiqueta', qc.etiqueta, 'Control de calidad');
   t.ok('y el conteo habla de correcciones', /correcci/.test(qc.conteo), qc.conteo);
   t.eq('el título sale del nombre del archivo, sin el .pdf', qc.titulo, 'QC 101');
   t.eq('no se pinta en gris', qc.gris, false);
   t.eq('y cabe en dos hojas', qc.topeHojas, 2);
+
+  t.seccion('15b · el tipo se deduce del comentario cuando el original no lo trae');
+  /* Deducir no es cambiar el texto -el comentario sigue intacto-, pero SI es
+     una lectura nuestra, asi que solo se hace si no venia. */
+  t.eq('«Falta el take. Pegar.» es Pegar', qc.filas[0][4], 'pegar',
+       'gana la acción que hay que hacer, no la palabra con la que empieza');
+  t.eq('y el comentario no se toca', qc.filas[0][3], 'Falta el take. Pegar.');
+
+  const conTipo = M.qcpdfDeInforme({ columnas:['Location','Comments','Tipo'],
+                                     filas:[['01:00:01:00','lo que sea','Cambiar']],
+                                     tarjetas:[], nombre:'x.pdf' }, {});
+  t.eq('si el original YA trae el tipo, se respeta el suyo',
+       conTipo.filas[0][2], 'Cambiar',
+       'deducirlo encima del que viene sería cambiar el informe de otro');
+  t.eq('y no se añade una segunda columna de tipo',
+       conTipo.columnas.filter(c => c.clase === 'tipo').length, 1,
+       JSON.stringify(conTipo.columnas.map(c => c.et)));
+  /* Y ese tipo, escrito como etiqueta y no como clave, TAMBIEN cuenta arriba:
+     el original lo escribe «Cambiar» y la aplicacion «cambiar». */
+  t.eq('y cuenta en las pastillas de arriba',
+       (conTipo.chips.find(c => c.k === 'cambiar') || {}).n, 1,
+       JSON.stringify(conTipo.chips));
+
+  t.seccion('15b2 · el tipo se reconoce como clave y como etiqueta');
+  t.eq('la clave que escribe la aplicación', M.qcpdfClaveTipo('pegar'), 'pegar');
+  t.eq('la etiqueta que llega en un PDF ajeno', M.qcpdfClaveTipo('Pegar'), 'pegar',
+       'el original lo escribe con mayúscula: si solo se acepta la clave, el tipo se pierde');
+  t.eq('en mayúsculas del todo, igual', M.qcpdfClaveTipo('PEGAR'), 'pegar');
+  t.eq('con espacios alrededor, igual', M.qcpdfClaveTipo('  Ajuste  '), 'ajuste');
+  t.eq('lo que no es un tipo, nada', M.qcpdfClaveTipo('urgente'), null,
+       'pintar una pastilla sin saber de qué sería peor que no pintarla');
+  t.eq('y vacío, nada', M.qcpdfClaveTipo(''), null);
+
+  t.seccion('15c · los contadores de arriba salen de los tipos');
+  const varios = M.qcpdfDeInforme({ columnas:['Location','Comments'], filas:[
+      ['01:00:01:00','Falta gesto.'],
+      ['01:00:02:00','Falta gritos.'],
+      ['01:00:03:00','Cambiar por: «Mike el blanquito».'],
+      ['01:00:04:00','Mejorar vocalización.']
+    ], tarjetas:[], nombre:'x.pdf' }, {});
+  const porTipo = {};
+  varios.chips.forEach(c => { porTipo[c.k] = c.n; });
+  t.eq('dos faltas', porTipo.falta, 2, JSON.stringify(varios.chips));
+  t.eq('un cambiar', porTipo.cambiar, 1);
+  t.eq('un ajuste', porTipo.ajuste, 1);
+  t.ok('y los tipos sin ninguna no salen', !('pegar' in porTipo),
+       'una pastilla en cero no dice nada y quita sitio');
+
+  t.seccion('15d · quién revisa y qué estudio hace los cambios');
+  const conNombres = M.qcpdfDeInforme({ columnas:['Location','Comments'],
+                                        filas:[['01:00:01:00','uno']], tarjetas:[], nombre:'x.pdf' },
+                                       { revisor:'Pamela H', estudio:'Estudio Bogotá' });
+  t.ok('salen los dos', /Pamela H/.test(conNombres.subtitulo) && /Estudio Bogotá/.test(conNombres.subtitulo),
+       conNombres.subtitulo);
+  t.ok('dicen cuál es cuál', /QC:/.test(conNombres.subtitulo) && /Cambios:/.test(conNombres.subtitulo),
+       'dos nombres sueltos no dicen quién pregunta y quién arregla');
+  const soloUno = M.qcpdfDeInforme({ columnas:['Location','Comments'],
+                                     filas:[['01:00:01:00','uno']], tarjetas:[], nombre:'x.pdf' },
+                                    { revisor:'Pamela H' });
+  t.eq('con uno solo, no queda un separador huérfano', soloUno.subtitulo, 'QC: Pamela H');
+
+  t.seccion('15e · el llamado NO lleva tipo ni círculo');
+  const lla2 = M.qcpdfDeInforme({ columnas:['Hora','Actor'], filas:[['09:00','A']],
+                                  tarjetas:[], nombre:'l.pdf' }, {});
+  t.eq('ni tipo', lla2.columnas.filter(c => c.clase === 'tipo').length, 0);
+  t.eq('ni círculo', lla2.columnas.filter(c => c.clase === 'marca').length, 0,
+       'un llamado no se resuelve corrección a corrección: se rellena a mano');
+  t.ok('y su nota lo dice', /a mano/.test(lla2.nota), lla2.nota);
 
   t.seccion('16 · con póster, todo en escala de grises');
   const gris = M.qcpdfDeInforme({ columnas:['#','Location'], filas:[['1','01:00:01:00']],
@@ -239,10 +327,25 @@ exports.pruebas = function(t){
 
   t.seccion('17 · el informe de las correcciones apuntadas en QC');
   const d = M.qcpdfDeCorrecciones([
-    { tcSec: 3940, quien:'GRÁFICA', texto:'Repetir', hecha:false },
-    { tcSec: 4000, quien:'PHILIP',  texto:'Ruido',   hecha:true }
-  ], '100 days · 101', 'Capítulo 101');
+    { tcSec: 3940, quien:'GRÁFICA', texto:'Repetir', tipo:'falta', hecha:false },
+    { tcSec: 4000, quien:'PHILIP',  texto:'Ruido',   tipo:'ajuste', hecha:true }
+  ], '100 days', '', { programa:'100 days', episodio:'101',
+                       revisor:'Pamela H', estudio:'Estudio Bogotá' });
   t.eq('dos filas', d.filas.length, 2);
+  t.eq('el programa va en el título', d.titulo, '100 days');
+  t.eq('y el episodio detrás, en gris', d.titulo2, 'Episodio 101');
+  t.ok('con la fecha', /\d{4}$/.test(d.fecha), d.fecha);
+  t.ok('y los dos nombres', /Pamela H/.test(d.subtitulo) && /Estudio Bogotá/.test(d.subtitulo),
+       d.subtitulo);
+  t.ok('diciendo cuál es cuál', /QC: Pamela H/.test(d.subtitulo) && /Cambios: Estudio/.test(d.subtitulo),
+       'dos nombres sueltos no dicen a quién preguntar y quién tiene que arreglarlo');
+  t.eq('el tipo va en su columna', d.filas[0][3], 'falta');
+  t.eq('y el círculo queda vacío', d.filas[0][4], '',
+       'se marca a mano cuando la corrección queda resuelta');
+  t.ok('la nota del pie lo explica', /círculo/.test(d.nota), d.nota);
+  t.eq('las columnas son las de la hoja de sala',
+       d.columnas.map(c => c.et).join('|'), 'Timecode|Actor|Comentario|Tipo|');
+  t.ok('el nombre del documento lleva el episodio', /101/.test(d.nombreDoc), d.nombreDoc);
   t.eq('el tiempo escrito como timecode', d.filas[0][0], 'TC3940',
        'los segundos son de dentro; en el informe va el timecode');
   t.eq('con su personaje', d.filas[0][1], 'GRÁFICA');

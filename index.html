@@ -780,6 +780,12 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
   border-radius:10px; padding:9px 15px; font-size:12.5px; font-weight:600; cursor:pointer; }
 .herr-fb button[disabled]{ opacity:.45; cursor:default; }
 .herr-fb .conv-go{ border-color:#5FC85A; color:#5FC85A; }
+.conv-meta{ display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.conv-meta label{ flex:1 1 200px; display:flex; align-items:center; gap:8px; }
+.conv-meta span{ flex:0 0 52px; font-size:10px; letter-spacing:.8px; text-transform:uppercase;
+  color:#9a93c4; font-weight:700; }
+.conv-meta input{ flex:1; min-width:0; background:#1e1a40; border:1px solid #2f2a5c; color:#ECE9FB;
+  border-radius:9px; padding:7px 9px; font:inherit; font-size:12.5px; }
 .conv-zona{ border:2px dashed #3a3470; border-radius:14px; padding:22px 14px; text-align:center;
   cursor:pointer; display:flex; flex-direction:column; gap:5px; }
 .conv-zona.sobre{ border-color:#5FC85A; background:#1b2a1b; }
@@ -2288,7 +2294,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.99.0-nube';
+const APP_VER_NUM = 'v11.0.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3855,6 +3861,78 @@ function docxCue(text){
    como timecode solo al enseñarlo. */
 const QC_TOPE = 400;                 // correcciones por capítulo: de sobra
 const QC_TEXTO_TOPE = 600;
+const QC_NOMBRE_TOPE = 90;           // quien revisa y qué estudio lo arregla
+
+/* Los cuatro tipos de corrección, con su color. Cada uno pide una acción
+   distinta del estudio, y por eso van contados arriba del informe: de un
+   vistazo se sabe si hay que volver a llamar al actor —Falta— o si basta con
+   pegar un take que ya existe.
+   Un tipo NO se deduce del comentario, se elige: «Falta el take. Pegar.» es
+   Pegar y «Falta el take.» es Falta, y las dos frases empiezan igual. Se
+   sugiere y manda quien apunta. */
+const QC_TIPOS = [
+  { k:'falta',   et:'Falta',   hex:'#F87171', rgb:[220, 38, 38],  suave:[254, 226, 226] },
+  { k:'cambiar', et:'Cambiar', hex:'#60A5FA', rgb:[0, 102, 204],  suave:[219, 234, 254] },
+  { k:'pegar',   et:'Pegar',   hex:'#A78BFA', rgb:[124, 58, 237], suave:[237, 233, 254] },
+  { k:'ajuste',  et:'Ajuste',  hex:'#9CA3AF', rgb:[85, 85, 90],   suave:[235, 235, 240] }
+];
+const QC_TIPO_POR_DEFECTO = 'ajuste';
+
+function qcTipo(k){
+  return QC_TIPOS.find(t => t.k === String(k || '').toLowerCase()) || null;
+}
+
+/** El tipo que se sugiere al abrir el formulario. Solo una sugerencia: lo que
+    se guarda es lo que quede elegido. Se mira de lo más concreto a lo más
+    general, porque «Falta el take. Pegar.» cumple dos a la vez y gana Pegar,
+    que es la acción que hay que hacer. */
+function qcTipoSugerido(texto){
+  const s = String(texto == null ? '' : texto).toLowerCase();
+  if(/\bpegar\b|\bpega\b|\bpegue\b/.test(s)) return 'pegar';
+  if(/\bcambiar\b|\bcambia\b|cambio por|sustitu/.test(s)) return 'cambiar';
+  if(/\bfalta\b|\bfaltan\b|\bno está\b|\bno esta\b/.test(s)) return 'falta';
+  return QC_TIPO_POR_DEFECTO;
+}
+
+/** Cuántas hay de cada tipo, en el orden de QC_TIPOS. Los ceros no salen: una
+    fila de tipos vacíos no dice nada y quita sitio. */
+function qcCuentaTipos(lista){
+  const l = Array.isArray(lista) ? lista : qcDatos();
+  return QC_TIPOS.map(t => ({
+    k: t.k, et: t.et, hex: t.hex, rgb: t.rgb, suave: t.suave,
+    n: l.filter(c => c && (c.tipo || QC_TIPO_POR_DEFECTO) === t.k).length
+  })).filter(x => x.n > 0);
+}
+
+/** Quién revisa y qué estudio hace los cambios. Van en el informe porque es un
+    documento que se entrega: sin nombre no se sabe a quién preguntar, y sin
+    estudio no se sabe quién tiene que arreglarlo. */
+function qcMeta(){
+  if(!window._qcMeta || typeof window._qcMeta !== 'object') window._qcMeta = { revisor:'', estudio:'' };
+  return window._qcMeta;
+}
+function qcMetaCargar(src){
+  const s = (src && typeof src === 'object') ? src : {};
+  window._qcMeta = {
+    revisor: String(s.revisor == null ? '' : s.revisor).trim().slice(0, QC_NOMBRE_TOPE),
+    estudio: String(s.estudio == null ? '' : s.estudio).trim().slice(0, QC_NOMBRE_TOPE)
+  };
+  return window._qcMeta;
+}
+function qcMetaParaGuardar(){
+  const m = qcMeta();
+  return (m.revisor || m.estudio) ? { revisor: m.revisor, estudio: m.estudio } : null;
+}
+/* Lo último que se escribió, para no volver a teclearlo en cada capítulo: casi
+   siempre revisa la misma persona y lo arregla el mismo estudio. */
+function qcMetaRecordar(){
+  try{ localStorage.setItem('ddl-qc-meta', JSON.stringify(qcMetaParaGuardar() || {})); }
+  catch(e){ /* sin almacén local se teclea otra vez, no se rompe nada */ }
+}
+function qcMetaUltima(){
+  try{ return JSON.parse(localStorage.getItem('ddl-qc-meta') || '{}') || {}; }
+  catch(e){ return {}; }
+}
 
 /** Un número de verdad, o nada.
     Hace falta porque `+null` es 0 y `+''` es 0: sin esto, una corrección sin
@@ -3882,6 +3960,9 @@ function qcSanUna(v){
   const o = { id: String(v.id || '').slice(0, 40) || qcId(),
               texto: texto,
               quien: String(v.quien == null ? '' : v.quien).trim().slice(0, 80),
+              /* Un tipo que no conozco no se guarda a medias: cae al de por
+                 defecto, que es el más inofensivo de los cuatro. */
+              tipo: (qcTipo(v.tipo) ? String(v.tipo).toLowerCase() : QC_TIPO_POR_DEFECTO),
               hecha: !!v.hecha };
   const tc = qcNum(v.tcSec); if(tc != null && tc >= 0) o.tcSec = tc;
   const si = qcNum(v.si);    if(si != null && si >= 0) o.si = Math.round(si);
@@ -3915,10 +3996,11 @@ function qcOrden(){
 }
 
 /** Apunta una. Devuelve la corrección, o null si no hay comentario. */
-function qcApuntar(tcSec, quien, texto, si){
+function qcApuntar(tcSec, quien, texto, si, tipo){
   const l = qcDatos();
   if(l.length >= QC_TOPE) return null;
-  const c = qcSanUna({ id: qcId(), tcSec: tcSec, quien: quien, texto: texto, si: si });
+  const c = qcSanUna({ id: qcId(), tcSec: tcSec, quien: quien, texto: texto, si: si,
+                       tipo: (tipo || qcTipoSugerido(texto)) });
   if(!c) return null;
   l.push(c);
   return c;
@@ -3988,7 +4070,7 @@ function qcBorrador(){
                   ? charIdx[b.key].display : (b && b.display) || '';
   return { si: (b ? si : null),
            tcSec: (b && isFinite(+b.tcEff)) ? +b.tcEff : null,
-           quien: quien, texto: '' };
+           quien: quien, texto: '', tipo: QC_TIPO_POR_DEFECTO };
 }
 
 /** El tiempo, como lo escribe el resto de la casa. */
@@ -4004,12 +4086,30 @@ function qcPanelHtml(){
   const l = qcOrden();
   const n = qcPendientes();
   const nue = pop2._qcNueva;
+  const m = qcMeta();
   const chars = Object.keys(charIdx || {}).map(k => (charIdx[k] && charIdx[k].display) || k).sort();
+  const pastilla = (k) => {
+    const t = qcTipo(k) || qcTipo(QC_TIPO_POR_DEFECTO);
+    return '<span class="qc-tipo" style="color:' + t.hex + '">' + esc(t.et) + '</span>';
+  };
   return '<div class="qc-card">'
     + '<div class="qc-h"><span>QC · Control de calidad</span>'
       + '<span class="qc-cuenta">' + l.length + ' correccion' + (l.length === 1 ? '' : 'es')
       + (n ? ' · ' + n + ' sin resolver' : '') + '</span>'
       + '<button class="qc-x" id="qcX" title="Cerrar">✕</button></div>'
+    /* Quién firma y quién arregla. Van arriba porque son del informe entero,
+       no de una corrección. */
+    + '<div class="qc-meta">'
+      + '<div class="qc-fr"><label>Revisa</label>'
+        + '<input id="qcRev" type="text" placeholder="quién hace el QC" value="' + esc(m.revisor || '') + '"></div>'
+      + '<div class="qc-fr"><label>Estudio</label>'
+        + '<input id="qcEst" type="text" placeholder="quién hace los cambios" value="' + esc(m.estudio || '') + '"></div>'
+      + '</div>'
+    + (qcCuentaTipos(l).length
+        ? '<div class="qc-chips">' + qcCuentaTipos(l).map(t =>
+            '<span class="qc-chip"><i style="background:' + t.hex + '"></i><b>' + t.n + '</b> '
+            + esc(t.et) + '</span>').join('') + '</div>'
+        : '')
     + (nue
         ? '<div class="qc-form">'
           + '<div class="qc-fr"><label>Tiempo</label>'
@@ -4020,6 +4120,15 @@ function qcPanelHtml(){
             + '<datalist id="qcChars">' + chars.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist></div>'
           + '<div class="qc-fr col"><label>Comentario</label>'
             + '<textarea id="qcTexto" rows="3" placeholder="Qué hay que arreglar">' + esc(nue.texto || '') + '</textarea></div>'
+          /* Se marca el tipo que se va a guardar de verdad: mientras no se
+             elija a mano, el que sugiere el comentario. Enseñar «Ajuste» fijo
+             y guardar otra cosa sería mentirle a quien apunta. */
+          + '<div class="qc-fr"><label>Tipo</label><span class="qc-tsel">'
+            + QC_TIPOS.map(t => '<button class="qc-t'
+                + ((nue.tipoManual ? nue.tipo : qcTipoSugerido(nue.texto)) === t.k ? ' on' : '')
+                + '" data-tipo="' + t.k + '" style="--tc:' + t.hex + '">'
+                + '<i style="background:' + t.hex + '"></i>' + esc(t.et) + '</button>').join('')
+            + '</span></div>'
           + '<div class="qc-fb"><button class="qc-ok" id="qcGuardar">Guardar corrección</button>'
             + '<button id="qcCancelar">Cancelar</button></div>'
           + '</div>'
@@ -4032,7 +4141,8 @@ function qcPanelHtml(){
               + (c.hecha ? '✓' : '○') + '</button>'
             + '<div class="qc-cu">'
               + '<div class="qc-m"><b class="qc-tc">' + esc(qcTC(c.tcSec)) + '</b>'
-                + (c.quien ? '<span class="qc-q">' + esc(c.quien) + '</span>' : '') + '</div>'
+                + (c.quien ? '<span class="qc-q">' + esc(c.quien) + '</span>' : '')
+                + pastilla(c.tipo) + '</div>'
               + '<div class="qc-t">' + esc(c.texto) + '</div></div>'
             + (c.si != null ? '<button class="qc-ir" data-si="' + c.si + '" title="Ir al parlamento">ir →</button>' : '')
             + '<button class="qc-del" data-id="' + esc(c.id) + '" title="Quitar">✕</button>'
@@ -4057,9 +4167,35 @@ function qcPanelEnganchar(ov){
     if(w) b.quien = w.value;
     if(c) b.tcEsc = c.value;
   };
-  const tx = q('#qcTexto'); if(tx) tx.oninput = leer;
+  /* Al soltar el comentario se repinta, para que el tipo sugerido se vea. */
+  const tx = q('#qcTexto');
+  if(tx){ tx.oninput = leer;
+          tx.onchange = ()=>{ leer(); if(!(pop2._qcNueva || {}).tipoManual) qcPanel(false); }; }
   const wq = q('#qcQuien'); if(wq) wq.oninput = leer;
   const tc = q('#qcTc'); if(tc) tc.oninput = leer;
+
+  /* Quién revisa y qué estudio arregla: se guardan al escribir y se recuerdan
+     para el siguiente capítulo, que casi siempre son los mismos. */
+  const guardarMeta = ()=>{
+    const m = qcMeta();
+    const r = q('#qcRev'), e2 = q('#qcEst');
+    if(r) m.revisor = r.value.trim().slice(0, QC_NOMBRE_TOPE);
+    if(e2) m.estudio = e2.value.trim().slice(0, QC_NOMBRE_TOPE);
+    qcMetaRecordar();
+  };
+  const rev = q('#qcRev'); if(rev) rev.oninput = guardarMeta;
+  const est = q('#qcEst'); if(est) est.oninput = guardarMeta;
+  { const g2 = ()=>{ guardarMeta(); qcGuardado(); };
+    if(rev) rev.onchange = g2;
+    if(est) est.onchange = g2; }
+
+  /* El tipo. Se repinta para que se vea cuál queda elegido, y lo escrito se
+     lee antes: si no, elegir el tipo borraría el comentario a medias. */
+  todos('.qc-t[data-tipo]').forEach(b => b.onclick = ()=>{
+    leer();
+    if(pop2._qcNueva){ pop2._qcNueva.tipo = b.dataset.tipo; pop2._qcNueva.tipoManual = true; }
+    qcPanel(false);
+  });
 
   const aqui = q('#qcTcAqui');
   if(aqui) aqui.onclick = ()=>{
@@ -4075,7 +4211,9 @@ function qcPanelEnganchar(ov){
     leer();
     const b = pop2._qcNueva; if(!b) return;
     const seg = qcLeerTC(b.tcEsc != null ? b.tcEsc : qcTC(b.tcSec), b.tcSec);
-    const c = qcApuntar(seg, b.quien, b.texto, b.si);
+    /* Si no se ha elegido tipo a mano, lo sugiere el comentario. Pasarle
+       siempre `b.tipo` dejaría la sugerencia muerta: nace en «Ajuste». */
+    const c = qcApuntar(seg, b.quien, b.texto, b.si, (b.tipoManual ? b.tipo : null));
     if(!c){ qcAviso('Escribe el comentario: una corrección sin decir qué arreglar no sirve'); return; }
     pop2._qcNueva = null;
     qcGuardado();
@@ -4137,9 +4275,12 @@ async function qcInformePdf(){
   }catch(e){ /* sin la lista de programas, el informe va solo con el capítulo */ }
   qcAviso('⏳ Preparando el informe…');
   try{
-    const d = qcpdfDeCorrecciones(l, (prog ? prog + ' · ' : '') + (cap || 'Control de calidad'),
-                                  cap && prog ? ('Capítulo ' + cap) : '');
-    await qcpdfDescargar(d, 'QC ' + (prog ? prog + ' ' : '') + (cap || ''));
+    const m = qcMeta();
+    const d = qcpdfDeCorrecciones(l, prog || cap || 'Control de calidad', '',
+                                  { programa: prog || cap || 'Control de calidad',
+                                    episodio: prog ? cap : '',
+                                    revisor: m.revisor, estudio: m.estudio });
+    await qcpdfDescargar(d, d.nombreDoc);
     qcAviso('✅ Informe descargado');
   }catch(e){
     fallo('qcpdfDescargar · index.html:qcInformePdf', e, 'no se ha podido crear el informe');
@@ -9837,7 +9978,7 @@ function hydrateEpisode(d){ _epOpen(true);
       if(r && isFinite(+r.sim)) window._cotejo[k] = { sim:+r.sim, oido:String(r.oido || '').slice(0, 300) };
     }
   }catch(e){}
-  try{ qcCargar(d.qc); }
+  try{ qcCargar(d.qc); qcMetaCargar(d.qcMeta || qcMetaUltima()); }
   catch(e){ fallo('qcCargar · index.html:epDataAplicar', e, 'las correcciones de QC de este capítulo no se han cargado'); }
   chars = (Array.isArray(d.chars) ? d.chars : []).map(sanChar).filter(Boolean);
   charIdx = {}; chars.forEach(c=> charIdx[c.key] = c);
@@ -9927,7 +10068,8 @@ async function epDataUpsert(epId, showId){
       adr: (window._adrDatos && Object.keys(window._adrDatos).length) ? window._adrDatos : null,
       cortes: (typeof CORTES !== 'undefined' && CORTES.lista.length) ? CORTES.lista : null,
       cotejo: (window._cotejo && Object.keys(window._cotejo).length) ? window._cotejo : null,
-      qc: qcParaGuardar() };
+      qc: qcParaGuardar(),
+      qcMeta: qcMetaParaGuardar() };
     const stamp = new Date().toISOString();
     let { error } = await sb.from('episode_data').upsert({ ep_id:epId, show_id:showId||null, data, updated_at:stamp });
     if(error && authErr(error) && await reAuth()){
@@ -10085,7 +10227,8 @@ async function ensureLibretoJson(ep){
       adr: (window._adrDatos && Object.keys(window._adrDatos).length) ? window._adrDatos : null,
       cortes: (typeof CORTES !== 'undefined' && CORTES.lista.length) ? CORTES.lista : null,
       cotejo: (window._cotejo && Object.keys(window._cotejo).length) ? window._cotejo : null,
-      qc: qcParaGuardar() });
+      qc: qcParaGuardar(),
+      qcMeta: qcMetaParaGuardar() });
     const { error } = await sb.storage.from('libretos').upload(jsonPath, new Blob([payload], {type:'application/json'}), {upsert:true, contentType:'application/json'});
     if(error) return;
     await sb.from('episodes').update({ json_path: jsonPath }).eq('id', ep.id);
@@ -11636,6 +11779,20 @@ body.haschips.rclosed .ltools{transform:translateX(100%)}
 .qc-h>span:first-child{font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#4ADE80}
 .qc-cuenta{font-size:11px;color:var(--dim);margin-left:auto}
 .qc-x{background:none;border:0;color:var(--dim);font-size:15px;cursor:pointer;padding:2px 6px}
+.qc-meta{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.qc-meta .qc-fr{flex:1 1 200px;margin-bottom:0}
+.qc-meta label{flex:0 0 58px}
+.qc-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.qc-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ink);
+  background:var(--card);border:1px solid var(--card-b);border-radius:999px;padding:4px 10px}
+.qc-chip i{width:7px;height:7px;border-radius:50%;display:inline-block}
+.qc-chip b{font-weight:800}
+.qc-tipo{font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;margin-left:auto}
+.qc-tsel{display:flex;gap:5px;flex-wrap:wrap;flex:1;min-width:0}
+.qc-t{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:5px 9px;border-radius:999px;
+  border:1px solid var(--card-b);background:var(--head);color:var(--dim);cursor:pointer}
+.qc-t i{width:7px;height:7px;border-radius:50%;display:inline-block}
+.qc-t.on{border-color:var(--tc);color:var(--tc);font-weight:700}
 .qc-form{border:1px solid var(--card-b);border-radius:12px;padding:12px;margin-bottom:12px;background:var(--card)}
 .qc-fr{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .qc-fr.col{flex-direction:column;align-items:stretch}

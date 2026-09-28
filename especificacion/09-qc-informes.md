@@ -37,6 +37,13 @@ en [`01-libreto.md`](01-libreto.md), de **QC-1** a **QC-7**.
 | **PDF-12** | Un **llamado de actores** se agrupa por **Mañana / Tarde** —la frontera son las 14:00— y lleva columnas vacías de **Salida** y **Observaciones** para rellenar a mano. Si el original ya las trae, no se duplican. Quien no tiene hora va al final, no se pierde. | ✅ |
 | **PDF-13** | El motor de PDF se **baja cuando hace falta** y no al arrancar: son unos 350 kB que la mayoría de las sesiones no toca, y esto se abre en salas con la red justa. | ✅ |
 | **PDF-14** | El informe se entrega **solo con lo apuntado**. Sin correcciones no se descarga una hoja en blanco. | ✅ |
+| **PDF-15** | El encabezado lleva el **programa en negrita** y el **episodio detrás en gris claro**, sobre el mismo renglón; a la derecha el **conteo en negrita** y debajo la **fecha** en gris. Si el episodio no cabe al lado, baja a su propio renglón antes que salirse. | ✅ |
+| **PDF-16** | Cada corrección tiene un **tipo** —Falta, Cambiar, Pegar, Ajuste— que se pinta como **pastilla de color** en su columna, y arriba van las **pastillas con la cuenta de cada uno**. De un vistazo se sabe si hay que volver a llamar al actor —Falta— o si basta con pegar un take que ya existe. Los tipos sin ninguna corrección **no salen**: una pastilla en cero no dice nada y quita sitio. | ✅ |
+| **PDF-17** | El informe dice **quién hace el QC** y **qué estudio hace los cambios**, con su etiqueta delante (`QC:` y `Cambios:`). Dos nombres sueltos no dicen a quién preguntar ni quién tiene que arreglarlo. Se recuerdan de un capítulo al siguiente: casi siempre revisa la misma persona. | ✅ |
+| **PDF-18** | Cada fila lleva un **círculo vacío** a la derecha para marcar a mano cuando la corrección queda resuelta, y el pie lo explica. Un llamado de actores **no** lo lleva: no se resuelve corrección a corrección. | ✅ |
+| **PDF-19** | La pastilla del tipo **nunca es más alta que la fila** ni manda sobre su alto, y se alinea con el **primer renglón** del comentario, no con el centro del párrafo. Medida a ojo se salía por abajo, se metía en la fila siguiente y el nombre del tipo salía **cortado por la mitad**. | ✅ |
+| **PDF-20** | Al convertir un informe ajeno, si **no trae** columna de tipo se **deduce del comentario** y se añade; si **sí la trae**, se respeta la suya. Deducir no cambia el texto —el comentario sigue intacto— pero es una lectura nuestra, así que no se pone encima de la de otro. | ✅ |
+| **PDF-21** | La hoja va en **gris muy claro** con las tarjetas en **blanco**: es lo que separa la tabla del papel y lo que hace que se lea como una ficha y no como un listado. La tarjeta de la tabla se rellena **fila a fila**, porque su borde se traza al final y por dentro se vería el gris. | ✅ |
 
 ## Nunca
 
@@ -63,6 +70,17 @@ dos fallos que ninguna prueba de las de arriba iba a ver:
   **PDF-8**: la corrección marcada con `✓` había desaparecido entera;
 - y se miró la hoja, que es lo que descubrió el corte de **PDF-4**.
 
+La hoja del formato —**PDF-15 a PDF-21**— llegó de sala como imagen y se
+reprodujo hasta que el PDF producido daba los mismos números: `12 correcciones`
+y `3 Falta · 4 Cambiar · 2 Pegar · 3 Ajuste`. **PDF-19** no salió de ninguna
+prueba: salió de mirar la hoja y ver el nombre del tipo cortado.
+
+De las 19 mutaciones de esta tanda, 19 quedaron en rojo. Una vigésima delató
+**código muerto**: `qcpdfTipoDe` comparaba también con la etiqueta del tipo, y
+como el texto se pasa a minúsculas antes y la etiqueta en minúsculas ES la
+clave, esa rama nunca podía entrar. Ninguna mutación la ponía en rojo porque no
+hacía nada; se quitó.
+
 ## Sin resolver
 
 - **PDF-11** está a medias. La variante en escala de grises y la tarjeta del
@@ -73,6 +91,10 @@ dos fallos que ninguna prueba de las de arriba iba a ver:
 - El motor de dibujo —jsPDF— no se prueba solo: se comprueba el resultado, no
   sus llamadas. Si cambia de versión, lo que avisa es el navegador, no la
   batería.
+- El guardarraíl que impide que la pastilla del tipo haga crecer la fila
+  (**PDF-19**, la parte del alto) **no lo pone en rojo ninguna mutación**: con
+  las cuatro etiquetas que hay —todas cortas— quitarlo no cambia nada. Se deja
+  como guardia, no como algo comprobado.
 - Un informe de Pro Tools **real** todavía no ha pasado por el convertidor. Los
   que se han usado los fabricamos nosotros con la forma que tienen, que no es
   lo mismo: las X de una exportación de verdad las pone Pro Tools.

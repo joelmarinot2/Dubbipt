@@ -24,7 +24,9 @@ const QCPDF_COLOR = {
   texto:   [58, 58, 60],
   borde:   [235, 235, 240],      // #EBEBF0
   cabeza:  [250, 250, 252],      // #FAFAFC
-  tarjeta: [255, 255, 255]
+  tarjeta: [255, 255, 255],
+  hoja:    [245, 245, 247],      // #F5F5F7 · la hoja, para que la tarjeta se vea
+  plano:   false                 // con color: las pastillas van de su color
 };
 const QCPDF_GRIS = {
   tinta:   [17, 17, 17],
@@ -33,7 +35,11 @@ const QCPDF_GRIS = {
   texto:   [51, 51, 51],
   borde:   [218, 218, 218],      // #DADADA
   cabeza:  [242, 242, 242],      // #F2F2F2
-  tarjeta: [255, 255, 255]
+  tarjeta: [255, 255, 255],
+  hoja:    [248, 248, 248],
+  /* Sin color: un informe impreso en blanco y negro con pastillas de color
+     saca cuatro grises que no se distinguen, y entonces el tipo no dice nada. */
+  plano:   true
 };
 
 /** Baja jsPDF una sola vez. Se inyecta un <script> en vez de importarlo porque
@@ -116,6 +122,20 @@ function qcpdfTextoSeguro(s){
   return out;
 }
 
+/** El tipo de corrección, venga como clave -«pegar»- o como etiqueta
+    -«Pegar»-: el primero lo escribe la aplicación y el segundo llega en la
+    columna de un PDF ajeno. Null si no es ninguno de los cuatro.
+    Basta comparar con la clave porque el texto se pasa a minúsculas antes, y
+    la etiqueta de cada tipo en minúsculas ES su clave. Comparar también con la
+    etiqueta parecía más seguro y era una rama que nunca podía entrar: ninguna
+    mutación la ponía en rojo, y eso es lo que la delató. */
+function qcpdfTipoDe(v){
+  const s = String(v == null ? '' : v).trim().toLowerCase();
+  if(!s) return null;
+  const tabla = (typeof QC_TIPOS !== 'undefined' && Array.isArray(QC_TIPOS)) ? QC_TIPOS : [];
+  return tabla.find(t => t.k === s) || null;
+}
+
 /* ── El texto de una celda, partido en renglones ─────────────────────────── */
 
 /** Los renglones que ocupa un texto en un ancho dado.
@@ -193,44 +213,135 @@ function qcpdfEncabezado(doc, d, x, y, ancho, P, paso, conPoster){
     catch(e){ /* sin imagen se queda la tarjeta, que ya dice donde iba */ }
     ix = x + pw + 6; iw = ancho - pw - 6;
   }
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.4);
   doc.setTextColor(P.suave[0], P.suave[1], P.suave[2]);
-  doc.text(qcpdfTextoSeguro(String(d.etiqueta || '').toUpperCase()), ix, cy + 3.5);
+  doc.text(qcpdfTextoSeguro(d.etiqueta), ix, cy + 3.5);
 
-  /* El conteo, a la derecha y a la misma altura que el titulo. */
+  /* El conteo en negrita a la derecha y, debajo, la fecha en gris. */
+  const derecha = x + ancho;
+  let anchoDerecha = 0;
   if(d.conteo){
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5);
+    doc.setTextColor(P.tinta[0], P.tinta[1], P.tinta[2]);
+    const c = qcpdfTextoSeguro(d.conteo);
+    doc.text(c, derecha, cy + 9.5, { align: 'right' });
+    anchoDerecha = doc.getTextWidth(c);
+  }
+  if(d.fecha){
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.6);
     doc.setTextColor(P.suave[0], P.suave[1], P.suave[2]);
-    doc.text(qcpdfTextoSeguro(d.conteo), x + ancho, cy + 11, { align: 'right' });
+    const f = qcpdfTextoSeguro(d.fecha);
+    doc.text(f, derecha, cy + 15, { align: 'right' });
+    anchoDerecha = Math.max(anchoDerecha, doc.getTextWidth(f));
   }
 
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(19);
+  /* El titulo, en dos pesos sobre el mismo renglon: el programa en negrita y
+     el episodio en gris claro detras, como en la hoja que llego de sala. */
+  const hueco = iw - (anchoDerecha ? anchoDerecha + 8 : 0);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(21);
   doc.setTextColor(P.tinta[0], P.tinta[1], P.tinta[2]);
-  try{ doc.setCharSpace(-0.35); }catch(e){ /* motor viejo: sin tracking */ }
-  const tit = doc.splitTextToSize(qcpdfTextoSeguro(d.titulo), iw - (d.conteo ? 34 : 0));
-  doc.text(tit.slice(0, 2), ix, cy + 12);
+  try{ doc.setCharSpace(-0.4); }catch(e){ /* motor viejo: sin tracking */ }
+  const fuerte = qcpdfTextoSeguro(d.titulo);
+  const ls = doc.splitTextToSize(fuerte, hueco);
+  doc.text(ls.slice(0, 2), ix, cy + 14);
+  let tx = ix + doc.getTextWidth(ls[ls.length - 1] || '');
+  cy += 14 + (ls.length > 1 ? 8 : 0);
+  if(d.titulo2){
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(P.suave[0], P.suave[1], P.suave[2]);
+    const flojo = ' ' + qcpdfTextoSeguro(d.titulo2);
+    /* Si no cabe al lado, baja a su propio renglon antes que salirse. */
+    if(tx + doc.getTextWidth(flojo) > ix + hueco){
+      cy += 8.5; doc.text(flojo.trim(), ix, cy);
+    }else{
+      doc.text(flojo, tx, cy);
+    }
+  }
   try{ doc.setCharSpace(0); }catch(e){ /* se deja como estaba */ }
-  cy += 12 + (tit.length > 1 ? 7 : 0);
 
   if(d.subtitulo){
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.8);
     doc.setTextColor(P.suave[0], P.suave[1], P.suave[2]);
-    doc.text(doc.splitTextToSize(qcpdfTextoSeguro(d.subtitulo), iw)[0] || '', ix, cy + 5);
-    cy += 5;
+    doc.text(doc.splitTextToSize(qcpdfTextoSeguro(d.subtitulo), iw)[0] || '', ix, cy + 5.5);
+    cy += 5.5;
   }
-  cy += 6;
+  cy += 7;
   if(d.tarjetas && d.tarjetas.length) cy += qcpdfTarjetas(doc, d.tarjetas, ix, cy, iw, P, paso);
+  if(d.chips && d.chips.length) cy += qcpdfChips(doc, d.chips, ix, cy, iw, P);
   /* Con poster, el cuerpo no empieza hasta que la tarjeta se acaba. */
   if(conPoster) cy = Math.max(cy, y + 78 + 6);
   return cy;
 }
 
-function qcpdfPie(doc, nombre, pag, de, P, margen){
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+/** Las pastillas con la cuenta de cada tipo. De un vistazo se sabe si hay que
+    volver a llamar al actor o si basta con pegar un take que ya existe. */
+function qcpdfChips(doc, chips, x, y, ancho, P){
+  const h = 7.4;
+  let cx = x;
+  let cy = y;
+  doc.setFontSize(8);
+  for(const c of chips){
+    doc.setFont('helvetica', 'bold');
+    const nTxt = String(c.n);
+    doc.setFont('helvetica', 'normal');
+    const et = qcpdfTextoSeguro(c.et);
+    const w = 4.2 + 2.6 + doc.getTextWidth(nTxt + ' ' + et) + 5.5;
+    if(cx + w > x + ancho){ cx = x; cy += h + 2.4; }
+    qcpdfRect(doc, cx, cy, w, h, h / 2, P.tarjeta, P.borde);
+    /* El punto de color, que es lo que se busca primero. En escala de grises
+       se pinta igual pero en su gris: sin el, las pastillas son todas iguales. */
+    const pc = P.plano ? P.texto : (c.rgb || P.texto);
+    doc.setFillColor(pc[0], pc[1], pc[2]);
+    doc.circle(cx + 4.2, cy + h / 2, 1.25, 'F');
+    doc.setTextColor(P.tinta[0], P.tinta[1], P.tinta[2]);
+    doc.setFont('helvetica', 'bold');
+    doc.text(nTxt, cx + 6.9, cy + h / 2 + 1.5);
+    const wn = doc.getTextWidth(nTxt);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(P.texto[0], P.texto[1], P.texto[2]);
+    doc.text(et, cx + 6.9 + wn + 1.6, cy + h / 2 + 1.5);
+    cx += w + 2.4;
+  }
+  return (cy - y) + h + 7;
+}
+
+/** El pie: a la izquierda la nota de uso o el nombre del documento, y a la
+    derecha el nombre corto con la hoja. */
+function qcpdfPie(doc, d, pag, de, P, margen){
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.2);
   doc.setTextColor(P.suave[0], P.suave[1], P.suave[2]);
   const y = QCPDF_HOJA.h - margen + 5;
-  doc.text(qcpdfTextoSeguro(nombre), margen, y);
-  doc.text('página ' + pag + ' / ' + de, QCPDF_HOJA.w - margen, y, { align: 'right' });
+  doc.text(qcpdfTextoSeguro(d.nota || d.nombreDoc), margen, y);
+  const der = qcpdfTextoSeguro(d.nombreDoc) + (de > 1 ? ('  ·  página ' + pag + ' / ' + de) : '');
+  doc.text(der, QCPDF_HOJA.w - margen, y, { align: 'right' });
+}
+
+/** La pastilla de un tipo: el nombre sobre su fondo suave, con su color.
+    Viene del tipo tal como se apunto; si no se reconoce, no se pinta nada, que
+    es mejor que una pastilla en blanco sin decir de que. */
+function qcpdfPastilla(doc, valor, x, y, ancho, altoFila, P, paso){
+  const t = qcpdfTipoDe(valor);
+  if(!t) return;
+  const et = qcpdfTextoSeguro(t.et);
+  const pt = Math.max(6, paso.fuente - 1.4);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(pt);
+  const w = Math.min(ancho, doc.getTextWidth(et) + 6.4);
+  /* Nunca más alta que la fila: medida a ojo se salía por abajo, se metía en
+     la fila siguiente y el nombre del tipo salía cortado por la mitad. */
+  const h = Math.max(3.2, Math.min(paso.fila - 0.8, pt * 0.3528 + 1.9));
+  /* Y pegada arriba, no centrada en la fila: un comentario de tres renglones
+     dejaría la pastilla flotando en medio, lejos del renglón al que pertenece. */
+  y = y + Math.max(0.6, (Math.min(altoFila, paso.fila) - h) / 2);
+  /* En escala de grises la pastilla se queda en gris: con el color puesto, un
+     informe impreso en blanco y negro saca cuatro grises que no distinguen. */
+  const fondo = P.plano ? P.cabeza : t.suave;
+  const tinta = P.plano ? P.texto : t.rgb;
+  doc.setFillColor(fondo[0], fondo[1], fondo[2]);
+  doc.roundedRect(x, y, w, h, h / 2, h / 2, 'F');
+  doc.setTextColor(tinta[0], tinta[1], tinta[2]);
+  /* La línea base cae a media altura más la mitad de lo que levanta la letra:
+     centrarla por el alto de la caja la deja mirando hacia abajo. */
+  doc.text(et, x + w / 2, y + h / 2 + pt * 0.3528 * 0.35, { align: 'center' });
 }
 
 /** Cuanto alto necesita una fila con unas medidas dadas. Se mide ANTES de
@@ -239,6 +350,8 @@ function qcpdfAltoFila(doc, fila, cols, anchos, paso){
   doc.setFontSize(paso.fuente);
   let max = paso.fila;
   cols.forEach((c, i) => {
+    /* La pastilla y el circulo no crecen: no pueden mandar sobre el alto. */
+    if(c.clase === 'tipo' || c.clase === 'marca') return;
     const parr = qcpdfParrafos(fila[i]);
     doc.setFont('helvetica', c.negrita ? 'bold' : 'normal');
     let n = 0;
@@ -259,6 +372,15 @@ function qcpdfPintar(doc, d, paso, medir){
   const anchos = qcpdfAnchos(cols, util);
   const conPoster = !!d.poster;
 
+  /* La hoja, en gris muy claro con las tarjetas en blanco: es lo que separa la
+     tabla del papel y lo que hace que se lea como una ficha y no como un
+     listado. Se pinta en cada hoja, asi que va dentro de `hojaFondo`. */
+  const hojaFondo = () => {
+    if(medir) return;
+    doc.setFillColor(P.hoja[0], P.hoja[1], P.hoja[2]);
+    doc.rect(0, 0, QCPDF_HOJA.w, QCPDF_HOJA.h, 'F');
+  };
+  hojaFondo();
   let pag = 1;
   let y = qcpdfEncabezado(doc, d, m, m, util, P, paso, conPoster);
   const tope = QCPDF_HOJA.h - m - 8;
@@ -279,6 +401,7 @@ function qcpdfPintar(doc, d, paso, medir){
   const nuevaHoja = () => {
     pag++;
     if(!medir) doc.addPage();
+    hojaFondo();
     y = m;
     y = cabecera(y);
   };
@@ -301,6 +424,8 @@ function qcpdfPintar(doc, d, paso, medir){
       const alto = paso.fila + 2;
       if(y + alto > tope){ cerrarTramo(y); nuevaHoja(); tramoY = y - paso.cab - 2.4; }
       if(!medir){
+        doc.setFillColor(P.tarjeta[0], P.tarjeta[1], P.tarjeta[2]);
+        doc.rect(m, y, util, alto, 'F');
         doc.setFont('helvetica', 'bold'); doc.setFontSize(paso.fuente);
         doc.setTextColor(P.tinta[0], P.tinta[1], P.tinta[2]);
         doc.text(qcpdfTextoSeguro(f.grupo), m + 2, y + paso.fila - 1.4);
@@ -312,12 +437,32 @@ function qcpdfPintar(doc, d, paso, medir){
     /* Ninguna fila se corta entre hojas: si no cabe entera, pasa a la siguiente. */
     if(y + alto > tope){ cerrarTramo(y); nuevaHoja(); tramoY = y - paso.cab - 2.4; }
     if(!medir){
+      /* La tarjeta es blanca sobre hoja gris, y su borde se traza al final; si
+         el fondo no se pusiera fila a fila, por dentro se vería el gris. */
+      doc.setFillColor(P.tarjeta[0], P.tarjeta[1], P.tarjeta[2]);
+      doc.rect(m, y, util, alto, 'F');
       if(i > 0){
         doc.setDrawColor(P.borde[0], P.borde[1], P.borde[2]); doc.setLineWidth(0.2);
         doc.line(m + 1.5, y, m + util - 1.5, y);
       }
       let cx = m;
       cols.forEach((c, j) => {
+        /* La columna del tipo no es texto: es una pastilla de color. */
+        if(c.clase === 'tipo'){
+          qcpdfPastilla(doc, f[j], cx + 2, y, anchos[j] - 4, alto, P, paso);
+          cx += anchos[j];
+          return;
+        }
+        /* Y la del circulo se deja vacia a proposito: se marca a mano cuando
+           la correccion queda resuelta, y por eso es un circulo y no un texto. */
+        if(c.clase === 'marca'){
+          doc.setDrawColor(P.borde[0], P.borde[1], P.borde[2]); doc.setLineWidth(0.35);
+          /* A la altura del primer renglón, como la pastilla: es de la fila,
+             no del centro del párrafo más largo. */
+          doc.circle(cx + anchos[j] / 2, y + Math.min(alto, paso.fila) / 2, 1.85, 'S');
+          cx += anchos[j];
+          return;
+        }
         const col = (c.clase === 'tc') ? P.tc : (c.clase === 'nombre' ? P.tinta : P.texto);
         doc.setTextColor(col[0], col[1], col[2]);
         doc.setFont('helvetica', c.negrita ? 'bold' : 'normal');
@@ -334,7 +479,7 @@ function qcpdfPintar(doc, d, paso, medir){
     y += alto;
   }
   cerrarTramo(y);
-  if(!medir) for(let p = 1; p <= pag; p++){ doc.setPage(p); qcpdfPie(doc, d.nombreDoc, p, pag, P, m); }
+  if(!medir) for(let p = 1; p <= pag; p++){ doc.setPage(p); qcpdfPie(doc, d, p, pag, P, m); }
   return pag;
 }
 
@@ -562,6 +707,9 @@ function qcpdfPintaColumna(et){
     return { et: et, peso: 1.15, clase:'tc', negrita: true };
   if(/name|nombre|personaje|actor|talento/.test(s))
     return { et: et, peso: 1.45, clase:'nombre', negrita: true };
+  /* «Tipo» se pinta como pastilla de color, venga del original o lo pongamos
+     nosotros: es lo que se busca de un vistazo en la hoja. */
+  if(/^tipo$|^type$/.test(s)) return { et: et, peso: 0.85, clase:'tipo' };
   if(/comment|observaci|nota/.test(s)) return { et: et, peso: 3.2, clase:'texto' };
   if(/salida/.test(s)) return { et: et, peso: 1.0, clase:'texto' };
   if(/units|duration|track/.test(s)) return { et: et, peso: 0.8, clase:'texto' };
@@ -569,61 +717,124 @@ function qcpdfPintaColumna(et){
 }
 
 /** El informe leido, listo para pintar. No se cambia NI UNA palabra: ni
-    mayusculas, ni erratas, ni abreviaturas. Solo se decide como se ve. */
+    mayusculas, ni erratas, ni abreviaturas. Solo se decide como se ve.
+    `opts`: { titulo, episodio, revisor, estudio, poster }. */
 function qcpdfDeInforme(inf, opts){
   opts = opts || {};
   const llamado = qcpdfEsLlamado(inf);
   let columnas = inf.columnas.map(qcpdfPintaColumna);
-  let filas = inf.filas;
+  let filas = inf.filas.map(f => (f && f.grupo) ? f : f.slice());
+  const tiene = (re) => columnas.some(c => re.test(String(c.et).toLowerCase()));
+
   if(llamado){
     /* Un llamado se agrupa por turno y lleva dos columnas en blanco para
        rellenar a mano, que es como se usa en sala. */
     filas = qcpdfPorTurno(filas);
-    const tiene = (re) => columnas.some(c => re.test(String(c.et).toLowerCase()));
     if(!tiene(/salida/)) columnas = columnas.concat([{ et:'Salida', peso:1.0, clase:'texto' }]);
     if(!tiene(/observaci/)) columnas = columnas.concat([{ et:'Observaciones', peso:2.2, clase:'texto' }]);
+  }else{
+    /* Un informe de QC lleva el tipo de correccion. Si el original no lo trae,
+       se DEDUCE del comentario y se añade: es lo que permite contarlos arriba.
+       Deducir no es cambiar el texto -el comentario sigue intacto-, pero sí es
+       una lectura nuestra, y por eso solo se hace cuando no venía. */
+    if(!tiene(/^tipo$|^type$/)){
+      const iCom = columnas.findIndex(c => /comment|observaci|nota/.test(String(c.et).toLowerCase()));
+      if(iCom >= 0 && typeof qcTipoSugerido === 'function'){
+        columnas = columnas.concat([{ et:'Tipo', peso:0.85, clase:'tipo' }]);
+        filas = filas.map(f => (f && f.grupo) ? f : f.concat([qcTipoSugerido(f[iCom])]));
+      }
+    }
+    /* Y el circulo para ir marcando lo que queda resuelto. */
+    columnas = columnas.concat([{ et:'', peso:0.35, clase:'marca' }]);
+    filas = filas.map(f => (f && f.grupo) ? f : f.concat(['']));
   }
-  const cuantas = filas.filter(f => f && !f.grupo).length;
+
+  const sinGrupo = filas.filter(f => f && !f.grupo);
+  const cuantas = sinGrupo.length;
   const base = String(inf.nombre || 'informe').replace(/\.pdf$/i, '');
+  const iTipo = columnas.findIndex(c => c.clase === 'tipo');
+  const chips = (!llamado && iTipo >= 0 && typeof qcCuentaTipos === 'function')
+                  ? qcCuentaTipos(sinGrupo.map(f => ({ tipo: qcpdfClaveTipo(f[iTipo]) })))
+                  : [];
+  const pie = [];
+  if(opts.revisor) pie.push('QC: ' + opts.revisor);
+  if(opts.estudio) pie.push('Cambios: ' + opts.estudio);
   return {
     etiqueta: llamado ? 'Llamado de actores' : 'Control de calidad',
     titulo: opts.titulo || base,
-    subtitulo: opts.subtitulo || '',
+    titulo2: opts.episodio ? ('Episodio ' + opts.episodio) : '',
+    subtitulo: pie.length ? pie.join('   ·   ') : (opts.subtitulo || ''),
     conteo: cuantas + (llamado ? (' llamado' + (cuantas === 1 ? '' : 's'))
                                : (' correcci' + (cuantas === 1 ? 'ón' : 'ones'))),
+    fecha: opts.fecha || qcpdfFechaHoy(),
     tarjetas: inf.tarjetas || [],
+    chips: chips,
     columnas: columnas,
     filas: filas,
     nombreDoc: base,
+    nota: llamado ? 'Rellenar la salida y las observaciones a mano.'
+                  : 'Marcar el círculo cuando la corrección quede resuelta.',
     gris: !!opts.poster,
     poster: opts.poster || null,
     topeHojas: 2
   };
 }
 
-/** El informe de las correcciones apuntadas en QC, del capitulo abierto. */
-function qcpdfDeCorrecciones(lista, titulo, subtitulo){
+/** La clave de un tipo, venga como clave o como etiqueta. Null si no lo es. */
+function qcpdfClaveTipo(v){
+  const t = qcpdfTipoDe(v);
+  return t ? t.k : null;
+}
+
+/** La fecha de hoy, escrita como se lee. */
+function qcpdfFechaHoy(d){
+  const f = (d instanceof Date) ? d : new Date();
+  const mes = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto',
+               'septiembre','octubre','noviembre','diciembre'][f.getMonth()];
+  return f.getDate() + ' de ' + mes + ' de ' + f.getFullYear();
+}
+
+/** El informe de las correcciones apuntadas en QC.
+    `opts`: { programa, episodio, revisor, estudio, fecha }. El programa va en
+    negrita y el episodio detras en gris, que es como se lee de un vistazo. */
+function qcpdfDeCorrecciones(lista, titulo, subtitulo, opts){
+  opts = opts || {};
   const filas = (lista || []).map(c => [
     (typeof qcTC === 'function' ? qcTC(c.tcSec) : ''),
     c.quien || '',
-    /* Una palabra y no un símbolo: los «✓» no existen en la tipografía de un
-       PDF de serie y se llevaban el comentario entero por delante. */
-    (c.hecha ? 'RESUELTA · ' : '') + c.texto
+    /* Una palabra y no un simbolo: el visto no existe en la tipografia de un
+       PDF de serie y se llevaba el comentario entero por delante. */
+    (c.hecha ? 'RESUELTA · ' : '') + c.texto,
+    c.tipo || '',
+    ''                                     // el circulo, que se marca a mano
   ]);
-  const base = String(titulo || 'Control de calidad').replace(/[\/:*?"<>|]/g, '-');
+  const prog = String(opts.programa || titulo || 'Control de calidad');
+  const base = (prog + (opts.episodio ? (' ' + opts.episodio) : ''))
+                 .replace(/[\\/:*?"<>|]/g, '-').trim();
+  /* Quien revisa y que estudio arregla: es un documento que se entrega, y sin
+     esos dos nombres no se sabe a quien preguntar ni quien tiene que hacerlo. */
+  const pie = [];
+  if(opts.revisor) pie.push('QC: ' + opts.revisor);
+  if(opts.estudio) pie.push('Cambios: ' + opts.estudio);
   return {
     etiqueta: 'Control de calidad',
-    titulo: titulo || 'Control de calidad',
-    subtitulo: subtitulo || '',
+    titulo: prog,
+    titulo2: opts.episodio ? ('Episodio ' + opts.episodio) : '',
+    subtitulo: pie.length ? pie.join('   ·   ') : (subtitulo || ''),
     conteo: filas.length + ' correcci' + (filas.length === 1 ? 'ón' : 'ones'),
+    fecha: opts.fecha || qcpdfFechaHoy(),
     tarjetas: [],
+    chips: (typeof qcCuentaTipos === 'function') ? qcCuentaTipos(lista || []) : [],
     columnas: [
-      { et:'Tiempo',     peso:1.15, clase:'tc', negrita:true },
-      { et:'Personaje',  peso:1.45, clase:'nombre', negrita:true },
-      { et:'Corrección', peso:3.2,  clase:'texto' }
+      { et:'Timecode',   peso:1.05, clase:'tc', negrita:true },
+      { et:'Actor',      peso:1.15, clase:'nombre', negrita:true },
+      { et:'Comentario', peso:3.1,  clase:'texto' },
+      { et:'Tipo',       peso:0.85, clase:'tipo' },
+      { et:'',           peso:0.35, clase:'marca' }
     ],
     filas: filas,
-    nombreDoc: base,
+    nombreDoc: 'QC · ' + base,
+    nota: 'Marcar el círculo cuando la corrección quede resuelta.',
     gris: false,
     poster: null,
     topeHojas: 2
@@ -659,7 +870,7 @@ function herramientasPanel(){
 }
 
 /* Lo que se ha soltado, esperando a convertirse. */
-const QCCONV = { archivos: [], poster: null, trabajando: false };
+const QCCONV = { archivos: [], poster: null, trabajando: false, revisor: '', estudio: '' };
 
 /** El convertidor. Se sueltan PDF -y un poster si lo hay- y sale un PDF nuevo
     por cada uno. El poster no se convierte: hace que los demas salgan en
@@ -676,6 +887,8 @@ function qcConvPanel(){
 function qcConvCerrar(){
   const ov = document.getElementById('convOv'); if(ov) ov.remove();
   QCCONV.archivos = []; QCCONV.poster = null; QCCONV.trabajando = false;
+  /* Los dos nombres se quedan: casi siempre revisa la misma persona y lo
+     arregla el mismo estudio, y volver a teclearlos en cada tanda sobra. */
 }
 
 function qcConvPintar(){
@@ -686,6 +899,14 @@ function qcConvPintar(){
     + '<div class="herr-h">Convertidor PDF QC</div>'
     + '<div class="herr-sub">No se cambia ni una palabra: mayúsculas, erratas y '
       + 'abreviaturas salen tal cual. Solo cambia cómo se ve.</div>'
+    /* Los dos nombres del informe. Se piden aquí y no al final porque forman
+       parte de lo que se entrega, igual que las correcciones. */
+    + '<div class="conv-meta">'
+      + '<label><span>Revisa</span><input id="convRev" type="text" placeholder="quién hace el QC" value="'
+        + esc_(QCCONV.revisor || '') + '"></label>'
+      + '<label><span>Estudio</span><input id="convEst" type="text" placeholder="quién hace los cambios" value="'
+        + esc_(QCCONV.estudio || '') + '"></label>'
+      + '</div>'
     + '<div class="conv-zona" id="convZona">'
       + '<b>Suelta aquí los PDF</b><i>o pulsa para buscarlos · A4, máximo 2 hojas</i></div>'
     + '<input type="file" id="convIn" accept="application/pdf,.pdf,image/*" multiple style="display:none">'
@@ -723,6 +944,10 @@ function qcConvEnganchar(ov){
       e.preventDefault(); e.stopPropagation(); zona.classList.remove('sobre'); }));
     zona.addEventListener('drop', (e)=>{ qcConvAnadir(e.dataTransfer && e.dataTransfer.files); });
   }
+  /* Se leen sin repintar: repintar en cada tecla mataria el cursor. */
+  { const r = ov.querySelector('#convRev'), e2 = ov.querySelector('#convEst');
+    if(r) r.oninput = ()=>{ QCCONV.revisor = r.value.trim().slice(0, 90); };
+    if(e2) e2.oninput = ()=>{ QCCONV.estudio = e2.value.trim().slice(0, 90); }; }
   const x = ov.querySelector('#convX'); if(x) x.onclick = ()=>{ if(!QCCONV.trabajando) qcConvCerrar(); };
   const go = ov.querySelector('#convGo'); if(go) go.onclick = ()=> qcConvTodos();
   const qp = ov.querySelector('#convQuitaPost');
@@ -768,7 +993,8 @@ async function qcConvTodos(){
       if(!inf){ f.estado = 'mal'; f.msg = 'no encuentro la tabla'; continue; }
       if(!inf.filas.length){ f.estado = 'mal'; f.msg = 'la tabla está vacía'; continue; }
       f.msg = 'dibujando…'; qcConvPintar();
-      const d = qcpdfDeInforme(inf, { poster: QCCONV.poster ? QCCONV.poster.dato : null });
+      const d = qcpdfDeInforme(inf, { poster: QCCONV.poster ? QCCONV.poster.dato : null,
+                                      revisor: QCCONV.revisor, estudio: QCCONV.estudio });
       f.doc = await qcpdfHacer(d);
       f.listo = true; f.estado = 'ok';
       f.msg = inf.filas.length + ' filas · listo';

@@ -50,6 +50,8 @@ El modelo es siempre el mismo:
 | **QC-4** | **«Sin tiempo» no es «el minuto cero».** `+null` y `+''` valen 0 al convertir, así que una corrección de la mezcla se guardaba en 00:00:00 y salía la primera del informe, como lo más urgente. Las que no tienen tiempo se enseñan **al final**. El cero sí es un tiempo válido: hay correcciones en el primer segundo. | ✅ |
 | **QC-5** | Un timecode escrito a mano que **no se entiende deja el que había**, no manda la corrección al minuto cero: un dedazo no puede mover un apunte. | ✅ |
 | **QC-6** | Las correcciones **viajan con el capítulo**, en los **dos** caminos por los que se sube; si solo se toca uno, se pierden según cómo se haya guardado. Al volver, lo que llega de la nube se sanea: sin comentario no entra, y un tiempo imposible entra **sin tiempo**, no con uno inventado. | ✅ |
+| **QC-8** | Una corrección lleva un **tipo**: Falta, Cambiar, Pegar o Ajuste. **Se sugiere y manda quien apunta**: «Falta el take. Pegar.» es Pegar y «Falta el take.» es Falta, y las dos frases empiezan igual, así que no se puede deducir a ciegas. Gana la **acción** que hay que hacer, no la palabra con la que empieza la frase. Un tipo que no se reconoce cae en **Ajuste**, que es el más inofensivo: no convoca a nadie. | ✅ |
+| **QC-9** | El capítulo guarda **quién hace el QC** y **qué estudio hace los cambios**, y se recuerdan para el siguiente: casi siempre revisa la misma persona y lo arregla el mismo estudio. Si los dos están vacíos no se sube nada. | ✅ |
 | **QC-7** | El audio que se carga en QC queda en **`studio.dlgUrl`**, que es lo que el reconocedor prefiere al vídeo, y se **olvida el audio ya preparado**. Ese campo se leía en `karIaPreparar` y no lo escribía nadie: hasta ahora Whisper oía siempre el vídeo aunque cargaras otra pista, y sin olvidar el anterior se cotejaría el capítulo nuevo contra la voz del viejo. | ✅ |
 
 ## Nunca
@@ -86,7 +88,7 @@ una entrega: cargar un guion real, contar las intervenciones por personaje y
 compararlas con el desglose de la empresa, y comprobar que el primer timecode
 de cada personaje coincide.
 
-**QC-1 a QC-7**: `pruebas/qc.prueba.js`. La frontera de QC-2 se comprueba
+**QC-1 a QC-9**: `pruebas/qc.prueba.js`. La frontera de QC-2 se comprueba
 leyendo el cuerpo de `cotejarTodo` y exigiendo que no nombre las correcciones:
 es una regla sobre quién escribe dónde, y solo el código lo puede decir.
 Quince mutaciones comprobadas en rojo. Dos de las comprobaciones nacieron
