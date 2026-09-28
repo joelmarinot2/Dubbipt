@@ -32,6 +32,7 @@ compartido rompe cosas más rápido de lo que las arregla.
 | [`06-sincronia.md`](06-sincronia.md) | Nube, tiempo real, tablet y escritorio, concurrencia |
 | [`07-entorno.md`](07-entorno.md) | CSP, service worker, versiones, despliegue, reparto en archivos |
 | [`08-fallos.md`](08-fallos.md) | Que un fallo silencioso se oiga, y el trinquete de la deuda |
+| [`09-qc-informes.md`](09-qc-informes.md) | Informes de QC en PDF: entregarlos y rehacer los que llegan |
 
 ## Cómo se leen las reglas
 

@@ -760,6 +760,48 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 /* ===== Modales estilo Dubbipt ===== */
 .dlgov{ position:fixed; inset:0; z-index:9500; background:rgba(8,5,20,.86); display:flex; align-items:center; justify-content:center; padding:20px; overflow:auto; }
 .dlgcard{ width:min(560px,94vw); background:#181433; border:3px solid #5FC85A; border-radius:24px; padding:24px 24px 26px; box-shadow:0 24px 70px rgba(0,0,0,.5); }
+
+/* ─── Caja de herramientas y convertidor de PDF ─── */
+.dh-tools{ background:#231d4a; border:1px solid #2f2a5c; color:#ECE9FB;
+  border-radius:11px; padding:9px 13px; font-size:12.5px; font-weight:600; cursor:pointer; }
+.dh-tools:hover{ border-color:#5FC85A; }
+.herr-h{ font-size:17px; font-weight:800; color:#ECE9FB; margin-bottom:4px; }
+.herr-sub{ font-size:12px; color:#9a93c4; margin-bottom:16px; line-height:1.45; }
+.herr-it{ display:flex; gap:12px; align-items:flex-start; width:100%; text-align:left;
+  background:#1e1a40; border:1px solid #2f2a5c; border-radius:14px; padding:13px 14px;
+  cursor:pointer; color:#ECE9FB; margin-bottom:10px; }
+.herr-it:hover{ border-color:#5FC85A; }
+.herr-ic{ flex:0 0 auto; font-size:19px; line-height:1.1; }
+.herr-tx{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+.herr-tx b{ font-size:13.5px; }
+.herr-tx i{ font-style:normal; font-size:11.5px; color:#9a93c4; line-height:1.45; }
+.herr-fb{ display:flex; gap:9px; justify-content:flex-end; margin-top:14px; }
+.herr-fb button{ background:#1e1a40; border:1px solid #2f2a5c; color:#ECE9FB;
+  border-radius:10px; padding:9px 15px; font-size:12.5px; font-weight:600; cursor:pointer; }
+.herr-fb button[disabled]{ opacity:.45; cursor:default; }
+.herr-fb .conv-go{ border-color:#5FC85A; color:#5FC85A; }
+.conv-zona{ border:2px dashed #3a3470; border-radius:14px; padding:22px 14px; text-align:center;
+  cursor:pointer; display:flex; flex-direction:column; gap:5px; }
+.conv-zona.sobre{ border-color:#5FC85A; background:#1b2a1b; }
+.conv-zona b{ font-size:13px; color:#ECE9FB; }
+.conv-zona i{ font-style:normal; font-size:11px; color:#9a93c4; }
+.conv-post{ display:flex; align-items:center; gap:8px; margin-top:10px; font-size:12px;
+  color:#ECE9FB; background:#1e1a40; border:1px solid #2f2a5c; border-radius:11px; padding:9px 11px; }
+.conv-post i{ font-style:normal; color:#9a93c4; font-size:11px; }
+.conv-post .conv-q{ margin-left:auto; }
+.conv-lista{ margin-top:12px; display:flex; flex-direction:column; gap:6px;
+  max-height:40vh; overflow:auto; }
+.conv-it{ display:flex; align-items:center; gap:9px; background:#1e1a40; border:1px solid #2f2a5c;
+  border-radius:11px; padding:9px 11px; }
+.conv-n{ flex:1; min-width:0; font-size:12px; color:#ECE9FB; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+.conv-st{ flex:0 0 auto; font-size:10.5px; color:#9a93c4; }
+.conv-st.ok{ color:#5FC85A; }
+.conv-st.mal{ color:#F87171; }
+.conv-dl,.conv-q{ flex:0 0 auto; background:none; border:0; color:#9a93c4; cursor:pointer;
+  font-size:13px; padding:2px 5px; }
+.conv-dl:hover,.conv-q:hover{ color:#ECE9FB; }
+.conv-vacio{ margin-top:12px; font-size:12px; color:#9a93c4; text-align:center; padding:12px; }
 .dlgtitle{ font-family:'Open Serif',monospace; color:#fff; text-align:center; font-size:26px; margin-bottom:18px; }
 .dlgfield{ background:#221d47; border-radius:22px; padding:2px 10px; margin-bottom:12px; }
 .dlgfield input{ width:100%; background:transparent; border:none; outline:none; color:#fff; font-family:'Open Serif',monospace; font-size:15px; padding:14px 8px; }
@@ -2246,7 +2288,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.98.0-nube';
+const APP_VER_NUM = 'v10.99.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4079,6 +4121,30 @@ function qcPintarCuenta(){
   const n = qcPendientes();
   el.textContent = n ? (' ' + n) : '';
   el.className = n ? 'qc-n hay' : 'qc-n';
+}
+
+/** El informe de QC, en PDF y con el diseño de la casa.
+    Solo lo apuntado: si no hay nada, no se entrega una hoja en blanco. */
+async function qcInformePdf(){
+  const l = qcOrden();
+  if(!l.length){ qcAviso('No hay correcciones que entregar todavía'); return; }
+  const cap = (typeof currentEp !== 'undefined' && currentEp && currentEp.name) ? currentEp.name : '';
+  let prog = '';
+  try{
+    const sh = (typeof shows !== 'undefined' && Array.isArray(shows) && currentEp)
+                 ? shows.find(x => x && x.id === currentEp.showId) : null;
+    if(sh && sh.name) prog = sh.name;
+  }catch(e){ /* sin la lista de programas, el informe va solo con el capítulo */ }
+  qcAviso('⏳ Preparando el informe…');
+  try{
+    const d = qcpdfDeCorrecciones(l, (prog ? prog + ' · ' : '') + (cap || 'Control de calidad'),
+                                  cap && prog ? ('Capítulo ' + cap) : '');
+    await qcpdfDescargar(d, 'QC ' + (prog ? prog + ' ' : '') + (cap || ''));
+    qcAviso('✅ Informe descargado');
+  }catch(e){
+    fallo('qcpdfDescargar · index.html:qcInformePdf', e, 'no se ha podido crear el informe');
+    qcAviso('⚠️ No se pudo crear el informe: ' + ((e && e.message) || e));
+  }
 }
 
 /** El audio del programa que se va a cotejar.
@@ -6326,11 +6392,13 @@ async function renderLibrary(silent){
           + '</div></div>'
         + '<label class="dh-search"><span class="fi">🔍</span>'
           + '<input type="text" id="dashSearch" placeholder="Buscar programa…" value="'+esc(window._dashQuery||'')+'"></label>'
+        + '<button class="dh-tools" id="dashTools" title="Herramientas que no dependen de ningún capítulo">🧰 Herramientas</button>'
         + '<button class="dh-new" id="dashNew">＋ Nuevo programa</button>';
       { const ds=head.querySelector('#dashSearch');
         if(ds){ ds.oninput=()=>{ window._dashQuery=ds.value; renderLibrary(true);
           const d2=document.getElementById('dashSearch'); if(d2){ d2.focus(); d2.setSelectionRange(d2.value.length,d2.value.length); } }; } }
       { const dn=head.querySelector('#dashNew'); if(dn) dn.onclick=newShow; }
+      { const dt=head.querySelector('#dashTools'); if(dt) dt.onclick=()=> herramientasPanel(); }
       { const dO=head.querySelector('#dhOther'); if(dO) dO.onclick=()=> showWorkspacePicker(true); }
       // breadcrumb de espacio (queda como migaja discreta encima del panel)
       crumb.className='dashcrumb';
@@ -12032,6 +12100,7 @@ function buildLibretoDoc(pc){
       <button id="tQcCotejar" title="Transcribe el capítulo y lo compara con el libreto: marca dónde no coincide. No cambia ni una palabra">🔎 Transcribir y comparar</button>
       <button id="tQcNueva" title="Apuntar una corrección en el parlamento seleccionado">＋ Corrección</button>
       <button id="tQcLista" title="Las correcciones de este capítulo">Correcciones<span id="tQcN" class="qc-n"></span></button>
+      <button id="tQcPdf" title="Descargar el informe de QC en PDF">⤓ Informe PDF</button>
       <input type="file" id="tQcAudioIn" accept=".wav,.mp3,.m4a,.aac,.ogg,.oga,.opus,.flac,audio/*" style="display:none">
       <div class="tt">Grabación</div>
       <button id="tRec" class="grn">✓ Grabada</button>
@@ -12229,6 +12298,7 @@ function buildLibretoDoc(pc){
                   i.value = '';
                 }); } }
   if($t('tQcCotejar')) $t('tQcCotejar').addEventListener('click', ()=> qcCotejar());
+  if($t('tQcPdf')) $t('tQcPdf').addEventListener('click', ()=> qcInformePdf());
   try{ qcPintarCuenta(); }catch(e){ fallo('qcPintarCuenta · index.html:libreto', e); }
   const dl = $t('dtabL'), dr = $t('dtabR');
   if(dl) dl.addEventListener('click', ()=>{ d.body.classList.toggle('lclosed'); dl.textContent = d.body.classList.contains('lclosed')?'⟩':'⟨'; });
@@ -19165,3 +19235,4 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/sala.js"></script>
 <script src="./js/talentos.js"></script>
 <script src="./js/tcpantalla.js"></script>
+<script src="./js/qcpdf.js"></script>

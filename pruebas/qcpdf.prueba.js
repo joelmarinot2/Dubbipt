@@ -1,0 +1,294 @@
+/* El convertidor de informes de QC a PDF · especificacion 09
+ *
+ * Entra un informe feo -el que escupe Pro Tools al exportar las marcas de
+ * memoria- y sale una hoja A4 limpia. La regla que manda:
+ *
+ *     NO SE CAMBIA NI UNA PALABRA
+ *
+ * Ni mayusculas, ni minusculas, ni erratas, ni abreviaturas. Solo cambia como
+ * se ve. Quien recibe el informe lo compara con el original, y una palabra
+ * «arreglada» por el camino es una correccion que nadie pidio.
+ *
+ * Lo que se prueba aqui es leer y decidir, que es donde estan los errores. El
+ * dibujo -jsPDF- no se prueba: hace falta un navegador, y esta anotado.
+ *
+ * Los datos salen de la forma que tiene un informe de Pro Tools: renglones con
+ * la X de cada trozo de texto, que es lo unico que dice de que columna es cada
+ * cosa.
+ */
+'use strict';
+const { montar } = require('./ayuda');
+
+exports.nombre = 'El convertidor de informes de QC: leer sin cambiar una palabra';
+
+const RECORTES = [
+  ['/* ── Medidas de la hoja', '/* ── Dibujar'],
+  ['/* ── Leer el informe que entra', '/* ── Los paneles del dashboard']
+];
+const EXPORTA = ['QCPDF_HOJA', 'QCPDF_PASOS', 'qcpdfAnchos', 'qcpdfParrafos',
+                 'qcpdfRenglones', 'qcpdfDatosSesion', 'qcpdfCabecera', 'qcpdfColumnaDe',
+                 'qcpdfLeerInforme', 'qcpdfEsLlamado', 'qcpdfPorTurno',
+                 'qcpdfPintaColumna', 'qcpdfDeInforme', 'qcpdfDeCorrecciones'];
+
+const M = montar(RECORTES, EXPORTA, {
+  window: {}, document: {}, pdfjsLib: null, URL: {},
+  esc: (s) => String(s == null ? '' : s),
+  fallo: () => {},
+  qcTC: (s) => (s == null ? '' : 'TC' + s),
+  console: { warn: () => {}, log: () => {} }
+});
+
+/* Un trozo de texto donde cae en la hoja. La Y crece hacia arriba, como en un
+   PDF de verdad. */
+const tz = (t, x, y) => ({ t: t, x: x, y: y });
+
+/* El informe tal como sale de Pro Tools: cuatro datos de sesion arriba y luego
+   la tabla. Las X son las de una exportacion real. */
+const CAB = [tz('#', 40, 700), tz('LOCATION', 60, 700), tz('NAME', 150, 700), tz('COMMENTS', 250, 700)];
+
+exports.pruebas = function(t){
+
+  t.seccion('1 · los renglones se agrupan por su altura');
+  const filas = M.qcpdfRenglones([
+    tz('COMMENTS', 250, 700), tz('#', 40, 700), tz('LOCATION', 60, 700.8),
+    tz('1', 40, 686), tz('01:00:12:05', 60, 686)
+  ]);
+  t.eq('dos renglones', filas.length, 2);
+  t.eq('el de arriba primero', filas[0].cel[0].t, '#',
+       'en un PDF la Y crece hacia arriba: ordenar al revés pone el informe boca abajo');
+  t.eq('y cada uno de izquierda a derecha', filas[0].cel.map(c => c.t).join(' '),
+       '# LOCATION COMMENTS');
+  t.eq('una diferencia de menos de un punto es el MISMO renglón', filas[0].cel.length, 3,
+       'las letras de un renglón no caen todas a la misma altura exacta');
+
+  t.seccion('2 · la cabecera de la tabla, y dónde empieza cada columna');
+  const cab = M.qcpdfCabecera(M.qcpdfRenglones(CAB.concat([tz('1', 40, 686)])));
+  t.ok('la encuentra', !!cab);
+  t.eq('con sus cuatro columnas', cab.cols.map(c => c.et).join(' '), '# LOCATION NAME COMMENTS');
+
+  /* Con UNA sola palabra conocida no se acepta. Este renglon -una celda que
+     dice justo «Name»- aparece antes de la cabecera de verdad, y con el limite
+     en uno se la lleva por delante: las columnas saldrian de ahi y el informe
+     entero se descolocaria. Caso propio, porque el de abajo no tiene NINGUNA
+     palabra exacta y no distingue «una» de «dos». */
+  const conTrampa = M.qcpdfRenglones([
+    tz('Name', 40, 720),                                  // una sola, y no es la cabecera
+    CAB[0], CAB[1], CAB[2], CAB[3],
+    tz('1', 40, 686)
+  ]);
+  const cabBuena = M.qcpdfCabecera(conTrampa);
+  t.eq('con una sola palabra conocida NO es la cabecera', cabBuena.cols.length, 4,
+       'se la llevaría por delante y las columnas saldrían de donde no deben');
+  t.eq('la de verdad es la de las cuatro', cabBuena.cols.map(c => c.et).join(' '),
+       '# LOCATION NAME COMMENTS');
+
+  const falsa = M.qcpdfCabecera(M.qcpdfRenglones([
+    tz('el actor dice su name mal', 40, 700), tz('1', 40, 686)
+  ]));
+  t.eq('y un renglón sin ninguna palabra exacta, tampoco', falsa, null);
+
+  t.seccion('3 · de qué columna es cada cosa');
+  const cols = cab.cols;
+  t.eq('lo que empieza en la primera', M.qcpdfColumnaDe(40, cols), 0);
+  t.eq('en la segunda', M.qcpdfColumnaDe(60, cols), 1);
+  t.eq('un poco a la derecha, sigue siendo la segunda', M.qcpdfColumnaDe(95, cols), 1,
+       'el texto de una celda crece hacia la derecha; por cercanía se iría a la siguiente');
+  t.eq('la tercera', M.qcpdfColumnaDe(150, cols), 2);
+  t.eq('y el comentario largo, la cuarta', M.qcpdfColumnaDe(320, cols), 3);
+
+  t.seccion('4 · los datos de sesión salen como tarjetas');
+  const tarj = M.qcpdfDatosSesion(M.qcpdfRenglones([
+    tz('Session Name: 100 DAYS OF DECEPTION 101', 40, 760),
+    tz('Sample Rate: 48000.000000', 40, 750),
+    tz('Bit Depth: 24-bit', 40, 740),
+    tz('Timecode Format: 25 Frame', 40, 730)
+  ]));
+  t.eq('las cuatro', tarj.length, 4, JSON.stringify(tarj));
+  t.eq('con su valor', tarj[0].v, '100 DAYS OF DECEPTION 101');
+  t.eq('y el nombre en su sitio', tarj[0].k, 'Session Name');
+  t.eq('sin datos de sesión, ninguna tarjeta', M.qcpdfDatosSesion([]).length, 0);
+
+  t.seccion('5 · el informe entero, fila a fila');
+  const hoja = M.qcpdfRenglones(CAB.concat([
+    tz('1', 40, 686), tz('01:00:12:05', 60, 686), tz('GRÁFICA', 150, 686),
+      tz('Repetir, se come la última', 250, 686),
+    tz('sílaba', 250, 676),                                   // continuación del comentario
+    tz('2', 40, 660), tz('01:05:40:00', 60, 660), tz('PHILIP', 150, 660),
+      tz('Ruido de boca', 250, 660)
+  ]));
+  const inf = M.qcpdfLeerInforme([hoja], 'QC 101.pdf');
+  t.eq('dos filas, no tres', inf.filas.length, 2,
+       'el renglón sin primera columna es la continuación del comentario, no una fila');
+  t.eq('y el comentario partido queda junto',
+       inf.filas[0][3], 'Repetir, se come la última\nsílaba');
+  t.eq('el timecode en su columna', inf.filas[0][1], '01:00:12:05');
+  t.eq('el personaje en la suya', inf.filas[0][2], 'GRÁFICA');
+  t.eq('y la segunda fila entera', inf.filas[1].join(' | '), '2 | 01:05:40:00 | PHILIP | Ruido de boca');
+
+  t.seccion('6 · no se cambia NI UNA palabra');
+  /* La regla de arriba, comprobada: mayusculas, minusculas y una errata a
+     proposito tienen que salir tal cual. */
+  const raro = M.qcpdfLeerInforme([M.qcpdfRenglones(CAB.concat([
+    tz('1', 40, 686), tz('01:00:01:00', 60, 686), tz('mc Donald', 150, 686),
+      tz('DICE «vacasiones» y no se entinede', 250, 686)
+  ]))], 'x.pdf');
+  t.eq('la errata sigue ahí', raro.filas[0][3], 'DICE «vacasiones» y no se entinede',
+       'corregir una errata del original es una corrección que nadie pidió');
+  t.eq('y las mayúsculas tal cual', raro.filas[0][2], 'mc Donald');
+
+  t.seccion('7 · «GUION:» va como párrafo aparte');
+  t.eq('separado', M.qcpdfParrafos('Repetir la frase GUION: dice otra cosa').length, 2);
+  t.eq('con su texto', M.qcpdfParrafos('Repetir la frase GUION: dice otra cosa')[1],
+       'GUION: dice otra cosa');
+  t.eq('un comentario normal es un solo párrafo',
+       M.qcpdfParrafos('Repetir, se come la sílaba').length, 1);
+  t.eq('y el partido en renglones se une',
+       M.qcpdfParrafos('Repetir, se come la\núltima sílaba')[0], 'Repetir, se come la');
+  t.eq('una casilla vacía no desaparece', M.qcpdfParrafos('').join('|'), '');
+
+  t.seccion('8 · los números de página del original se ignoran');
+  const conPag = M.qcpdfLeerInforme([M.qcpdfRenglones(CAB.concat([
+    tz('1', 40, 686), tz('01:00:01:00', 60, 686), tz('A', 150, 686), tz('uno', 250, 686),
+    tz('12', 300, 40)                                          // el número de hoja, solo y suelto
+  ]))], 'x.pdf');
+  t.eq('una fila, no dos', conPag.filas.length, 1);
+  /* Y sobre todo: NO se le pega al comentario de arriba. Contar filas no basta
+     -un renglon sin primera columna se va por el camino de la continuacion y el
+     total sigue siendo uno-, asi que se mira lo que quedo escrito. */
+  t.eq('y el número no se le pega al comentario de arriba', conPag.filas[0][3], 'uno',
+       'el número de hoja acabaría dentro de una corrección, como si fuera texto suyo');
+
+  t.seccion('9 · la cabecera repetida de cada hoja no se cuela como fila');
+  const dos = M.qcpdfLeerInforme([
+    M.qcpdfRenglones(CAB.concat([tz('1', 40, 686), tz('01:00:01:00', 60, 686),
+                                 tz('A', 150, 686), tz('uno', 250, 686)])),
+    M.qcpdfRenglones(CAB.concat([tz('2', 40, 686), tz('01:00:02:00', 60, 686),
+                                 tz('B', 150, 686), tz('dos', 250, 686)]))
+  ], 'x.pdf');
+  t.eq('dos filas de las dos hojas', dos.filas.length, 2, JSON.stringify(dos.filas));
+  t.eq('y la segunda es la de la segunda hoja', dos.filas[1][2], 'B');
+
+  t.seccion('10 · sin tabla no se inventa un informe');
+  t.eq('un PDF que no lo es', M.qcpdfLeerInforme([M.qcpdfRenglones([
+         tz('Esto es una carta cualquiera', 40, 700)])], 'x.pdf'), null,
+       'dibujar una tabla vacía haría creer que el informe salió bien');
+
+  t.seccion('11 · qué pinta tiene cada columna');
+  t.eq('el timecode va en azul', M.qcpdfPintaColumna('Location').clase, 'tc');
+  t.ok('y en negrita', M.qcpdfPintaColumna('Location').negrita === true);
+  t.eq('el nombre, en negrita', M.qcpdfPintaColumna('Name').clase, 'nombre');
+  t.ok('el comentario es la columna ancha',
+       M.qcpdfPintaColumna('Comments').peso > M.qcpdfPintaColumna('Name').peso);
+  t.ok('y el número, la estrecha',
+       M.qcpdfPintaColumna('#').peso < M.qcpdfPintaColumna('Name').peso);
+  t.eq('una columna que no conozco sigue saliendo', M.qcpdfPintaColumna('Vestuario').clase, 'texto',
+       'cada estudio pone las suyas: tirarlas perdería datos del original');
+
+  t.seccion('12 · los anchos llenan la hoja, pase lo que pase con los pesos');
+  const an = M.qcpdfAnchos([{ peso:1 }, { peso:3 }], 180);
+  t.cerca('suman el ancho útil', an[0] + an[1], 180, 1e-9);
+  t.cerca('y en su proporción', an[1] / an[0], 3, 1e-9);
+  const raros = M.qcpdfAnchos([{ peso:0 }, { peso:-2 }, {}], 180);
+  t.cerca('con pesos imposibles, se reparte a partes iguales', raros[0], 60, 1e-9,
+         'un peso cero dejaría la columna en nada y el texto encima del de al lado');
+
+  t.seccion('13 · un llamado de actores se agrupa por turno');
+  t.ok('se reconoce por sus columnas', M.qcpdfEsLlamado({ columnas:['Hora','Actor','Personaje'] }));
+  t.ok('y no se confunde con un QC', !M.qcpdfEsLlamado({ columnas:['#','Location','Comments'] }));
+  const turnos = M.qcpdfPorTurno([
+    ['15:30', 'LUIS H MORENO'], ['09:00', 'MIGUEL VELEZ'], ['10:15', 'VALERIA JIMENEZ'],
+    ['', 'SIN HORA']
+  ]);
+  t.eq('Mañana primero', turnos[0].grupo, 'Mañana');
+  t.eq('con los dos de la mañana', [turnos[1][1], turnos[2][1]].join(' '),
+       'MIGUEL VELEZ VALERIA JIMENEZ');
+  t.eq('después Tarde', turnos[3].grupo, 'Tarde');
+  t.eq('y quien no trae hora va al final, no se pierde', turnos[5][1], 'SIN HORA');
+  t.eq('las 14:00 ya son tarde', M.qcpdfPorTurno([['14:00','X']])[0].grupo, 'Tarde');
+  t.eq('y las 13:59 aún son mañana', M.qcpdfPorTurno([['13:59','X']])[0].grupo, 'Mañana');
+
+  t.seccion('14 · el llamado lleva columnas en blanco para rellenar a mano');
+  const lla = M.qcpdfDeInforme({ columnas:['Hora','Actor'], filas:[['09:00','MIGUEL VELEZ']],
+                                 tarjetas:[], nombre:'llamado.pdf' }, {});
+  const ets = lla.columnas.map(c => c.et);
+  t.ok('sale Salida', ets.indexOf('Salida') >= 0, ets.join(' · '));
+  t.ok('y Observaciones', ets.indexOf('Observaciones') >= 0);
+  t.eq('con su etiqueta', lla.etiqueta, 'Llamado de actores');
+  t.ok('el conteo habla de llamados', /llamado/.test(lla.conteo), lla.conteo);
+  /* Si el original YA las trae, no se duplican. */
+  const yaLas = M.qcpdfDeInforme({ columnas:['Hora','Actor','Salida','Observaciones'],
+                                   filas:[['09:00','A','','']], tarjetas:[], nombre:'l.pdf' }, {});
+  t.eq('y no se repiten si ya venían', yaLas.columnas.length, 4,
+       JSON.stringify(yaLas.columnas.map(c => c.et)));
+
+  t.seccion('15 · un informe de QC no se agrupa ni gana columnas');
+  const qc = M.qcpdfDeInforme({ columnas:['#','Location','Name','Comments'],
+                                filas:[['1','01:00:01:00','A','uno']], tarjetas:[], nombre:'QC 101.pdf' }, {});
+  t.eq('cuatro columnas, las del original', qc.columnas.length, 4);
+  t.eq('su etiqueta', qc.etiqueta, 'Control de calidad');
+  t.ok('y el conteo habla de correcciones', /correcci/.test(qc.conteo), qc.conteo);
+  t.eq('el título sale del nombre del archivo, sin el .pdf', qc.titulo, 'QC 101');
+  t.eq('no se pinta en gris', qc.gris, false);
+  t.eq('y cabe en dos hojas', qc.topeHojas, 2);
+
+  t.seccion('16 · con póster, todo en escala de grises');
+  const gris = M.qcpdfDeInforme({ columnas:['#','Location'], filas:[['1','01:00:01:00']],
+                                  tarjetas:[], nombre:'x.pdf' }, { poster:'data:image/jpeg;base64,xx' });
+  t.eq('en grises', gris.gris, true, 'es la variante que se pide con póster');
+  t.ok('y con el póster dentro', !!gris.poster);
+
+  t.seccion('17 · el informe de las correcciones apuntadas en QC');
+  const d = M.qcpdfDeCorrecciones([
+    { tcSec: 3940, quien:'GRÁFICA', texto:'Repetir', hecha:false },
+    { tcSec: 4000, quien:'PHILIP',  texto:'Ruido',   hecha:true }
+  ], '100 days · 101', 'Capítulo 101');
+  t.eq('dos filas', d.filas.length, 2);
+  t.eq('el tiempo escrito como timecode', d.filas[0][0], 'TC3940',
+       'los segundos son de dentro; en el informe va el timecode');
+  t.eq('con su personaje', d.filas[0][1], 'GRÁFICA');
+  t.eq('y su comentario', d.filas[0][2], 'Repetir');
+  t.eq('la resuelta sale marcada', d.filas[1][2], 'RESUELTA · Ruido',
+       'quien recibe el informe tiene que ver qué se arregló ya');
+  t.eq('el conteo', d.conteo, '2 correcciones');
+  t.eq('en singular cuando hay una', M.qcpdfDeCorrecciones([{ tcSec:1, quien:'', texto:'x' }], 'a', '').conteo,
+       '1 corrección');
+  t.ok('el nombre del archivo no lleva caracteres que rompan al guardar',
+       !/[\\/:*?"<>|]/.test(M.qcpdfDeCorrecciones([], 'A/B:C', '').nombreDoc),
+       M.qcpdfDeCorrecciones([], 'A/B:C', '').nombreDoc);
+
+  t.seccion('18 · lo que el PDF no sabe escribir no se lleva el renglón por delante');
+  /* Medido en un navegador de verdad, y por eso esta aqui: una correccion
+     marcada con «✓» salia COMPLETAMENTE VACIA en el informe. Las tipografias
+     de serie de un PDF escriben WinAnsi, y lo que no esta ahi no falla: se
+     traga el renglon entero, callando. Lo mismo con cualquier emoji que
+     alguien escriba en un comentario. */
+  t.eq('el visto se traduce, no desaparece', M.qcpdfParrafos('✓ Resuelta')[0], 'OK Resuelta',
+       'el renglón entero se perdía del informe sin decir nada');
+  t.eq('un emoji deja marca, no un hueco', M.qcpdfParrafos('\u{1F534} Repetir')[0], '? Repetir',
+       'un hueco callado haría pensar que el original tampoco decía nada ahí');
+  t.eq('la flecha se entiende', M.qcpdfParrafos('sube → baja')[0], 'sube -> baja');
+  /* Y lo que SI sabe escribir no se toca: son casi todas las palabras del
+     castellano y los signos de los libretos. */
+  t.eq('los acentos no se tocan', M.qcpdfParrafos('GRÁFICA ñÁÉÍÓÚü')[0], 'GRÁFICA ñÁÉÍÓÚü');
+  t.eq('ni las comillas del libreto', M.qcpdfParrafos('dice «así»')[0], 'dice «así»');
+  t.eq('ni la raya', M.qcpdfParrafos('uno — dos')[0], 'uno — dos');
+  t.eq('ni las comillas tipográficas', M.qcpdfParrafos('“hola”')[0], '“hola”');
+  t.eq('ni el punto medio', M.qcpdfParrafos('a · b')[0], 'a · b');
+  t.eq('el salto de línea sigue partiendo párrafos',
+       M.qcpdfParrafos('una\ndos').length, 2);
+  /* Y la marca de resuelta ya no es un simbolo, asi que pasa entera. */
+  t.eq('la marca de resuelta llega intacta',
+       M.qcpdfParrafos(M.qcpdfDeCorrecciones([{ tcSec:1, quien:'A', texto:'x', hecha:true }], 'a', '').filas[0][2])[0],
+       'RESUELTA · x');
+
+  t.seccion('19 · la hoja es A4 y el último paso no baja de 7,5 pt');
+  t.eq('ancho A4', M.QCPDF_HOJA.w, 210);
+  t.eq('alto A4', M.QCPDF_HOJA.h, 297);
+  const P = M.QCPDF_PASOS;
+  t.eq('el último paso', P[P.length - 1].fuente, 7.5,
+       'más pequeño no se lee en sala, y el informe se lee en sala');
+  t.ok('y cada paso encoge de verdad',
+       P.every((p, i) => i === 0 || p.fuente < P[i-1].fuente),
+       P.map(p => p.fuente).join(' > '));
+  t.ok('los márgenes también', P.every((p, i) => i === 0 || p.margen <= P[i-1].margen));
+};
