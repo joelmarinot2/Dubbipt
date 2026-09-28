@@ -44,6 +44,13 @@ El modelo es siempre el mismo:
 | **LIB-22** | La banda **se vuelve a medir cuando cambia de alto**, no solo al pintarse. Mide una fila o dos según el ancho, y eso cambia sin que nadie la repinte: al estrechar la ventana, al abrir el libreto en media pantalla o cuando acaba de cargar la tipografía. El valor se quedaba viejo y lo que cuelga de él se quedaba ARRIBA — llegó de sala la pestaña de Ocupación tapando el botón de guardar el talento. Medido: a 1000 px la banda ocupa 45 y la variable dice 45; estrechada a 430 pasa a 64 y la variable sigue diciendo 45, así que la pestaña arranca en el 113 y la banda no acaba hasta el 118. Se vigila por **dos vías** —observador de tamaño y aviso de ventana— porque el observador no se pudo comprobar en un navegador de verdad. | ✅ |
 | **LIB-23** | La **barra de herramientas** también se vuelve a medir cuando cambia de alto. Se parte en más filas al estrecharse el hueco del libreto, y abrir el cajón de Ocupación le quita 320 px de golpe **sin que la ventana cambie de tamaño**, así que el oyente de resize que ya había no se enteraba: el cajón entero —y su pestaña— arrancaban encima de la barra. Medido: a 900 px la barra ocupa 50 y la variable dice 50; con el cajón abierto pasa a 91 y la variable sigue diciendo 50, así que la pestaña empieza en el 64 y la barra no acaba hasta el 91. Se vigila **el elemento**, que es lo único que se entera. | ✅ |
 | **LIB-24** | Dubbipt lee tambien el guion de Word **en tabla**: tres columnas —timecode, personaje y lo que dice—, un renglon por subtitulo. Manda la **segunda columna**: con nombre empieza un parlamento nuevo y vacia es el mismo personaje. Los renglones sin timecode y sin personaje cuyo primer parrafo nombra a un personaje son **rotulos** y van a GRAFICA, no a quien hablaba. Una **linea son doce palabras**, contadas sobre el parlamento entero: fila a fila saldria el doble. Los nombres se pasan a MAYUSCULAS, como en los desgloses. El lector de Word que ya habia busca nombres en mayusculas al principio del renglon y con este guion no encontraba NI UN personaje. | ✅ |
+| **QC-1** | El libreto tiene una sección **QC** en el cajón de herramientas, entre «Marcar» y «Grabación», con lo que hace falta al revisar: cargar el audio del programa, transcribirlo y compararlo con el libreto, apuntar correcciones y verlas. | ✅ |
+| **QC-2** | Una **corrección la apunta una persona**. El cotejo automático señala SITIOS donde sospechar y eso vive aparte, en `_cotejo`; nunca se convierte solo en corrección. Un informe firmado con lo que creyó oír una máquina no vale, y el reconocedor que hay —`whisper-tiny`— se equivoca a menudo. | ✅ |
+| **QC-3** | Una corrección es **tiempo, personaje y comentario**, y lo único obligatorio es el **comentario**: el tiempo y el personaje los rellena el programa con el parlamento seleccionado, pero qué hay que arreglar no lo puede inventar. Sin personaje sí se apunta —hay correcciones del ambiente o de la mezcla—. | ✅ |
+| **QC-4** | **«Sin tiempo» no es «el minuto cero».** `+null` y `+''` valen 0 al convertir, así que una corrección de la mezcla se guardaba en 00:00:00 y salía la primera del informe, como lo más urgente. Las que no tienen tiempo se enseñan **al final**. El cero sí es un tiempo válido: hay correcciones en el primer segundo. | ✅ |
+| **QC-5** | Un timecode escrito a mano que **no se entiende deja el que había**, no manda la corrección al minuto cero: un dedazo no puede mover un apunte. | ✅ |
+| **QC-6** | Las correcciones **viajan con el capítulo**, en los **dos** caminos por los que se sube; si solo se toca uno, se pierden según cómo se haya guardado. Al volver, lo que llega de la nube se sanea: sin comentario no entra, y un tiempo imposible entra **sin tiempo**, no con uno inventado. | ✅ |
+| **QC-7** | El audio que se carga en QC queda en **`studio.dlgUrl`**, que es lo que el reconocedor prefiere al vídeo, y se **olvida el audio ya preparado**. Ese campo se leía en `karIaPreparar` y no lo escribía nadie: hasta ahora Whisper oía siempre el vídeo aunque cargaras otra pista, y sin olvidar el anterior se cotejaría el capítulo nuevo contra la voz del viejo. | ✅ |
 
 ## Nunca
 
@@ -78,6 +85,12 @@ Y **a mano**, la comprobación de extremo a extremo que sigue mandando antes de
 una entrega: cargar un guion real, contar las intervenciones por personaje y
 compararlas con el desglose de la empresa, y comprobar que el primer timecode
 de cada personaje coincide.
+
+**QC-1 a QC-7**: `pruebas/qc.prueba.js`. La frontera de QC-2 se comprueba
+leyendo el cuerpo de `cotejarTodo` y exigiendo que no nombre las correcciones:
+es una regla sobre quién escribe dónde, y solo el código lo puede decir.
+Quince mutaciones comprobadas en rojo. Dos de las comprobaciones nacieron
+rojas y encontraron el fallo de QC-4 antes de que llegara a sala.
 
 ## Sin resolver
 

@@ -2246,7 +2246,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v10.97.0-nube';
+const APP_VER_NUM = 'v10.98.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3797,6 +3797,335 @@ function docxCue(text){
     if(/[!?¡¿]/.test(hc)) return null;
   }
   return { name:head.trim(), rest };
+}
+
+/* ═══ QC · CONTROL DE CALIDAD ══════════════════════════════════════════════
+   Las correcciones que salen al revisar el capítulo: dónde, quién, y qué hay
+   que arreglar. Es lo que luego se entrega como informe.
+
+   Una corrección es un apunte a mano, y eso manda sobre cualquier otra cosa:
+   el cotejo automático —transcribir y comparar con el libreto— señala SITIOS
+   donde sospechar, no correcciones. Quien decide es la persona, así que lo que
+   el reconocedor dice vive aparte, en `_cotejo`, y aquí solo llega si alguien
+   lo apunta. Un informe firmado con lo que creyó oír una máquina no vale.
+
+   El tiempo se guarda en segundos, como todo lo demás de la casa, y se escribe
+   como timecode solo al enseñarlo. */
+const QC_TOPE = 400;                 // correcciones por capítulo: de sobra
+const QC_TEXTO_TOPE = 600;
+
+/** Un número de verdad, o nada.
+    Hace falta porque `+null` es 0 y `+''` es 0: sin esto, una corrección sin
+    tiempo —del ambiente, de la mezcla— se guardaba en el minuto cero y se
+    colaba la primera del informe, como si fuera lo más urgente. */
+function qcNum(v){
+  if(v === null || v === undefined || typeof v === 'boolean') return null;
+  if(typeof v === 'string' && !v.trim()) return null;      // '' y '   ' también valen 0 al convertir
+  const n = +v;
+  return isFinite(n) ? n : null;
+}
+
+/** El cajón de las correcciones del capítulo abierto. */
+function qcDatos(){
+  if(!Array.isArray(window._qc)) window._qc = [];
+  return window._qc;
+}
+
+/** Una corrección, dejada en su forma buena o descartada. Lo que llega de la
+    nube ha pasado por otras manos y otras versiones: si no cuadra, fuera. */
+function qcSanUna(v){
+  if(!v || typeof v !== 'object') return null;
+  const texto = String(v.texto == null ? '' : v.texto).trim().slice(0, QC_TEXTO_TOPE);
+  if(!texto) return null;                                   // sin comentario no hay corrección
+  const o = { id: String(v.id || '').slice(0, 40) || qcId(),
+              texto: texto,
+              quien: String(v.quien == null ? '' : v.quien).trim().slice(0, 80),
+              hecha: !!v.hecha };
+  const tc = qcNum(v.tcSec); if(tc != null && tc >= 0) o.tcSec = tc;
+  const si = qcNum(v.si);    if(si != null && si >= 0) o.si = Math.round(si);
+  return o;
+}
+
+function qcId(){
+  return 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+/** Lo que viene guardado del capítulo. */
+function qcCargar(src){
+  window._qc = (Array.isArray(src) ? src : []).map(qcSanUna).filter(Boolean).slice(0, QC_TOPE);
+  return window._qc;
+}
+
+/** Lo que se sube. Null cuando no hay nada, para no engordar el registro. */
+function qcParaGuardar(){
+  const l = qcDatos().map(qcSanUna).filter(Boolean);
+  return l.length ? l : null;
+}
+
+/** Por tiempo, que es el orden en que se revisa y en que se entrega. Las que
+    no tienen tiempo van al final: no se pierden, pero no se cuelan delante. */
+function qcOrden(){
+  return qcDatos().slice().sort((a, b) => {
+    const A = isFinite(+a.tcSec) ? +a.tcSec : Infinity;
+    const B = isFinite(+b.tcSec) ? +b.tcSec : Infinity;
+    return A === B ? 0 : (A < B ? -1 : 1);
+  });
+}
+
+/** Apunta una. Devuelve la corrección, o null si no hay comentario. */
+function qcApuntar(tcSec, quien, texto, si){
+  const l = qcDatos();
+  if(l.length >= QC_TOPE) return null;
+  const c = qcSanUna({ id: qcId(), tcSec: tcSec, quien: quien, texto: texto, si: si });
+  if(!c) return null;
+  l.push(c);
+  return c;
+}
+
+function qcQuitar(id){
+  const l = qcDatos();
+  const i = l.findIndex(c => c && c.id === id);
+  if(i < 0) return false;
+  l.splice(i, 1);
+  return true;
+}
+
+/** Marcar resuelta, o desmarcarla. */
+function qcMarcar(id, hecha){
+  const c = qcDatos().find(x => x && x.id === id);
+  if(!c) return false;
+  c.hecha = !!hecha;
+  return true;
+}
+
+/** Un timecode escrito a mano; si no se entiende, se queda el que había: una
+    errata al teclear no puede mandar la corrección al minuto cero. */
+function qcLeerTC(txt, siFalla){
+  const s = String(txt == null ? '' : txt).trim();
+  if(!s) return qcNum(siFalla);
+  try{ if(typeof strictTC === 'function'){ const v = strictTC(s); if(v != null) return v; } }
+  catch(e){ /* sin el motor de la casa, se prueba a mano */ }
+  const m = s.match(/^(\d{1,2}):(\d{2}):(\d{2})(?:[:.,](\d{1,3}))?$/);
+  if(m) return (+m[1])*3600 + (+m[2])*60 + (+m[3]);
+  return qcNum(siFalla);
+}
+
+/** Cuántas quedan por resolver, que es el número que interesa en la barra. */
+function qcPendientes(){
+  return qcDatos().filter(c => c && !c.hecha).length;
+}
+
+/** El panel de las correcciones, dentro del libreto como las demás
+    herramientas: así no le afecta el apagón de `body.ddlov` del padre. */
+function qcPanel(abrirNueva){
+  const d = pop2 && pop2.doc; if(!d) return;
+  let ov = d.getElementById('qcOv');
+  if(!ov){
+    ov = d.createElement('div'); ov.id = 'qcOv'; ov.className = 'qc-ov';
+    d.body.appendChild(ov);
+    ov.addEventListener('click', (e)=>{ if(e.target === ov) qcCerrar(); });
+  }
+  if(abrirNueva) pop2._qcNueva = qcBorrador();
+  ov.innerHTML = qcPanelHtml();
+  qcPanelEnganchar(ov);
+}
+
+function qcCerrar(){
+  const d = pop2 && pop2.doc; if(!d) return;
+  const ov = d.getElementById('qcOv'); if(ov) ov.remove();
+  pop2._qcNueva = null;
+}
+
+/** El borrador de una corrección nueva, relleno con dónde está el libreto:
+    el tiempo y el personaje del parlamento seleccionado. Escribirlos a mano en
+    cada corrección, con el actor esperando, no lo hace nadie. */
+function qcBorrador(){
+  const si = (typeof libActiveSi === 'function') ? libActiveSi() : null;
+  const b = (si != null && script && script[si]) ? script[si] : null;
+  const quien = (b && b.key && charIdx && charIdx[b.key] && charIdx[b.key].display)
+                  ? charIdx[b.key].display : (b && b.display) || '';
+  return { si: (b ? si : null),
+           tcSec: (b && isFinite(+b.tcEff)) ? +b.tcEff : null,
+           quien: quien, texto: '' };
+}
+
+/** El tiempo, como lo escribe el resto de la casa. */
+function qcTC(sec){
+  if(!isFinite(+sec)) return '';
+  try{ if(typeof fmtTC4 === 'function') return fmtTC4(+sec); }catch(e){ /* sin motor de tiempo, se pone a mano */ }
+  const s = Math.max(0, Math.floor(+sec));
+  const p = (n)=> String(n).padStart(2, '0');
+  return p(Math.floor(s/3600)) + ':' + p(Math.floor(s/60)%60) + ':' + p(s%60);
+}
+
+function qcPanelHtml(){
+  const l = qcOrden();
+  const n = qcPendientes();
+  const nue = pop2._qcNueva;
+  const chars = Object.keys(charIdx || {}).map(k => (charIdx[k] && charIdx[k].display) || k).sort();
+  return '<div class="qc-card">'
+    + '<div class="qc-h"><span>QC · Control de calidad</span>'
+      + '<span class="qc-cuenta">' + l.length + ' correccion' + (l.length === 1 ? '' : 'es')
+      + (n ? ' · ' + n + ' sin resolver' : '') + '</span>'
+      + '<button class="qc-x" id="qcX" title="Cerrar">✕</button></div>'
+    + (nue
+        ? '<div class="qc-form">'
+          + '<div class="qc-fr"><label>Tiempo</label>'
+            + '<input id="qcTc" type="text" placeholder="00:00:00:00" value="' + esc(qcTC(nue.tcSec)) + '">'
+            + '<button id="qcTcAqui" title="Coger el tiempo del parlamento seleccionado">del libreto</button></div>'
+          + '<div class="qc-fr"><label>Personaje</label>'
+            + '<input id="qcQuien" type="text" list="qcChars" placeholder="(quién)" value="' + esc(nue.quien || '') + '">'
+            + '<datalist id="qcChars">' + chars.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist></div>'
+          + '<div class="qc-fr col"><label>Comentario</label>'
+            + '<textarea id="qcTexto" rows="3" placeholder="Qué hay que arreglar">' + esc(nue.texto || '') + '</textarea></div>'
+          + '<div class="qc-fb"><button class="qc-ok" id="qcGuardar">Guardar corrección</button>'
+            + '<button id="qcCancelar">Cancelar</button></div>'
+          + '</div>'
+        : '<div class="qc-fb"><button class="qc-ok" id="qcNueva">＋ Corrección</button></div>')
+    + (l.length
+        ? '<div class="qc-lista">' + l.map(c =>
+            '<div class="qc-it' + (c.hecha ? ' ya' : '') + '" data-id="' + esc(c.id) + '">'
+            + '<button class="qc-chk" data-id="' + esc(c.id) + '" title="'
+              + (c.hecha ? 'Marcar como pendiente' : 'Marcar como resuelta') + '">'
+              + (c.hecha ? '✓' : '○') + '</button>'
+            + '<div class="qc-cu">'
+              + '<div class="qc-m"><b class="qc-tc">' + esc(qcTC(c.tcSec)) + '</b>'
+                + (c.quien ? '<span class="qc-q">' + esc(c.quien) + '</span>' : '') + '</div>'
+              + '<div class="qc-t">' + esc(c.texto) + '</div></div>'
+            + (c.si != null ? '<button class="qc-ir" data-si="' + c.si + '" title="Ir al parlamento">ir →</button>' : '')
+            + '<button class="qc-del" data-id="' + esc(c.id) + '" title="Quitar">✕</button>'
+            + '</div>').join('') + '</div>'
+        : '<div class="qc-vacio">Todavía no hay correcciones apuntadas en este capítulo.</div>')
+    + '</div>';
+}
+
+function qcPanelEnganchar(ov){
+  const q = (s)=> ov.querySelector(s);
+  const todos = (s)=> Array.prototype.slice.call(ov.querySelectorAll(s));
+  const x = q('#qcX'); if(x) x.onclick = qcCerrar;
+  const nv = q('#qcNueva'); if(nv) nv.onclick = ()=> qcPanel(true);
+  const can = q('#qcCancelar'); if(can) can.onclick = ()=>{ pop2._qcNueva = null; qcPanel(false); };
+
+  /* Lo escrito se recuerda mientras el panel se repinta: sin esto, tocar
+     «del libreto» borraría el comentario a medio escribir. */
+  const leer = ()=>{
+    const b = pop2._qcNueva; if(!b) return;
+    const t = q('#qcTexto'), w = q('#qcQuien'), c = q('#qcTc');
+    if(t) b.texto = t.value;
+    if(w) b.quien = w.value;
+    if(c) b.tcEsc = c.value;
+  };
+  const tx = q('#qcTexto'); if(tx) tx.oninput = leer;
+  const wq = q('#qcQuien'); if(wq) wq.oninput = leer;
+  const tc = q('#qcTc'); if(tc) tc.oninput = leer;
+
+  const aqui = q('#qcTcAqui');
+  if(aqui) aqui.onclick = ()=>{
+    leer();
+    const b2 = qcBorrador();
+    const b = pop2._qcNueva || {};
+    pop2._qcNueva = { si: b2.si, tcSec: b2.tcSec, quien: b.quien || b2.quien, texto: b.texto || '' };
+    qcPanel(false);
+  };
+
+  const g = q('#qcGuardar');
+  if(g) g.onclick = ()=>{
+    leer();
+    const b = pop2._qcNueva; if(!b) return;
+    const seg = qcLeerTC(b.tcEsc != null ? b.tcEsc : qcTC(b.tcSec), b.tcSec);
+    const c = qcApuntar(seg, b.quien, b.texto, b.si);
+    if(!c){ qcAviso('Escribe el comentario: una corrección sin decir qué arreglar no sirve'); return; }
+    pop2._qcNueva = null;
+    qcGuardado();
+    qcPanel(false);
+  };
+
+  todos('.qc-chk').forEach(b => b.onclick = ()=>{
+    const id = b.dataset.id;
+    const c = qcDatos().find(x2 => x2 && x2.id === id);
+    qcMarcar(id, !(c && c.hecha));
+    qcGuardado(); qcPanel(false);
+  });
+  todos('.qc-del').forEach(b => b.onclick = ()=>{ qcQuitar(b.dataset.id); qcGuardado(); qcPanel(false); });
+  todos('.qc-ir').forEach(b => b.onclick = ()=>{
+    const si = +b.dataset.si;
+    qcCerrar();
+    try{
+      const node = pop2.doc.querySelector('.blk[data-si="' + si + '"]');
+      if(node) node.scrollIntoView({ block:'center', behavior:'auto' });
+      else qcAviso('Ese parlamento no está a la vista: abre el libreto completo');
+    }catch(e){ /* sin libreto pintado no hay a donde ir */ }
+  });
+}
+
+function qcAviso(t){
+  try{ if(typeof libMsg === 'function'){ libMsg(t); return; } }catch(e){ /* sin barra del libreto */ }
+  try{ if(typeof stMsg === 'function') stMsg(t); }catch(e){ /* ni eso: se queda sin decir */ }
+}
+
+/** Se acaba de tocar algo: al contador de la barra y a la nube. */
+function qcGuardado(){
+  try{ qcPintarCuenta(); }catch(e){ fallo('qcPintarCuenta · index.html:qcGuardado', e); }
+  try{
+    if(typeof currentEp !== 'undefined' && currentEp && currentEp.id && typeof epDataUpsert === 'function')
+      epDataUpsert(currentEp.id, currentEp.showId);
+  }catch(e){ fallo('epDataUpsert · index.html:qcGuardado', e, 'la corrección puede no haber subido a la nube'); }
+}
+
+/** El número que va pegado al botón, para saber si queda algo sin mirar. */
+function qcPintarCuenta(){
+  const d = pop2 && pop2.doc; if(!d) return;
+  const el = d.getElementById('tQcN'); if(!el) return;
+  const n = qcPendientes();
+  el.textContent = n ? (' ' + n) : '';
+  el.className = n ? 'qc-n hay' : 'qc-n';
+}
+
+/** El audio del programa que se va a cotejar.
+    Entra por `karAudioDialogos`, que ya sabe descodificar y dibujar la onda,
+    y además se deja en `studio.dlgUrl`: el reconocedor lo prefiere al vídeo.
+    Ese campo se leía en `karIaPreparar` y no se escribía en ningún sitio, así
+    que hasta ahora Whisper oía SIEMPRE el vídeo, aunque cargaras otra pista. */
+async function qcCargarAudio(file){
+  if(!file) return;
+  try{
+    if(typeof studio === 'undefined' || !studio){ qcAviso('Abre primero el Video Estudio'); return; }
+    try{ if(studio.dlgUrl) URL.revokeObjectURL(studio.dlgUrl); }
+    catch(e){ /* si no era nuestra, no hay nada que soltar */ }
+    studio.dlgUrl = URL.createObjectURL(file);
+    /* Que el reconocedor vuelva a preparar el audio: si se queda el de antes,
+       se cotejaría el capítulo nuevo contra la voz del anterior. */
+    try{ if(typeof karIa !== 'undefined' && karIa) karIa.pcm = null; }
+    catch(e){ fallo('karIa.pcm · index.html:qcCargarAudio', e); }
+    qcAviso('⏳ Leyendo «' + file.name + '»…');
+    await karAudioDialogos(file);
+    qcAviso('✅ Audio cargado — ya puedes «Transcribir y comparar»');
+  }catch(e){
+    fallo('qcCargarAudio · index.html:qcCargarAudio', e, 'no se ha podido cargar ese audio');
+    qcAviso('⚠️ No se pudo leer ese audio: ' + ((e && e.message) || e));
+  }
+}
+
+/** Transcribe el capítulo y lo compara con el libreto.
+    El trabajo lo hace `cotejarTodo`, que ya existía en los planos: recorre los
+    parlamentos, transcribe cada uno y mide el parecido. Aquí solo se entra
+    desde QC y se cuenta el resultado donde se está mirando.
+    NO se apunta nada como corrección: el reconocedor señala dónde sospechar,
+    y quien firma el informe es una persona. */
+async function qcCotejar(){
+  if(typeof cotejarTodo !== 'function'){ qcAviso('⚠️ Falta el módulo de planos'); return; }
+  const hayAudio = (typeof studio !== 'undefined' && studio && (studio.dlgUrl || studio.url));
+  if(!hayAudio){ qcAviso('Carga primero el audio del programa'); return; }
+  qcAviso('🔎 Transcribiendo y comparando… puede tardar');
+  try{
+    const r = await cotejarTodo();
+    if(!r){ qcAviso('No se pudo cotejar — mira el aviso del Video Estudio'); return; }
+    qcAviso('🔎 ' + r.hechos + ' comparados · ' + r.mal + ' no cuadran · ' + r.dudosos
+            + ' dudosos — marcados en el libreto, sin cambiar una palabra');
+  }catch(e){
+    fallo('cotejarTodo · index.html:qcCotejar', e, 'el cotejo se ha quedado a medias');
+    qcAviso('⚠️ El cotejo falló: ' + ((e && e.message) || e));
+  }
 }
 
 /* ═══ GUION DE WORD EN TABLA ═══════════════════════════════════════════════
@@ -9440,6 +9769,8 @@ function hydrateEpisode(d){ _epOpen(true);
       if(r && isFinite(+r.sim)) window._cotejo[k] = { sim:+r.sim, oido:String(r.oido || '').slice(0, 300) };
     }
   }catch(e){}
+  try{ qcCargar(d.qc); }
+  catch(e){ fallo('qcCargar · index.html:epDataAplicar', e, 'las correcciones de QC de este capítulo no se han cargado'); }
   chars = (Array.isArray(d.chars) ? d.chars : []).map(sanChar).filter(Boolean);
   charIdx = {}; chars.forEach(c=> charIdx[c.key] = c);
   numPages = num(d.numPages)|0;
@@ -9527,7 +9858,8 @@ async function epDataUpsert(epId, showId){
       pdfName, xlsName: xlsFileName, charsRaw: window._charsRaw || null,
       adr: (window._adrDatos && Object.keys(window._adrDatos).length) ? window._adrDatos : null,
       cortes: (typeof CORTES !== 'undefined' && CORTES.lista.length) ? CORTES.lista : null,
-      cotejo: (window._cotejo && Object.keys(window._cotejo).length) ? window._cotejo : null };
+      cotejo: (window._cotejo && Object.keys(window._cotejo).length) ? window._cotejo : null,
+      qc: qcParaGuardar() };
     const stamp = new Date().toISOString();
     let { error } = await sb.from('episode_data').upsert({ ep_id:epId, show_id:showId||null, data, updated_at:stamp });
     if(error && authErr(error) && await reAuth()){
@@ -9684,7 +10016,8 @@ async function ensureLibretoJson(ep){
       pdfName, xlsName:xlsFileName, charsRaw: window._charsRaw || null,
       adr: (window._adrDatos && Object.keys(window._adrDatos).length) ? window._adrDatos : null,
       cortes: (typeof CORTES !== 'undefined' && CORTES.lista.length) ? CORTES.lista : null,
-      cotejo: (window._cotejo && Object.keys(window._cotejo).length) ? window._cotejo : null });
+      cotejo: (window._cotejo && Object.keys(window._cotejo).length) ? window._cotejo : null,
+      qc: qcParaGuardar() });
     const { error } = await sb.storage.from('libretos').upload(jsonPath, new Blob([payload], {type:'application/json'}), {upsert:true, contentType:'application/json'});
     if(error) return;
     await sb.from('episodes').update({ json_path: jsonPath }).eq('id', ep.id);
@@ -11224,6 +11557,45 @@ body.haschips .lchips .pgchip{text-align:center}
 body.haschips .ltools{display:flex}
 body.haschips.rclosed .ltools{transform:translateX(100%)}
 .ltools .tt{font-size:9.5px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;margin-top:5px;font-weight:700}
+/* ─── QC · control de calidad ─── */
+.qc-n{font-size:10px;font-weight:800;margin-left:5px;color:var(--dim)}
+.qc-n.hay{color:#F87171}
+.qc-ov{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.55);display:flex;align-items:center;
+  justify-content:center;padding:18px}
+.qc-card{width:min(620px,95vw);max-height:88vh;overflow:auto;background:var(--head);
+  border:1px solid var(--card-b);border-radius:16px;padding:16px;box-shadow:0 24px 60px rgba(0,0,0,.55)}
+.qc-h{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.qc-h>span:first-child{font-size:12px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;color:#4ADE80}
+.qc-cuenta{font-size:11px;color:var(--dim);margin-left:auto}
+.qc-x{background:none;border:0;color:var(--dim);font-size:15px;cursor:pointer;padding:2px 6px}
+.qc-form{border:1px solid var(--card-b);border-radius:12px;padding:12px;margin-bottom:12px;background:var(--card)}
+.qc-fr{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.qc-fr.col{flex-direction:column;align-items:stretch}
+.qc-fr label{font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--dim);
+  font-weight:700;flex:0 0 76px}
+.qc-fr input,.qc-fr textarea{flex:1;min-width:0;background:var(--head);color:var(--ink);
+  border:1px solid var(--card-b);border-radius:8px;padding:7px 8px;font:inherit;font-size:13px}
+.qc-fr textarea{resize:vertical}
+.qc-fr button{flex:0 0 auto;font-size:11px;padding:6px 8px;border-radius:8px;
+  border:1px solid var(--card-b);background:var(--head);color:var(--dim);cursor:pointer}
+.qc-fb{display:flex;gap:8px}
+.qc-fb button{padding:8px 12px;border-radius:9px;border:1px solid var(--card-b);
+  background:var(--card);color:var(--ink);font-size:12px;font-weight:600;cursor:pointer}
+.qc-fb .qc-ok{border-color:#4ADE80;color:#4ADE80}
+.qc-lista{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.qc-it{display:flex;align-items:flex-start;gap:8px;border:1px solid var(--card-b);
+  border-radius:10px;padding:8px 9px;background:var(--card)}
+.qc-it.ya{opacity:.5}
+.qc-it.ya .qc-t{text-decoration:line-through}
+.qc-chk{flex:0 0 auto;width:24px;height:24px;border-radius:50%;border:1px solid var(--card-b);
+  background:var(--head);color:#4ADE80;cursor:pointer;font-size:12px;line-height:1}
+.qc-cu{flex:1;min-width:0}
+.qc-m{display:flex;gap:8px;align-items:baseline;margin-bottom:2px}
+.qc-tc{font-size:12px;color:#60A5FA;font-variant-numeric:tabular-nums}
+.qc-q{font-size:11px;font-weight:700;color:var(--ink)}
+.qc-t{font-size:12.5px;color:var(--ink);white-space:pre-wrap;word-break:break-word}
+.qc-ir,.qc-del{flex:0 0 auto;background:none;border:0;color:var(--dim);cursor:pointer;font-size:11px;padding:2px 4px}
+.qc-vacio{font-size:12px;color:var(--dim);text-align:center;padding:18px 8px}
 .ltools .trow{display:flex;gap:5px}
 .ltools button{border:1px solid var(--card-b);background:var(--card);color:var(--ink);border-radius:9px;
   padding:8px 8px;font-size:12px;cursor:pointer;font-family:inherit;text-align:left}
@@ -11655,6 +12027,12 @@ function buildLibretoDoc(pc){
       <button id="tDraw">${LIB_ICON.brush} Pincel</button>
       <button id="tComp">${LIB_ICON.sliders} Ajustar</button>
       <button id="tDict">${LIB_ICON.speak} Significado</button>
+      <div class="tt">QC</div>
+      <button id="tQcAudio" title="Carga el audio del programa para poder cotejarlo con el libreto">⤒ Audio del programa</button>
+      <button id="tQcCotejar" title="Transcribe el capítulo y lo compara con el libreto: marca dónde no coincide. No cambia ni una palabra">🔎 Transcribir y comparar</button>
+      <button id="tQcNueva" title="Apuntar una corrección en el parlamento seleccionado">＋ Corrección</button>
+      <button id="tQcLista" title="Las correcciones de este capítulo">Correcciones<span id="tQcN" class="qc-n"></span></button>
+      <input type="file" id="tQcAudioIn" accept=".wav,.mp3,.m4a,.aac,.ogg,.oga,.opus,.flac,audio/*" style="display:none">
       <div class="tt">Grabación</div>
       <button id="tRec" class="grn">✓ Grabada</button>
     </div>
@@ -11839,6 +12217,19 @@ function buildLibretoDoc(pc){
   }
   if($t('tFind')) $t('tFind').addEventListener('click', ()=> openLibFind());
   if($t('tRec')) $t('tRec').addEventListener('click', ()=> libretoMarkRecorded());
+  if($t('tQcNueva')) $t('tQcNueva').addEventListener('click', ()=> qcPanel(true));
+  if($t('tQcLista')) $t('tQcLista').addEventListener('click', ()=> qcPanel(false));
+  /* El audio del programa entra por la misma puerta que la pista de diálogos
+     —`karAudioDialogos`—, que es la que ya sabe descodificar y dibujar la onda.
+     Así el cotejo lo encuentra sin cambiar nada del reconocedor. */
+  { const b = $t('tQcAudio'), i = $t('tQcAudioIn');
+    if(b && i){ b.addEventListener('click', ()=> i.click());
+                i.addEventListener('change', ()=>{
+                  if(i.files && i.files[0]) qcCargarAudio(i.files[0]);
+                  i.value = '';
+                }); } }
+  if($t('tQcCotejar')) $t('tQcCotejar').addEventListener('click', ()=> qcCotejar());
+  try{ qcPintarCuenta(); }catch(e){ fallo('qcPintarCuenta · index.html:libreto', e); }
   const dl = $t('dtabL'), dr = $t('dtabR');
   if(dl) dl.addEventListener('click', ()=>{ d.body.classList.toggle('lclosed'); dl.textContent = d.body.classList.contains('lclosed')?'⟩':'⟨'; });
   if(dr) dr.addEventListener('click', ()=>{ d.body.classList.toggle('rclosed'); dr.textContent = d.body.classList.contains('rclosed')?'⟨':'⟩'; });
