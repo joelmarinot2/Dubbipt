@@ -286,6 +286,61 @@ exports.pruebas = function(t){
          .test(TODO),
        'dos cotejos a la vez sobre el mismo capítulo se pisan');
 
+  t.seccion('12c · en cada fase, solo las herramientas de cada quien');
+  /* Pedido de sala. Antes el cajon lo traia TODO en las tres fases -solo en QC
+     se escondia lo de escribir-, asi que quien repartia tenia delante los
+     botones de cotejar y quien grababa los de QC. */
+  const P = montar([['/* De quién es cada herramienta del cajón.', '/**\n * Deja en el cajón']],
+                   ['PERFIL_CAJON_DE', 'perfilVeLaHerramienta'],
+                   { window: {}, console: { warn: () => {}, log: () => {} } });
+  const DE = P.PERFIL_CAJON_DE;
+  const ve = P.perfilVeLaHerramienta;
+
+  /* Que la tabla esté bien no basta: hay que APLICARLA. Sin esto, la mutación
+     de enseñar todo en todas las fases no ponía nada en rojo. */
+  t.ok('quien graba ve lo de marcar', ve('tEdit', 'grabacion'));
+  t.ok('y NO ve lo de QC', !ve('tQcCotejar', 'grabacion'));
+  t.ok('quien revisa ve lo de QC', ve('tQcCotejar', 'qc'));
+  t.ok('y NO ve lo de marcar', !ve('tEdit', 'qc'));
+  t.ok('quien reparte no ve ni lo uno ni lo otro',
+       !ve('tEdit', 'casting') && !ve('tQcCotejar', 'casting'));
+  t.ok('pero los tres ven lo de leer',
+       ve('tFind', 'grabacion') && ve('tFind', 'qc') && ve('tFind', 'casting'),
+       'sin esto el libreto no se podría ni recorrer');
+  /* Y que el cajón PREGUNTE. Esto va sobre el código porque es el cable entre
+     la decisión y los botones, y ahí no llega ninguna prueba de las de arriba:
+     la tabla puede estar perfecta y el cajón no mirarla. Se vio mutándolo. */
+  t.ok('y el cajón pregunta por ahí antes de esconder nada',
+       /b\.style\.display = perfilVeLaHerramienta\(id, m\) \? '' : 'none';/.test(TODO),
+       'la tabla puede estar perfecta y el cajón enseñarlo todo igual');
+
+  const escriben = ['tEdit', 'tPause', 'tUnpause', 'tAccent', 'tClear', 'tDraw', 'tComp', 'tRec'];
+  escriben.forEach(id => t.eq('escribir en el libreto es de quien graba: ' + id, DE[id], 'grabacion',
+    'quien revisa o reparte no marca pausas ni da por grabada una intervención'));
+
+  const deQc = ['tQcAudio', 'tQcCotejar', 'tQcNueva', 'tQcLista', 'tQcPdf'];
+  deQc.forEach(id => t.eq('cotejar y apuntar es de quien revisa: ' + id, DE[id], 'qc'));
+
+  /* Y lo de LEER Y MOVERSE no tiene dueño: si lo tuviera, el libreto no se
+     podria ni recorrer en las otras dos fases. */
+  ['tScope', 'tTheme', 'tPgGo', 'tFontDn', 'tFontUp', 'tGo', 'tFind', 'tPron', 'tDict', 'tHide']
+    .forEach(id => t.ok('leer y moverse es de todos: ' + id, !(id in DE),
+      'con dueño, en las otras fases el libreto no se podría ni recorrer'));
+
+  /* El titulo de un grupo se quita mirando lo que le queda debajo, NO por su
+     nombre: con los nombres a mano, mover un titulo dejaba un encabezado
+     encabezando el vacio y nadie se enteraba. */
+  t.ok('el título de un grupo vacío se quita mirando su grupo',
+       /if\(h\.classList && h\.classList\.contains\('tt'\)\) break;/.test(TODO)
+       && /t\.style\.display = algoVivo \? '' : 'none';/.test(TODO));
+  t.eq('y no por su nombre', (TODO.match(/nombre === 'marcar'/g) || []).length, 0,
+       'ir por nombres se rompe en silencio al cambiar un título de sitio');
+  /* «Leer» tiene que existir como grupo propio: antes Buscar, Pronunciaciones y
+     Significado vivian bajo «Marcar», asi que al quitarle a QC lo de marcar se
+     quedaban sin titulo o se iban con el. */
+  t.ok('«Leer» es un grupo propio en el cajón', />Leer<\/div>/.test(TODO),
+       'antes buscar y pronunciaciones vivían bajo «Marcar», que no es lo que son');
+
   t.seccion('13 · la sección QC está en el panel de herramientas');
   t.ok('con su título', />QC<\/div>/.test(TODO) || /class="tt">QC</.test(TODO));
   ['tQcAudio', 'tQcCotejar', 'tQcNueva', 'tQcLista'].forEach(id => {

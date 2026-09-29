@@ -2300,7 +2300,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.3.1-nube';
+const APP_VER_NUM = 'v11.4.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3951,28 +3951,54 @@ function perfilPintar(){
   perfilAjustarCajon(d, m);
 }
 
-/* Lo que ESCRIBE en el libreto: marcas, pausas, acentos y dar por grabada una
-   intervención. En QC no se ofrece —quien revisa no marca el libreto, y tener
-   el botón delante es invitar a tocarlo por error—. */
-const PERFIL_CAJON_ESCRIBEN = ['tEdit', 'tPause', 'tUnpause', 'tAccent', 'tClear', 'tDraw', 'tRec'];
+/* De quién es cada herramienta del cajón.
+   Lo que no aparece aquí es de TODOS —vista, página, letra, tiempo, leer—:
+   sin eso el libreto no se puede ni recorrer, y las tres fases lo recorren. */
+const PERFIL_CAJON_DE = {
+  /* Escribir en el libreto es de quien graba. Quien revisa o reparte no marca
+     pausas ni da por grabada una intervención, y tener el botón delante es
+     invitar a tocarlo por error. */
+  tEdit:'grabacion', tPause:'grabacion', tUnpause:'grabacion', tAccent:'grabacion',
+  tClear:'grabacion', tDraw:'grabacion', tComp:'grabacion', tRec:'grabacion',
+  /* Y cotejar, apuntar y entregar es de quien revisa. */
+  tQcAudio:'qc', tQcCotejar:'qc', tQcNueva:'qc', tQcLista:'qc', tQcPdf:'qc'
+};
 
-/** Deja en el cajón de la derecha solo lo que toca a este perfil.
-    Lo que se queda SIEMPRE es lo de leer y moverse —página, letra, tiempo,
-    buscar, pronunciaciones, significado—: sin eso el libreto no se puede ni
-    recorrer, y quien hace QC lo recorre entero. */
+/** ¿Ve este perfil esta herramienta? Lo que no tiene dueño lo ve todo el
+    mundo, que es lo de leer y moverse. */
+function perfilVeLaHerramienta(id, m){
+  const de = PERFIL_CAJON_DE[id];
+  return !de || de === m;
+}
+
+/**
+ * Deja en el cajón de la derecha SOLO las herramientas de este perfil.
+ *
+ * Y quita el título de un grupo cuando se ha ido TODO el grupo: se mira qué
+ * queda debajo de cada título hasta el siguiente, en vez de ir por nombres.
+ * Con los nombres a mano, cambiar un título de sitio dejaba un encabezado
+ * encabezando el vacío y nadie se enteraba.
+ */
 function perfilAjustarCajon(d, m){
-  const esQc = (m === 'qc');
-  for(const id of PERFIL_CAJON_ESCRIBEN){
+  for(const id in PERFIL_CAJON_DE){
     const b = d.getElementById(id);
-    if(b) b.style.display = esQc ? 'none' : '';
+    if(b) b.style.display = perfilVeLaHerramienta(id, m) ? '' : 'none';
   }
-  /* Y sus dos títulos, que si no se quedan encabezando el vacío. */
   try{
-    const tts = Array.prototype.slice.call(d.querySelectorAll('#lTools .tt'));
-    for(const t of tts){
-      const nombre = String(t.textContent || '').trim().toLowerCase();
-      if(nombre === 'marcar' || nombre === 'grabación' || nombre === 'grabacion')
-        t.style.display = esQc ? 'none' : '';
+    const caja = d.getElementById('lTools'); if(!caja) return;
+    const hijos = Array.prototype.slice.call(caja.children);
+    for(let i = 0; i < hijos.length; i++){
+      const t = hijos[i];
+      if(!t.classList || !t.classList.contains('tt')) continue;
+      let algoVivo = false;
+      for(let j = i + 1; j < hijos.length; j++){
+        const h = hijos[j];
+        if(h.classList && h.classList.contains('tt')) break;      // empieza otro grupo
+        /* El hueco del audio es un `input` escondido a propósito: no cuenta. */
+        if(h.tagName === 'INPUT' && h.type === 'file') continue;
+        if(h.style.display !== 'none'){ algoVivo = true; break; }
+      }
+      t.style.display = algoVivo ? '' : 'none';
     }
   }catch(e){ /* sin el cajón pintado no hay títulos que esconder */ }
 }
@@ -12573,10 +12599,11 @@ function buildLibretoDoc(pc){
       <button id="tUnpause" title="Borrar pausas una a una">✕ Pausa</button>
       <button id="tAccent">á Acento</button>
       <button id="tClear">Limpiar</button>
-      <button id="tPron">${LIB_ICON.speak} Pronunc.</button>
-      <button id="tFind">${LIB_ICON.search} Buscar</button>
       <button id="tDraw">${LIB_ICON.brush} Pincel</button>
       <button id="tComp">${LIB_ICON.sliders} Ajustar</button>
+      <div class="tt">Leer</div>
+      <button id="tFind">${LIB_ICON.search} Buscar</button>
+      <button id="tPron">${LIB_ICON.speak} Pronunc.</button>
       <button id="tDict">${LIB_ICON.speak} Significado</button>
       <div class="tt">QC</div>
       <button id="tQcAudio" title="Carga el audio del programa para poder cotejarlo con el libreto">⤒ Audio del programa</button>
