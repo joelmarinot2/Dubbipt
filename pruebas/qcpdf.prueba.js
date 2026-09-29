@@ -432,6 +432,63 @@ exports.pruebas = function(t){
   t.ok('en el informe de correcciones el timecode también cabe', anchosCor[0] >= 25,
        'mide ' + anchosCor[0].toFixed(1) + ' mm');
 
+  t.seccion('18c · el informe de cambios dice cuánto se analizó');
+  /* Pedido de sala: «al finalizar me entregue tambien un PDF». Se entrega
+     siempre, también sin cambios, y entonces lo que dice es que se analizó y
+     que coincide. */
+  const uno = { tcSec: 3650, quien: 'BETO', escrito: 'Adiós', oido: 'otra', sim: 0.3, nivel: 'mal', et: 'no cuadra' };
+  const conA = M.qcpdfDeCambios([uno], { analizados: 72, tardo: '50 s' });
+  t.eq('cuántos de cuántos', conA.conteo, '1 cambio de 72 parlamentos');
+  t.eq('con las pastillas de analizados y de los que coinciden',
+       conA.chips.map(c => c.n + ' ' + c.et).join(' · '), '72 Analizados · 71 Coinciden · 1 No cuadran');
+  t.ok('y lo que tardó el análisis', /Análisis: 50 s/.test(conA.subtitulo), conA.subtitulo);
+  t.eq('nunca menos analizados que cambios', M.qcpdfDeCambios([uno, uno], { analizados: 1 }).conteo,
+       '2 cambios de 2 parlamentos', 'un «3 cambios de 2» no lo cree nadie');
+  t.eq('sin saber cuántos, no se inventa', M.qcpdfDeCambios([uno], {}).conteo, '1 cambio');
+  const sinC = M.qcpdfDeCambios([], { analizados: 72 });
+  t.eq('sin cambios, una sola fila', sinC.filas.length, 1);
+  t.eq('que lo dice con todas las letras', sinC.filas[0].aviso,
+       'Sin cambios: los 72 parlamentos analizados coinciden con el libreto.',
+       'una tabla vacía parece un informe roto');
+  t.eq('y sus pastillas', sinC.chips.map(c => c.n + ' ' + c.et).join(' · '), '72 Analizados · 72 Coinciden');
+  t.eq('con uno solo, en singular', M.qcpdfDeCambios([], { analizados: 1 }).filas[0].aviso,
+       'Sin cambios: el parlamento analizado coincide con el libreto.');
+
+  t.seccion('18d · la fila de «sin cambios» se pinta de verdad');
+  /* El dibujo no se prueba con jsPDF -hace falta un navegador-, pero SÍ que el
+     aviso llegue a la hoja: un documento de mentira apunta lo que se escribe y
+     dónde. Sin esto, quitar la rama del aviso no ponía nada en rojo. */
+  const D = montar([['const QCPDF_COLOR = {', 'function qcpdfCargar(){'],
+                    ['/* ── Medidas de la hoja', '/* ── Una imagen en blanco y negro']],
+                   ['qcpdfPintar', 'QCPDF_PASOS', 'QCPDF_HOJA'],
+                   { QC_TIPOS: QC.QC_TIPOS, window: {}, document: {}, console: { warn: () => {}, log: () => {} } });
+  const docFalso = () => {
+    const d = { textos: [], hojas: 1, pt: 10 };
+    ['setFillColor', 'setDrawColor', 'setLineWidth', 'setTextColor', 'setFont', 'setCharSpace',
+     'rect', 'roundedRect', 'line', 'circle', 'setPage'].forEach(k => { d[k] = () => {}; });
+    d.setFontSize = (n) => { d.pt = n; };
+    d.getTextWidth = (s) => String(s).length * d.pt * 0.18;
+    d.splitTextToSize = (s, w) => {
+      const out = []; let l = '';
+      for(const p of String(s).split(' ')){ const c = l ? l + ' ' + p : p;
+        if(d.getTextWidth(c) > w && l){ out.push(l); l = p; } else l = c; }
+      if(l) out.push(l);
+      return out.length ? out : [''];
+    };
+    d.text = (s, x, y, o) => { d.textos.push({ s: Array.isArray(s) ? s.join(' ') : String(s), x: x, y: y, o: o || {} }); };
+    d.addPage = () => { d.hojas++; };
+    return d;
+  };
+  const doc = docFalso();
+  const paso = D.QCPDF_PASOS[0];
+  const hojas = D.qcpdfPintar(doc, sinC, paso, false);
+  const av = doc.textos.find(x => /Sin cambios/.test(x.s));
+  t.ok('el aviso está en la hoja', !!av, JSON.stringify(doc.textos.map(x => x.s)));
+  t.eq('centrado, que no se lea como una celda suelta', av && av.o.align, 'center');
+  t.cerca('en el centro de la tabla', av ? av.x : 0, D.QCPDF_HOJA.w / 2, 0.01);
+  t.eq('en una sola hoja', hojas, 1);
+  t.eq('y midiendo, también una', D.qcpdfPintar(docFalso(), sinC, paso, true), 1);
+
   t.seccion('19 · la hoja es A4 y el último paso no baja de 7,5 pt');
   t.eq('ancho A4', M.QCPDF_HOJA.w, 210);
   t.eq('alto A4', M.QCPDF_HOJA.h, 297);

@@ -252,48 +252,19 @@ function cortesPegar(margen){
 
 /* ── Cotejo con lo que de verdad se dice ──────────────────────────────── */
 
-/* `total`, `mal` y `dudosos` no los usa el cotejo para nada: los publica para
-   que se pueda ENSEÑAR por dónde va. Llegó de sala: «no sé si está haciendo
-   algo». El cotejo tarda minutos -baja el modelo de voz, descodifica el audio
-   y luego va parlamento a parlamento- y sin esto no se ve ni un número. */
-const COTEJO = { res:new Map(), trabajando:false, cancelar:false,
+/* `total`, `vistos`, `mal` y `dudosos` no los usa el análisis para nada: los
+   publica para que se pueda ENSEÑAR por dónde va. Llegó de sala: «no sé si
+   está haciendo algo». `total` y `vistos` van en milésimas del audio ya oído,
+   no en parlamentos: los tramos se reparten entre varios trabajadores y acaban
+   desordenados, así que lo único que avanza de forma pareja es el audio. */
+const COTEJO = { res:new Map(), trabajando:false, cancelar:false, parado:false,
                  hechos:0, vistos:0, total:0, mal:0, dudosos:0, fase:'' };
 
-/** Palabras normalizadas de un texto, para comparar. */
-function cotPalabras(t){
-  return String(t || '').split(/\s+/).map(x => karNorm(x)).filter(Boolean);
-}
-/** Subsecuencia común más larga: mide parecido SIN perder el orden. */
-function cotParecido(a, b){
-  if(!a.length || !b.length) return 0;
-  const m = a.length, n = b.length;
-  let prev = new Array(n + 1).fill(0), cur = new Array(n + 1).fill(0);
-  for(let i = 1; i <= m; i++){
-    for(let j = 1; j <= n; j++)
-      cur[j] = (a[i-1] === b[j-1]) ? prev[j-1] + 1 : Math.max(prev[j], cur[j-1]);
-    const t = prev; prev = cur; cur = t; cur.fill(0);
-  }
-  return prev[n] / Math.max(m, n);
-}
-
-/** Transcribe la ventana de un cue y la compara con lo escrito. */
-async function cotejarCue(si){
-  const ven = karVentana(si);
-  const b = script[si];
-  if(!ven || !b) return null;
-  const escrito = cotPalabras((b.lines || []).join(' '));
-  if(!escrito.length) return null;
-  const a0 = Math.max(0, karVid(ven[0]) - 0.25);
-  const a1 = Math.min(karIa.pcm.length / karIa.sr, karVid(ven[1]) + 0.25);
-  if(!(a1 > a0 + 0.25)) return null;
-  const trozo = karIa.pcm.slice(Math.round(a0 * karIa.sr), Math.round(a1 * karIa.sr));
-  try{
-    const out = await karIa.pipe(trozo, { language:karIa.idioma, task:'transcribe' });
-    const oido = String((out && out.text) || '').trim();
-    const sim = cotParecido(escrito, cotPalabras(oido));
-    return { sim: sim, oido: oido };
-  }catch(e){ return null; }
-}
+/* Desde cuánto parecido se avisa. Los mismos dos números para el análisis, la
+   hoja de cues y el informe: si cada uno tuviera los suyos, un parlamento
+   saldría como cambio en un sitio y bien en otro. */
+const COTEJO_MAL = 0.45;
+const COTEJO_DUDOSO = 0.72;
 
 function cotejoDatos(){
   if(!window._cotejo || typeof window._cotejo !== 'object') window._cotejo = {};
@@ -307,60 +278,137 @@ function cotejoDe(si){
 function cotejoAviso(si){
   const r = cotejoDe(si);
   if(!r) return null;
-  if(r.sim < 0.45) return { nivel:'mal', et:'no cuadra', color:'#F87171', sim:r.sim, oido:r.oido };
-  if(r.sim < 0.72) return { nivel:'dudoso', et:'dudoso', color:'#FBBF24', sim:r.sim, oido:r.oido };
+  if(r.sim < COTEJO_MAL) return { nivel:'mal', et:'no cuadra', color:'#F87171', sim:r.sim, oido:r.oido };
+  if(r.sim < COTEJO_DUDOSO) return { nivel:'dudoso', et:'dudoso', color:'#FBBF24', sim:r.sim, oido:r.oido };
   return null;
 }
 
-/** Coteja el capítulo entero, cue a cue, sin bloquear la aplicación. */
+/** El tiempo que ha tardado, dicho como se dice. */
+function cotejoTardo(seg){
+  const s = Math.max(1, Math.round(+seg || 0));
+  if(s < 60) return s + ' s';
+  const m = Math.floor(s / 60), r = s % 60;
+  return m + ' min' + (r ? (' ' + r + ' s') : '');
+}
+
+/**
+ * Analiza el capítulo entero: oye el audio por tramos y dice qué parlamentos no
+ * dicen lo que pone. El cómo —y por qué así es mucho más rápido que de
+ * parlamento en parlamento— está contado en `analisis.js`.
+ *
+ * Llamado mientras trabaja, lo PARA. Devuelve la cuenta, o nulo si no pudo o
+ * si se paró; `COTEJO.parado` dice cuál de las dos.
+ *
+ * Lo de antes no se toca hasta tener lo nuevo ENTERO: parar a medias deja el
+ * análisis anterior como estaba. Y al acabar se sustituye de golpe, no se
+ * mezcla: un resultado de otro día colgando de un parlamento que hoy no se ha
+ * podido comparar sería un cambio inventado.
+ */
 async function cotejarTodo(){
-  if(COTEJO.trabajando){ COTEJO.cancelar = true; stMsg('Cotejo cancelado'); return null; }
-  if(!studio.url && !studio.dlgUrl){ stMsg('⚠️ Primero carga el vídeo o la pista de diálogos'); return null; }
-  COTEJO.trabajando = true; COTEJO.cancelar = false;
-  COTEJO.hechos = 0; COTEJO.total = 0; COTEJO.mal = 0; COTEJO.dudosos = 0;
-  COTEJO.fase = 'preparando';
-  stMsg('⏳ Preparando el reconocimiento de voz…');
-  const ok = await karIaPreparar();
-  if(!ok){ COTEJO.trabajando = false; COTEJO.fase = ''; return null; }
-  const d = cotejoDatos();
-  const lista = [];
-  for(let i = 0; i < script.length; i++)
-    if(script[i] && script[i].tcEff != null && (script[i].lines || []).join('').trim()) lista.push(i);
-  let mal = 0, dudosos = 0;
-  /* Se publica ANTES de empezar: es el número que convierte «está pensando» en
-     «va por el 37 de 412». */
-  COTEJO.total = lista.length; COTEJO.fase = 'cotejando';
-  stMsg('🔎 Cotejando… 0 de ' + lista.length);
-  for(let n = 0; n < lista.length; n++){
-    if(COTEJO.cancelar) break;
-    const si = lista[n];
-    const r = await cotejarCue(si);
-    if(r){
-      d[si] = { sim: +r.sim.toFixed(3), oido: r.oido.slice(0, 300) };
-      COTEJO.hechos++;
-      if(r.sim < 0.45) mal++; else if(r.sim < 0.72) dudosos++;
-    }
-    COTEJO.mal = mal; COTEJO.dudosos = dudosos;
-    /* `vistos` cuenta por dónde va aunque ese parlamento no se haya podido
-       cotejar; `hechos` cuenta los que sí. Para quien espera lo que importa es
-       que la barra AVANCE, y hay parlamentos que no se pueden cotejar. */
-    COTEJO.vistos = n + 1;
-    if(n % 3 === 0 || n === lista.length - 1)
-      stMsg('🔎 Cotejando… ' + (n + 1) + ' de ' + lista.length
-            + (mal ? (' · ' + mal + ' no cuadran') : '') + (dudosos ? (' · ' + dudosos + ' dudosos') : ''));
-    await new Promise(r2 => setTimeout(r2, 0));      // dejar respirar a la interfaz
+  if(COTEJO.trabajando){
+    COTEJO.cancelar = true;
+    try{ anaParar(); }catch(e){ fallo('anaParar · js/cortes.js:cotejarTodo', e); }
+    stMsg('Análisis parado');
+    return null;
   }
-  COTEJO.trabajando = false; COTEJO.fase = '';
-  try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · js\cortes.js:338', e, 'puede que esto no se haya guardado en la nube'); }
-  try{ adrRepintar(); }catch(e){ fallo('adrRepintar · js\cortes.js:339', e); }
-  const msg = '🔎 ' + COTEJO.hechos + ' cotejados · ' + mal + ' no cuadran · ' + dudosos + ' dudosos';
-  stMsg(msg);
-  /* Dónde mirarlos depende del perfil. «📋 Cues» es del Video Estudio, y QC no
-     lo lleva: mandar ahí a quien revisa era mandarle a un botón que no tiene. */
-  const donde = (typeof perfilLlevaVideo === 'function' && typeof DDL_MODO !== 'undefined'
-                 && !perfilLlevaVideo(DDL_MODO)) ? '«≠ Cambios»' : '«📋 Cues»';
-  castAviso(msg + ' — míralos en ' + donde + ', no se ha cambiado ni una palabra del libreto');
-  return { hechos: COTEJO.hechos, mal: mal, dudosos: dudosos };
+  if(!studio.url && !studio.dlgUrl){ stMsg('⚠️ Primero carga el audio del programa'); return null; }
+  COTEJO.trabajando = true; COTEJO.cancelar = false; COTEJO.parado = false;
+  COTEJO.hechos = 0; COTEJO.vistos = 0; COTEJO.total = 0; COTEJO.mal = 0; COTEJO.dudosos = 0;
+  COTEJO.fase = 'preparando';
+  const t0 = Date.now();
+  const parado = () => !!COTEJO.cancelar;
+  try{
+    karIa.error = null;
+    stMsg('⏳ Preparando el audio…');
+    try{ await karIaAudio(); }
+    catch(e){
+      karIa.error = 'no se pudo leer el audio: ' + ((e && e.message) || e);
+      stMsg('⚠️ ' + karIa.error);
+      return null;
+    }
+    if(parado()){ COTEJO.parado = true; return null; }
+
+    const plan = anaPlan(karIa.pcm, karIa.sr);
+    if(!plan.tramos.length){
+      karIa.error = 'en ese audio no se oye ninguna voz';
+      stMsg('⚠️ ' + karIa.error);
+      return null;
+    }
+    const ventanas = anaVentanas();
+
+    /* Se publica ANTES de empezar: es lo que convierte «está pensando» en «va
+       por el 37 %». */
+    COTEJO.total = 1000; COTEJO.fase = 'cotejando';
+    let arranque = 0;
+    const o = {
+      idioma: karIa.idioma,
+      parado: parado,
+      bajando: (m) => {
+        const mb = (m && m.bytes > 0) ? (' ' + Math.round(m.bytes / 1048576) + ' MB') : '';
+        stMsg('⏳ Bajando el modelo de voz, solo la primera vez…' + mb);
+      },
+      avisa: (hecho, total, cuantos) => {
+        if(!arranque) arranque = Date.now();
+        COTEJO.vistos = Math.round(1000 * hecho / total);
+        const queda = anaQueda(hecho, total, (Date.now() - arranque) / 1000);
+        stMsg('🔎 Analizando… ' + Math.round(100 * hecho / total) + ' %' + (queda ? (' · ' + queda) : ''));
+      }
+    };
+    stMsg('⏳ Preparando el reconocimiento de voz…');
+    let oido = null;
+    try{
+      oido = await anaTranscribir(karIa.pcm, plan.tramos, o);
+    }catch(e){
+      if(parado()){ COTEJO.parado = true; return null; }
+      if(!(e && e.sinTrabajadores)){
+        /* Arrancaron, pero un tramo no se pudo oír ni a la segunda. Se dice y
+           se para: dar por buenos los parlamentos de ese tramo sería mentir. */
+        karIa.error = (e && e.message) || String(e);
+        stMsg('⚠️ ' + karIa.error);
+        return null;
+      }
+      /* Los trabajadores no han podido ni arrancar. Se hace en la propia
+         página, de uno en uno: más lento, pero sale. Y si tampoco,
+         `karIaPreparar` averigua por qué y lo deja dicho. */
+      fallo('anaTranscribir · js/cortes.js:cotejarTodo', e);
+      stMsg('⏳ Preparando el reconocimiento de voz…');
+      if(!(await karIaPreparar())) return null;
+      arranque = 0; COTEJO.vistos = 0;
+      oido = await anaTranscribirAqui(karIa.pcm, plan.tramos, o);
+    }
+    if(!oido || parado()){ COTEJO.parado = true; return null; }
+
+    const palabras = [];
+    oido.forEach(h => anaOidas(h.items, h.mapa).forEach(p => palabras.push(p)));
+    const r = anaRepartir(ventanas, palabras, plan.duracion);
+    let mal = 0, dudosos = 0, hechos = 0;
+    for(const si in r.por){
+      hechos++;
+      if(r.por[si].sim < COTEJO_MAL) mal++;
+      else if(r.por[si].sim < COTEJO_DUDOSO) dudosos++;
+    }
+    window._cotejo = r.por;
+    COTEJO.hechos = hechos; COTEJO.mal = mal; COTEJO.dudosos = dudosos;
+    COTEJO.vistos = COTEJO.total;
+
+    try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }
+    catch(e){ fallo('epDataUpsert · js/cortes.js:cotejarTodo', e, 'puede que esto no se haya guardado en la nube'); }
+    try{ adrRepintar(); }catch(e){ fallo('adrRepintar · js/cortes.js:cotejarTodo', e); }
+
+    const segundos = (Date.now() - t0) / 1000;
+    const msg = '🔎 ' + hechos + ' analizados en ' + cotejoTardo(segundos) + ' · '
+              + mal + ' no cuadran · ' + dudosos + ' dudosos';
+    stMsg(msg);
+    /* Dónde mirarlos depende del perfil. «📋 Cues» es del Video Estudio, y QC no
+       lo lleva: mandar ahí a quien revisa era mandarle a un botón que no tiene. */
+    const donde = (typeof perfilLlevaVideo === 'function' && typeof DDL_MODO !== 'undefined'
+                   && !perfilLlevaVideo(DDL_MODO)) ? '«≠ Cambios»' : '«📋 Cues»';
+    castAviso(msg + ' — míralos en ' + donde + ', no se ha cambiado ni una palabra del libreto');
+    return { hechos: hechos, mal: mal, dudosos: dudosos, fuera: r.fuera, sinTexto: r.sinTexto,
+             segundos: segundos, tramos: plan.tramos.length, voz: plan.voz, duracion: plan.duracion };
+  }finally{
+    COTEJO.trabajando = false; COTEJO.fase = '';
+  }
 }
 
 /* ── El panel de los planos ───────────────────────────────────────────── */

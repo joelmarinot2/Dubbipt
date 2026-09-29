@@ -64,6 +64,13 @@ El modelo es siempre el mismo:
 | **QC-19** | Dónde empieza el audio se corrige **desde QC**, en **«⏱ Inicio»**, que enseña en el propio botón el que vale. Es **el mismo dato** que el «TC inicio» del Video Estudio, no una copia. Una **errata no mueve nada**: el panel se queda abierto, dice qué no entendió y **conserva lo tecleado**. Cambiarlo **caduca lo cotejado** —cada parlamento se buscó en el trozo de audio que decía el inicio de antes— y se borra también en la nube, para que no resucite al reabrir el capítulo; guardar **el mismo** valor no borra nada. Los dos atajos —la hora en punto del libreto y el cero— **rellenan, no guardan**. Al cargar el audio se dice **siempre** el inicio que vale, se haya supuesto o viniera puesto: el que viene puesto es el que más engaña, porque el Video Estudio deja el tiempo del **primer parlamento** al cargar un vídeo, no la hora en punto. Y si ningún parlamento cayó dentro del audio, el panel **se abre solo** con el porqué delante. | ✅ |
 | **QC-20** | La fila del avance **sobrevive a los repintados** de la barra del perfil. Colgaba de ella y repintarla se la llevaba: el «✅ 412 comparados» del final se escribía y se borraba en la línea siguiente, y cualquier refresco del libreto a medio cotejo apagaba el progreso. La barra y la tira que va y viene salen **solo mientras trabaja** —un aviso ya terminado con la tira moviéndose dice lo contrario de lo que es— y un aviso terminado **se puede quitar**. | ✅ |
 | **QC-21** | Lo de QC-10 vale también para la **barra de arriba** del libreto y para los **botones flotantes**. En QC y en Casting no están el **lápiz**, el **pincel** —ni el de la barra ni el flotante— ni **«✓ Página grabada»**, y el **engranaje se queda solo con «Colores»**. Marcar es de quien graba **esté el botón donde esté**: el cajón ya lo cumplía y arriba seguía todo a la vista, las mismas herramientas por otra puerta. El **engranaje no se esconde**: los colores son cómo se ve el libreto, no una herramienta de marcar, y tienen que seguir al alcance en los tres perfiles; además su panel se coloca midiendo dónde está el botón. Lo que se va es lo de dentro que actúa sobre la caja —completar, editar, pausa, quitar pausa, acento, limpiar, ajustar, dividir, unir— y con ello la cabecera de «caja seleccionada», que sin herramientas de caja no dice nada; el botón pasa a decir «Colores del libreto». Cada entrada del engranaje **lleva nombre y dueño**, y la única sin dueño es Colores: una herramienta de caja nueva sin dueño saldría en las tres fases. El **lápiz tiene dos oficios** —en rol tablet abre el cajón de la derecha—, así que **donde hay cajón se queda** en los tres perfiles. **Entrar en un perfil que no marca suelta lo que hubiera encendido**: el pincel, la pausa o el acento armados, el modo de editar y las cajas abiertas. Esconder el botón no basta, porque se seguiría pintando sobre el libreto sin nada a la vista con que apagarlo. Lo que se estuviera escribiendo **se guarda**: cambiar de perfil no le cuesta a nadie lo tecleado. En Grabación no se toca nada. Se esconde **en línea y con `!important`**, como en QC-18 y por lo mismo. | ✅ |
+| **QC-22** | «Cotejar» pasa a llamarse **«Analizar cambios»**, en la barra de QC, en el cajón y en el Video Estudio, y en todos los avisos que lo nombran. Pedido de sala. No queda **ninguna puerta con el nombre viejo**: dos nombres para lo mismo es preguntarse si son dos cosas. | ✅ |
+| **QC-23** | El análisis es **mucho más rápido** porque ya no se transcribe parlamento a parlamento. El reconocedor trabaja por ventanas de 30 s y **rellena con silencio**: oír un «sí» de medio segundo le costaba lo mismo que treinta segundos de conversación, y un capítulo de 450 parlamentos pagaba 450 ventanas. Ahora se busca **dónde hay voz** por la energía del audio —con el listón **28 dB por debajo de lo que suena fuerte** y un suelo para que el silencio digital no cuente—, los trozos se juntan en **tramos de 29 s** saltándose los silencios, y los tramos se reparten entre **varios trabajadores en segundo plano**: uno por núcleo menos el de la página, cuatro como mucho, dos con 4 GB de memoria o menos. El **primero baja el modelo** y los demás arrancan después, de la copia ya guardada. Dos trozos a menos de 0,6 s son el mismo, y se juntan **antes** de tirar los de menos de 0,12 s: al revés, la consonante suelta del final de una frase se perdería. Un trozo más largo que un tramo se parte **por la mitad del silencio** más hondo de su último tercio, nunca por su primer instante, que es donde acaba de terminar la voz. Cada segundo del tramo **vuelve a su segundo del audio** por un mapa: sin él, cada palabra iría al parlamento equivocado. La barra avanza por **audio oído**, no por parlamentos —los tramos acaban desordenados— y dice **cuánto queda** en cuanto hay un 8 % hecho, no antes. Medido con un premix de prueba: **244 s antes, 50 s ahora**. | ✅ |
+| **QC-24** | Cada palabra oída va **a su parlamento por su tiempo**, y como el timecode del libreto nunca es exacto, los bordes no se toman al pie de la letra. Lo que cae **bien dentro** —a más de 0,3 s de los bordes— es de ese parlamento **coincida o no**: ahí es donde están los cambios, y si se pudiera dejar fuera lo que sobra, las palabras añadidas no saldrían nunca. Lo que cae cerca de un borde, hasta **1,2 s por fuera**, es suyo **solo si le viene bien**: el final del parlamento de antes dicho un poco tarde, o el principio del siguiente. Los parlamentos que caen **fuera del audio** se cuentan aparte y se dicen: no se han comparado, y no es lo mismo que coincidir. Los que solo son acotaciones no se comparan. | ✅ |
+| **QC-25** | Se compara **cómo suena**, no cómo se escribe. El reconocedor escribe de oído y en español muchas letras suenan igual: la **hache** no suena, **be y uve**, **elle, ye e i**, y **ce, zeta y ese** —en el doblaje latino— son el mismo sonido; **ge/gi y jota**, y **qu, ka y la ce de «casa»**, también. Por eso escribía «adormido» por «ha dormido» o «vais» por «bais», y salía como cambio. Además, las palabras que el reconocedor **parte o junta** —«está vais» por «estabais», «hoy es» por «oyes»— se juntan, solo si juntas son una palabra del otro lado y no son ya las dos palabras de allí. Los **números** se comparan en letras —el reconocedor escribe «42» y el libreto «cuarenta y dos»— y las **acotaciones** no cuentan, ni escritas ni oídas, aunque el reconocedor deje un paréntesis sin cerrar. Lo que **sí suena distinto se queda distinto**: «hija» e «hijo», «pero» y «perro» —la erre doble se conserva—, «diez» y «quince». Medido con el mismo premix: de 64 parlamentos dichos tal cual, **23 salían marcados antes y 9 ahora**, y los cambios de verdad encontrados siguen siendo **7 de 8**. | ✅ |
+| **QC-26** | El análisis **no se inventa nada cuando algo falla**. Un tramo que falla se intenta **otra vez**; si vuelve a fallar se para y **se dice la causa**: dar por buenos los parlamentos de ese tramo sería mentir. Un trabajador que **se cae** o **deja de contestar** —cuatro minutos sin respuesta— devuelve su tramo a la cola y lo hacen los demás, y **nadie se va mientras otro tenga un tramo entre manos**: si ese otro se cae, alguien tiene que estar para cogerlo. Si **ninguno arranca** o se caen todos, se hace en la **propia página**, de uno en uno: más lento, pero sigue siendo por tramos. **Parar** cierra todos los trabajadores. Lo analizado antes **no se toca hasta tener lo nuevo entero**, y entonces se **sustituye de golpe**, sin mezclar: un resultado de otro día colgando de un parlamento que hoy no se ha comparado sería un cambio inventado. Parar **no es un fallo** y no se cuenta como tal, y pase lo que pase el análisis **deja de estar «trabajando»**: si no, el botón no volvería a arrancar. | ✅ |
+| **QC-27** | Al acabar se **entrega el PDF solo** y se **abre el resultado**, también cuando **no hay ni un cambio**: ese PDF es la constancia de que el capítulo se analizó y cuadra, y sin panel parecía que no había pasado nada. Pedido de sala: «al finalizar me entregue también un PDF». La barra lo cuenta todo en una línea —cuántos se analizaron, **cuánto tardó**, cuántos no cuadran, cuántos dudosos y cuántos quedaron fuera del audio— y dice si el PDF se descargó o **por qué no**, con dónde volver a pedirlo. El informe también se pide a mano desde «≠ Cambios» siempre que haya análisis, con o sin cambios; **sin análisis no hay informe**. | ✅ |
+| **QC-28** | El audio se **descodifica una sola vez, y ya a 16 kHz**, que es lo que pide el reconocedor. Antes se descodificaba al cargarlo —para la onda— y **otra vez** al analizar, las dos a la frecuencia del equipo, 48 kHz en estéreo: un capítulo de 45 minutos es más de un giga de memoria solo para tirarlo. Ahora de esa descodificación salen la onda y el audio del reconocedor. El premix **recuerda su nombre**, que es el que va en el pie del informe: antes salía el del vídeo, o nada. | ✅ |
 | **QC-7** | El audio que se carga en QC queda en **`studio.dlgUrl`**, que es lo que el reconocedor prefiere al vídeo, y se **olvida el audio ya preparado**. Ese campo se leía en `karIaPreparar` y no lo escribía nadie: hasta ahora Whisper oía siempre el vídeo aunque cargaras otra pista, y sin olvidar el anterior se cotejaría el capítulo nuevo contra la voz del viejo. | ✅ |
 
 ## Nunca
@@ -125,7 +132,59 @@ que cambiar de perfil deje el pincel encendido o tire lo que se estaba
 escribiendo. Y se comprobó **en el navegador**, en los tres perfiles, en
 escritorio, en rol tablet y en la tablet del actor.
 
+**QC-22 a QC-28**: `pruebas/analisis.prueba.js` y `pruebas/qc.prueba.js`. El
+reconocedor no corre en las pruebas —hace falta un navegador y un modelo de
+40 MB—: se sustituye por **trabajadores de mentira** que contestan lo que se les
+dice, y eso es lo que permite probar los caminos raros: uno que se cae, uno que
+deja de contestar, un tramo que falla dos veces, ninguno que arranque. El
+trabajador de verdad se carga desde su archivo y se le habla por mensajes.
+Tres fallos los cazó una prueba antes de llegar a sala: el corte de un tramo
+largo pegado al final de la voz, una palabra sin tiempo que caía en el segundo
+cero —otra vez `+null`, como en QC-4— y un tramo que se quedaba sin oír cuando
+se caía el único trabajador que lo tenía y los demás ya se habían ido.
+
+Y **en el navegador**, con un **premix de prueba** hecho con la voz española de
+Windows: 72 parlamentos, 8 de ellos dichos distinto a propósito —una palabra
+cambiada, media frase, palabras de más, uno que no se dice, otra frase—, con
+el mismo servidor y la misma CSP que producción:
+
+| | Antes | Ahora |
+|---|---|---|
+| Tiempo del análisis | 244 s | 50 s |
+| Dichos tal cual y marcados como cambio | 23 de 64 | 9 de 64 |
+| Cambios de verdad encontrados | 7 de 8 | 7 de 8 |
+
+Y con uno **seis veces más largo** —432 parlamentos, 27,8 minutos, 18 de voz—,
+del tamaño de un capítulo: **3 min 23 s**, 61 de 384 iguales marcados y 42 de
+48 cambios encontrados. El PDF, con 103 filas, salió en cuatro hojas. Al ritmo
+del método de antes habrían sido unos 24 minutos; eso no se midió, se calcula.
+
+Mirando el panel de resultados salió además que la clase de las pastillas del
+tipo la llevaba también el texto de cada fila: cada texto salía como una
+pastilla y el «(nada)» de un oído vacío se partía letra a letra.
+
 ## Sin resolver
+
+- **Un cambio de una sola palabra en una frase larga puede no salir.** «En
+  unos diez días» dicho «en unos quince días» se parece un 88 %, por encima
+  del 72 % desde el que se avisa. Bajar el listón llenaría el informe de
+  avisos falsos con este reconocedor —el más pequeño—; la salida sería uno
+  mayor, que tarda el doble o más.
+- Los números de QC-23 y QC-25 salen de una **voz sintética**, y rápida, en un
+  i3 de dos núcleos que además estaba ocupado. Con un premix de verdad no se
+  han medido todavía ni el tiempo ni los avisos falsos.
+- **QC-25 supone doblaje latino**: la zeta y la ese suenan igual. En doblaje
+  para España «casa» y «caza» son dos palabras distintas y ese cambio no
+  saldría.
+- La **tarjeta gráfica** se probó y aquí fue más lenta que el procesador —41 s
+  y 60 s por tramo frente a 7 s—, así que no se usa. En otro equipo podría ser
+  al revés, pero no se ha medido.
+- El PDF de QC-27 se **descarga sin que nadie pulse nada**, al acabar. Chrome
+  deja la primera descarga así, pero si en la misma sesión ya se descargó otra
+  cosa puede pedir permiso para «descargar varios archivos». No se ha probado
+  en el Chrome de sala; si pasa, el PDF sigue en «≠ Cambios».
+- El botón del Video Estudio usa el mismo análisis, pero **no entrega PDF**: el
+  pedido era de QC, y ahí los resultados van a la hoja de cues.
 
 - **LIB-1**, **LIB-2** y **LIB-N4** ya están cerradas, en
   `pruebas/acentos.prueba.js`: se comprueba que ninguna clave conserve un

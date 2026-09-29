@@ -27,11 +27,17 @@ exports.nombre = 'Cambios de plano y cotejo';
 exports.pruebas = function(t){
   const G = montar(
     [['/** Diferencia media entre dos fotogramas', 'async function cortesAnalizar'],
-     ['function cortesDecidir(muestras){', '/** Coloca el vídeo en un instante'],
-     ['/** Palabras normalizadas de un texto', '/** Transcribe la ventana de un cue']],
-    ['cortesDif', 'cortesDecidir', 'cotPalabras', 'cotParecido'],
+     ['function cortesDecidir(muestras){', '/** Coloca el vídeo en un instante']],
+    ['cortesDif', 'cortesDecidir'],
     { karNorm: karNormReal(), CORTES: { cancelar: false } }
   );
+  /* El parecido lo mide ahora el análisis de cambios (js/analisis.js), que es
+     el que usan la hoja de cues y QC. Se prueba aquí con las mismas frases de
+     siempre: si cambia cómo se compara, estas tienen que seguir saliendo. */
+  const A = montar([['/* ── 3 · Las palabras', '/**\n * Lo que se oyó en UN parlamento']],
+                   ['anaPalabras', 'anaCasar'], { karNorm: karNormReal() });
+  G.cotPalabras = A.anaPalabras;
+  G.cotParecido = (a, b) => A.anaCasar(a, b).sim;
 
   /* 64 × 36 píxeles, tres canales: el mismo tamaño al que mira la aplicación */
   const N = 64 * 36 * 3;

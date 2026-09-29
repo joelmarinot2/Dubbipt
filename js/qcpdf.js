@@ -422,6 +422,23 @@ function qcpdfPintar(doc, d, paso, medir){
   const filas = d.filas || [];
   for(let i = 0; i < filas.length; i++){
     const f = filas[i];
+    /* Un aviso a todo lo ancho -«sin cambios»- tampoco es una fila: no tiene
+       columnas, y va centrado para que no se lea como una celda suelta. */
+    if(f && f.aviso){
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(paso.fuente + 0.6);
+      const ls = doc.splitTextToSize(qcpdfTextoSeguro(f.aviso), util - 12);
+      const alto = 7 + ls.length * (paso.fuente * 0.45);
+      if(y + alto > tope){ cerrarTramo(y); nuevaHoja(); tramoY = y - paso.cab - 2.4; }
+      if(!medir){
+        doc.setFillColor(P.tarjeta[0], P.tarjeta[1], P.tarjeta[2]);
+        doc.rect(m, y, util, alto, 'F');
+        doc.setTextColor(P.texto[0], P.texto[1], P.texto[2]);
+        let ty = y + 3.5 + paso.fuente * 0.34;
+        for(const l of ls){ doc.text(l, m + util / 2, ty, { align: 'center' }); ty += paso.fuente * 0.45; }
+      }
+      y += alto;
+      continue;
+    }
     /* Un separador de grupo -Mañana / Tarde en los llamados- no es una fila. */
     if(f && f.grupo){
       const alto = paso.fila + 2;
@@ -802,6 +819,10 @@ function qcpdfDeCambios(lista, opts){
   ]);
   const mal = l.filter(c => c.nivel === 'mal').length;
   const dud = l.filter(c => c.nivel === 'dudoso').length;
+  /* Cuántos parlamentos se analizaron en total. Nunca menos que los cambios
+     que se enseñan: un «3 cambios de 2» no lo cree nadie. */
+  const analizados = (isFinite(+opts.analizados) && +opts.analizados > 0)
+                       ? Math.max(l.length, Math.floor(+opts.analizados)) : 0;
   const prog = String(opts.programa || 'Diálogos que cambiaron');
   const base = (prog + (opts.episodio ? (' ' + opts.episodio) : '')).replace(/[\\/:*?"<>|]/g, '-').trim();
   const pie = [];
@@ -809,16 +830,22 @@ function qcpdfDeCambios(lista, opts){
   if(opts.estudio) pie.push('Cambios: ' + opts.estudio);
   if(opts.audio)   pie.push('Audio: ' + opts.audio);
   if(opts.desfase) pie.push('Inicio: ' + opts.desfase);
+  if(opts.tardo)   pie.push('Análisis: ' + opts.tardo);
   return {
     etiqueta: 'Diálogos que cambiaron',
     titulo: prog,
     titulo2: opts.episodio ? ('Episodio ' + opts.episodio) : '',
     subtitulo: pie.join('   ·   '),
-    conteo: l.length + ' cambio' + (l.length === 1 ? '' : 's'),
+    conteo: l.length + ' cambio' + (l.length === 1 ? '' : 's')
+            + (analizados ? (' de ' + analizados + ' parlamento' + (analizados === 1 ? '' : 's')) : ''),
     fecha: opts.fecha || qcpdfFechaHoy(),
     tarjetas: [],
-    /* Solo las pastillas que tienen algo: una en cero no dice nada. */
-    chips: [ mal ? { k:'mal',    et:'No cuadran', n:mal, rgb:[220, 38, 38] }  : null,
+    /* Cuántos se analizaron y cuántos coinciden van SIEMPRE que se sepa: es lo
+       que dice el informe cuando no hay cambios, y lo que da la medida cuando
+       los hay. Las de los cambios, solo si tienen algo: una en cero no dice nada. */
+    chips: [ analizados ? { k:'analizados', et:'Analizados', n:analizados, rgb:[71, 85, 105] } : null,
+             analizados ? { k:'coinciden',  et:'Coinciden',  n:analizados - l.length, rgb:[22, 163, 74] } : null,
+             mal ? { k:'mal',    et:'No cuadran', n:mal, rgb:[220, 38, 38] }  : null,
              dud ? { k:'dudoso', et:'Dudosos',    n:dud, rgb:[217, 119, 6] } : null ].filter(Boolean),
     /* Los anchos salen de lo que tiene que CABER en un renglón, no de repartir
        a ojo: un timecode en negrita pide unos 25 mm y «41 % · no cuadra» unos
@@ -831,7 +858,13 @@ function qcpdfDeCambios(lista, opts){
       { et:'Oído',    peso:2.25, clase:'texto' },
       { et:'Coincidencia', peso:1.55, clase:'texto' }
     ],
-    filas: filas,
+    /* Sin cambios no se entrega una tabla vacía, que parece un informe roto:
+       se dice con todas las letras que se analizó y que coincide. */
+    filas: filas.length ? filas
+         : [{ aviso: analizados
+                ? ('Sin cambios: ' + (analizados === 1 ? 'el parlamento analizado coincide'
+                     : ('los ' + analizados + ' parlamentos analizados coinciden')) + ' con el libreto.')
+                : 'Sin cambios que señalar.' }],
     nombreDoc: 'Cambios · ' + base,
     nota: 'Lo «oído» es lo que creyó entender el reconocedor: una pista, no una prueba. Comprobar cada uno.',
     gris: false,

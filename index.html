@@ -2300,7 +2300,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.6.3-nube';
+const APP_VER_NUM = 'v11.7.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3898,10 +3898,10 @@ function docxCue(text){
 
 const PERFIL_HERRAMIENTAS = {
   qc: [
-    { id:'pQcAudio',   et:'⤒ Audio',      tit:'Cargar el audio del programa para cotejarlo' },
+    { id:'pQcAudio',   et:'⤒ Audio',      tit:'Cargar el audio del programa para analizarlo' },
     /* Dónde empieza ese audio. Vivía en el Video Estudio, y QC ya no lo lleva. */
     { id:'pQcInicio',  et:'⏱ Inicio',     tit:'En qué timecode del libreto empieza el audio cargado', inicio:true },
-    { id:'pQcCotejar', et:'🔎 Cotejar',   tit:'Transcribir el capítulo y compararlo con el libreto' },
+    { id:'pQcCotejar', et:'🔎 Analizar cambios', tit:'Oír el audio, compararlo con el libreto y entregar el informe de cambios en PDF' },
     { id:'pQcNueva',   et:'＋ Corrección', tit:'Apuntar una corrección en el parlamento seleccionado', fuerte:true },
     { id:'pQcLista',   et:'Correcciones', tit:'Las correcciones de este capítulo', cuenta:true },
     { id:'pQcCambios', et:'≠ Cambios',    tit:'Los diálogos donde lo dicho no coincide con lo escrito', cuentaCambios:true },
@@ -4937,8 +4937,8 @@ function qcInicioPanel(aviso, escrito){
        capítulo resucita el cotejo que se midió con el inicio de antes. */
     if(r.caducados) qcGuardado();
     qcAvance('✅ El audio empieza en ' + qcTC(r.inicio)
-      + (r.caducados ? ' · lo cotejado antes se ha borrado, se midió con el otro inicio · pulsa «Cotejar»'
-                     : ' · ya puedes «Cotejar»'));
+      + (r.caducados ? ' · lo analizado antes se ha borrado, se midió con el otro inicio · pulsa «Analizar cambios»'
+                     : ' · ya puedes «Analizar cambios»'));
   };
   { const b = q('#qcIniOk'); if(b) b.onclick = guardar; }
   if(caja){
@@ -5001,7 +5001,7 @@ function qcAvance(txt){
             ? '<span class="qc-av-bar"><i style="width:' + pct + '%"></i></span>'
               + '<b class="qc-av-p">' + pct + '%</b>'
             : '<span class="qc-av-late"></span>'))
-    + (activo ? '<button class="qc-av-x" id="qcAvX" title="Parar el cotejo">Parar</button>'
+    + (activo ? '<button class="qc-av-x" id="qcAvX" title="Parar el análisis">Parar</button>'
               : '<button class="qc-av-x" id="qcAvFuera" title="Quitar este aviso">✕</button>');
   const x = d.getElementById('qcAvX');
   if(x) x.onclick = ()=>{
@@ -5015,10 +5015,9 @@ function qcAvance(txt){
   if(fuera) fuera.onclick = ()=>{ const c = d.getElementById('qcAvance'); if(c) c.remove(); };
 }
 
-/** Transcribe el capítulo y lo compara con el libreto.
-    El trabajo lo hace `cotejarTodo`, que ya existía en los planos: recorre los
-    parlamentos, transcribe cada uno y mide el parecido. Aquí solo se entra
-    desde QC y se cuenta el resultado donde se está mirando.
+/** Analizar cambios: oye el audio, lo compara con el libreto y entrega el PDF.
+    El trabajo lo hace `cotejarTodo`. Aquí solo se entra desde QC, se cuenta el
+    resultado donde se está mirando y se entrega el informe.
     NO se apunta nada como corrección: el reconocedor señala dónde sospechar,
     y quien firma el informe es una persona. */
 async function qcCotejar(){
@@ -5034,12 +5033,17 @@ async function qcCotejar(){
   try{
     const r = await cotejarTodo();
     if(!r){
+      /* Parar no es un fallo, y no se cuenta como si lo fuera. */
+      if(typeof COTEJO !== 'undefined' && COTEJO && COTEJO.parado){
+        qcAvance('Análisis parado · se queda el de antes, si lo había');
+        return;
+      }
       /* La causa de verdad, no un genérico: `karIaPreparar` ya la averigua
          host por host y la deja en `karIa.error` y en el último aviso. Antes
          se tapaba con «mira el aviso del Video Estudio», que desde QC no se ve. */
       const causa = (typeof karIa !== 'undefined' && karIa && karIa.error)
-        ? karIa.error : (window._stUltimo || 'no se pudo cotejar');
-      qcAvance('⚠️ No se pudo cotejar: ' + causa);
+        ? karIa.error : (window._stUltimo || 'no se pudo analizar');
+      qcAvance('⚠️ No se pudo analizar: ' + causa);
       return;
     }
     if(!r.hechos){
@@ -5053,14 +5057,28 @@ async function qcCotejar(){
       catch(e){ fallo('qcInicioPanel · index.html:qcCotejar', e); }
       return;
     }
-    const cambios = qcCambiosLista();
-    qcAvance('✅ ' + r.hechos + ' comparados · ' + r.mal + ' no cuadran · ' + r.dudosos
-             + ' dudosos — pulsa «≠ Cambios» para ver el informe');
+    /* Los que caen fuera del audio se dicen: no se han comparado, y no es lo
+       mismo que coincidir. Pasa cuando el audio es de medio capítulo. */
+    const resumen = r.hechos + ' analizados en ' + cotejoTardo(r.segundos) + ' · '
+                  + r.mal + ' no cuadran · ' + r.dudosos + ' dudosos'
+                  + (r.fuera ? (' · ' + r.fuera + ' fuera del audio') : '');
+    qcAvance('✅ ' + resumen + ' · preparando el PDF…');
     try{ perfilPintar(); }catch(e){ fallo('perfilPintar · index.html:qcCotejar', e); }
-    if(cambios.length) qcCambiosPanel();
+    /* El resultado se enseña SIEMPRE, también sin cambios: «todo coincide»
+       también es un resultado, y sin panel parecía que no había pasado nada. */
+    try{ qcCambiosPanel(); }catch(e){ fallo('qcCambiosPanel · index.html:qcCotejar', e); }
+    /* Pedido de sala: «al finalizar me entregue también un PDF». Se entrega
+       SIEMPRE, también cuando no hay ni un cambio: ese PDF es la constancia de
+       que el capítulo se analizó y cuadra. El informe va callado y el aviso lo
+       pone esta función, para que el resumen del análisis no se pierda debajo
+       de un «informe descargado». */
+    const pdf = await qcInformeCambios({ callado: true, analisis: r });
+    qcAvance((pdf.ok ? '✅ ' : '⚠️ ') + resumen
+      + (pdf.ok ? ' · informe PDF descargado'
+                : ' · el PDF no se pudo crear: ' + pdf.causa + ' · vuelve a pedirlo en «≠ Cambios»'));
   }catch(e){
-    fallo('cotejarTodo · index.html:qcCotejar', e, 'el cotejo se ha quedado a medias');
-    qcAvance('⚠️ El cotejo falló: ' + ((e && e.message) || e));
+    fallo('cotejarTodo · index.html:qcCotejar', e, 'el análisis se ha quedado a medias');
+    qcAvance('⚠️ El análisis falló: ' + ((e && e.message) || e));
   }
 }
 
@@ -5125,8 +5143,8 @@ function qcCambiosPanel(){
   ov.innerHTML = '<div class="qc-card">'
     + '<div class="qc-h"><span>≠ Diálogos que cambiaron</span>'
       + '<span class="qc-cuenta">' + (hayCotejo
-          ? (n.total + ' de ' + Object.keys(window._cotejo).length + ' cotejados')
-          : 'sin cotejar todavía') + '</span>'
+          ? (n.total + ' de ' + Object.keys(window._cotejo).length + ' analizados')
+          : 'sin analizar todavía') + '</span>'
       + '<button class="qc-x" id="qcCamX" title="Cerrar">✕</button></div>'
     + (hayCotejo
         ? '<div class="qc-chips">'
@@ -5150,11 +5168,13 @@ function qcCambiosPanel(){
             + '<button class="qc-add" data-si="' + c.si + '" title="Apuntarlo como corrección">＋</button>'
             + '</div>').join('') + '</div>'
         : '<div class="qc-vacio">' + (hayCotejo
-            ? 'Todo lo cotejado cuadra con el libreto.'
-            : 'Carga el audio del programa y pulsa «Cotejar»: aquí saldrán los parlamentos donde lo dicho no coincide con lo escrito.')
+            ? 'Todo lo analizado coincide con el libreto.'
+            : 'Carga el audio del programa y pulsa «Analizar cambios»: aquí saldrán los parlamentos donde lo dicho no coincide con lo escrito.')
           + '</div>')
+    /* El PDF se puede pedir también sin cambios: es la constancia de que el
+       capítulo se analizó y cuadra. Lo que no tiene PDF es lo que no se analizó. */
     + '<div class="qc-fb">'
-      + (l.length ? '<button class="qc-ok" id="qcCamPdf">⤓ Informe de cambios (PDF)</button>' : '')
+      + (hayCotejo ? '<button class="qc-ok" id="qcCamPdf">⤓ Informe de cambios (PDF)</button>' : '')
       + '<button id="qcCamCerrar">Cerrar</button></div>'
     + '</div>';
   const q = (s)=> ov.querySelector(s);
@@ -5180,27 +5200,57 @@ function qcCambiosPanel(){
   });
 }
 
-/** El informe de cambios, en PDF, con el mismo motor que el de correcciones. */
-async function qcInformeCambios(){
+/** Con qué audio se analizó: el premix cargado en QC, o el medio del estudio. */
+function qcAudioNombre(){
+  try{
+    if(typeof studio === 'undefined' || !studio) return '';
+    return String((studio.dlgUrl ? studio.dlgNombre : studio.name) || '');
+  }catch(e){ return ''; /* sin estudio no hay audio que nombrar */ }
+}
+
+/**
+ * El informe de cambios, en PDF, con el mismo motor que el de correcciones.
+ *
+ * `o.callado`: no escribe en la barra, y el aviso lo pone quien llama.
+ * `o.analisis`: la cuenta del análisis recién hecho, para decir cuánto tardó.
+ * Devuelve `{ ok, causa }`.
+ *
+ * Se entrega AUNQUE NO HAYA CAMBIOS, siempre que se haya analizado algo: un
+ * informe que dice «los 412 parlamentos coinciden» es lo que se guarda como
+ * constancia. Lo que no se entrega es un informe de un capítulo sin analizar.
+ */
+async function qcInformeCambios(o){
+  o = o || {};
+  const decir = (t) => { if(!o.callado) qcAvance(t); };
   const l = qcCambiosLista();
-  if(!l.length){ qcAvance('No hay cambios que entregar: todo lo cotejado cuadra'); return; }
+  const analizados = Object.keys(window._cotejo || {}).length;
+  if(!analizados){
+    decir('Todavía no hay nada que entregar: carga el audio y pulsa «Analizar cambios»');
+    return { ok: false, causa: 'no se ha analizado el capítulo' };
+  }
   const cap = (typeof currentEp !== 'undefined' && currentEp && currentEp.name) ? currentEp.name : '';
   let prog = '';
   try{ const sh = (Array.isArray(shows) && currentEp) ? shows.find(x => x && x.id === currentEp.showId) : null;
        if(sh && sh.name) prog = sh.name; }
   catch(e){ /* sin la lista de programas, el informe va solo con el capítulo */ }
   const m = qcMeta();
-  qcAvance('⏳ Preparando el informe de cambios…');
+  decir('⏳ Preparando el informe de cambios…');
   try{
     const d = qcpdfDeCambios(l, { programa: prog || cap || 'Diálogos que cambiaron',
                                   episodio: prog ? cap : '',
                                   revisor: m.revisor, estudio: m.estudio,
-                                  desfase: qcTC(studioTc0()), audio: (studio && studio.name) || '' });
+                                  desfase: qcTC(studioTc0()), audio: qcAudioNombre(),
+                                  analizados: analizados,
+                                  tardo: (o.analisis && o.analisis.segundos)
+                                           ? cotejoTardo(o.analisis.segundos) : '' });
     await qcpdfDescargar(d, d.nombreDoc);
-    qcAvance('✅ Informe de cambios descargado');
+    decir('✅ Informe de cambios descargado');
+    return { ok: true, causa: '' };
   }catch(e){
     fallo('qcpdfDescargar · index.html:qcInformeCambios', e, 'no se ha podido crear el informe de cambios');
-    qcAvance('⚠️ No se pudo crear el informe: ' + ((e && e.message) || e));
+    const causa = String((e && e.message) || e);
+    decir('⚠️ No se pudo crear el informe: ' + causa);
+    return { ok: false, causa: causa };
   }
 }
 
@@ -8145,7 +8195,7 @@ function preguntarModo(nombreEp, sugerido, textos){
     +       '<small>El libreto, el marcado y la sincronía entre equipos.</small></button>'
     +     '<button class="modo-op" data-m="qc">'
     +       '<b>QC</b>'
-    +       '<small>Revisar el capítulo: cotejar el audio con el libreto, apuntar '
+    +       '<small>Revisar el capítulo: analizar los cambios entre el audio y el libreto, apuntar '
     +       'correcciones y entregar el informe.</small></button>'
     +     '<button class="modo-op" data-m="casting">'
     +       '<b>Casting</b>'
@@ -10721,7 +10771,7 @@ function showTutorial(onDone){
        +'· <b>📋 Cues</b> es la hoja entera: todos los cues con su estado, filtrables, y un clic salta el video ahi. El estado va <i>pendiente → ensayo → grabado → aprobado</i>, y cada vez que marcas grabado sube el numero de take. Desde ahi se imprime la <b>🖨 Hoja de ADR</b>: una tabla por talento con TC de entrada y salida, duracion, take, estado, notas y los totales de tiempo.<br>'
        +'· <b>⇄ Formatos</b> trae y lleva el libreto. <b>Trae</b> SRT, VTT, STL (el EBU de toda la vida) y CSV: si el texto viene con el personaje delante -«NILA: …»- se separa solo, y los tiempos, que en esos archivos se cuentan desde el principio del video, se pasan a timecode de reloj sumandoles el <b>TC inicio</b>. Al importar te avisa de que <b>sustituye el libreto</b> antes de tocar nada. <b>Lleva</b> SRT, CSV con todo el ADR (take, estado y notas incluidos), TTML y una lista de <b>marcadores</b> en el mismo formato en que Pro Tools escribe los suyos.<br>'
        +'· <b>✂ Planos</b> busca los <b>cambios de plano</b> del video mirandolo fotograma a fotograma. Salen como rayas azules finas sobre la onda, y desde ahi se pueden <b>pegar las entradas de los cues al corte</b> mas cercano. Los fundidos y las cortinillas no se cuelan: cambian poco de un fotograma al siguiente.<br>'
-       +'· <b>🔎 Cotejar</b> transcribe cada intervencion y la compara con lo que pone el libreto. Lo que no se parece sale marcado -<b>no cuadra</b> o <b>dudoso</b>- con lo que se ha oido, en la ficha del cue y en la hoja. <b>No corrige nada solo</b>: el reconocedor se equivoca, y un libreto cambiado a espaldas de nadie es peor que una errata. El audio no sale de tu equipo.<br>'
+       +'· <b>🔎 Analizar cambios</b> oye el audio por tramos y compara cada intervencion con lo que pone el libreto. Lo que no se parece sale marcado -<b>no cuadra</b> o <b>dudoso</b>- con lo que se ha oido, en la ficha del cue y en la hoja. <b>No corrige nada solo</b>: el reconocedor se equivoca, y un libreto cambiado a espaldas de nadie es peor que una errata. El audio no sale de tu equipo.<br>'
        +'· <b>⚙ Sala</b> ajusta todo eso: las duraciones de sala del streamer (1 · 2 · 2,67 · 3 · 3,3 · 5 s) y su sentido -de izquierda a derecha o de los dos bordes al centro-, el remate, cuerpo de letra, arriba o abajo, dónde va la línea de sincronía de la banda y su grosor, un carril por personaje, el nombre del talento, píxeles por segundo de la banda, y qué partes quieres encendidas.'
        +'<span class="tut-tip">Los dos primeros son independientes: puedes tener solo la ventana. Si algo baila, ajusta el <b>TC inicio</b> o el <b>ajuste</b> fino.</span>' },
 
@@ -12824,10 +12874,14 @@ body.haschips .lperfil{padding-left:100px}
 .qc-chip b{font-weight:800}
 .qc-tipo{font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;margin-left:auto}
 .qc-tsel{display:flex;gap:5px;flex-wrap:wrap;flex:1;min-width:0}
-.qc-t{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:5px 9px;border-radius:999px;
+/* Las pastillas del TIPO, y solo ellas: van dentro de su selector. La misma
+   clase la lleva el texto de cada fila de las listas, y sin acotarlas aqui
+   cada texto salia como una pastilla con borde, dos por renglon, y el
+   parentesis de un oido vacio se partia letra a letra. Se vio mirando el panel. */
+.qc-tsel .qc-t{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:5px 9px;border-radius:999px;
   border:1px solid var(--card-b);background:var(--head);color:var(--dim);cursor:pointer}
-.qc-t i{width:7px;height:7px;border-radius:50%;display:inline-block}
-.qc-t.on{border-color:var(--tc);color:var(--tc);font-weight:700}
+.qc-tsel .qc-t i{width:7px;height:7px;border-radius:50%;display:inline-block}
+.qc-tsel .qc-t.on{border-color:var(--tc);color:var(--tc);font-weight:700}
 .qc-form{border:1px solid var(--card-b);border-radius:12px;padding:12px;margin-bottom:12px;background:var(--card)}
 .qc-fr{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .qc-fr.col{flex-direction:column;align-items:stretch}
@@ -13306,8 +13360,8 @@ function buildLibretoDoc(pc){
       <button id="tPron">${LIB_ICON.speak} Pronunc.</button>
       <button id="tDict">${LIB_ICON.speak} Significado</button>
       <div class="tt">QC</div>
-      <button id="tQcAudio" title="Carga el audio del programa para poder cotejarlo con el libreto">⤒ Audio del programa</button>
-      <button id="tQcCotejar" title="Transcribe el capítulo y lo compara con el libreto: marca dónde no coincide. No cambia ni una palabra">🔎 Transcribir y comparar</button>
+      <button id="tQcAudio" title="Carga el audio del programa para poder analizarlo contra el libreto">⤒ Audio del programa</button>
+      <button id="tQcCotejar" title="Oye el audio, lo compara con el libreto y entrega el informe de cambios en PDF. No cambia ni una palabra">🔎 Analizar cambios</button>
       <button id="tQcNueva" title="Apuntar una corrección en el parlamento seleccionado">＋ Corrección</button>
       <button id="tQcLista" title="Las correcciones de este capítulo">Correcciones<span id="tQcN" class="qc-n"></span></button>
       <button id="tQcPdf" title="Descargar el informe de QC en PDF">⤓ Informe PDF</button>
@@ -18124,7 +18178,7 @@ function studioEnsureStrip(){
     +'<button id="stCues" class="st-btn ghost" title="Todos los cues del capítulo, con su estado">📋 Cues</button>'
     +'<button id="stIo" class="st-btn ghost" title="Traer o llevar el libreto: SRT, VTT, STL, CSV, TTML y marcadores">⇄ Formatos</button>'
     +'<button id="stCortes" class="st-btn ghost" title="Buscar los cambios de plano del vídeo, fotograma a fotograma">✂ Planos</button>'
-    +'<button id="stCotejo" class="st-btn ghost" title="Comprobar que lo escrito es lo que de verdad se dice">🔎 Cotejar</button>'
+    +'<button id="stCotejo" class="st-btn ghost" title="Comprobar que lo escrito es lo que de verdad se dice">🔎 Analizar cambios</button>'
     +'<input type="file" id="ioFile" accept=".srt,.vtt,.stl,.csv,.tsv,.txt" style="display:none">'
     +'<button id="stDlg" class="st-btn ghost" title="Carga la pista de dialogos limpia: el karaoke se guiara por ella">🎙 Diálogos</button>'
     +'<button id="stIa" class="st-btn ghost" title="Afina las marcas reconociendo la voz. El audio no sale de este equipo">✨ IA</button>'
@@ -19142,6 +19196,59 @@ function karNorm(t){
     .replace(/[^\p{L}\p{N}]/gu, '');
 }
 
+/**
+ * Descodifica un audio YA a 16 kHz, que es lo que pide el reconocedor.
+ *
+ * Antes se descodificaba a la frecuencia del equipo —48 kHz en estéreo— y
+ * después se remuestreaba entero. Un capítulo de 45 minutos son así más de un
+ * giga de memoria solo para tirarlo acto seguido, y el doble de espera. El
+ * navegador sabe entregarlo ya a la frecuencia que se le pida: basta con
+ * pedírselo a un contexto que esté a 16 kHz.
+ * Se queda con `ab`: no hace falta copiarlo, y en un audio largo la copia pesa.
+ */
+function karIaA16k(ab){
+  const off = new OfflineAudioContext(1, 16000, 16000);
+  return new Promise((res, rej) => {
+    let hecho = false;
+    const p = off.decodeAudioData(ab, b => { hecho = true; res(b); },
+                                  e => { if(!hecho) rej(e || new Error('no se pudo descodificar')); });
+    if(p && p.then) p.then(b => { if(!hecho){ hecho = true; res(b); } })
+                     .catch(e => { if(!hecho) rej(e); });
+  });
+}
+
+/** Los canales de un audio, mezclados en uno. */
+function karIaMono(buf){
+  const ch = buf.numberOfChannels, n = buf.length;
+  const out = new Float32Array(n);
+  for(let c = 0; c < ch; c++){
+    const d = buf.getChannelData(c);
+    for(let i = 0; i < n; i++) out[i] += d[i];
+  }
+  if(ch > 1) for(let i = 0; i < n; i++) out[i] /= ch;
+  return out;
+}
+
+/** Prepara SOLO el audio. Analizar cambios no necesita el reconocedor en la
+    página —lo llevan los trabajadores—, así que no tiene por qué esperarlo. */
+async function karIaAudio(){
+  if(karIa.pcm) return true;
+  const fuente = studio.dlgUrl || studio.url;
+  if(!fuente) throw new Error('no hay audio cargado');
+  /* Del Blob, no de la URL. Un fetch(blob:) lo prohíbe la CSP de producción
+     -connect-src no lleva blob:- y aquí se caía con «Failed to fetch»:
+     comprobado en dubbipt.vercel.app. Por eso el cotejo nunca arrancó allí,
+     ni con el vídeo ni con la pista. Solo se hace fetch de lo que es una
+     URL de verdad, como el audio bajado de la nube. */
+  const blob = studio.dlgUrl ? studio.dlgBlob : studio.blob;
+  const ab = (blob && blob.arrayBuffer)
+    ? await blob.arrayBuffer()
+    : await (await fetch(fuente)).arrayBuffer();
+  karIa.pcm = karIaMono(await karIaA16k(ab));
+  karIa.sr = 16000; karIa.base = 0;
+  return true;
+}
+
 /** Descarga el modelo y prepara el audio a 16 kHz. Solo la primera vez. */
 async function karIaPreparar(){
   if(karIa.pipe && karIa.pcm) return true;
@@ -19156,26 +19263,7 @@ async function karIaPreparar(){
     }
     if(!karIa.pcm){
       stMsg('⏳ Preparando el audio para el reconocimiento…');
-      const fuente = studio.dlgUrl || studio.url;
-      if(!fuente) throw new Error('no hay audio cargado');
-      /* Del Blob, no de la URL. Un fetch(blob:) lo prohíbe la CSP de producción
-         -connect-src no lleva blob:- y aquí se caía con «Failed to fetch»:
-         comprobado en dubbipt.vercel.app. Por eso el cotejo nunca arrancó allí,
-         ni con el vídeo ni con la pista. Solo se hace fetch de lo que es una
-         URL de verdad, como el audio bajado de la nube. */
-      const blob = studio.dlgUrl ? studio.dlgBlob : studio.blob;
-      const ab = (blob && blob.arrayBuffer)
-        ? await blob.arrayBuffer()
-        : await (await fetch(fuente)).arrayBuffer();
-      const AC = window.AudioContext || window.webkitAudioContext;
-      const ac = new AC();
-      let buf;
-      try{ buf = await ac.decodeAudioData(ab.slice(0)); } finally { try{ ac.close(); }catch(e){} }
-      // Whisper quiere mono a 16 kHz: se remuestrea de una vez, sin trocear
-      const off = new OfflineAudioContext(1, Math.ceil(buf.duration*16000), 16000);
-      const src = off.createBufferSource(); src.buffer = buf; src.connect(off.destination); src.start();
-      karIa.pcm = (await off.startRendering()).getChannelData(0);
-      karIa.sr = 16000; karIa.base = 0;
+      await karIaAudio();
     }
     karIa.cargando = false;
     return true;
@@ -19673,24 +19761,21 @@ async function karAudioDialogos(file){
   catch(e){ /* si no era nuestra, no hay nada que soltar */ }
   studio.dlgBlob = file;
   studio.dlgUrl = URL.createObjectURL(file);
+  /* Su nombre, para el pie del informe: con qué audio se analizó. */
+  studio.dlgNombre = String((file && file.name) || '');
   try{ if(typeof karIa !== 'undefined' && karIa){ karIa.pcm = null; karIa.marcas.clear(); } }
   catch(e){ fallo('karIa.pcm · index.html:karAudioDialogos', e); }
   stMsg('⏳ Analizando la pista de diálogos…');
   try{
-    const AC = window.AudioContext || window.webkitAudioContext;
-    const ac = new AC();
-    let buf;
-    try{
-      const ab = await file.arrayBuffer();
-      buf = await new Promise((res, rej)=>{
-        let hecho = false;
-        const p = ac.decodeAudioData(ab.slice(0), b=>{ hecho=true; res(b); }, e=>{ if(!hecho) rej(e||new Error('no se pudo descodificar')); });
-        if(p && p.then) p.then(b=>{ if(!hecho){ hecho=true; res(b); } }).catch(e=>{ if(!hecho) rej(e); });
-      });
-    } finally { try{ ac.close(); }catch(e){} }
+    /* Una sola descodificación, y ya a 16 kHz. De ella salen las dos cosas: la
+       onda y el audio que oirá el reconocedor. Antes se descodificaba aquí
+       para la onda y OTRA VEZ al analizar, las dos a 48 kHz en estéreo. */
+    const buf = await karIaA16k(await file.arrayBuffer());
 
     studioSetPcm(buf);
     studio.pcmSrc = 'dialogos';
+    try{ karIa.pcm = karIaMono(buf); karIa.sr = 16000; karIa.base = 0; }
+    catch(e){ fallo('karIaMono · index.html:karAudioDialogos', e); }
     kar.cache.clear(); kar.cur = -1; kar.wds = null;
     try{ stDrawWave(); }catch(e){ fallo('stDrawWave · index.html:16366', e); }
     const n = $('stDlgName');
@@ -20532,6 +20617,7 @@ if(typeof renderLibretoBlocks === 'function'){
      este orden, igual que cuando estaban dentro.
      Si anades uno, METELO TAMBIEN EN EL SHELL DE sw.js (regla ENT-6);
      pruebas/correr.js lo comprueba. -->
+<script src="./js/analisis.js"></script>
 <script src="./js/cortes.js"></script>
 <script src="./js/formatos.js"></script>
 <script src="./js/adr.js"></script>

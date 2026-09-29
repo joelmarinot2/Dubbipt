@@ -31,7 +31,7 @@ function armar(){
   return M;
 }
 
-exports.pruebas = function(t){
+exports.pruebas = async function(t){
 
   t.seccion('1 · apuntar una corrección');
   const M = armar();
@@ -227,9 +227,11 @@ exports.pruebas = function(t){
      en `_qc`, que es «lo que firmo». Si un dia alguien cruza esa linea, el
      informe pasa a llevar lo que creyo oir una maquina. */
   const TODO = fuentes().map(f => f.src).join('\n');
+  /* El cuerpo ENTERO, hasta el panel de los planos: con un trozo de largo
+     fijo, lo que se añadiera al final de la función quedaría sin mirar. */
   const cuerpoCotejo = TODO.slice(TODO.indexOf('async function cotejarTodo'),
-                                  TODO.indexOf('async function cotejarTodo') + 2200);
-  t.ok('existe el cotejo', cuerpoCotejo.length > 500);
+                                  TODO.indexOf('/* ── El panel de los planos'));
+  t.ok('existe el cotejo', cuerpoCotejo.length > 3000, String(cuerpoCotejo.length));
   t.eq('y no toca las correcciones', (cuerpoCotejo.match(/qcApuntar|_qc\b/g) || []).length, 0,
        'el reconocedor señala dónde mirar; quien firma el informe es una persona');
   t.ok('QC lo llama, eso sí', /cotejarTodo\(\)/.test(TODO));
@@ -259,10 +261,13 @@ exports.pruebas = function(t){
      el modelo de voz, descodifica el audio y luego va parlamento a parlamento-
      y avisaba por `stMsg`, que escribe en el panel del Video Estudio: desde QC
      eso no se ve. Son tres cables y si se corta uno se vuelve a quedar mudo. */
-  t.ok('el cotejo publica cuántos hay en total',
-       /COTEJO\.total = lista\.length/.test(TODO),
+  /* En milésimas del audio ya oído, no en parlamentos: los tramos se reparten
+     entre varios trabajadores y acaban desordenados, y lo único que avanza de
+     forma pareja es el audio. */
+  t.ok('el análisis publica cuánto hay en total',
+       /COTEJO\.total = 1000; COTEJO\.fase = 'cotejando';/.test(TODO),
        'sin el total no hay barra: solo «está pensando»');
-  t.ok('y por dónde va', /COTEJO\.vistos = n \+ 1/.test(TODO));
+  t.ok('y por dónde va', /COTEJO\.vistos = Math\.round\(1000 \* hecho \/ total\);/.test(TODO));
   t.ok('lo que el cotejo cuenta se espeja en la barra de QC',
        /function stMsg\(t\)\{[\s\S]{0,1400}?qcAvance\(t\)/.test(TODO),
        'es el único sitio por el que pasan todas las fases; sin este espejo, '
@@ -376,7 +381,7 @@ exports.pruebas = function(t){
   t.seccion('12f · cuando el cotejo falla, se dice la CAUSA');
   /* El tercer motivo: el error real se producia y lo tapaba mi genérico. */
   t.ok('se enseña karIa.error o el último aviso, no un genérico',
-       /karIa\.error : \(window\._stUltimo \|\| 'no se pudo cotejar'\)/.test(TODO));
+       /karIa\.error : \(window\._stUltimo \|\| 'no se pudo analizar'\)/.test(TODO));
   t.ok('stMsg guarda el último aviso para eso', /window\._stUltimo = String\(t\);/.test(TODO));
   t.ok('y si ningún parlamento cayó dentro del audio, se dice que es el desfase',
        /if\(!r\.hechos\)\{[\s\S]{0,200}?ninguno cayó dentro del audio/.test(TODO),
@@ -387,7 +392,7 @@ exports.pruebas = function(t){
   /* Lo que se entrega. Se monta con el `cotejoAviso` de VERDAD, el de los
      planos, para que los umbrales sean los mismos que en la hoja de cues. */
   const w = {};
-  const C = montar([['function cotejoDatos(){', '/** Coteja el capítulo entero'],
+  const C = montar([['/* Desde cuánto parecido se avisa.', '/** El tiempo que ha tardado'],
                     ['/* ═══ QC · LOS DIÁLOGOS QUE CAMBIARON', '/** El panel con la lista']],
                    ['qcCambiosLista', 'qcCambiosCuenta'],
                    { window: w,
@@ -1050,6 +1055,158 @@ exports.pruebas = function(t){
        cuerpoPoner.indexOf('perfilSoltarMarcar(m)') > 0
        && cuerpoPoner.indexOf('perfilSoltarMarcar(m)') < cuerpoPoner.indexOf('perfilPintar()'),
        'primero se apaga lo que hubiera encendido y luego se esconden sus botones');
+
+  t.seccion('12n · «Cotejar» pasa a llamarse «Analizar cambios»');
+  /* Pedido de sala. Se mira la barra de verdad, y que no quede ninguna puerta
+     con el nombre viejo: dos nombres para lo mismo es preguntarse si son dos
+     cosas. */
+  const PH = montar([['const PERFIL_HERRAMIENTAS = {', '/** La pista que se enseña']], ['PERFIL_HERRAMIENTAS'], {});
+  const bQc = PH.PERFIL_HERRAMIENTAS.qc.find(h => h.id === 'pQcCotejar');
+  t.eq('en la barra de QC', bQc && bQc.et, '🔎 Analizar cambios');
+  t.ok('en el cajón', />🔎 Analizar cambios<\/button>/.test(TODO) && /id="tQcCotejar"[^>]*>🔎 Analizar cambios</.test(TODO));
+  t.eq('y ningún botón ni aviso con el nombre viejo',
+       (TODO.match(/«Cotejar»|>🔎 Cotejar<|>🔎 Transcribir y comparar</g) || []).length, 0);
+  /* Se vio mirando el panel de resultados: la clase de las pastillas del TIPO
+     la lleva también el texto de cada fila, y sin acotar la regla cada texto
+     salía como una pastilla, dos por renglón, y el «(nada)» de un oído vacío
+     se partía letra a letra. */
+  t.ok('las pastillas del tipo, solo dentro de su selector',
+       /\.qc-tsel \.qc-t\{display:inline-flex/.test(TODO) && /\.qc-tsel \.qc-t i\{width:7px/.test(TODO),
+       'la misma clase la lleva el texto de las listas');
+  t.eq('y ninguna regla suelta que pinte pastillas en las listas',
+       (TODO.match(/\n\.qc-t\{display:inline-flex|\n\.qc-t i\{/g) || []).length, 0);
+
+  t.seccion('12o · al acabar el análisis se entrega el PDF, solo');
+  /* Pedido de sala: «al finalizar me entregue tambien un PDF». */
+  const conQc = (o) => {
+    o = o || {};
+    const avisos = [], diario = [];
+    const M = montar([['/** Analizar cambios: oye el audio', '/* ═══ QC · LOS DIÁLOGOS QUE CAMBIARON']], ['qcCotejar'], {
+      cotejarTodo: async () => { diario.push('analiza'); return ('r' in o) ? o.r : { hechos: 72, mal: 3, dudosos: 13, segundos: 50, fuera: o.fuera || 0 }; },
+      studio: o.sinAudio ? {} : { dlgUrl: 'blob:x', dur: 290 },
+      COTEJO: { trabajando: !!o.trabajando, parado: !!o.parado },
+      qcAvance: (m) => avisos.push(m),
+      karIa: { error: o.error || null },
+      window: { _stUltimo: '' },
+      qcTC: (s) => 'TC' + s, qcPrimerTc: () => 3600, qcInicioTexto: () => '01:00:00:00',
+      qcInicioPanel: () => diario.push('panel del inicio'),
+      qcCambiosLista: () => [],
+      perfilPintar: () => {},
+      qcCambiosPanel: () => diario.push('panel de cambios'),
+      qcInformeCambios: async (op) => { diario.push('pdf'); diario.op = op; return o.pdf || { ok: true, causa: '' }; },
+      cotejoTardo: (s) => s + ' s',
+      fallo: () => {}, console: { warn: () => {}, log: () => {} }
+    });
+    return { M, avisos, diario };
+  };
+  {
+    const Q = conQc();
+    await Q.M.qcCotejar();
+    t.eq('se analiza y se entrega el PDF, una vez', Q.diario.filter(x => x === 'pdf').length, 1);
+    t.ok('callado: el aviso lo pone quien analizó', Q.diario.op && Q.diario.op.callado === true,
+         'si no, el «informe descargado» taparía el resumen del análisis');
+    t.ok('con lo que tardó, para ponerlo en el informe', Q.diario.op && Q.diario.op.analisis && Q.diario.op.analisis.segundos === 50);
+    t.ok('el resultado se enseña también sin cambios', Q.diario.includes('panel de cambios'),
+         '«todo coincide» también es un resultado: sin panel parecía que no había pasado nada');
+    const fin = Q.avisos[Q.avisos.length - 1];
+    t.ok('y la barra lo cuenta todo', /72 analizados en 50 s/.test(fin) && /informe PDF descargado/.test(fin), fin);
+  }
+  {
+    const Q = conQc({ pdf: { ok: false, causa: 'sin papel' } });
+    await Q.M.qcCotejar();
+    const fin = Q.avisos[Q.avisos.length - 1];
+    t.ok('si el PDF falla se dice, con la causa y dónde volver a pedirlo',
+         /no se pudo crear: sin papel/.test(fin) && /«≠ Cambios»/.test(fin), fin);
+  }
+  {
+    const Q = conQc({ fuera: 12 });
+    await Q.M.qcCotejar();
+    t.ok('los que caen fuera del audio se dicen', /12 fuera del audio/.test(Q.avisos[Q.avisos.length - 1]),
+         'no se han comparado, y no es lo mismo que coincidir');
+  }
+  {
+    const Q = conQc({ r: null, parado: true });
+    await Q.M.qcCotejar();
+    t.ok('parado no es un fallo, y no entrega nada', !Q.diario.includes('pdf') && /parado/i.test(Q.avisos[Q.avisos.length - 1]));
+  }
+  {
+    const Q = conQc({ r: null, error: 'sin red' });
+    await Q.M.qcCotejar();
+    t.ok('si no se pudo analizar, se dice por qué y no hay PDF',
+         !Q.diario.includes('pdf') && /No se pudo analizar: sin red/.test(Q.avisos[Q.avisos.length - 1]));
+  }
+  {
+    const Q = conQc({ r: { hechos: 0, mal: 0, dudosos: 0, segundos: 3 } });
+    await Q.M.qcCotejar();
+    t.ok('si nada cayó en el audio, a corregir el inicio y sin PDF',
+         Q.diario.includes('panel del inicio') && !Q.diario.includes('pdf'),
+         'un informe de un audio que no es de este capítulo no se entrega');
+  }
+  {
+    const Q = conQc({ sinAudio: true });
+    await Q.M.qcCotejar();
+    t.ok('sin audio no se empieza', !Q.diario.includes('analiza') && /Carga primero el audio/.test(Q.avisos[0]));
+  }
+
+  t.seccion('12p · el informe de cambios, también cuando no hay cambios');
+  const conInforme = (o) => {
+    o = o || {};
+    const avisos = [], bajados = [];
+    const M = montar([['/** Con qué audio se analizó', '/* ═══ GUION DE WORD EN TABLA']], ['qcInformeCambios', 'qcAudioNombre'], {
+      qcCambiosLista: () => o.lista || [],
+      window: { _cotejo: ('cotejo' in o) ? o.cotejo : { 0: { sim: 1 }, 1: { sim: 1 }, 2: { sim: 1 } } },
+      currentEp: { name: '101', showId: 's' }, shows: [{ id: 's', name: 'The Wayans Bros' }],
+      qcMeta: () => ({ revisor: 'Pamela H', estudio: 'Estudio Bogotá' }),
+      qcTC: (s) => 'TC' + s, studioTc0: () => 3600,
+      studio: o.studio || { dlgUrl: 'blob:x', dlgNombre: 'premix 101.mp3', name: 'video.mp4' },
+      qcpdfDeCambios: (l, op) => ({ lista: l, op: op, nombreDoc: 'Cambios · x' }),
+      qcpdfDescargar: async (d) => { if(o.falla) throw new Error('jsPDF no carga'); bajados.push(d); return true; },
+      cotejoTardo: (s) => Math.round(s) + ' s',
+      fallo: () => {},
+      qcAvance: (m) => avisos.push(m),
+      console: { warn: () => {}, log: () => {} }
+    });
+    return { M, avisos, bajados };
+  };
+  {
+    const I = conInforme();
+    const r = await I.M.qcInformeCambios({ callado: true, analisis: { segundos: 49.6 } });
+    t.ok('sin cambios también se entrega', r.ok && I.bajados.length === 1,
+         'ese PDF es la constancia de que el capítulo se analizó y cuadra');
+    t.eq('diciendo cuántos se analizaron', I.bajados[0].op.analizados, 3);
+    t.eq('y cuánto tardó', I.bajados[0].op.tardo, '50 s');
+    t.eq('con el audio que se analizó, no el vídeo', I.bajados[0].op.audio, 'premix 101.mp3');
+    t.eq('callado: sin ni un aviso', I.avisos.length, 0);
+  }
+  {
+    const I = conInforme({ cotejo: {} });
+    const r = await I.M.qcInformeCambios({});
+    t.ok('lo que no se analizó no tiene informe', !r.ok && I.bajados.length === 0);
+    t.ok('y se dice qué hacer', /«Analizar cambios»/.test(I.avisos[0] || ''), JSON.stringify(I.avisos));
+  }
+  {
+    const I = conInforme({ falla: true });
+    const r = await I.M.qcInformeCambios({ callado: true });
+    t.ok('si el PDF no se puede hacer, se devuelve la causa', !r.ok && /jsPDF no carga/.test(r.causa));
+  }
+  {
+    const I = conInforme({ studio: { name: 'capitulo.mp4' } });
+    t.eq('sin premix cargado, el nombre del medio del estudio', I.M.qcAudioNombre(), 'capitulo.mp4');
+  }
+  t.ok('el premix recuerda su nombre al cargarse', /studio\.dlgNombre = String\(\(file && file\.name\) \|\| ''\);/.test(TODO),
+       'sin esto el pie del informe decía el nombre del vídeo, o nada');
+
+  t.seccion('12q · el audio se descodifica una vez, y ya a 16 kHz');
+  /* Antes se descodificaba al cargarlo -para la onda- y OTRA VEZ al analizar,
+     las dos a la frecuencia del equipo, 48 kHz en estéreo: un capítulo de 45
+     minutos es más de un giga solo para tirarlo. */
+  t.ok('se pide al navegador directamente a 16 kHz',
+       /function karIaA16k\(ab\)\{\s*const off = new OfflineAudioContext\(1, 16000, 16000\);/.test(TODO));
+  const cuerpoDlg = TODO.slice(TODO.indexOf('async function karAudioDialogos'), TODO.indexOf('function karLimpiar'));
+  t.ok('al cargar el premix se descodifica con eso', /await karIaA16k\(await file\.arrayBuffer\(\)\)/.test(cuerpoDlg));
+  t.ok('y de ahí sale ya el audio del reconocedor', /karIa\.pcm = karIaMono\(buf\);/.test(cuerpoDlg),
+       'sin esto se volvía a descodificar entero al pulsar «Analizar cambios»');
+  t.eq('una sola descodificación al cargar', (cuerpoDlg.match(/decodeAudioData|karIaA16k\(/g) || []).length, 1);
 
   t.seccion('13 · la sección QC está en el panel de herramientas');
   t.ok('con su título', />QC<\/div>/.test(TODO) || /class="tt">QC</.test(TODO));

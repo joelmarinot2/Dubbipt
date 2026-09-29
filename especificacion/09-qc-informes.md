@@ -44,6 +44,7 @@ en [`01-libreto.md`](01-libreto.md), de **QC-1** a **QC-7**.
 | **PDF-19** | La pastilla del tipo **nunca es más alta que la fila** ni manda sobre su alto, y se alinea con el **primer renglón** del comentario, no con el centro del párrafo. Medida a ojo se salía por abajo, se metía en la fila siguiente y el nombre del tipo salía **cortado por la mitad**. | ✅ |
 | **PDF-20** | Al convertir un informe ajeno, si **no trae** columna de tipo se **deduce del comentario** y se añade; si **sí la trae**, se respeta la suya. Deducir no cambia el texto —el comentario sigue intacto— pero es una lectura nuestra, así que no se pone encima de la de otro. | ✅ |
 | **PDF-21** | La hoja va **completamente en blanco**. La tabla se ve como tarjeta por su **borde**, no por contraste de fondo: un gris a toda página se lleva tinta en cada copia y en una impresora mediocre sale sucio. La tarjeta se sigue rellenando **fila a fila**, porque su borde se traza al final. | ✅ |
+| **PDF-22** | El informe de los diálogos que cambiaron dice **cuánto se analizó**: «**N cambios de M parlamentos**», con pastillas de **Analizados** y **Coinciden** —y las de No cuadran y Dudosos cuando hay alguno—, y en el pie **cuánto tardó el análisis**. **Sin cambios también se entrega**, con una sola fila a todo lo ancho y centrada: «Sin cambios: los M parlamentos analizados coinciden con el libreto». Una tabla vacía parece un informe roto (ver **PDF-N2**). Nunca salen menos analizados que cambios: un «3 cambios de 2» no lo cree nadie. | ✅ |
 
 ## Nunca
 
@@ -74,6 +75,11 @@ La hoja del formato —**PDF-15 a PDF-21**— llegó de sala como imagen y se
 reprodujo hasta que el PDF producido daba los mismos números: `12 correcciones`
 y `3 Falta · 4 Cambiar · 2 Pegar · 3 Ajuste`. **PDF-19** no salió de ninguna
 prueba: salió de mirar la hoja y ver el nombre del tipo cortado.
+
+**PDF-22** se probó con un documento de mentira que apunta lo que se escribe y
+dónde: sin él, quitar la rama de la fila «sin cambios» no ponía nada en rojo.
+Y se miraron **las dos hojas en el navegador**, la de un análisis con 16
+cambios —cabe en una— y la de un capítulo sin ninguno.
 
 De las 19 mutaciones de esta tanda, 19 quedaron en rojo. Una vigésima delató
 **código muerto**: `qcpdfTipoDe` comparaba también con la etiqueta del tipo, y
