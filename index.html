@@ -2300,7 +2300,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.5.0-nube';
+const APP_VER_NUM = 'v11.6.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -2650,7 +2650,39 @@ function postLogin(){
   // Cambio 1: borrar el último episodio guardado para que siempre se aterrice
   // en la pestaña de Programas, sin reabrir automáticamente el libreto.
   try{ localStorage.removeItem('ddl_last_ep'); localStorage.removeItem('ddl_last_key'); localStorage.removeItem('ddl_last_top'); }catch(e){}
-  askRoleAtLogin(()=> ensureWorkspace());
+  askRoleAtLogin(()=> perfilAlEntrar(()=> ensureWorkspace()));
+}
+
+/**
+ * El perfil de trabajo, en la pantalla inicial: justo después de elegir el
+ * dispositivo y antes de ver los programas.
+ *
+ * Pedido de sala. El perfil se preguntaba al abrir cada capítulo, y quien viene
+ * a hacer QC viene a hacer QC toda la sesión: se pregunta UNA vez, al entrar, y
+ * cada capítulo se abre ya con las herramientas de ese trabajo. Se sigue
+ * pudiendo cambiar desde el botón del perfil, en la barra del libreto.
+ *
+ * Aquí hay que elegir: pulsar fuera no vale. Un toque de más al entrar dejaba a
+ * quien venía a revisar en «Grabación» sin haberlo pedido.
+ */
+function perfilAlEntrar(done){
+  const seguir = ()=>{ if(typeof done === 'function') done(); };
+  let p;
+  try{
+    p = preguntarModo('', modoUltimo(), {
+      titulo: 'Dubbipt',
+      sub: '¿Qué vas a hacer?',
+      pie: 'Cada capítulo se abrirá con las herramientas de ese trabajo. '
+         + 'Se puede cambiar luego desde el botón del perfil, en la barra del libreto.',
+      obligatorio: true
+    });
+  }catch(e){ fallo('preguntarModo · index.html:perfilAlEntrar', e); seguir(); return; }
+  p.then((m)=>{
+      try{ ponerModo(null, m); }
+      catch(e){ fallo('ponerModo · index.html:perfilAlEntrar', e, 'el perfil puede no haberse aplicado'); }
+    })
+   .catch((e)=>{ fallo('perfilAlEntrar · index.html', e); })
+   .then(seguir);
 }
 function askRoleAtLogin(done){
   const old=document.getElementById('rolePick'); if(old) old.remove();
@@ -7608,9 +7640,23 @@ function modoDe(epId){
 function modoUltimo(){
   try{ return modoValido(localStorage.getItem('ddl_modo_ultimo')); }catch(e){ return ''; }
 }
+
+/**
+ * Qué perfil toca al abrir un capítulo, o '' si hay que preguntarlo.
+ *
+ * Manda el de la SESIÓN, que es el que se eligió al entrar: quien viene a hacer
+ * QC abre todos los capítulos en QC, tengan lo que tengan guardado de otro día.
+ * El guardado del capítulo solo decide cuando no hay sesión que lo diga.
+ */
+function modoQueToca(sesion, guardado){
+  return modoValido(sesion) || modoValido(guardado) || '';
+}
 function ponerModo(epId, m){
   m = modoValido(m) || 'grabacion';
   DDL_MODO = m;
+  /* Es el perfil de la sesión desde ahora, se haya elegido al entrar o
+     cambiado desde la barra del libreto: el siguiente capítulo lo hereda. */
+  window._perfilSesion = m;
   try{ if(epId) localStorage.setItem('ddl_modo::' + epId, m); }catch(e){}
   /* Sin almacén local el perfil no se recuerda y se volverá a preguntar: es
      molesto, no un fallo, y avisar de esto en cada cambio de perfil sería peor. */
@@ -7660,15 +7706,17 @@ function ponerModo(epId, m){
 }
 
 /** Pregunta el modo. Devuelve una promesa con 'grabacion' o 'casting'. */
-function preguntarModo(nombreEp, sugerido){
+function preguntarModo(nombreEp, sugerido, textos){
   const marca = modoValido(sugerido);
+  const tx = textos || {};
+  const limpio = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
   return new Promise((resolve) => {
     const cap = document.createElement('div');
     cap.className = 'modo-cap';
     cap.innerHTML =
       '<div class="modo-caja" role="dialog" aria-modal="true" aria-label="¿Qué vas a hacer?">'
-    +   '<div class="modo-tit">' + (nombreEp ? String(nombreEp).replace(/</g,'&lt;') : 'Capítulo') + '</div>'
-    +   '<div class="modo-sub">¿Qué vas a hacer con este capítulo?</div>'
+    +   '<div class="modo-tit">' + limpio(tx.titulo || nombreEp || 'Capítulo') + '</div>'
+    +   '<div class="modo-sub">' + limpio(tx.sub || '¿Qué vas a hacer con este capítulo?') + '</div>'
     +   '<div class="modo-ops">'
     +     '<button class="modo-op" data-m="grabacion">'
     +       '<b>Grabación</b>'
@@ -7681,8 +7729,8 @@ function preguntarModo(nombreEp, sugerido){
     +       '<b>Casting</b>'
     +       '<small>Repartir los talentos entre los personajes y descargar el desglose relleno.</small></button>'
     +   '</div>'
-    +   '<div class="modo-pie">Se puede cambiar luego desde el botón del perfil, '
-    +     'en la barra del libreto.</div>'
+    +   '<div class="modo-pie">' + limpio(tx.pie || ('Se puede cambiar luego desde el botón del perfil, '
+    +     'en la barra del libreto.')) + '</div>'
     + '</div>';
     document.body.appendChild(cap);
     const elegir = (m) => { cap.remove(); resolve(m); };
@@ -7693,9 +7741,12 @@ function preguntarModo(nombreEp, sugerido){
       const b = cap.querySelector('.modo-op[data-m="' + marca + '"]');
       if(b){ b.classList.add('ultimo'); b.focus(); }
     }
-    cap.addEventListener('click', (e) => { if(e.target === cap) elegir('grabacion'); });
+    /* Al entrar hay que ELEGIR: pulsar fuera o Escape no vale. Con el selector
+       de un capítulo sí se puede salir así, y cae en Grabación como siempre. */
+    cap.addEventListener('click', (e) => { if(e.target === cap && !tx.obligatorio) elegir('grabacion'); });
     document.addEventListener('keydown', function esc(e){
-      if(e.key === 'Escape'){ document.removeEventListener('keydown', esc); elegir('grabacion'); }
+      if(e.key !== 'Escape' || tx.obligatorio) return;
+      document.removeEventListener('keydown', esc); elegir('grabacion');
     });
     /* Solo si no se ha marcado ya el de la última vez: si no, el foco se lo
        llevaría el primero y la marca no serviría de nada. */
@@ -9590,16 +9641,15 @@ async function cambiarModo(){
 /**
  * Se llama al terminar de abrir un capítulo.
  *
- * Se PREGUNTA en cada capítulo nuevo. Probé a heredar el último perfil para
- * ahorrar el toque y llegó de vuelta de sala: la pregunta hace falta, porque
- * no se abre un capítulo para lo mismo que el anterior. El capítulo que ya
- * tiene perfil guardado no se vuelve a preguntar —ese ya se contestó—, y el
- * último elegido solo sirve para dejar marcada la opción de antes y que sea
- * un toque en vez de dos.
+ * El perfil ya viene elegido de la pantalla inicial —después del dispositivo—,
+ * así que aquí NO se pregunta: el capítulo se abre con el de la sesión. Tuvo
+ * tres vidas: preguntar en cada capítulo, heredar el último sin preguntar, y
+ * volver a preguntar. Lo que pedía sala era otra cosa: elegirlo una vez, al
+ * entrar. Solo se pregunta aquí si no hay sesión que lo diga ni nada guardado.
  */
 async function modoAlAbrir(epId, nombre){
-  const guardado = modoDe(epId);
-  if(guardado){ ponerModo(epId, guardado); return guardado; }
+  const toca = modoQueToca(window._perfilSesion, modoDe(epId));
+  if(toca){ ponerModo(epId, toca); return toca; }
   const m = await preguntarModo(nombre, modoUltimo());
   ponerModo(epId, m);
   return m;

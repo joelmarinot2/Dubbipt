@@ -434,6 +434,39 @@ exports.pruebas = function(t){
   t.eq('y en todo el panel de cambios no hay ni un qcApuntar',
        (cuerpoCambios.match(/qcApuntar\(/g) || []).length, 0);
 
+  t.seccion('12i · el perfil se elige en la pantalla inicial, después del dispositivo');
+  /* Pedido de sala. Se preguntaba al abrir cada capitulo, y quien viene a
+     hacer QC viene a hacer QC toda la sesion. */
+  const almacen = {};
+  const MO = montar([['/* Los perfiles que hay, y lo que cada uno saca', 'function ponerModo(epId, m){']],
+                    ['DDL_MODOS', 'modoValido', 'modoQueToca'],
+                    { window: {},
+                      localStorage: { getItem: k => (k in almacen ? almacen[k] : null),
+                                      setItem: (k, v) => { almacen[k] = String(v); } },
+                      console: { warn: () => {}, log: () => {} } });
+  t.eq('son tres perfiles', MO.DDL_MODOS.join(','), 'grabacion,qc,casting');
+  t.eq('manda el de la sesión', MO.modoQueToca('qc', 'casting'), 'qc',
+       'quien entra a hacer QC abre todos los capítulos en QC, tengan lo que tengan guardado de otro día');
+  t.eq('sin sesión, decide el guardado del capítulo', MO.modoQueToca('', 'casting'), 'casting');
+  t.eq('sin ninguno de los dos, hay que preguntar', MO.modoQueToca('', ''), '');
+  t.eq('un perfil que no existe no cuenta como sesión', MO.modoQueToca('loquesea', 'qc'), 'qc');
+  t.eq('ni como guardado', MO.modoQueToca(undefined, 'loquesea'), '');
+
+  t.ok('se pregunta justo después del dispositivo, y antes de los programas',
+       /askRoleAtLogin\(\(\)=> perfilAlEntrar\(\(\)=> ensureWorkspace\(\)\)\);/.test(TODO));
+  t.ok('al entrar hay que elegir: pulsar fuera no vale',
+       /obligatorio: true/.test(TODO)
+       && /if\(e\.target === cap && !tx\.obligatorio\) elegir\('grabacion'\)/.test(TODO),
+       'un toque de más al entrar dejaba a quien venía a revisar en Grabación sin haberlo pedido');
+  t.ok('ni Escape', /if\(e\.key !== 'Escape' \|\| tx\.obligatorio\) return;/.test(TODO));
+  t.ok('lo elegido queda como perfil de la sesión', /window\._perfilSesion = m;/.test(TODO),
+       'también cuando se cambia desde la barra del libreto: el siguiente capítulo lo hereda');
+  t.ok('y al abrir un capítulo ya no se pregunta: se mira la sesión',
+       /modoQueToca\(window\._perfilSesion, modoDe\(epId\)\)/.test(TODO));
+  t.ok('pase lo que pase con el selector, se sigue a los programas',
+       /\.catch\(\(e\)=>\{ fallo\('perfilAlEntrar · index\.html', e\); \}\)\s*\.then\(seguir\);/.test(TODO),
+       'un fallo al pintar el selector no puede dejar a nadie en una pantalla vacía');
+
   t.seccion('13 · la sección QC está en el panel de herramientas');
   t.ok('con su título', />QC<\/div>/.test(TODO) || /class="tt">QC</.test(TODO));
   ['tQcAudio', 'tQcCotejar', 'tQcNueva', 'tQcLista'].forEach(id => {
