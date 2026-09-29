@@ -252,7 +252,12 @@ function cortesPegar(margen){
 
 /* ── Cotejo con lo que de verdad se dice ──────────────────────────────── */
 
-const COTEJO = { res:new Map(), trabajando:false, cancelar:false, hechos:0 };
+/* `total`, `mal` y `dudosos` no los usa el cotejo para nada: los publica para
+   que se pueda ENSEÑAR por dónde va. Llegó de sala: «no sé si está haciendo
+   algo». El cotejo tarda minutos -baja el modelo de voz, descodifica el audio
+   y luego va parlamento a parlamento- y sin esto no se ve ni un número. */
+const COTEJO = { res:new Map(), trabajando:false, cancelar:false,
+                 hechos:0, vistos:0, total:0, mal:0, dudosos:0, fase:'' };
 
 /** Palabras normalizadas de un texto, para comparar. */
 function cotPalabras(t){
@@ -311,15 +316,21 @@ function cotejoAviso(si){
 async function cotejarTodo(){
   if(COTEJO.trabajando){ COTEJO.cancelar = true; stMsg('Cotejo cancelado'); return null; }
   if(!studio.url && !studio.dlgUrl){ stMsg('⚠️ Primero carga el vídeo o la pista de diálogos'); return null; }
-  COTEJO.trabajando = true; COTEJO.cancelar = false; COTEJO.hechos = 0;
+  COTEJO.trabajando = true; COTEJO.cancelar = false;
+  COTEJO.hechos = 0; COTEJO.total = 0; COTEJO.mal = 0; COTEJO.dudosos = 0;
+  COTEJO.fase = 'preparando';
   stMsg('⏳ Preparando el reconocimiento de voz…');
   const ok = await karIaPreparar();
-  if(!ok){ COTEJO.trabajando = false; return null; }
+  if(!ok){ COTEJO.trabajando = false; COTEJO.fase = ''; return null; }
   const d = cotejoDatos();
   const lista = [];
   for(let i = 0; i < script.length; i++)
     if(script[i] && script[i].tcEff != null && (script[i].lines || []).join('').trim()) lista.push(i);
   let mal = 0, dudosos = 0;
+  /* Se publica ANTES de empezar: es el número que convierte «está pensando» en
+     «va por el 37 de 412». */
+  COTEJO.total = lista.length; COTEJO.fase = 'cotejando';
+  stMsg('🔎 Cotejando… 0 de ' + lista.length);
   for(let n = 0; n < lista.length; n++){
     if(COTEJO.cancelar) break;
     const si = lista[n];
@@ -329,12 +340,17 @@ async function cotejarTodo(){
       COTEJO.hechos++;
       if(r.sim < 0.45) mal++; else if(r.sim < 0.72) dudosos++;
     }
+    COTEJO.mal = mal; COTEJO.dudosos = dudosos;
+    /* `vistos` cuenta por dónde va aunque ese parlamento no se haya podido
+       cotejar; `hechos` cuenta los que sí. Para quien espera lo que importa es
+       que la barra AVANCE, y hay parlamentos que no se pueden cotejar. */
+    COTEJO.vistos = n + 1;
     if(n % 3 === 0 || n === lista.length - 1)
       stMsg('🔎 Cotejando… ' + (n + 1) + ' de ' + lista.length
             + (mal ? (' · ' + mal + ' no cuadran') : '') + (dudosos ? (' · ' + dudosos + ' dudosos') : ''));
     await new Promise(r2 => setTimeout(r2, 0));      // dejar respirar a la interfaz
   }
-  COTEJO.trabajando = false;
+  COTEJO.trabajando = false; COTEJO.fase = '';
   try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · js\cortes.js:338', e, 'puede que esto no se haya guardado en la nube'); }
   try{ adrRepintar(); }catch(e){ fallo('adrRepintar · js\cortes.js:339', e); }
   const msg = '🔎 ' + COTEJO.hechos + ' cotejados · ' + mal + ' no cuadran · ' + dudosos + ' dudosos';

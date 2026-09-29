@@ -2300,7 +2300,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.2.1-nube';
+const APP_VER_NUM = 'v11.3.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4451,6 +4451,52 @@ async function qcCargarAudio(file){
   }
 }
 
+/**
+ * El aviso de por dónde va el cotejo, dentro de la barra del perfil.
+ *
+ * Tarda minutos —baja el modelo de voz, descodifica el audio y luego recorre
+ * los parlamentos uno a uno— y hasta ahora no se veía NADA desde QC: el cotejo
+ * escribe en el panel del Video Estudio. Aquí se enseña el texto que él ya
+ * manda, y además una barra que avanza cuando hay una cuenta que enseñar.
+ */
+function qcAvance(txt){
+  const d = (typeof pop2 !== 'undefined' && pop2) ? pop2.doc : null;
+  if(!d) return;
+  const barra = d.getElementById('lPerfil');
+  if(!barra) return;
+  const activo = (typeof COTEJO !== 'undefined' && COTEJO && COTEJO.trabajando);
+  let caja = d.getElementById('qcAvance');
+
+  if(!activo && !txt){
+    if(caja) caja.remove();
+    return;
+  }
+  if(!caja){
+    caja = d.createElement('div');
+    caja.id = 'qcAvance'; caja.className = 'qc-av';
+    barra.appendChild(caja);
+  }
+  /* La cuenta la publica el cotejo; si todavía no hay total, no se dibuja una
+     barra vacía —eso parece que está parada— y se deja solo el texto. */
+  const tot = (typeof COTEJO !== 'undefined' && COTEJO) ? +COTEJO.total : 0;
+  const va  = (typeof COTEJO !== 'undefined' && COTEJO) ? +COTEJO.vistos : 0;
+  const pct = (tot > 0) ? Math.max(2, Math.min(100, Math.round(va * 100 / tot))) : 0;
+  const esc_ = (typeof esc === 'function') ? esc : (s)=> String(s == null ? '' : s);
+  caja.innerHTML =
+      '<span class="qc-av-t">' + esc_(txt || '') + '</span>'
+    + (tot > 0
+        ? '<span class="qc-av-bar"><i style="width:' + pct + '%"></i></span>'
+          + '<b class="qc-av-p">' + pct + '%</b>'
+        : '<span class="qc-av-late"></span>')
+    + (activo ? '<button class="qc-av-x" id="qcAvX" title="Parar el cotejo">Parar</button>' : '');
+  const x = d.getElementById('qcAvX');
+  if(x) x.onclick = ()=>{
+    /* `cotejarTodo` llamado mientras trabaja es lo que lo cancela: lo dice su
+       primera línea. No se inventa otra puerta. */
+    try{ cotejarTodo(); }catch(e){ fallo('cotejarTodo · index.html:qcAvance', e); }
+  };
+}
+
 /** Transcribe el capítulo y lo compara con el libreto.
     El trabajo lo hace `cotejarTodo`, que ya existía en los planos: recorre los
     parlamentos, transcribe cada uno y mide el parecido. Aquí solo se entra
@@ -4458,18 +4504,23 @@ async function qcCargarAudio(file){
     NO se apunta nada como corrección: el reconocedor señala dónde sospechar,
     y quien firma el informe es una persona. */
 async function qcCotejar(){
-  if(typeof cotejarTodo !== 'function'){ qcAviso('⚠️ Falta el módulo de planos'); return; }
+  if(typeof cotejarTodo !== 'function'){ qcAvance('⚠️ Falta el módulo de planos'); return; }
   const hayAudio = (typeof studio !== 'undefined' && studio && (studio.dlgUrl || studio.url));
-  if(!hayAudio){ qcAviso('Carga primero el audio del programa'); return; }
-  qcAviso('🔎 Transcribiendo y comparando… puede tardar');
+  if(!hayAudio){ qcAvance('Carga primero el audio del programa'); return; }
+  /* Ya está trabajando: la segunda pulsación lo PARA, que es lo que hace
+     `cotejarTodo` por dentro. Sin esto se lanzaba otro encima. */
+  if(typeof COTEJO !== 'undefined' && COTEJO && COTEJO.trabajando){ cotejarTodo(); return; }
+  /* Se pinta ANTES de empezar: el primer trozo -bajar el modelo de voz- puede
+     tardar un minuto sin decir nada, y es justo donde parece que no hace nada. */
+  qcAvance('⏳ Empezando… se baja el modelo de voz la primera vez');
   try{
     const r = await cotejarTodo();
-    if(!r){ qcAviso('No se pudo cotejar — mira el aviso del Video Estudio'); return; }
-    qcAviso('🔎 ' + r.hechos + ' comparados · ' + r.mal + ' no cuadran · ' + r.dudosos
-            + ' dudosos — marcados en el libreto, sin cambiar una palabra');
+    if(!r){ qcAvance('No se pudo cotejar — mira el aviso del Video Estudio'); return; }
+    qcAvance('✅ ' + r.hechos + ' comparados · ' + r.mal + ' no cuadran · ' + r.dudosos
+             + ' dudosos — marcados en el libreto, sin cambiar una palabra');
   }catch(e){
     fallo('cotejarTodo · index.html:qcCotejar', e, 'el cotejo se ha quedado a medias');
-    qcAviso('⚠️ El cotejo falló: ' + ((e && e.message) || e));
+    qcAvance('⚠️ El cotejo falló: ' + ((e && e.message) || e));
   }
 }
 
@@ -12015,6 +12066,26 @@ body.haschips .lperfil{padding-left:100px}
 .lp-n{font-size:10px;font-weight:800;color:var(--dim);min-width:8px}
 .lp-n.hay{color:#F87171}
 .lp-pista{font-size:11px;color:var(--dim)}
+/* Por dónde va el cotejo. Ocupa su propia fila para no empujar los botones. */
+.qc-av{flex:1 0 100%;display:flex;align-items:center;gap:9px;margin-top:5px;
+  padding-top:5px;border-top:1px solid var(--card-b)}
+.qc-av-t{font-size:11.5px;color:var(--ink);flex:0 1 auto;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qc-av-bar{flex:1;min-width:60px;height:5px;border-radius:3px;background:var(--card);
+  overflow:hidden}
+.qc-av-bar i{display:block;height:100%;background:#4ADE80;border-radius:3px;
+  transition:width .25s linear}
+.qc-av-p{font-size:10.5px;font-weight:800;color:#4ADE80;min-width:30px;text-align:right}
+/* Sin cuenta todavía —bajando el modelo, descodificando el audio— una tira que
+   va y viene: una barra quieta al 0% parece que se ha colgado. */
+.qc-av-late{flex:1;min-width:60px;height:5px;border-radius:3px;background:var(--card);
+  position:relative;overflow:hidden}
+.qc-av-late::after{content:'';position:absolute;top:0;bottom:0;width:34%;border-radius:3px;
+  background:#4ADE80;animation:qcVaVien 1.15s ease-in-out infinite}
+@keyframes qcVaVien{0%{left:-34%}100%{left:100%}}
+.qc-av-x{flex:0 0 auto;font-size:10.5px;padding:4px 9px;border-radius:7px;
+  border:1px solid var(--card-b);background:var(--head);color:var(--dim);cursor:pointer}
+.qc-av-x:hover{border-color:#F87171;color:#F87171}
 /* ─── QC · control de calidad ─── */
 .qc-n{font-size:10px;font-weight:800;margin-left:5px;color:var(--dim)}
 .qc-n.hay{color:#F87171}
@@ -17215,7 +17286,15 @@ function stFmt(t){ t=Math.max(0,t||0); const m=Math.floor(t/60), s2=Math.floor(t
   return (m<10?'0':'')+m+':'+(s2<10?'0':'')+s2; }
 function stFmtTC(sec){ sec=Math.max(0,sec||0); const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), s2=Math.floor(sec%60);
   return (h<10?'0':'')+h+':'+(m<10?'0':'')+m+':'+(s2<10?'0':'')+s2; }
-function stMsg(t){ const m=$('stMsg'); if(m) m.textContent=t||''; }
+function stMsg(t){
+  const m=$('stMsg'); if(m) m.textContent=t||'';
+  /* Y en la barra de QC, que es donde se está mirando cuando se coteja: este
+     mensaje vive en el panel del Video Estudio, y desde QC no se ve. Llegó de
+     sala: «no sé si está haciendo algo». Así se aprovecha lo que el cotejo ya
+     cuenta —bajar el modelo, descodificar el audio, ir parlamento a
+     parlamento— sin tener que contarlo dos veces. */
+  try{ qcAvance(t); }catch(e){ /* sin libreto abierto no hay barra que pintar */ }
+}
 function studioStripOn(){ const l=$('stLeft'); return !!(l && l.style.display!=='none'); }
 function studioTc0(){ const m = sync.marks && sync.marks._tcOff; return (m && +m.v) || 0; }
 function studioSetTc0(sec, save){

@@ -254,6 +254,28 @@ exports.pruebas = function(t){
   t.ok('olvidando el audio preparado antes', /karIa\.pcm = null/.test(TODO),
        'si se queda el de antes, se coteja el capítulo nuevo contra la voz del anterior');
 
+  t.seccion('12b · el cotejo dice por dónde va');
+  /* Llego de sala: «no se si esta haciendo algo». El cotejo tarda minutos -baja
+     el modelo de voz, descodifica el audio y luego va parlamento a parlamento-
+     y avisaba por `stMsg`, que escribe en el panel del Video Estudio: desde QC
+     eso no se ve. Son tres cables y si se corta uno se vuelve a quedar mudo. */
+  t.ok('el cotejo publica cuántos hay en total',
+       /COTEJO\.total = lista\.length/.test(TODO),
+       'sin el total no hay barra: solo «está pensando»');
+  t.ok('y por dónde va', /COTEJO\.vistos = n \+ 1/.test(TODO));
+  t.ok('lo que el cotejo cuenta se espeja en la barra de QC',
+       /function stMsg\(t\)\{[\s\S]{0,600}?qcAvance\(t\)/.test(TODO),
+       'es el único sitio por el que pasan todas las fases; sin este espejo, '
+       + 'desde QC no se ve nada de lo que ya se cuenta');
+  t.ok('y el aviso se pinta ANTES de empezar, no al acabar',
+       /qcAvance\('⏳ Empezando/.test(TODO),
+       'el primer trozo puede tardar un minuto sin decir nada, y es justo donde '
+       + 'parece que no hace nada');
+  t.ok('pulsar otra vez lo PARA en vez de lanzar otro',
+       /if\(typeof COTEJO !== 'undefined' && COTEJO && COTEJO\.trabajando\)\{ cotejarTodo\(\); return; \}/
+         .test(TODO),
+       'dos cotejos a la vez sobre el mismo capítulo se pisan');
+
   t.seccion('13 · la sección QC está en el panel de herramientas');
   t.ok('con su título', />QC<\/div>/.test(TODO) || /class="tt">QC</.test(TODO));
   ['tQcAudio', 'tQcCotejar', 'tQcNueva', 'tQcLista'].forEach(id => {

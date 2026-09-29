@@ -55,6 +55,7 @@ El modelo es siempre el mismo:
 | **QC-10** | Al abrir el libreto se elige un **perfil de trabajo** —Grabación, QC o Casting— y sus herramientas salen en una **barra propia arriba del libreto, siempre a la vista**, con su botón para cambiar de perfil. Antes vivían en el cajón de la derecha, que hay que abrir y que lo trae todo. En QC el cajón **deja de ofrecer lo que escribe** en el libreto —editar, pausa, acento, limpiar, pincel, «grabada»—: quien revisa no marca el libreto. Lo de **leer y moverse se queda entero**: sin eso el libreto no se puede ni recorrer. | ✅ |
 | **QC-11** | El perfil **se pregunta en cada capítulo nuevo**. Se probó a heredar el último para ahorrar el toque y llegó de vuelta de sala: no se abre un capítulo para lo mismo que el anterior. El capítulo que ya tiene perfil guardado no se vuelve a preguntar, y el último elegido solo **deja marcada** su opción para que sea un toque en vez de dos. | ✅ |
 | **QC-12** | La barra del perfil se ve **con cualquier dispositivo**, y se pega **justo debajo** de la barra de herramientas. Nació apagada y encendiéndose con la clase `haschips` —copiada del cajón de la tablet—, y esa clase solo se pone en modo tablet: en escritorio no se veía nunca. Y pegada arriba del todo quedaba **detrás** de la barra de herramientas, que es fija. Su alto se **mide** y entra en `--lbarsH`, que es lo que miran el riel de páginas y la pestaña de Ocupación para empezar donde acaba todo: si no, vuelve el solape de LIB-22. | ✅ |
+| **QC-13** | Mientras se coteja **se ve por dónde va**, en la propia barra del perfil: el texto de cada fase, una barra que avanza con la cuenta de parlamentos, el porcentaje y un botón para **parar**. Llegó de sala: «no sé si está haciendo algo». El cotejo tarda minutos —baja el modelo de voz, descodifica el audio y luego recorre los parlamentos— y avisaba por el panel del Video Estudio, que desde QC no se ve. Mientras **no hay cuenta todavía** se enseña una tira que va y viene: una barra quieta al 0% parece colgada. Pulsar otra vez **para** el cotejo en vez de lanzar otro encima. | ✅ |
 | **QC-7** | El audio que se carga en QC queda en **`studio.dlgUrl`**, que es lo que el reconocedor prefiere al vídeo, y se **olvida el audio ya preparado**. Ese campo se leía en `karIaPreparar` y no lo escribía nadie: hasta ahora Whisper oía siempre el vídeo aunque cargaras otra pista, y sin olvidar el anterior se cotejaría el capítulo nuevo contra la voz del viejo. | ✅ |
 
 ## Nunca
@@ -91,7 +92,7 @@ una entrega: cargar un guion real, contar las intervenciones por personaje y
 compararlas con el desglose de la empresa, y comprobar que el primer timecode
 de cada personaje coincide.
 
-**QC-1 a QC-12**: `pruebas/qc.prueba.js`. La frontera de QC-2 se comprueba
+**QC-1 a QC-13**: `pruebas/qc.prueba.js`. La frontera de QC-2 se comprueba
 leyendo el cuerpo de `cotejarTodo` y exigiendo que no nombre las correcciones:
 es una regla sobre quién escribe dónde, y solo el código lo puede decir.
 Quince mutaciones comprobadas en rojo. Dos de las comprobaciones nacieron
