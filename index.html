@@ -2300,7 +2300,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.9.0-nube';
+const APP_VER_NUM = 'v11.9.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3518,10 +3518,37 @@ function saveProgress(){
    las marcas del otro. Ahora solo se envían las llaves tocadas (progTouched) y
    el servidor las FUSIONA con merge_episode_progress (progress = progress || patch).
    Si la RPC aún no existe en Supabase, se usa el guardado completo de antes. */
+/* Cuándo se reintenta un guardado en la nube que falló. Antes era a los 5 s,
+   siempre y para siempre, con un aviso rojo en cada intento: con la sesión
+   caducada o sin permiso eran doce avisos por minuto y doce llamadas que no
+   iban a entrar nunca. Se vio validando la app: 190 intentos seguidos. Ahora
+   el primero a los 5 s, y cada fallo seguido espera el doble, hasta 2 min. */
+function nubeEspera(fallos){
+  const n = Math.max(1, Math.floor(+fallos) || 1);
+  return Math.min(120000, 5000 * Math.pow(2, n - 1));
+}
+/** Si un fallo es de SESIÓN o de PERMISO y no de red: reintentar no lo
+    arregla hasta volver a entrar, y hay que decirlo así. */
+function nubeSinPermiso(e){
+  if(!e) return false;
+  const c = String(e.code || ''), s = +e.status || 0;
+  return c === '42501' || c === 'PGRST301' || c === 'PGRST302' || s === 401 || s === 403
+      || /permission denied|jwt|not authenticated/i.test(String(e.message || ''));
+}
+/** Lo que se dice cuando un guardado falla. Se dice UNA vez por racha de
+    fallos, no en cada intento. */
+function nubeAviso(que, e){
+  return nubeSinPermiso(e)
+    ? ('No se pudo guardar ' + que + ' en la nube: la sesión ha caducado o no hay permiso. '
+       + 'Vuelve a entrar; mientras, se sigue intentando.')
+    : ('No se pudo guardar ' + que + ' en la nube; reintentando…');
+}
+
 const _progDirty = new Set();
 function progTouched(k){ _progDirty.add(k); }
 let _cloudTmr = null;
 let _rpcProgress = true;
+let _cloudFallos = 0;       // cuántos guardados del progreso seguidos han fallado
 let _cloudPending = null;   // { epId, obj, keys } — instantánea del guardado programado
 function cloudSaveProgress(){
   if(!sb || !currentEp) return;
@@ -3555,14 +3582,16 @@ async function _cloudFlushPending(){
     if(!_rpcProgress){
       await sb.from('episodes').update({ progress: p.obj }).eq('id', p.epId);
     }
+    _cloudFallos = 0;
   }catch(e){
     console.error(e);
-    // fallo transitorio: las claves vuelven a estar sucias y se reintenta
+    _cloudFallos++;
+    // las claves vuelven a estar sucias y se reintenta, cada vez más despacio
     if(currentEp && currentEp.id === p.epId){
       p.keys.forEach(k=> _progDirty.add(k));
-      clearTimeout(_cloudTmr); _cloudTmr = setTimeout(cloudSaveProgress, 5000);
+      clearTimeout(_cloudTmr); _cloudTmr = setTimeout(cloudSaveProgress, nubeEspera(_cloudFallos));
     }
-    if(typeof DDL_UI!=='undefined') DDL_UI.toast('No se pudo guardar el progreso en la nube; reintentando…', {kind:'err'});
+    if(_cloudFallos === 1 && typeof DDL_UI!=='undefined') DDL_UI.toast(nubeAviso('el progreso', e), {kind:'err'});
   }
 }
 // Token de sesión de forma síncrona (para el vaciado al cerrar la pestaña):
@@ -18165,11 +18194,13 @@ function cloudSaveMarks(){
       // solo tras el éxito, y solo si seguimos en el mismo capítulo (las claves
       // "sucias" del capítulo nuevo no se tocan)
       if(currentEp && currentEp.id===epId) dirty.forEach(si=> _marksDirty.delete(si));
+      sync._fallos = 0;
     }catch(e){
       console.error(e);
-      // fallo transitorio (red/sesión): las claves siguen sucias → reintento
-      if(currentEp && currentEp.id===epId){ clearTimeout(sync._saveTmr); sync._saveTmr = setTimeout(()=> cloudSaveMarks(), 5000); }
-      try{ libMsg('⚠️ No se pudieron guardar las marcas en la nube; reintentando…'); }catch(_){}
+      sync._fallos = (sync._fallos || 0) + 1;
+      // las claves siguen sucias → reintento, cada vez más despacio (nubeEspera)
+      if(currentEp && currentEp.id===epId){ clearTimeout(sync._saveTmr); sync._saveTmr = setTimeout(()=> cloudSaveMarks(), nubeEspera(sync._fallos)); }
+      if(sync._fallos === 1){ try{ libMsg('⚠️ ' + nubeAviso('las marcas', e)); }catch(_){ /* sin libreto no hay dónde decirlo */ } }
     }
   }, 400);
 }

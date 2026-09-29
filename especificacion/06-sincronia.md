@@ -16,10 +16,10 @@ que dos personas trabajando a la vez no se borren el trabajo.
 | **SYN-5** | Los trazos y los gestos del pincel se **funden por identificador de dispositivo**: cada pantalla aporta los suyos y nadie pierde lo que dibujó el otro. | 👁 |
 | **SYN-6** | Al cambiar de capítulo, el modo estudio arranca apagado: no se arrastra el vídeo del anterior. | 👁 |
 | **SYN-7** | Todo lo que llega de la nube se trata como **datos de fuera**: se sanea antes de concatenarlo en HTML o de compararlo. Lo pudo escribir otro cliente, o una versión más nueva de la aplicación. | 👁 |
-
-| **SYN-8** | La posición del libreto viaja por **índice de intervención**, no por píxeles ni por página: el índice es el mismo en la tablet y en el escritorio aunque tengan otro tamaño de letra o otro ancho de caja. | 👁 |
-| **SYN-9** | Con la posición viaja una **huella del libreto** —cuántas intervenciones, de quién, con qué timecode y en qué página—. Sin ella, dos aparatos con libretos distintos se sincronizan a ciegas: el índice 300 es una intervención en cada uno y lo único que se ve es que **las páginas no coinciden**. | ✅ |
-| **SYN-10** | Si las huellas no casan **se dice, con el botón de ponerse al día**, y una sola vez por pareja de huellas: los mensajes de posición llegan a veinte por segundo. | ✅ |
+| **SYN-13** | La posición del libreto viaja por **índice de intervención**, no por píxeles ni por página: el índice es el mismo en la tablet y en el escritorio aunque tengan otro tamaño de letra o otro ancho de caja. | 👁 |
+| **SYN-14** | Con la posición viaja una **huella del libreto** —cuántas intervenciones, de quién, con qué timecode y en qué página—. Sin ella, dos aparatos con libretos distintos se sincronizan a ciegas: el índice 300 es una intervención en cada uno y lo único que se ve es que **las páginas no coinciden**. | ✅ |
+| **SYN-15** | Si las huellas no casan **se dice, con el botón de ponerse al día**, y una sola vez por pareja de huellas: los mensajes de posición llegan a veinte por segundo. | ✅ |
+| **SYN-16** | Un guardado en la nube que **falla se reintenta** sin perder nada —lo tocado sigue pendiente y viaja en el intento siguiente—, pero **cada vez más despacio**: a los 5 s, y el doble con cada fallo seguido, hasta 2 minutos. Y se dice **una vez por racha**, no en cada intento; si el fallo es de **sesión o de permiso** se dice que hay que volver a entrar, porque reintentar no lo arregla. Antes se reintentaba cada 5 s para siempre con un aviso rojo en cada intento: se vio validando la app, 190 intentos seguidos. Vale para el progreso de las páginas y para las marcas del libreto. | ✅ |
 
 ## Reglas · el puente con DublajeCast
 
@@ -43,7 +43,8 @@ que dos personas trabajando a la vez no se borren el trabajo.
 
 ## Cómo se demuestra
 
-- **SYN-9**, **SYN-10** y **SYN-N5**: `pruebas/seguir.prueba.js`. Se comprueba que
+- **SYN-16**: `pruebas/nube.prueba.js`, con la nube y el reloj de mentira: las esperas de cada intento, que se avise una vez por racha y con qué aviso, que cada intento lleve lo tocado y solo eso, y que la racha se acabe al entrar. Doce mutaciones, todas en rojo; dos nacieron verdes y se cerraron.
+- **SYN-14**, **SYN-15** y **SYN-N5**: `pruebas/seguir.prueba.js`. Se comprueba que
   la huella cambia ante **cualquier** diferencia que descoloque los índices —una
   intervención de más o de menos, otro personaje, otro timecode, otra página, el
   mismo libreto en otro orden—. Dejar la página fuera de la huella pone una
