@@ -264,14 +264,14 @@ exports.pruebas = function(t){
        'sin el total no hay barra: solo «está pensando»');
   t.ok('y por dónde va', /COTEJO\.vistos = n \+ 1/.test(TODO));
   t.ok('lo que el cotejo cuenta se espeja en la barra de QC',
-       /function stMsg\(t\)\{[\s\S]{0,900}?qcAvance\(t\)/.test(TODO),
+       /function stMsg\(t\)\{[\s\S]{0,1400}?qcAvance\(t\)/.test(TODO),
        'es el único sitio por el que pasan todas las fases; sin este espejo, '
        + 'desde QC no se ve nada de lo que ya se cuenta');
   /* Pero SOLO mientras coteja. Sin esta condicion se espejaba cualquier aviso
      del Video Estudio, y llego de sala «Sin medio cargado» colgado en la
      barra, en los tres perfiles. */
   t.ok('y solo mientras el cotejo trabaja',
-       /function stMsg\(t\)\{[\s\S]{0,900}?COTEJO\.trabajando\) qcAvance\(t\)/.test(TODO),
+       /function stMsg\(t\)\{[\s\S]{0,1400}?COTEJO\.trabajando\) qcAvance\(t\)/.test(TODO),
        'un aviso de otra pantalla puesto en una barra que es de otra cosa');
   t.ok('la fila del avance es solo del perfil QC',
        /function qcAvance\(txt\)\{[\s\S]{0,700}?DDL_MODO\) !== 'qc'\)\{[\s\S]{0,160}?remove\(\)/
@@ -340,6 +340,99 @@ exports.pruebas = function(t){
      quedaban sin titulo o se iban con el. */
   t.ok('«Leer» es un grupo propio en el cajón', />Leer<\/div>/.test(TODO),
        'antes buscar y pronunciaciones vivían bajo «Marcar», que no es lo que son');
+
+  t.seccion('12d · el audio del premix empieza donde el libreto dice');
+  /* Llego de sala: «la opcion de cotejar no funciona». Uno de los tres motivos:
+     sin «TC de inicio», un parlamento en 01:05:40 se busca en el segundo 3940
+     de un MP3 de 45 minutos, fuera del audio, y no hay nada que cotejar. */
+  const A = montar([['/** El primer timecode del guion', '/**\n * El aviso de por dónde va el cotejo']],
+                   ['qcPrimerTc', 'qcInicioSupuesto'],
+                   { script: [{}, { tcEff: 3612.2 }, { tcEff: 3620 }], window: {},
+                     console: { warn: () => {}, log: () => {} } });
+  t.eq('el primer tiempo del guion, saltando lo que no lo tiene', A.qcPrimerTc(), 3612.2);
+  t.eq('con el desfase a cero y el guion en la hora, se supone la hora en punto',
+       A.qcInicioSupuesto(3612.2, 0), 3600,
+       'los programas empiezan en la hora en punto y el primer parlamento unos segundos después');
+  t.eq('a las diez, las diez', A.qcInicioSupuesto(36005, 0), 36000);
+  t.eq('si alguien ya puso un desfase, NO se toca', A.qcInicioSupuesto(3612.2, 3595), null,
+       'pisar lo que alguien puso a mano es peor que suponer mal');
+  t.eq('si el guion empieza en cero, el cero es correcto', A.qcInicioSupuesto(12.5, 0), null);
+  t.eq('sin guion, nada', A.qcInicioSupuesto(null, 0), null);
+  t.eq('con un tiempo que no es número, nada', A.qcInicioSupuesto('ayer', 0), null);
+
+  t.seccion('12e · el reconocedor lee el audio del Blob, no por fetch');
+  /* El segundo motivo, comprobado en dubbipt.vercel.app: la CSP no lleva blob:
+     en connect-src, asi que fetch(blob:) se cae con «Failed to fetch». El
+     cotejo nunca arranco en produccion, ni con el video ni con la pista. */
+  t.ok('el vídeo se guarda como Blob además de como URL', /studio\.blob = blob;/.test(TODO));
+  t.ok('y la pista de diálogos también', /studio\.dlgBlob = file;/.test(TODO));
+  t.ok('el reconocedor lee el Blob directo',
+       /const blob = studio\.dlgUrl \? studio\.dlgBlob : studio\.blob;[\s\S]{0,200}?await blob\.arrayBuffer\(\)/.test(TODO),
+       'fetch(blob:) lo prohíbe la CSP de producción');
+  t.ok('y solo hace fetch de lo que es una URL de verdad',
+       /: await \(await fetch\(fuente\)\)\.arrayBuffer\(\);/.test(TODO),
+       'el audio bajado de la nube sigue siendo una URL https');
+
+  t.seccion('12f · cuando el cotejo falla, se dice la CAUSA');
+  /* El tercer motivo: el error real se producia y lo tapaba mi genérico. */
+  t.ok('se enseña karIa.error o el último aviso, no un genérico',
+       /karIa\.error : \(window\._stUltimo \|\| 'no se pudo cotejar'\)/.test(TODO));
+  t.ok('stMsg guarda el último aviso para eso', /window\._stUltimo = String\(t\);/.test(TODO));
+  t.ok('y si ningún parlamento cayó dentro del audio, se dice que es el desfase',
+       /if\(!r\.hechos\)\{[\s\S]{0,200}?ninguno cayó dentro del audio/.test(TODO),
+       'con que el mensaje exista no basta: tiene que gobernarlo la cuenta de cotejados. '
+       + 'Se vio mutando la condición');
+
+  t.seccion('12g · los diálogos que cambiaron');
+  /* Lo que se entrega. Se monta con el `cotejoAviso` de VERDAD, el de los
+     planos, para que los umbrales sean los mismos que en la hoja de cues. */
+  const w = {};
+  const C = montar([['function cotejoDatos(){', '/** Coteja el capítulo entero'],
+                    ['/* ═══ QC · LOS DIÁLOGOS QUE CAMBIARON', '/** El panel con la lista']],
+                   ['qcCambiosLista', 'qcCambiosCuenta'],
+                   { window: w,
+                     script: [ { tcEff: 3700, key: 'A', lines: ['Hola.'] },
+                               { tcEff: 3650, key: 'B', lines: ['Adiós', 'amigo'] },
+                               /* Antes que el de arriba en TIEMPO aunque vaya después en el
+                                  guion: es lo que separa «por tiempo» de «por orden». */
+                               { tcEff: 3600, key: 'A', lines: ['Regular'] },
+                               { tcEff: 3900, key: 'C', lines: ['Sin cotejar'] },
+                               { tcEff: 3950, key: 'A', lines: ['Justo'] },
+                               { tcEff: 3960, key: 'A', lines: ['Casi'] } ],
+                     charIdx: { A: { display: 'ANA' }, B: { display: 'BETO' } },
+                     console: { warn: () => {}, log: () => {} } });
+  w._cotejo = { 0: { sim: 0.95, oido: 'hola' },          // cuadra
+                1: { sim: 0.30, oido: 'otra cosa' },     // no cuadra
+                2: { sim: 0.60, oido: 'mas o menos' },   // dudoso
+                4: { sim: 0.45, oido: 'x' },             // el borde: dudoso
+                5: { sim: 0.72, oido: 'y' } };           // el borde: cuadra
+  const cam = C.qcCambiosLista();
+  t.eq('salen los que no cuadran y los dudosos, y nada más', cam.length, 3,
+       JSON.stringify(cam.map(c => c.si + ':' + c.nivel)));
+  t.eq('por tiempo, no por orden del guion', cam.map(c => c.si).join(','), '2,1,4',
+       'el 2 va después en el guion pero suena antes; el informe se lee en orden de escucha');
+  const beto = cam.find(c => c.si === 1);
+  t.eq('con su personaje', beto.quien, 'BETO');
+  t.eq('lo escrito, junto', beto.escrito, 'Adiós amigo');
+  t.eq('lo oído, tal cual', beto.oido, 'otra cosa');
+  t.eq('y su veredicto', beto.nivel + '/' + beto.et, 'mal/no cuadra');
+  t.eq('el 45 % ya es dudoso, no «no cuadra»', cam[2].nivel, 'dudoso',
+       'los umbrales son los de la hoja de cues: 0,45 y 0,72');
+  t.ok('el que cuadra NO sale', !cam.some(c => c.si === 0));
+  t.ok('el que no se cotejó tampoco', !cam.some(c => c.si === 3),
+       'no cotejado no es lo mismo que cambiado');
+  const cnt = C.qcCambiosCuenta(cam);
+  t.eq('la cuenta', cnt.mal + '/' + cnt.dudosos + '/' + cnt.total, '1/2/3');
+  t.eq('sin cotejo, lista vacía', (w._cotejo = {}, C.qcCambiosLista().length), 0);
+
+  t.seccion('12h · nada se apunta solo como corrección');
+  /* QC-2: el reconocedor señala; quien firma es una persona. Desde la lista
+     de cambios se ABRE el formulario con lo oído de pista, y ella escribe. */
+  t.ok('el botón de la lista abre el formulario, no apunta',
+       /pop2\._qcNueva = \{ si: c\.si, tcSec: c\.tcSec, quien: c\.quien,[\s\S]{0,120}?qcPanel\(false\);/.test(TODO));
+  const cuerpoCambios = TODO.slice(TODO.indexOf('function qcCambiosPanel'), TODO.indexOf('async function qcInformeCambios'));
+  t.eq('y en todo el panel de cambios no hay ni un qcApuntar',
+       (cuerpoCambios.match(/qcApuntar\(/g) || []).length, 0);
 
   t.seccion('13 · la sección QC está en el panel de herramientas');
   t.ok('con su título', />QC<\/div>/.test(TODO) || /class="tt">QC</.test(TODO));

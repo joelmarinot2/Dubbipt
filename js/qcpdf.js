@@ -783,6 +783,62 @@ function qcpdfDeInforme(inf, opts){
   };
 }
 
+/** El informe de los diálogos que cambiaron: lo escrito frente a lo oído.
+    `lista` sale de qcCambiosLista(). `opts`: { programa, episodio, revisor,
+    estudio, desfase, audio, fecha }.
+    Lleva SIEMPRE las dos columnas -escrito y oído-: lo que oyó el reconocedor
+    es una pista, no una prueba, y quien lee tiene que poder juzgar. Y dice con
+    qué audio y qué inicio se cotejó, porque de eso depende todo lo demás. */
+function qcpdfDeCambios(lista, opts){
+  opts = opts || {};
+  const l = lista || [];
+  const filas = l.map(c => [
+    (typeof qcTC === 'function' ? qcTC(c.tcSec) : ''),
+    c.quien || '',
+    c.escrito || '',
+    /* Lo no oído se dice: una celda en blanco parece que se olvidó. */
+    (c.oido && String(c.oido).trim()) ? c.oido : '(nada)',
+    Math.round((+c.sim || 0) * 100) + ' % · ' + (c.et || (c.nivel === 'mal' ? 'no cuadra' : 'dudoso'))
+  ]);
+  const mal = l.filter(c => c.nivel === 'mal').length;
+  const dud = l.filter(c => c.nivel === 'dudoso').length;
+  const prog = String(opts.programa || 'Diálogos que cambiaron');
+  const base = (prog + (opts.episodio ? (' ' + opts.episodio) : '')).replace(/[\\/:*?"<>|]/g, '-').trim();
+  const pie = [];
+  if(opts.revisor) pie.push('QC: ' + opts.revisor);
+  if(opts.estudio) pie.push('Cambios: ' + opts.estudio);
+  if(opts.audio)   pie.push('Audio: ' + opts.audio);
+  if(opts.desfase) pie.push('Inicio: ' + opts.desfase);
+  return {
+    etiqueta: 'Diálogos que cambiaron',
+    titulo: prog,
+    titulo2: opts.episodio ? ('Episodio ' + opts.episodio) : '',
+    subtitulo: pie.join('   ·   '),
+    conteo: l.length + ' cambio' + (l.length === 1 ? '' : 's'),
+    fecha: opts.fecha || qcpdfFechaHoy(),
+    tarjetas: [],
+    /* Solo las pastillas que tienen algo: una en cero no dice nada. */
+    chips: [ mal ? { k:'mal',    et:'No cuadran', n:mal, rgb:[220, 38, 38] }  : null,
+             dud ? { k:'dudoso', et:'Dudosos',    n:dud, rgb:[217, 119, 6] } : null ].filter(Boolean),
+    columnas: [
+      { et:'Timecode',     peso:0.95, clase:'tc', negrita:true },
+      { et:'Actor',        peso:1.0,  clase:'nombre', negrita:true },
+      { et:'Escrito',      peso:2.4,  clase:'texto' },
+      { et:'Oído',    peso:2.4,  clase:'texto' },
+      { et:'Coincidencia', peso:0.95, clase:'texto' }
+    ],
+    filas: filas,
+    nombreDoc: 'Cambios · ' + base,
+    nota: 'Lo «oído» es lo que creyó entender el reconocedor: una pista, no una prueba. Comprobar cada uno.',
+    gris: false,
+    poster: null,
+    /* Cuatro hojas y no dos: dos columnas de texto por fila ocupan el doble, y
+       encoger hasta 7,5 pt para que quepa en dos lo haría ilegible. Es un
+       informe de trabajo, y se lee en sala. */
+    topeHojas: 4
+  };
+}
+
 /** La clave de un tipo, venga como clave o como etiqueta. Null si no lo es. */
 function qcpdfClaveTipo(v){
   const t = qcpdfTipoDe(v);

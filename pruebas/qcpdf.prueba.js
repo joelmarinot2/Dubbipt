@@ -29,7 +29,7 @@ const EXPORTA = ['QCPDF_HOJA', 'QCPDF_PASOS', 'qcpdfAnchos', 'qcpdfParrafos',
                  'qcpdfRenglones', 'qcpdfDatosSesion', 'qcpdfCabecera', 'qcpdfColumnaDe',
                  'qcpdfLeerInforme', 'qcpdfEsLlamado', 'qcpdfPorTurno',
                  'qcpdfPintaColumna', 'qcpdfDeInforme', 'qcpdfDeCorrecciones',
-                 'qcpdfTipoDe', 'qcpdfClaveTipo', 'qcpdfFechaHoy'];
+                 'qcpdfTipoDe', 'qcpdfClaveTipo', 'qcpdfFechaHoy', 'qcpdfDeCambios'];
 
 /* Los tipos y el que los sugiere viven en index.html -son de QC, no del
    dibujo-, asi que aqui se pasan como los pasa el navegador. Se recortan del
@@ -383,6 +383,36 @@ exports.pruebas = function(t){
   t.eq('la marca de resuelta llega intacta',
        M.qcpdfParrafos(M.qcpdfDeCorrecciones([{ tcSec:1, quien:'A', texto:'x', hecha:true }], 'a', '').filas[0][2])[0],
        'RESUELTA · x');
+
+  t.seccion('18b · el informe de los diálogos que cambiaron');
+  /* Lo que pide sala: «subo el premix, comparalo con el libreto y entregame
+     un informe de los dialogos que cambiaron». */
+  const dc = M.qcpdfDeCambios([
+    { tcSec: 3650, quien:'BETO', escrito:'Adiós amigo', oido:'otra cosa', sim:0.30, nivel:'mal', et:'no cuadra' },
+    { tcSec: 3800, quien:'ANA',  escrito:'Regular',     oido:'',          sim:0.60, nivel:'dudoso', et:'dudoso' }
+  ], { programa:'100 days', episodio:'101', revisor:'Pamela H', estudio:'Estudio Bogotá',
+       desfase:'01:00:00:00', audio:'premix.mp3' });
+  t.eq('dos filas', dc.filas.length, 2);
+  t.eq('escrito y oído van en columnas DISTINTAS',
+       dc.columnas.map(c => c.et).join('|'), 'Timecode|Actor|Escrito|Oído|Coincidencia',
+       'quien lee tiene que poder comparar: lo oído es una pista, no una prueba');
+  t.eq('la coincidencia va en porcentaje con su veredicto', dc.filas[0][4], '30 % · no cuadra');
+  t.eq('lo no oído se dice, no se deja en blanco', dc.filas[1][3], '(nada)',
+       'una celda vacía parece que se olvidó');
+  t.eq('las pastillas cuentan cada nivel', dc.chips.map(c => c.n + ' ' + c.et).join(' · '),
+       '1 No cuadran · 1 Dudosos');
+  t.ok('el pie dice con qué audio y qué inicio se cotejó',
+       /Audio: premix\.mp3/.test(dc.subtitulo) && /Inicio: 01:00:00:00/.test(dc.subtitulo),
+       'de eso depende todo lo demás: sin decirlo, el informe no se puede reproducir');
+  t.ok('y avisa de que lo oído es una pista', /pista, no una prueba/.test(dc.nota), dc.nota);
+  t.eq('el conteo', dc.conteo, '2 cambios');
+  t.eq('en singular con uno', M.qcpdfDeCambios([dc && { tcSec:1, quien:'', escrito:'a', oido:'b',
+        sim:0.1, nivel:'mal', et:'no cuadra' }], {}).conteo, '1 cambio');
+  t.eq('sin dudosos, no sale su pastilla', M.qcpdfDeCambios([{ tcSec:1, quien:'', escrito:'a', oido:'b',
+        sim:0.1, nivel:'mal', et:'no cuadra' }], {}).chips.length, 1,
+       'una pastilla en cero no dice nada');
+  t.eq('cabe en cuatro hojas, no en dos', dc.topeHojas, 4,
+       'dos columnas de texto por fila: encoger a dos hojas lo haría ilegible');
 
   t.seccion('19 · la hoja es A4 y el último paso no baja de 7,5 pt');
   t.eq('ancho A4', M.QCPDF_HOJA.w, 210);
