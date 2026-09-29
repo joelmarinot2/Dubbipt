@@ -2300,7 +2300,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.6.1-nube';
+const APP_VER_NUM = 'v11.6.2-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3899,6 +3899,8 @@ function docxCue(text){
 const PERFIL_HERRAMIENTAS = {
   qc: [
     { id:'pQcAudio',   et:'⤒ Audio',      tit:'Cargar el audio del programa para cotejarlo' },
+    /* Dónde empieza ese audio. Vivía en el Video Estudio, y QC ya no lo lleva. */
+    { id:'pQcInicio',  et:'⏱ Inicio',     tit:'En qué timecode del libreto empieza el audio cargado', inicio:true },
     { id:'pQcCotejar', et:'🔎 Cotejar',   tit:'Transcribir el capítulo y compararlo con el libreto' },
     { id:'pQcNueva',   et:'＋ Corrección', tit:'Apuntar una corrección en el parlamento seleccionado', fuerte:true },
     { id:'pQcLista',   et:'Correcciones', tit:'Las correcciones de este capítulo', cuenta:true },
@@ -3939,6 +3941,15 @@ function perfilPintar(){
   const esc_ = (typeof esc === 'function') ? esc : (s)=> String(s == null ? '' : s);
   const n = (typeof qcPendientes === 'function') ? qcPendientes() : 0;
   const nc = (typeof qcCambiosCuenta === 'function') ? qcCambiosCuenta().total : 0;
+  const ini = (typeof qcInicioTexto === 'function') ? qcInicioTexto() : '';
+
+  /* La fila del avance cuelga de esta barra, y repintar la barra se la llevaba:
+     el «✅ 412 comparados» del final del cotejo se escribía y se borraba en la
+     línea siguiente, y cualquier refresco del libreto a medio cotejo apagaba
+     la barra de progreso hasta el parlamento siguiente. Se aparta y se vuelve
+     a colgar. */
+  const avance = barra.querySelector('#qcAvance');
+  if(avance && avance.parentNode) avance.parentNode.removeChild(avance);
 
   barra.className = 'lperfil perfil-' + m;
   barra.innerHTML =
@@ -3949,9 +3960,12 @@ function perfilPintar(){
     +     ' title="' + esc_(h.tit) + '">' + esc_(h.et)
     +     (h.cuenta ? ('<b class="lp-n' + (n ? ' hay' : '') + '">' + (n || '') + '</b>') : '')
     +     (h.cuentaCambios ? ('<b class="lp-n' + (nc ? ' hay' : '') + '">' + (nc || '') + '</b>') : '')
+    +     (h.inicio && ini ? ('<b class="lp-tc">' + esc_(ini) + '</b>') : '')
     +     '</button>').join('')
     + '</span>'
     + (lista.length ? '' : '<span class="lp-pista">' + esc_(PERFIL_PISTA[m] || '') + '</span>');
+  /* Solo vuelve en QC: en los otros dos perfiles esa fila no pinta nada. */
+  if(avance && m === 'qc') barra.appendChild(avance);
 
   const q = (id) => barra.querySelector('#' + id);
   { const b = q('lpModo'); if(b) b.onclick = ()=>{ try{ cambiarModo(); }catch(e){ fallo('cambiarModo · perfilPintar', e); } }; }
@@ -3962,6 +3976,7 @@ function perfilPintar(){
   { const b = q('pQcCotejar'); if(b) b.onclick = ()=> qcCotejar(); }
   { const b = q('pQcPdf');     if(b) b.onclick = ()=> qcInformePdf(); }
   { const b = q('pQcCambios'); if(b) b.onclick = ()=> qcCambiosPanel(); }
+  { const b = q('pQcInicio');  if(b) b.onclick = ()=> qcInicioPanel(); }
   { const b = q('pQcAudio');
     if(b) b.onclick = ()=>{
       const i = d.getElementById('tQcAudioIn');
@@ -3985,6 +4000,7 @@ function perfilPintar(){
   { const b = q('pGrRec');     if(b) b.onclick = comoSi('tRec'); }
 
   perfilAjustarCajon(d, m);
+  perfilAjustarVideo(d, m);
 }
 
 /* De quién es cada herramienta del cajón.
@@ -4000,9 +4016,28 @@ const PERFIL_CAJON_DE = {
   tQcAudio:'qc', tQcCotejar:'qc', tQcNueva:'qc', tQcLista:'qc', tQcPdf:'qc'
 };
 
+/* El vídeo NO es de QC. Pedido de sala: «quita la opción de vídeo en QC y
+   todas las herramientas de vídeo».
+   Quien revisa coteja un AUDIO —el premix, solo las voces— contra lo escrito.
+   El Video Estudio es de la sala: karaoke, banda, cues, planos, pausas. Y el
+   botón «Seguir» va con él: cuelga el libreto del vídeo o del contador de Pro
+   Tools, y sin vídeo lo que decía era «Seguir · vídeo» sobre nada.
+   No tiene un dueño único —lo llevan Grabación y Casting—, así que no cabe en
+   la tabla de arriba: aquí se dice qué perfiles NO lo llevan. */
+const PERFIL_SIN_VIDEO = ['qc'];
+/* Lo que es vídeo: los dos botones de la barra del libreto y el de la pantalla
+   del capítulo, que abre el mismo panel por otra puerta. */
+const PERFIL_VIDEO = ['lVid', 'lSeguir', 'btnModoEst'];
+
+/** ¿Lleva vídeo este perfil? */
+function perfilLlevaVideo(m){
+  return PERFIL_SIN_VIDEO.indexOf(String(m == null ? '' : m)) < 0;
+}
+
 /** ¿Ve este perfil esta herramienta? Lo que no tiene dueño lo ve todo el
     mundo, que es lo de leer y moverse. */
 function perfilVeLaHerramienta(id, m){
+  if(PERFIL_VIDEO.indexOf(id) >= 0) return perfilLlevaVideo(m);
   const de = PERFIL_CAJON_DE[id];
   return !de || de === m;
 }
@@ -4037,6 +4072,78 @@ function perfilAjustarCajon(d, m){
       t.style.display = algoVivo ? '' : 'none';
     }
   }catch(e){ /* sin el cajón pintado no hay títulos que esconder */ }
+}
+
+/**
+ * Quita lo que es vídeo en los perfiles que no lo llevan, y lo devuelve en los
+ * que sí. `d` es el documento del libreto, y puede no estar: el botón de la
+ * pantalla del capítulo vive fuera y hay que atenderlo igual.
+ *
+ * Se esconde EN LÍNEA y con !important. La barra del libreto impone su
+ * `display` a todos sus botones con !important, y contra eso ni una clase ni un
+ * `style.display` a secas pueden: el botón se quedaba a la vista.
+ */
+function perfilAjustarVideo(d, m){
+  for(const id of PERFIL_VIDEO){
+    const b = (d && d.getElementById(id)) || document.getElementById(id);
+    if(!b || !b.style) continue;
+    if(perfilVeLaHerramienta(id, m)) b.style.removeProperty('display');
+    else b.style.setProperty('display', 'none', 'important');
+  }
+  /* «Seguir» se viste a mano —es una pastilla, no un círculo— y al devolverlo
+     hay que volver a vestirlo: sin su `display` en línea cae en el círculo de
+     34 px del resto de la barra, con la etiqueta saliéndose por debajo. */
+  try{ if(typeof libPintarSeguir === 'function') libPintarSeguir(); }
+  catch(e){ /* sin libreto abierto no hay botón que vestir */ }
+  /* Y la pista del timecode de cada parlamento: «saltar el vídeo aquí» no es
+     verdad donde no hay vídeo. Los que ya están pintados se corrigen aquí; los
+     que se pinten después lo preguntan al pintarse. */
+  try{
+    if(d && d.querySelectorAll){
+      const pista = perfilPistaDelTc(m);
+      const tcs = d.querySelectorAll('.bhead .tc');
+      for(let i = 0; i < tcs.length; i++){
+        if(pista) tcs[i].setAttribute('title', pista);
+        else tcs[i].removeAttribute('title');
+      }
+    }
+  }catch(e){ /* una pista de más o de menos no puede tirar la barra */ }
+}
+
+/** Lo que dice el timecode de un parlamento al pasar por encima. */
+function perfilPistaDelTc(m){
+  return perfilLlevaVideo(m) ? 'Clic: saltar el video aquí' : '';
+}
+
+/**
+ * Al entrar en un perfil sin vídeo se SUELTA lo que de vídeo hubiera abierto.
+ * Esconder el botón no basta: si el panel estaba desplegado se quedaría ahí,
+ * sin botón con el que cerrarlo. Devuelve lo que ha cerrado, para poder decirlo.
+ *
+ * También se suelta la lectura de Pro Tools, que es del botón «Seguir»: sin
+ * botón seguiría leyendo la pantalla quince veces por segundo, y compartiéndola,
+ * sin nada a la vista que lo apague.
+ */
+function perfilSoltarVideo(m){
+  const cerrado = [];
+  if(perfilLlevaVideo(m)) return cerrado;
+  try{
+    if(typeof studioStripOn === 'function' && studioStripOn()){ studioToggleStrip(); cerrado.push('estudio'); }
+  }catch(e){ fallo('studioToggleStrip · index.html:perfilSoltarVideo', e); }
+  try{
+    if(typeof karWinAbierta === 'function' && karWinAbierta()){ karWinCerrar(); cerrado.push('karaoke'); }
+  }catch(e){ fallo('karWinCerrar · index.html:perfilSoltarVideo', e); }
+  try{
+    if(typeof TCP !== 'undefined' && TCP && (TCP.on || TCP.stream)){
+      if(typeof tcpParar === 'function') tcpParar();
+      if(typeof tcpSoltar === 'function') tcpSoltar();
+      cerrado.push('protools');
+    }
+  }catch(e){ fallo('tcpParar · index.html:perfilSoltarVideo', e); }
+  try{
+    const p = document.getElementById('tcpOv'); if(p) p.remove();
+  }catch(e){ /* el panel de Pro Tools no estaba abierto */ }
+  return cerrado;
 }
 
 /* ═══ QC · CONTROL DE CALIDAD ══════════════════════════════════════════════
@@ -4496,7 +4603,12 @@ async function qcInformePdf(){
 async function qcCargarAudio(file){
   if(!file) return;
   try{
-    if(typeof studio === 'undefined' || !studio){ qcAvance('Abre primero el Video Estudio'); return; }
+    /* No se manda a nadie al Video Estudio: QC no lo lleva. Si falta el lector
+       es que la página se ha cargado a medias, y eso se arregla recargando. */
+    if(typeof studio === 'undefined' || !studio){
+      qcAvance('⚠️ No está cargado el lector de audio · recarga la página con Ctrl+F5');
+      return;
+    }
     /* Se avisa en la barra de QC, que es lo que se está mirando. `qcAviso`
        escribe en la cabecera del libreto, que va escondida dentro de un
        capítulo: por eso cargar el audio parecía no hacer nada. */
@@ -4514,13 +4626,19 @@ async function qcCargarAudio(file){
        segundo 3940 de un audio de 45 minutos y no hay nada que cotejar. */
     const primero = qcPrimerTc();
     const supuesto = qcInicioSupuesto(primero, studioTc0());
-    let nota = '';
     if(supuesto != null){
       try{ studioSetTc0(supuesto, true); }
       catch(e){ fallo('studioSetTc0 · index.html:qcCargarAudio', e); }
-      nota = ' · se toma ' + qcTC(supuesto) + ' como inicio del audio (cámbialo en el Video Estudio si no es así)';
     }
-    qcAvance('✅ Audio cargado: ' + (studio.dur/60).toFixed(1) + ' min' + nota + ' — ya puedes «Cotejar»');
+    /* El inicio se dice SIEMPRE, se haya supuesto o viniera puesto de antes.
+       El que viene puesto es justo el que más engaña: el Video Estudio deja el
+       tiempo del PRIMER PARLAMENTO al cargar un vídeo, no la hora en punto, y
+       con eso el cotejo entero va doce segundos corrido sin que nada avise. */
+    const nota = (supuesto != null ? ' · se supone que empieza en ' : ' · empieza en ')
+      + qcTC(studioTc0()) + ' · si no es ahí, corrígelo en «⏱ Inicio»';
+    /* El botón «Inicio» enseña el que vale: se repinta ANTES de avisar. */
+    try{ perfilPintar(); }catch(e){ fallo('perfilPintar · index.html:qcCargarAudio', e); }
+    qcAvance('✅ Audio cargado: ' + (studio.dur/60).toFixed(1) + ' min' + nota);
   }catch(e){
     COTEJO.trabajando = false;
     fallo('qcCargarAudio · index.html:qcCargarAudio', e, 'no se ha podido cargar ese audio');
@@ -4551,6 +4669,140 @@ function qcInicioSupuesto(primerTc, desfaseActual){
   if(primerTc == null || !isFinite(+primerTc)) return null;
   if(+primerTc < 1800) return null;                    // empieza «en cero»: no hay que suponer nada
   return Math.floor(+primerTc / 3600) * 3600;
+}
+
+/* ═══ QC · DÓNDE EMPIEZA EL AUDIO ══════════════════════════════════════════
+   El timecode del libreto que suena en el segundo cero del audio cargado. De
+   esto depende que el cotejo mire en el sitio, y suponiendo no siempre se
+   acierta: hay premix que arrancan en la claqueta de 00:59:50, y capítulos
+   donde quedó puesto el tiempo del primer parlamento.
+
+   Solo se podía corregir en el Video Estudio —«TC inicio»—, y QC ya no lleva
+   vídeo: sin esto, quien revisa se quedaba sin dónde arreglarlo. Es el MISMO
+   dato, no una copia: se lee y se escribe donde siempre. */
+
+/** El inicio que vale ahora, escrito. Vacío si todavía no se puede saber. */
+function qcInicioTexto(){
+  try{ return qcTC(typeof studioTc0 === 'function' ? studioTc0() : 0); }
+  catch(e){ return ''; /* sin las marcas del capítulo no hay inicio que enseñar */ }
+}
+
+/** Lo escrito a mano como inicio, en segundos. Nulo si no se entiende: una
+    errata no puede mover el audio de sitio. */
+function qcInicioLeer(txt){
+  const v = qcLeerTC(txt, null);
+  return (v != null && isFinite(+v) && +v >= 0) ? +v : null;
+}
+
+/**
+ * Pone el inicio del audio y dice qué ha pasado:
+ *   null                         lo pedido no vale, y no se toca nada
+ *   { cambio:false, … }          era el que ya había
+ *   { cambio:true, caducados }   se cambió, y cuántos cotejos caducan con ello
+ *
+ * Lo cotejado CADUCA. Cada parlamento se buscó en el trozo de audio que decía
+ * el inicio de antes; con otro inicio, esas comparaciones son contra otro
+ * sitio. Dejarlas sería entregar un informe de cambios medido donde no era.
+ */
+function qcInicioPoner(seg){
+  const v = qcNum(seg);
+  if(v == null || v < 0) return null;
+  const antes = +studioTc0() || 0;
+  if(Math.abs(v - antes) < 0.02) return { cambio: false, inicio: antes, caducados: 0 };
+  studioSetTc0(v, true);
+  let caducados = 0;
+  try{
+    caducados = Object.keys(window._cotejo || {}).length;
+    window._cotejo = {};
+  }catch(e){ fallo('_cotejo · index.html:qcInicioPoner', e); }
+  /* Y las marcas de palabra del reconocedor, que salieron del mismo inicio. Es
+     lo que ya hace el «ajuste» fino cuando se mueve. */
+  try{
+    if(typeof karIa !== 'undefined' && karIa){
+      karIa.marcas.clear(); karIa.cola.length = 0; karIa.hechos = 0;
+    }
+    if(typeof kar !== 'undefined' && kar && kar.cache) kar.cache.clear();
+  }catch(e){ fallo('karIa.marcas · index.html:qcInicioPoner', e); }
+  return { cambio: true, inicio: v, caducados: caducados };
+}
+
+/** El panel donde se corrige, dentro del libreto como los demás de QC.
+    `aviso` es lo que salió mal la vez anterior, y `escrito` lo que se había
+    tecleado: repintar no puede borrarle a nadie lo que acaba de escribir. */
+function qcInicioPanel(aviso, escrito){
+  const d = pop2 && pop2.doc; if(!d) return;
+  let ov = d.getElementById('qcIniOv');
+  if(!ov){
+    ov = d.createElement('div'); ov.id = 'qcIniOv'; ov.className = 'qc-ov';
+    d.body.appendChild(ov);
+    ov.addEventListener('click', (e)=>{ if(e.target === ov) ov.remove(); });
+  }
+  const primero = qcPrimerTc();
+  const hora = qcInicioSupuesto(primero, 0);           // la hora en punto del libreto, si la tiene
+  const dur = (typeof studio !== 'undefined' && studio && studio.dlgUrl && studio.dur) ? +studio.dur : 0;
+  const valor = (escrito != null) ? String(escrito) : qcInicioTexto();
+  ov.innerHTML = '<div class="qc-card qc-ini">'
+    + '<div class="qc-h"><span>⏱ Dónde empieza el audio</span>'
+      + '<button class="qc-x" id="qcIniX" title="Cerrar">✕</button></div>'
+    + (aviso ? '<div class="qc-err">' + esc(aviso) + '</div>' : '')
+    + '<div class="qc-nota">El timecode del libreto que suena en el <b>segundo cero</b> del audio. '
+      + 'Si el premix arranca en la claqueta, es el tiempo de la claqueta; si arranca con el '
+      + 'programa, la hora en punto.</div>'
+    + '<div class="qc-fr"><label>Inicio</label>'
+      + '<input id="qcIniTc" type="text" autocomplete="off" placeholder="01:00:00:00" value="' + esc(valor) + '">'
+      + (hora != null
+          ? '<button id="qcIniHora" data-tc="' + esc(qcTC(hora)) + '" title="La hora en punto del primer parlamento">'
+            + esc(qcTC(hora)) + '</button>'
+          : '')
+      + '<button id="qcIniCero" data-tc="00:00:00:00" title="El audio y el libreto empiezan los dos en cero">00:00:00:00</button>'
+      + '</div>'
+    + '<div class="qc-ini-d">'
+      + (primero != null ? ('El libreto empieza en <b>' + esc(qcTC(primero)) + '</b>')
+                         : 'El libreto no trae timecodes')
+      + (dur ? (' · el audio dura <b>' + (dur / 60).toFixed(1) + ' min</b>') : ' · todavía sin audio cargado')
+      + '</div>'
+    + '<div class="qc-fb"><button class="qc-ok" id="qcIniOk">Guardar</button>'
+      + '<button id="qcIniNo">Cancelar</button></div>'
+    + '</div>';
+
+  const q = (s)=> ov.querySelector(s);
+  const cerrar = ()=> ov.remove();
+  const caja = q('#qcIniTc');
+  { const b = q('#qcIniX');  if(b) b.onclick = cerrar; }
+  { const b = q('#qcIniNo'); if(b) b.onclick = cerrar; }
+  /* Los dos atajos RELLENAN, no guardan: guardar caduca el cotejo, y eso no se
+     hace con un toque de más. */
+  ['#qcIniHora', '#qcIniCero'].forEach(s => {
+    const b = q(s);
+    if(b) b.onclick = ()=>{ if(caja){ caja.value = b.dataset.tc; try{ caja.focus(); }catch(e){ /* sin foco se guarda igual */ } } };
+  });
+
+  const guardar = ()=>{
+    const puesto = caja ? caja.value : '';
+    const v = qcInicioLeer(puesto);
+    if(v == null){ qcInicioPanel('No se entiende ese timecode. Escríbelo como 01:00:00:00.', puesto); return; }
+    let r = null;
+    try{ r = qcInicioPoner(v); }
+    catch(e){ fallo('qcInicioPoner · index.html:qcInicioPanel', e, 'no se ha podido guardar el inicio del audio'); }
+    if(!r){ qcInicioPanel('No se ha podido guardar ese inicio.', puesto); return; }
+    cerrar();
+    try{ perfilPintar(); }catch(e){ fallo('perfilPintar · index.html:qcInicioPanel', e); }
+    if(!r.cambio){ qcAvance('El audio ya empezaba en ' + qcTC(r.inicio)); return; }
+    /* Lo borrado aquí se borra también en la nube: si no, al volver a abrir el
+       capítulo resucita el cotejo que se midió con el inicio de antes. */
+    if(r.caducados) qcGuardado();
+    qcAvance('✅ El audio empieza en ' + qcTC(r.inicio)
+      + (r.caducados ? ' · lo cotejado antes se ha borrado, se midió con el otro inicio · pulsa «Cotejar»'
+                     : ' · ya puedes «Cotejar»'));
+  };
+  { const b = q('#qcIniOk'); if(b) b.onclick = guardar; }
+  if(caja){
+    caja.onkeydown = (e)=>{
+      if(e.key === 'Enter'){ e.preventDefault(); guardar(); }
+      else if(e.key === 'Escape'){ cerrar(); }
+    };
+    try{ caja.focus(); caja.select(); }catch(e){ /* sin foco se escribe igual */ }
+  }
 }
 
 /**
@@ -4591,19 +4843,31 @@ function qcAvance(txt){
   const va  = (typeof COTEJO !== 'undefined' && COTEJO) ? +COTEJO.vistos : 0;
   const pct = (tot > 0) ? Math.max(2, Math.min(100, Math.round(va * 100 / tot))) : 0;
   const esc_ = (typeof esc === 'function') ? esc : (s)=> String(s == null ? '' : s);
+  /* El texto va en un renglón y se recorta con puntos suspensivos; entero
+     queda en la pista, para cuando el aviso es largo y la ventana estrecha. */
   caja.innerHTML =
-      '<span class="qc-av-t">' + esc_(txt || '') + '</span>'
-    + (tot > 0
-        ? '<span class="qc-av-bar"><i style="width:' + pct + '%"></i></span>'
-          + '<b class="qc-av-p">' + pct + '%</b>'
-        : '<span class="qc-av-late"></span>')
-    + (activo ? '<button class="qc-av-x" id="qcAvX" title="Parar el cotejo">Parar</button>' : '');
+      '<span class="qc-av-t" title="' + esc_(txt || '') + '">' + esc_(txt || '') + '</span>'
+    /* La barra y la tira que va y viene, SOLO mientras trabaja. Un aviso ya
+       terminado -«audio cargado», «el audio empieza en…»- salía con la tira
+       moviéndose al lado, que dice justo lo contrario: que sigue en ello. Se
+       vio mirando la pantalla. */
+    + (!activo ? '<span class="qc-av-hueco"></span>'
+        : (tot > 0
+            ? '<span class="qc-av-bar"><i style="width:' + pct + '%"></i></span>'
+              + '<b class="qc-av-p">' + pct + '%</b>'
+            : '<span class="qc-av-late"></span>'))
+    + (activo ? '<button class="qc-av-x" id="qcAvX" title="Parar el cotejo">Parar</button>'
+              : '<button class="qc-av-x" id="qcAvFuera" title="Quitar este aviso">✕</button>');
   const x = d.getElementById('qcAvX');
   if(x) x.onclick = ()=>{
     /* `cotejarTodo` llamado mientras trabaja es lo que lo cancela: lo dice su
        primera línea. No se inventa otra puerta. */
     try{ cotejarTodo(); }catch(e){ fallo('cotejarTodo · index.html:qcAvance', e); }
   };
+  /* Y un aviso terminado se puede quitar: ahora sobrevive a los repintados de
+     la barra, así que sin esto se quedaría ahí hasta el siguiente. */
+  const fuera = d.getElementById('qcAvFuera');
+  if(fuera) fuera.onclick = ()=>{ const c = d.getElementById('qcAvance'); if(c) c.remove(); };
 }
 
 /** Transcribe el capítulo y lo compara con el libreto.
@@ -4634,9 +4898,14 @@ async function qcCotejar(){
       return;
     }
     if(!r.hechos){
-      qcAvance('⚠️ Se recorrieron los parlamentos y ninguno cayó dentro del audio. Casi siempre es el '
-        + 'desfase: el audio dura ' + ((studio && studio.dur) ? (studio.dur/60).toFixed(1) : '?')
-        + ' min y el libreto empieza en ' + qcTC(qcPrimerTc()) + '. Pon el «TC de inicio» en el Video Estudio.');
+      const queHaPasado = 'Se recorrieron los parlamentos y ninguno cayó dentro del audio: dura '
+        + ((studio && studio.dur) ? (studio.dur/60).toFixed(1) : '?') + ' min, el libreto empieza en '
+        + qcTC(qcPrimerTc()) + ' y el audio está puesto en ' + qcInicioTexto() + '.';
+      qcAvance('⚠️ ' + queHaPasado + ' Corrígelo en «⏱ Inicio».');
+      /* Y se abre donde se arregla, con el porqué delante: es lo único que se
+         puede hacer aquí, y antes mandaba al Video Estudio, que QC no lleva. */
+      try{ qcInicioPanel(queHaPasado); }
+      catch(e){ fallo('qcInicioPanel · index.html:qcCotejar', e); }
       return;
     }
     const cambios = qcCambiosLista();
@@ -7663,6 +7932,11 @@ function ponerModo(epId, m){
   try{ localStorage.setItem('ddl_modo_ultimo', m); }catch(e){ /* se preguntará otra vez */ }
   document.body.classList.toggle('modo-casting', m === 'casting');
   document.body.classList.toggle('modo-qc', m === 'qc');
+  /* Un perfil sin vídeo cierra lo que de vídeo hubiera abierto, y esconde sus
+     botones. Va ANTES de pintar la barra y no depende del libreto: el botón
+     «Video Estudio» de la pantalla del capítulo vive fuera de él. */
+  try{ perfilSoltarVideo(m); }catch(e){ fallo('perfilSoltarVideo · index.html:ponerModo', e); }
+  try{ perfilAjustarVideo(null, m); }catch(e){ fallo('perfilAjustarVideo · index.html:ponerModo', e); }
   /* La barra del perfil vive dentro del libreto, que puede no estar abierto. */
   try{ perfilPintar(); }catch(e){ fallo('perfilPintar · index.html:ponerModo', e); }
   const b = document.getElementById('btnCastOut');
@@ -12350,6 +12624,8 @@ body.haschips .lperfil{padding-left:100px}
 .lp-n{font-size:10px;font-weight:800;color:var(--dim);min-width:8px}
 .lp-n.hay{color:#F87171}
 .lp-pista{font-size:11px;color:var(--dim)}
+/* El inicio del audio, escrito en su propio botón: se ve sin abrir nada. */
+.lp-tc{font-size:10.5px;font-weight:700;color:#60A5FA;font-variant-numeric:tabular-nums}
 /* Por dónde va el cotejo. Ocupa su propia fila para no empujar los botones. */
 .qc-av{flex:1 0 100%;display:flex;align-items:center;gap:9px;margin-top:5px;
   padding-top:5px;border-top:1px solid var(--card-b)}
@@ -12367,6 +12643,8 @@ body.haschips .lperfil{padding-left:100px}
 .qc-av-late::after{content:'';position:absolute;top:0;bottom:0;width:34%;border-radius:3px;
   background:#4ADE80;animation:qcVaVien 1.15s ease-in-out infinite}
 @keyframes qcVaVien{0%{left:-34%}100%{left:100%}}
+/* Sin trabajo en marcha no hay barra: solo el hueco que empuja el boton. */
+.qc-av-hueco{flex:1;min-width:0}
 .qc-av-x{flex:0 0 auto;font-size:10.5px;padding:4px 9px;border-radius:7px;
   border:1px solid var(--card-b);background:var(--head);color:var(--dim);cursor:pointer}
 .qc-av-x:hover{border-color:#F87171;color:#F87171}
@@ -12430,6 +12708,15 @@ body.haschips .lperfil{padding-left:100px}
 .qc-oido i{color:var(--dim)}
 .qc-add{flex:0 0 auto;background:none;border:1px solid var(--card-b);border-radius:7px;
   color:#4ADE80;cursor:pointer;font-size:13px;padding:1px 7px}
+/* Donde empieza el audio: un panel corto, con el porque delante si algo fallo. */
+.qc-ini{width:min(480px,95vw)}
+.qc-ini .qc-fr input{font-variant-numeric:tabular-nums;letter-spacing:.4px}
+.qc-ini .qc-fr button{font-variant-numeric:tabular-nums;color:var(--ink)}
+.qc-ini .qc-fr button:hover{border-color:#60A5FA;color:#60A5FA}
+.qc-ini-d{font-size:11.5px;color:var(--dim);margin:2px 0 12px}
+.qc-ini-d b{color:var(--ink);font-variant-numeric:tabular-nums}
+.qc-err{font-size:11.5px;line-height:1.45;color:#FCA5A5;background:rgba(248,113,113,.10);
+  border:1px solid rgba(248,113,113,.35);border-radius:9px;padding:8px 10px;margin-bottom:10px}
 .ltools .trow{display:flex;gap:5px}
 .ltools button{border:1px solid var(--card-b);background:var(--card);color:var(--ink);border-radius:9px;
   padding:8px 8px;font-size:12px;cursor:pointer;font-family:inherit;text-align:left}
@@ -14468,6 +14755,12 @@ function renderLibretoBlocks(){
   let mineCount = 0;
   pop2.blockMap = [];
   let lastPage = 0;
+  /* Lo que dice el timecode al pasar por encima. «Saltar el vídeo aquí» solo
+     es verdad en los perfiles que llevan vídeo: en QC no se promete. */
+  const pistaTxt = (typeof perfilPistaDelTc === 'function')
+    ? perfilPistaDelTc(typeof DDL_MODO !== 'undefined' ? DDL_MODO : 'grabacion')
+    : 'Clic: saltar el video aquí';
+  const pistaTc = pistaTxt ? (' title="' + esc(pistaTxt) + '"') : '';
   script.forEach((b, i)=>{
     const keyFlat = (k)=> (k||'').replace(/[^A-Z0-9]/g,'');
     const mine = b.key === highlight || (highlight && b.key && keyFlat(b.key)===keyFlat(highlight) && keyFlat(highlight).length>=2);
@@ -14498,7 +14791,7 @@ function renderLibretoBlocks(){
     const recDone = recSet(recKey).has(b.page);
     const cls2 = cls + (recDone ? ' rec' : '');
     html.push('<div class="'+cls2+'" data-vi="'+vi+'" data-si="'+i+'" data-pg="'+b.page+'" style="--pc:'+bcolor+'">'
-      + ((tc||who) ? '<div class="bhead">'+(tc?'<span class="tc" title="Clic: saltar el video aquí">'+tc+'</span>':'')+(isEdited(i)?'<button class="edited-tag" data-si="'+i+'" title="Ver historial de cambios">✎ Editado</button>':'')+(who?'<span class="who">'+esc(who)+'</span>':'')+(window._stCps?stCpsBadge(i):'')+'</div>' : '')
+      + ((tc||who) ? '<div class="bhead">'+(tc?'<span class="tc"'+pistaTc+'>'+tc+'</span>':'')+(isEdited(i)?'<button class="edited-tag" data-si="'+i+'" title="Ver historial de cambios">✎ Editado</button>':'')+(who?'<span class="who">'+esc(who)+'</span>':'')+(window._stCps?stCpsBadge(i):'')+'</div>' : '')
       + (txt ? '<div class="tx">'+applyMarks(i, txt)+'</div>' : '')
       + '<div class="mtools">'
         + '<button class="done'+(recDone?' on':'')+'" data-act="done" data-si="'+i+'">'+(recDone?'↩ Quitar':'✓ Completar')+'</button>'
@@ -17978,6 +18271,23 @@ function studioPlayPause(){
 }
 function studioToggleStrip(){
   if(!currentEp){ libMsg('Abre primero un capítulo'); return; }
+  /* En un perfil sin vídeo el estudio NO SE ABRE, se llame desde donde se
+     llame. Los botones ya van escondidos, pero esta es la puerta por la que
+     pasan todos —el de la barra, el de la pantalla del capítulo y lo que venga
+     después—, y aquí es donde se cierra de verdad. CERRAR sí se deja siempre:
+     es justo lo que hay que poder hacer al entrar en ese perfil. */
+  if(typeof perfilLlevaVideo === 'function' && typeof DDL_MODO !== 'undefined'
+     && !perfilLlevaVideo(DDL_MODO)){
+    const panel = $('stLeft');
+    const abierto = !!(panel && panel.style.display !== 'none');
+    if(!abierto){
+      /* Por el aviso que SE VE: dentro de un capítulo la cabecera donde escribe
+         `libMsg` va escondida, y un «no» que no se lee parece un botón roto. */
+      const decir = (typeof castAviso === 'function') ? castAviso : libMsg;
+      decir('⚠️ Este perfil no lleva vídeo · cámbialo desde el botón del perfil para abrir el Video Estudio');
+      return;
+    }
+  }
   /* `libInline` puede NO existir todavia: la primera vez que se entra en modo
      estudio sin haber abierto antes el libreto incrustado, hay que crearlo. Y
      entonces hay que VOLVER A PEDIRLO, porque el de arriba se leyo antes de que
@@ -18192,6 +18502,16 @@ function libPintarSeguir(){
   if(typeof pop2 === 'undefined' || !pop2 || !pop2.doc) return;
   const b = pop2.doc.getElementById('lSeguir');
   if(!b) return;
+  /* En un perfil sin vídeo este botón no está, y hay que decirlo AQUÍ: más
+     abajo se le pone `display` en línea con !important, y eso lo devolvería a
+     la vista cada vez que algo lo repinta —encender, apagar, Pro Tools
+     enganchando—. */
+  if(typeof perfilVeLaHerramienta === 'function' && typeof DDL_MODO !== 'undefined'
+     && !perfilVeLaHerramienta('lSeguir', DDL_MODO)){
+    try{ b.style.setProperty('display', 'none', 'important'); }
+    catch(e){ /* sin estilo que tocar, se queda como estaba */ }
+    return;
+  }
   b.classList.toggle('on', !!SEG.on);
   b.setAttribute('aria-pressed', SEG.on ? 'true' : 'false');
   /* El color se pone AQUÍ, no en la hoja de estilos. La barra del libreto tiene

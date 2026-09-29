@@ -355,7 +355,11 @@ async function cotejarTodo(){
   try{ adrRepintar(); }catch(e){ fallo('adrRepintar · js\cortes.js:339', e); }
   const msg = '🔎 ' + COTEJO.hechos + ' cotejados · ' + mal + ' no cuadran · ' + dudosos + ' dudosos';
   stMsg(msg);
-  castAviso(msg + ' — míralos en «📋 Cues», no se ha cambiado ni una palabra del libreto');
+  /* Dónde mirarlos depende del perfil. «📋 Cues» es del Video Estudio, y QC no
+     lo lleva: mandar ahí a quien revisa era mandarle a un botón que no tiene. */
+  const donde = (typeof perfilLlevaVideo === 'function' && typeof DDL_MODO !== 'undefined'
+                 && !perfilLlevaVideo(DDL_MODO)) ? '«≠ Cambios»' : '«📋 Cues»';
+  castAviso(msg + ' — míralos en ' + donde + ', no se ha cambiado ni una palabra del libreto');
   return { hechos: COTEJO.hechos, mal: mal, dudosos: dudosos };
 }
 

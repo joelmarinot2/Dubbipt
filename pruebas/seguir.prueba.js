@@ -61,7 +61,11 @@ function conSeguir(opts){
   const boton = { clases: new Set(opts.seguir === false ? [] : ['on']), atrib: {}, title: '',
     classList: { toggle: (c, v) => { if(v) boton.clases.add(c); else boton.clases.delete(c); },
                  contains: (c) => boton.clases.has(c) },
-    setAttribute: (k, v) => { boton.atrib[k] = v; } };
+    setAttribute: (k, v) => { boton.atrib[k] = v; },
+    /* El estilo en linea CON su prioridad: es lo que decide si el boton se ve,
+       porque la barra del libreto impone el suyo con !important. */
+    style: { props: {}, setProperty: (k, v, p) => { boton.style.props[k] = v + (p ? ' !' + p : ''); } },
+    querySelector: () => null };
   const _guardado = {};
   const doc = {
     getElementById: (id) => (id === 'lSeguir' ? boton : null),
@@ -73,10 +77,16 @@ function conSeguir(opts){
     },
     querySelectorAll: () => []
   };
-  const M = montar(R_SEGUIR, ['stSeguirOn', 'stSeguirPoner', 'libPintarSeguir', 'SEG',
+  /* Con `perfil` se monta ademas la tabla de que perfil lleva video, la de
+     verdad: el boton pregunta ahi. Sin el, como antes. */
+  const recortes = opts.perfil
+    ? [['/* De quién es cada herramienta del cajón.', '/**\n * Deja en el cajón']].concat(R_SEGUIR)
+    : R_SEGUIR;
+  const M = montar(recortes, ['stSeguirOn', 'stSeguirPoner', 'libPintarSeguir', 'SEG',
                               'studioSeguirLibreto', 'studioAvisarFueraDeAlcance',
                               'stCurBlock', 'verAvisado: () => _stFueraAvisado',
-                              'verGuardado: () => _guardado', 'studioTick'], {
+                              'verGuardado: () => _guardado', 'studioTick'], Object.assign(
+                              opts.perfil ? { DDL_MODO: opts.perfil } : {}, {
     /* El seguimiento ya no vive en una casilla de la tira de video: es un
        estado propio que se recuerda entre sesiones. Se enciende y se apaga
        por ahi. */
@@ -98,7 +108,7 @@ function conSeguir(opts){
     syncSendTool: () => {},
     fallo: () => {},
     console: { warn: () => {}, log: () => {} }
-  });
+  }));
   M._movidos = movidos; M._avisos = avisos;
   M._casilla = casilla; M._boton = boton; M._guardado = _guardado;
   return M;
@@ -264,4 +274,27 @@ exports.pruebas = function(t){
   SV.studioTick(false);
   t.eq('no se mueve nada', SV._movidos.length, 0,
        'y sobre todo: no revienta');
+
+  t.seccion('18 · en un perfil sin vídeo el botón no está, se repinte lo que se repinte');
+  /* Pedido de sala: «quita la opcion de video en QC y todas las herramientas
+     de video». El boton se viste a mano con `display` en linea y !important,
+     asi que esconderlo desde fuera no basta: cada vez que algo lo repinta
+     -encender, apagar, Pro Tools enganchando- volveria a la vista. */
+  const QV = conSeguir({ hace: 99999, perfil: 'qc' });
+  QV.libPintarSeguir();
+  t.eq('escondido, y con prioridad', QV._boton.style.props.display, 'none !important',
+       'la barra del libreto impone su display con !important');
+  QV.stSeguirPoner(false);
+  QV.stSeguirPoner(true);
+  t.eq('encenderlo y apagarlo no lo devuelve', QV._boton.style.props.display, 'none !important',
+       'si volviera, en QC saldría «Seguir · vídeo» sobre un vídeo que no hay');
+  t.ok('y no se le pone ni el fondo', !('background' in QV._boton.style.props),
+       JSON.stringify(QV._boton.style.props));
+
+  ['grabacion', 'casting'].forEach(p => {
+    const GV = conSeguir({ hace: 99999, perfil: p });
+    GV.libPintarSeguir();
+    t.eq(p + ': se viste como siempre', GV._boton.style.props.display, 'inline-flex !important',
+         'solo se pidió quitarlo de QC');
+  });
 };

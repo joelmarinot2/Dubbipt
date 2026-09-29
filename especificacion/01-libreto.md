@@ -60,6 +60,9 @@ El modelo es siempre el mismo:
 | **QC-15** | El reconocedor de voz lee el audio **del Blob, no por `fetch` de su URL**. La CSP de producción no lleva `blob:` en `connect-src`, así que `fetch(blob:)` se cae con «Failed to fetch» — comprobado en dubbipt.vercel.app. Por eso el cotejo **nunca arrancó en producción**, ni con el vídeo ni con la pista de diálogos. El vídeo y la pista se guardan como Blob además de como URL; solo se hace `fetch` de lo que es una URL de verdad, como el audio bajado de la nube. | ✅ |
 | **QC-16** | Al cargar el audio desde QC, si nadie ha puesto el **«TC de inicio»** se **supone la hora en punto del primer timecode del guion** y **se dice**. Sin desfase, un parlamento en 01:05:40 se busca en el segundo 3940 de un MP3 de 45 minutos —fuera del audio— y no hay nada que cotejar. Solo cuando el desfase está a cero y el guion claramente no empieza en cero; **nunca se pisa** uno puesto a mano. Y si tras cotejar ningún parlamento cayó dentro del audio, se dice que casi seguro es el desfase, con la duración del audio y el primer tiempo del libreto delante. | ✅ |
 | **QC-17** | El cotejo entrega un **informe de los diálogos que cambiaron**: los parlamentos donde lo oído no cuadra con lo escrito, por tiempo, con **las dos columnas** —escrito y oído—, el porcentaje y el veredicto, y en el pie **con qué audio y qué inicio** se cotejó. Los umbrales son los de la hoja de cues (0,45 y 0,72). Lo «oído» es una pista, no una prueba, y el informe lo dice. Desde la lista se puede **abrir** el formulario de corrección con lo oído de pista, pero **nada se apunta solo** (QC-2). Cuando el cotejo falla se enseña **la causa** que ya averigua `karIaPreparar`, no un genérico. | ✅ |
+| **QC-18** | El perfil QC **no lleva vídeo**. Pedido de sala: «quita la opción de vídeo en QC y todas las herramientas de vídeo». Se van el botón **«Vídeo»** y el botón **«Seguir»** de la barra del libreto, y el **«Video Estudio»** de la pantalla del capítulo, que abre el mismo panel por otra puerta; con el panel se va todo lo que vive dentro —karaoke, sala, banda, cues, formatos, planos—. **Entrar en QC con el estudio abierto lo cierra**, y con él la ventana del karaoke y la lectura de Pro Tools: esconder el botón no basta, porque el panel se quedaría desplegado sin nada con qué cerrarlo y la pantalla seguiría compartida sin nada a la vista que lo apague. El estudio **no se abre** desde un perfil sin vídeo se llame desde donde se llame —la guarda está en la puerta por la que pasan todos—, pero **cerrarlo** se deja siempre. **Grabación y Casting lo siguen llevando.** El timecode de cada parlamento deja de prometer «saltar el vídeo aquí», y **ningún aviso de QC manda al Video Estudio**. Los botones se esconden **en línea y con `!important`**: la barra del libreto impone su `display` a todos sus botones con `!important`, y contra eso una clase no puede. | ✅ |
+| **QC-19** | Dónde empieza el audio se corrige **desde QC**, en **«⏱ Inicio»**, que enseña en el propio botón el que vale. Es **el mismo dato** que el «TC inicio» del Video Estudio, no una copia. Una **errata no mueve nada**: el panel se queda abierto, dice qué no entendió y **conserva lo tecleado**. Cambiarlo **caduca lo cotejado** —cada parlamento se buscó en el trozo de audio que decía el inicio de antes— y se borra también en la nube, para que no resucite al reabrir el capítulo; guardar **el mismo** valor no borra nada. Los dos atajos —la hora en punto del libreto y el cero— **rellenan, no guardan**. Al cargar el audio se dice **siempre** el inicio que vale, se haya supuesto o viniera puesto: el que viene puesto es el que más engaña, porque el Video Estudio deja el tiempo del **primer parlamento** al cargar un vídeo, no la hora en punto. Y si ningún parlamento cayó dentro del audio, el panel **se abre solo** con el porqué delante. | ✅ |
+| **QC-20** | La fila del avance **sobrevive a los repintados** de la barra del perfil. Colgaba de ella y repintarla se la llevaba: el «✅ 412 comparados» del final se escribía y se borraba en la línea siguiente, y cualquier refresco del libreto a medio cotejo apagaba el progreso. La barra y la tira que va y viene salen **solo mientras trabaja** —un aviso ya terminado con la tira moviéndose dice lo contrario de lo que es— y un aviso terminado **se puede quitar**. | ✅ |
 | **QC-7** | El audio que se carga en QC queda en **`studio.dlgUrl`**, que es lo que el reconocedor prefiere al vídeo, y se **olvida el audio ya preparado**. Ese campo se leía en `karIaPreparar` y no lo escribía nadie: hasta ahora Whisper oía siempre el vídeo aunque cargaras otra pista, y sin olvidar el anterior se cotejaría el capítulo nuevo contra la voz del viejo. | ✅ |
 
 ## Nunca
@@ -96,11 +99,19 @@ una entrega: cargar un guion real, contar las intervenciones por personaje y
 compararlas con el desglose de la empresa, y comprobar que el primer timecode
 de cada personaje coincide.
 
-**QC-1 a QC-17**: `pruebas/qc.prueba.js`. La frontera de QC-2 se comprueba
+**QC-1 a QC-20**: `pruebas/qc.prueba.js`, y la puerta del estudio de QC-18
+en `pruebas/estudio.prueba.js`. La frontera de QC-2 se comprueba
 leyendo el cuerpo de `cotejarTodo` y exigiendo que no nombre las correcciones:
 es una regla sobre quién escribe dónde, y solo el código lo puede decir.
 Quince mutaciones comprobadas en rojo. Dos de las comprobaciones nacieron
 rojas y encontraron el fallo de QC-4 antes de que llegara a sala.
+
+**QC-18 a QC-20** se mutaron aparte: cincuenta y dos roturas, una cada vez, y
+las cincuenta y dos en rojo. Las que importan: que QC vuelva a llevar vídeo,
+que la puerta del estudio impida también **cerrar**, que los botones se
+escondan sin prioridad, que cambiar el inicio no caduque lo cotejado y que
+guardar el mismo inicio sí lo borre. Y se comprobó **en el navegador**, con un
+audio de verdad: el cotejo entero corre en QC sin abrir el Video Estudio.
 
 ## Sin resolver
 
