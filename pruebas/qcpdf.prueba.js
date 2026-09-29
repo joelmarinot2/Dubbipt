@@ -442,6 +442,9 @@ exports.pruebas = function(t){
   t.eq('con las pastillas de analizados y de los que coinciden',
        conA.chips.map(c => c.n + ' ' + c.et).join(' · '), '72 Analizados · 71 Coinciden · 1 No cuadran');
   t.ok('y lo que tardó el análisis', /Análisis: 50 s/.test(conA.subtitulo), conA.subtitulo);
+  t.ok('con qué oído se oyó, si se sabe', /Oído: muy fiel/.test(M.qcpdfDeCambios([uno], { oido: 'muy fiel' }).subtitulo),
+       'de eso depende cuánto fiarse de la columna «Oído»');
+  t.ok('y si no se sabe, no se dice', !/Oído:/.test(conA.subtitulo));
   t.eq('nunca menos analizados que cambios', M.qcpdfDeCambios([uno, uno], { analizados: 1 }).conteo,
        '2 cambios de 2 parlamentos', 'un «3 cambios de 2» no lo cree nadie');
   t.eq('sin saber cuántos, no se inventa', M.qcpdfDeCambios([uno], {}).conteo, '1 cambio');

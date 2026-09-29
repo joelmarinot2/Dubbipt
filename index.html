@@ -2300,7 +2300,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.8.0-nube';
+const APP_VER_NUM = 'v11.9.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3902,6 +3902,8 @@ const PERFIL_HERRAMIENTAS = {
     /* Dónde empieza ese audio. Vivía en el Video Estudio, y QC ya no lo lleva. */
     { id:'pQcInicio',  et:'⏱ Inicio',     tit:'En qué timecode del libreto empieza el audio cargado', inicio:true },
     { id:'pQcCotejar', et:'🔎 Analizar cambios', tit:'Oír el audio, compararlo con el libreto y entregar el informe de cambios en PDF' },
+    /* Con qué oído se analiza. Pedido de sala: «mejora cómo escucha». */
+    { id:'pQcOido',    et:'👂 Oído',       tit:'Cómo escucha el análisis: más rápido o más fiel', oido:true },
     { id:'pQcNueva',   et:'＋ Corrección', tit:'Apuntar una corrección en el parlamento seleccionado', fuerte:true },
     { id:'pQcLista',   et:'Correcciones', tit:'Las correcciones de este capítulo', cuenta:true },
     { id:'pQcCambios', et:'≠ Cambios',    tit:'Los diálogos donde lo dicho no coincide con lo escrito', cuentaCambios:true },
@@ -3942,6 +3944,8 @@ function perfilPintar(){
   const n = (typeof qcPendientes === 'function') ? qcPendientes() : 0;
   const nc = (typeof qcCambiosCuenta === 'function') ? qcCambiosCuenta().total : 0;
   const ini = (typeof qcInicioTexto === 'function') ? qcInicioTexto() : '';
+  const oidoNombre = (typeof anaOidoElegido === 'function' && typeof ANA_OIDOS !== 'undefined')
+    ? ANA_OIDOS[anaOidoElegido()].nombre : '';
 
   /* La fila del avance cuelga de esta barra, y repintar la barra se la llevaba:
      el «✅ 412 comparados» del final del cotejo se escribía y se borraba en la
@@ -3961,6 +3965,7 @@ function perfilPintar(){
     +     (h.cuenta ? ('<b class="lp-n' + (n ? ' hay' : '') + '">' + (n || '') + '</b>') : '')
     +     (h.cuentaCambios ? ('<b class="lp-n' + (nc ? ' hay' : '') + '">' + (nc || '') + '</b>') : '')
     +     (h.inicio && ini ? ('<b class="lp-tc">' + esc_(ini) + '</b>') : '')
+    +     (h.oido && oidoNombre ? ('<b class="lp-tc">' + esc_(oidoNombre) + '</b>') : '')
     +     '</button>').join('')
     + '</span>'
     + (lista.length ? '' : '<span class="lp-pista">' + esc_(PERFIL_PISTA[m] || '') + '</span>');
@@ -3977,6 +3982,7 @@ function perfilPintar(){
   { const b = q('pQcPdf');     if(b) b.onclick = ()=> qcInformePdf(); }
   { const b = q('pQcCambios'); if(b) b.onclick = ()=> qcCambiosPanel(); }
   { const b = q('pQcInicio');  if(b) b.onclick = ()=> qcInicioPanel(); }
+  { const b = q('pQcOido');    if(b) b.onclick = ()=> qcOidoPanel(); }
   { const b = q('pQcAudio');
     if(b) b.onclick = ()=>{
       const i = d.getElementById('tQcAudioIn');
@@ -5029,6 +5035,84 @@ function qcAvance(txt){
   if(fuera) fuera.onclick = ()=>{ const c = d.getElementById('qcAvance'); if(c) c.remove(); };
 }
 
+/* ═══ QC · CON QUÉ OÍDO SE ANALIZA ═════════════════════════════════════════
+   Pedido de sala: «la transcripción aún no es tan fiel, mejora cómo escucha».
+   Hay tres oídos -rápido, fiel y muy fiel-; qué es cada uno y cómo se midió
+   está en `analisis.js`. Aquí se elige, y se dice cuánto va a tardar CON EL
+   AUDIO CARGADO: escoger entre «rápido» y «fiel» sin saber si son cinco
+   minutos o veinte es escoger a ciegas. */
+
+/** Los segundos de voz del audio cargado; cero si todavía no hay audio. Se
+    guarda por audio: buscar la voz en un capítulo entero cuesta un momento. */
+function qcVozCargada(){
+  try{
+    if(typeof karIa === 'undefined' || !karIa || !karIa.pcm || typeof anaPlan !== 'function') return 0;
+    if(karIa._voz && karIa._voz.pcm === karIa.pcm) return karIa._voz.s;
+    const s = +anaPlan(karIa.pcm, karIa.sr).voz || 0;
+    karIa._voz = { pcm: karIa.pcm, s: s };
+    return s;
+  }catch(e){ return 0; /* sin audio que leer no hay cuenta que echar */ }
+}
+
+/** Lo que va a tardar, dicho sin decimales que prometan de más. */
+function qcOidoTarda(seg){
+  const s = +seg || 0;
+  if(!(s >= 60)) return 'menos de un minuto';
+  const m = Math.round(s / 60);
+  return m <= 1 ? 'un minuto' : ('unos ' + m + ' min');
+}
+
+/** El panel para elegir el oído. */
+function qcOidoPanel(){
+  const d = pop2 && pop2.doc; if(!d) return;
+  let ov = d.getElementById('qcOidoOv');
+  if(!ov){
+    ov = d.createElement('div'); ov.id = 'qcOidoOv'; ov.className = 'qc-ov';
+    d.body.appendChild(ov);
+    ov.addEventListener('click', (e)=>{ if(e.target === ov) ov.remove(); });
+  }
+  const elegido = anaOidoElegido();
+  const voz = qcVozCargada();
+  const trabajando = (typeof COTEJO !== 'undefined' && COTEJO && COTEJO.trabajando);
+  const mayus = (s)=> String(s).charAt(0).toUpperCase() + String(s).slice(1);
+  const fila = (k)=>{
+    const O = ANA_OIDOS[k];
+    /* Con audio, lo que tardará ESE audio; sin él, la vara de medir. */
+    const cuanto = voz > 0 ? (qcOidoTarda(anaEstima(k, voz)) + ' con este audio')
+                           : (qcOidoTarda(anaEstima(k, 600)) + ' por cada 10 min de voz');
+    return '<button class="qc-oir-op' + (k === elegido ? ' on' : '') + '" data-k="' + esc(k) + '">'
+      + '<span class="qc-oir-n">' + esc(mayus(O.nombre))
+        + (k === ANA_OIDO_DEFECTO ? '<i>recomendado</i>' : '') + '</span>'
+      + '<span class="qc-oir-d">' + esc(O.dice) + '</span>'
+      + '<span class="qc-oir-e">' + esc(cuanto) + ' · la primera vez baja ' + O.mb + ' MB</span>'
+      + '</button>';
+  };
+  ov.innerHTML = '<div class="qc-card qc-oir">'
+    + '<div class="qc-h"><span>👂 Cómo escucha</span>'
+      + '<button class="qc-x" id="qcOirX" title="Cerrar">✕</button></div>'
+    + '<div class="qc-nota">Más fiel es oír mejor y tardar más. Todo se oye en este equipo: el audio no sale de aquí. '
+      + 'La elección se recuerda.</div>'
+    + '<div class="qc-oir-l">' + Object.keys(ANA_OIDOS).map(fila).join('') + '</div>'
+    + (trabajando ? '<div class="qc-nota">Hay un análisis en marcha: el oído que elijas vale para el siguiente.</div>' : '')
+    + '<div class="qc-fb">'
+      /* Con un análisis en marcha no se ofrece analizar: pulsar «Analizar
+         cambios» mientras trabaja lo PARA, y aquí eso sería una trampa. */
+      + (trabajando ? '' : '<button class="qc-ok" id="qcOirYa">🔎 Analizar con este oído</button>')
+      + '<button id="qcOirNo">Cerrar</button></div>'
+    + '</div>';
+  const q = (s)=> ov.querySelector(s);
+  const cerrar = ()=> ov.remove();
+  { const b = q('#qcOirX');  if(b) b.onclick = cerrar; }
+  { const b = q('#qcOirNo'); if(b) b.onclick = cerrar; }
+  Array.prototype.slice.call(ov.querySelectorAll('.qc-oir-op')).forEach(b => b.onclick = ()=>{
+    const k = anaOidoElegir(b.dataset.k);
+    try{ perfilPintar(); }catch(e){ fallo('perfilPintar · index.html:qcOidoPanel', e); }
+    qcOidoPanel();
+    qcAvance('👂 Oído ' + ANA_OIDOS[k].nombre + (voz > 0 ? (' · ' + qcOidoTarda(anaEstima(k, voz)) + ' con este audio') : ''));
+  });
+  { const b = q('#qcOirYa'); if(b) b.onclick = ()=>{ cerrar(); qcCotejar(); }; }
+}
+
 /** Analizar cambios: oye el audio, lo compara con el libreto y entrega el PDF.
     El trabajo lo hace `cotejarTodo`. Aquí solo se entra desde QC, se cuenta el
     resultado donde se está mirando y se entrega el informe.
@@ -5043,7 +5127,10 @@ async function qcCotejar(){
   if(typeof COTEJO !== 'undefined' && COTEJO && COTEJO.trabajando){ cotejarTodo(); return; }
   /* Se pinta ANTES de empezar: el primer trozo -bajar el modelo de voz- puede
      tardar un minuto sin decir nada, y es justo donde parece que no hace nada. */
-  qcAvance('⏳ Empezando… se baja el modelo de voz la primera vez');
+  { const O = (typeof ANA_OIDOS !== 'undefined' && typeof anaOidoElegido === 'function')
+              ? ANA_OIDOS[anaOidoElegido()] : null;
+    qcAvance('⏳ Empezando' + (O ? (' con el oído ' + O.nombre + '… la primera vez baja ' + O.mb + ' MB')
+                                 : '… se baja el modelo de voz la primera vez')); }
   try{
     const r = await cotejarTodo();
     if(!r){
@@ -5073,7 +5160,8 @@ async function qcCotejar(){
     }
     /* Los que caen fuera del audio se dicen: no se han comparado, y no es lo
        mismo que coincidir. Pasa cuando el audio es de medio capítulo. */
-    const resumen = r.hechos + ' analizados en ' + cotejoTardo(r.segundos) + ' · '
+    const resumen = r.hechos + ' analizados' + (r.oidoNombre ? (' con el oído ' + r.oidoNombre) : '')
+                  + ' en ' + cotejoTardo(r.segundos) + ' · '
                   + r.mal + ' no cuadran · ' + r.dudosos + ' dudosos'
                   + (r.fuera ? (' · ' + r.fuera + ' fuera del audio') : '');
     qcAvance('✅ ' + resumen + ' · preparando el PDF…');
@@ -5102,8 +5190,8 @@ async function qcCotejar(){
    parecido de cada parlamento y lo que creyó oír; aquí se convierte en una
    lista que se puede leer y entregar.
 
-   Lo que oyó el reconocedor es una PISTA, no una prueba: whisper-tiny se
-   equivoca, y más con nombres propios. El informe lo dice, y por eso lleva
+   Lo que oyó el reconocedor es una PISTA, no una prueba: se equivoca -menos
+   con el oído fiel, pero se equivoca-, y más con nombres propios. El informe lo dice, y por eso lleva
    siempre las dos columnas -lo escrito y lo oído- para que quien lo lea
    juzgue. Nunca se convierte solo en corrección (QC-2). */
 
@@ -5255,6 +5343,7 @@ async function qcInformeCambios(o){
                                   revisor: m.revisor, estudio: m.estudio,
                                   desfase: qcTC(studioTc0()), audio: qcAudioNombre(),
                                   analizados: analizados,
+                                  oido: (typeof cotejoOidoUsado === 'function') ? cotejoOidoUsado() : '',
                                   tardo: (o.analisis && o.analisis.segundos)
                                            ? cotejoTardo(o.analisis.segundos) : '' });
     await qcpdfDescargar(d, d.nombreDoc);
@@ -11014,7 +11103,15 @@ function hydrateEpisode(d){ _epOpen(true);
     for(const k in src){
       if(!/^\d+$/.test(k)) continue;
       const r = src[k];
-      if(r && isFinite(+r.sim)) window._cotejo[k] = { sim:+r.sim, oido:String(r.oido || '').slice(0, 300) };
+      if(!r || !isFinite(+r.sim)) continue;
+      const c = { sim:+r.sim, oido:String(r.oido || '').slice(0, 300) };
+      /* Cuántas palabras no cuadran y con qué oído se oyó: sin eso, al volver a
+         abrir el capítulo cada parlamento se mediría con el listón de antes, y
+         el aviso de «una palabra distinta» desaparecería. */
+      if(isFinite(+r.dif) && +r.dif >= 0) c.dif = +r.dif;
+      if(typeof r.o === 'string' && typeof ANA_OIDOS !== 'undefined'
+         && Object.prototype.hasOwnProperty.call(ANA_OIDOS, r.o)) c.o = r.o;
+      window._cotejo[k] = c;
     }
   }catch(e){}
   try{ qcCargar(d.qc); qcMetaCargar(d.qcMeta || qcMetaUltima()); }
@@ -12938,6 +13035,20 @@ body.haschips .lperfil{padding-left:100px}
 .qc-ini .qc-fr button:hover{border-color:#60A5FA;color:#60A5FA}
 .qc-ini-d{font-size:11.5px;color:var(--dim);margin:2px 0 12px}
 .qc-ini-d b{color:var(--ink);font-variant-numeric:tabular-nums}
+/* Con que oido se analiza: tres opciones, con lo que tarda cada una. */
+.qc-oir{width:min(520px,95vw)}
+.qc-oir-l{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.qc-oir-op{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;text-align:left;
+  border:1px solid var(--card-b);border-radius:10px;padding:9px 11px;background:var(--card);
+  color:var(--ink);cursor:pointer;font:inherit}
+.qc-oir-op:hover{border-color:#60A5FA}
+.qc-oir-op.on{border-color:#4ADE80;box-shadow:inset 0 0 0 1px #4ADE80}
+.qc-oir-n{font-size:13px;font-weight:800}
+.qc-oir-op.on .qc-oir-n{color:#4ADE80}
+.qc-oir-n i{font-style:normal;font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+  color:#4ADE80;margin-left:8px}
+.qc-oir-d{font-size:11.5px;color:var(--dim);line-height:1.4}
+.qc-oir-e{font-size:11px;color:var(--ink);font-variant-numeric:tabular-nums}
 .qc-err{font-size:11.5px;line-height:1.45;color:#FCA5A5;background:rgba(248,113,113,.10);
   border:1px solid rgba(248,113,113,.35);border-radius:9px;padding:8px 10px;margin-bottom:10px}
 .ltools .trow{display:flex;gap:5px}

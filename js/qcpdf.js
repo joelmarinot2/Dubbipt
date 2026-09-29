@@ -802,7 +802,7 @@ function qcpdfDeInforme(inf, opts){
 
 /** El informe de los diálogos que cambiaron: lo escrito frente a lo oído.
     `lista` sale de qcCambiosLista(). `opts`: { programa, episodio, revisor,
-    estudio, desfase, audio, fecha }.
+    estudio, desfase, audio, oido, analizados, tardo, fecha }.
     Lleva SIEMPRE las dos columnas -escrito y oído-: lo que oyó el reconocedor
     es una pista, no una prueba, y quien lee tiene que poder juzgar. Y dice con
     qué audio y qué inicio se cotejó, porque de eso depende todo lo demás. */
@@ -830,6 +830,8 @@ function qcpdfDeCambios(lista, opts){
   if(opts.estudio) pie.push('Cambios: ' + opts.estudio);
   if(opts.audio)   pie.push('Audio: ' + opts.audio);
   if(opts.desfase) pie.push('Inicio: ' + opts.desfase);
+  /* Con qué oído: de eso depende cuánto fiarse de la columna «Oído». */
+  if(opts.oido)    pie.push('Oído: ' + opts.oido);
   if(opts.tardo)   pie.push('Análisis: ' + opts.tardo);
   return {
     etiqueta: 'Diálogos que cambiaron',

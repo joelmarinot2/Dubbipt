@@ -392,7 +392,8 @@ exports.pruebas = async function(t){
   /* Lo que se entrega. Se monta con el `cotejoAviso` de VERDAD, el de los
      planos, para que los umbrales sean los mismos que en la hoja de cues. */
   const w = {};
-  const C = montar([['/* Desde cuánto parecido se avisa.', '/** El tiempo que ha tardado'],
+  const C = montar([['/* ── 0 · Con qué se escucha', '/* ── 1 · Dónde hay voz'],
+                    ['/* Desde cuánto parecido se avisa.', '/** El tiempo que ha tardado'],
                     ['/* ═══ QC · LOS DIÁLOGOS QUE CAMBIARON', '/** El panel con la lista']],
                    ['qcCambiosLista', 'qcCambiosCuenta'],
                    { window: w,
@@ -429,6 +430,14 @@ exports.pruebas = async function(t){
   const cnt = C.qcCambiosCuenta(cam);
   t.eq('la cuenta', cnt.mal + '/' + cnt.dudosos + '/' + cnt.total, '1/2/3');
   t.eq('sin cotejo, lista vacía', (w._cotejo = {}, C.qcCambiosLista().length), 0);
+  /* Lo oído con un oído fiel avisa por palabras: una distinta en una frase
+     larga es un 95 %, y por parecido habría pasado por buena. */
+  w._cotejo = { 0: { sim: 0.95, dif: 1, o: 'fiel', oido: 'hola' },
+                1: { sim: 0.97, dif: 0.5, o: 'fiel', oido: 'adios amigos' },
+                2: { sim: 0.9, dif: 2, o: 'rapido', oido: 'regular' } };
+  const camF = C.qcCambiosLista();
+  t.eq('con el oído fiel, una palabra distinta sale en la lista', camF.map(c => c.si + ':' + c.nivel).join(','), '0:dudoso',
+       'la lista, la hoja de cues y el informe usan el mismo `cotejoAviso`');
 
   t.seccion('12h · nada se apunta solo como corrección');
   /* QC-2: el reconocedor señala; quien firma es una persona. Desde la lista
@@ -1201,6 +1210,72 @@ exports.pruebas = async function(t){
   }
   t.ok('el premix recuerda su nombre al cargarse', /studio\.dlgNombre = String\(\(file && file\.name\) \|\| ''\);/.test(TODO),
        'sin esto el pie del informe decía el nombre del vídeo, o nada');
+
+  t.seccion('12s · con qué oído: en la barra, en su panel, en el informe y en la nube');
+  /* Pedido de sala: «la transcripción aún no es tan fiel, mejora cómo escucha». */
+  {
+    const lista = PH.PERFIL_HERRAMIENTAS.qc.map(h => h.id);
+    t.eq('el oído, justo detrás de «Analizar cambios»', lista[lista.indexOf('pQcCotejar') + 1], 'pQcOido');
+    t.ok('y abre su panel', /q\('pQcOido'\);\s*if\(b\) b\.onclick = \(\)=> qcOidoPanel\(\);/.test(TODO));
+    t.ok('el botón dice qué oído está puesto', /h\.oido && oidoNombre \? \('<b class="lp-tc">'/.test(TODO));
+    const I = conInforme();
+    await I.M.qcInformeCambios({ callado: true });
+    t.eq('sin saber con qué oído se oyó, el informe no se lo inventa', I.bajados[0] && I.bajados[0].op.oido, '');
+    const I2 = (() => {
+      const avisos = [], bajados = [];
+      const M = montar([['/** Con qué audio se analizó', '/* ═══ GUION DE WORD EN TABLA']], ['qcInformeCambios'], {
+        qcCambiosLista: () => [], window: { _cotejo: { 0: { sim: 1, o: 'fiel' } } },
+        currentEp: { name: '101' }, shows: [], qcMeta: () => ({}), qcTC: (s) => 'TC' + s, studioTc0: () => 0,
+        studio: {}, cotejoOidoUsado: () => 'fiel',
+        qcpdfDeCambios: (l, op) => ({ op: op, nombreDoc: 'x' }),
+        qcpdfDescargar: async (d) => { bajados.push(d); return true; },
+        cotejoTardo: (s) => s + ' s', fallo: () => {}, qcAvance: (m) => avisos.push(m),
+        console: { warn: () => {}, log: () => {} } });
+      return { M, bajados };
+    })();
+    await I2.M.qcInformeCambios({ callado: true });
+    t.eq('el informe lleva el oído', I2.bajados[0] && I2.bajados[0].op.oido, 'fiel');
+  }
+  {
+    const V = montar([['/* ═══ QC · CON QUÉ OÍDO SE ANALIZA', '/** El panel para elegir el oído.']],
+                     ['qcVozCargada', 'qcOidoTarda'],
+                     { karIa: { pcm: new Float32Array(3), sr: 16000 },
+                       anaPlan: (() => { const f = () => { f.veces++; return { voz: 1500 }; }; f.veces = 0; return f; })() });
+    t.eq('lo que tarda, sin decimales: menos de un minuto', V.qcOidoTarda(42), 'menos de un minuto');
+    t.eq('y en minutos redondos', V.qcOidoTarda(754), 'unos 13 min');
+    t.eq('un minuto es un minuto', V.qcOidoTarda(61), 'un minuto');
+    t.eq('y lo que no es tiempo, menos de uno', V.qcOidoTarda(NaN), 'menos de un minuto');
+    t.eq('la voz del audio cargado', V.qcVozCargada(), 1500);
+    t.eq('y se busca una sola vez por audio', V.qcVozCargada(), 1500);
+    const V2 = montar([['/* ═══ QC · CON QUÉ OÍDO SE ANALIZA', '/** El panel para elegir el oído.']],
+                      ['qcVozCargada'], { karIa: { pcm: null }, anaPlan: () => { throw new Error('no debería'); } });
+    t.eq('sin audio, cero, y sin buscar nada', V2.qcVozCargada(), 0);
+  }
+  {
+    let veces = 0;
+    const karIa = { pcm: new Float32Array(3), sr: 16000 };
+    const V = montar([['/* ═══ QC · CON QUÉ OÍDO SE ANALIZA', '/** El panel para elegir el oído.']],
+                     ['qcVozCargada'], { karIa: karIa, anaPlan: () => { veces++; return { voz: 10 * veces }; } });
+    V.qcVozCargada(); V.qcVozCargada();
+    t.eq('buscar la voz, una vez', veces, 1, 'en un capítulo entero cuesta un momento, y el panel se repinta al elegir');
+    karIa.pcm = new Float32Array(5);
+    t.eq('y otra si cambia el audio', V.qcVozCargada(), 20);
+  }
+  {
+    /* La carga desde la nube, con el código de verdad de `epDataAplicar`. */
+    const ini = TODO.indexOf('  window._cotejo = {};\n  try{\n    const src = (d.cotejo');
+    const fin = TODO.indexOf('  try{ qcCargar(d.qc)', ini);
+    t.ok('la carga del análisis está donde se espera', ini > 0 && fin > ini);
+    const cargar = new Function('window', 'd', 'ANA_OIDOS', TODO.slice(ini, fin));
+    const w = {};
+    cargar(w, { cotejo: { 3: { sim: 0.95, dif: 1, o: 'fiel', oido: 'x' }, 4: { sim: 1, o: 'sordo', dif: -2 },
+                          5: { sim: 0.7 }, x: { sim: 1 } } }, { fiel: {}, rapido: {}, muyfiel: {} });
+    t.eq('vuelve con su cuenta de palabras y su oído', JSON.stringify(w._cotejo[3]), '{"sim":0.95,"oido":"x","dif":1,"o":"fiel"}',
+         'sin esto, al volver a abrir el capítulo el aviso de «una palabra distinta» desaparecía');
+    t.eq('un oído que no existe, o una cuenta que no es cuenta, no se cargan', JSON.stringify(w._cotejo[4]), '{"sim":1,"oido":""}');
+    t.eq('lo de antes, como antes', JSON.stringify(w._cotejo[5]), '{"sim":0.7,"oido":""}');
+    t.ok('y lo que no es un parlamento, fuera', !('x' in w._cotejo));
+  }
 
   t.seccion('12q · el audio se descodifica una vez, y ya a 16 kHz');
   /* Antes se descodificaba al cargarlo -para la onda- y OTRA VEZ al analizar,

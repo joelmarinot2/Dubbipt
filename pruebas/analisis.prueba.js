@@ -1,4 +1,4 @@
-/* Analizar cambios · especificacion 01 (QC-22 a QC-28)
+/* Analizar cambios · especificacion 01 (QC-22 a QC-31)
  *
  * Oír el premix, compararlo con el libreto y decir qué parlamentos no dicen lo
  * que pone. Pedido de sala: «que el proceso sea mucho más rápido».
@@ -26,7 +26,8 @@ const { montar, karNormReal, RAIZ } = require('./ayuda');
 
 exports.nombre = 'Analizar cambios: más rápido, y sin inventarse cambios';
 
-const R_MEDIDAS = ['/* Las medidas del análisis', '/* ── 1 · Dónde hay voz'];
+const R_MEDIDAS = ['/* Las medidas del análisis', '/* ── 0 · Con qué se escucha'];
+const R_OIDOS   = ['/* ── 0 · Con qué se escucha', '/* ── 1 · Dónde hay voz'];
 const R_VOZ     = ['/* ── 1 · Dónde hay voz', '/* ── 2 · Los tramos'];
 const R_TRAMOS  = ['/* ── 2 · Los tramos', '/* ── 3 · Las palabras'];
 const R_PALAB   = ['/* ── 3 · Las palabras', '/* ── 4 · A qué parlamento'];
@@ -36,11 +37,27 @@ const R_TRABAJO = ['/* ── 5 · El reparto del trabajo', '/** Las ventanas de
 const callado = { warn: () => {}, log: () => {} };
 const REAL = montar([R_MEDIDAS], ['ANA', 'ANA_TRABAJADOR'], {});
 
+/** Un almacén de mentira. `roto` lo hace fallar como en una ventana privada. */
+function almacen(inicial, roto){
+  const d = Object.assign({}, inicial || {});
+  return { d: d,
+    getItem(k){ if(roto) throw new Error('prohibido'); return Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null; },
+    setItem(k, v){ if(roto) throw new Error('prohibido'); d[k] = String(v); } };
+}
+
+/** Los oídos, con el almacén que se les dé. */
+function oidos(ls){
+  return montar([R_OIDOS],
+    ['ANA_OIDOS', 'ANA_OIDO_DEFECTO', 'ANA_OIDO_GUARDADO', 'ANA_RITMO_GUARDADO', 'anaOido', 'anaOidoElegido',
+     'anaOidoElegir', 'anaRitmo', 'anaRitmoGuardar', 'anaEstima', 'anaAviso'],
+    { localStorage: ls || almacen(), console: callado });
+}
+
 /** Todo lo que decide, con las medidas de verdad o con otras. */
 function logica(ana){
   return montar([R_VOZ, R_TRAMOS, R_PALAB, R_REPARTO],
     ['anaEnergia', 'anaUmbral', 'anaVoces', 'anaPartir', 'anaTramos', 'anaMontar', 'anaTiempo',
-     'anaNumero', 'anaSinAcotaciones', 'anaFonetica', 'anaPalabras', 'anaJuntar', 'anaOidas',
+     'anaNumero', 'anaSinAcotaciones', 'anaFonetica', 'anaPalabras', 'anaUnir', 'anaJuntar', 'anaCasi', 'anaOidas',
      'anaCasar', 'anaParlamento', 'anaRepartir'],
     { ANA: ana || REAL.ANA, karNorm: karNormReal(), console: callado });
 }
@@ -103,14 +120,14 @@ function fabrica(guion){
 /** El reparto del trabajo montado con trabajadores de mentira. */
 function reparto(guion, nav, ana){
   const F = fabrica(guion);
-  const M = montar([R_TRAMOS, R_TRABAJO],
+  const M = montar([R_OIDOS, R_TRAMOS, R_TRABAJO],
     ['anaTranscribir', 'anaTranscribirAqui', 'anaCuantos', 'anaQueda', 'anaRespiro', 'anaParar',
-     'anaTrabajador', 'ANA_ACTIVOS'],
+     'anaTrabajador', 'ANA_ACTIVOS', 'ANA_OIDOS'],
     { ANA: Object.assign({}, REAL.ANA, { sr: 10, hueco: 0.1 }, ana || {}),
       ANA_TRABAJADOR: './js/analisis-worker.js',
       KARIA_LIB: 'lib', KARIA_MODELO: 'modelo',
       navigator: nav || { hardwareConcurrency: 4, deviceMemory: 8 },
-      Worker: F.Worker, karIa: { pipe: null }, console: callado });
+      Worker: F.Worker, karIa: { pipe: null }, localStorage: almacen(), console: callado });
   M._creados = F.creados;
   return M;
 }
@@ -131,6 +148,80 @@ const conTope = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(
 
 exports.pruebas = async function(t){
   const L = logica();
+
+  t.seccion('0 · con qué se escucha');
+  {
+    const ls = almacen();
+    const Oi = oidos(ls);
+    t.eq('tres oídos, de más rápido a más fiel', Object.keys(Oi.ANA_OIDOS).join(','), 'rapido,fiel,muyfiel');
+    t.eq('sin elegir, el fiel', Oi.anaOidoElegido(), 'fiel',
+         'con el rápido, una palabra suelta cambiada no se avisa: por defecto tiene que ser el que sí');
+    t.eq('lo que no es un oído, el de por defecto', Oi.anaOido('sordo') + '|' + Oi.anaOido(undefined), 'fiel|fiel');
+    t.eq('ni lo que hereda cualquier objeto', Oi.anaOido('toString'), 'fiel',
+         'sin mirar que sea suyo, «toString» pasaría por un oído y reventaría al usarlo');
+    t.eq('se elige', Oi.anaOidoElegir('muyfiel'), 'muyfiel');
+    t.eq('y se recuerda', Oi.anaOidoElegido(), 'muyfiel');
+    t.eq('guardado con su nombre', ls.d[Oi.ANA_OIDO_GUARDADO], 'muyfiel');
+    t.eq('elegir lo que no existe deja el de por defecto', Oi.anaOidoElegir('sordo'), 'fiel');
+    const roto = oidos(almacen({}, true));
+    let revienta = false;
+    try{ roto.anaOidoElegir('rapido'); }catch(e){ revienta = true; }
+    t.ok('sin almacén, elegir no revienta', !revienta, 'en una ventana privada el almacén falla al tocarlo');
+    t.eq('y se usa el de por defecto', roto.anaOidoElegido(), 'fiel');
+    const ls2 = almacen({ ddl_oido: 'muyfiel' });
+    t.eq('lo guardado en otra sesión se lee', oidos(ls2).anaOidoElegido(), 'muyfiel');
+
+    const O = Oi.ANA_OIDOS;
+    t.ok('cada uno con su modelo, y distintos', new Set(Object.keys(O).map(k => O[k].modelo)).size === 3);
+    t.ok('el rápido y el fiel oyen con la pieza que escucha SIN comprimir',
+         ['rapido', 'fiel'].every(k => O[k].opciones && O[k].opciones.dtype
+           && O[k].opciones.dtype.encoder_model === 'fp32' && O[k].opciones.dtype.decoder_model_merged === 'q8'),
+         'comprimida a 8 bits se equivocaba un tercio más, y tarda lo mismo: medido');
+    t.ok('los grandes, con menos trabajadores', O.rapido.trabajadores > O.fiel.trabajadores
+         && O.fiel.trabajadores > O.muyfiel.trabajadores && O.muyfiel.trabajadores >= 1);
+    t.ok('cada uno dice cuánto baja y qué es', Object.keys(O).every(k => O[k].mb > 0 && O[k].dice && O[k].nombre));
+    t.ok('los fieles avisan de UNA palabra; el rápido pide más', O.fiel.dif === 1 && O.muyfiel.dif === 1 && O.rapido.dif > 1);
+
+    t.eq('el ritmo, sin medir, el de la tabla', Oi.anaRitmo('fiel'), O.fiel.ritmo);
+    t.ok('lo que tardó de verdad se apunta', Oi.anaRitmoGuardar('fiel', 90, 150));
+    t.ok('distinto del de la tabla, para que se note cuál se usa', O.fiel.ritmo !== 0.6);
+    t.cerca('y es lo que se usa después', Oi.anaRitmo('fiel'), 0.6, 1e-9);
+    t.cerca('para decir cuánto va a tardar', Oi.anaEstima('fiel', 300), 180, 1e-9,
+            'con el de la tabla diría otra cosa: el equipo de cada uno manda');
+    t.eq('cada oído con su ritmo', Oi.anaRitmo('rapido'), O.rapido.ritmo);
+    t.ok('un audio de menos de medio minuto de voz no se apunta', !Oi.anaRitmoGuardar('rapido', 10, 20),
+         'casi todo ese tiempo es arrancar: no dice nada de lo que tarda un capítulo');
+    t.eq('y no cambia nada', Oi.anaRitmo('rapido'), O.rapido.ritmo);
+    t.ok('ni un tiempo que no es tiempo', !Oi.anaRitmoGuardar('fiel', 0, 100) && !Oi.anaRitmoGuardar('fiel', NaN, 100));
+    const ls3 = almacen({ ddl_oido_ritmo: '{roto' });
+    t.eq('con lo guardado roto, el de la tabla', oidos(ls3).anaRitmo('muyfiel'), O.muyfiel.ritmo);
+    t.ok('y se puede volver a apuntar encima', oidos(ls3).anaRitmoGuardar('muyfiel', 100, 100));
+    t.eq('sin voz, nada que estimar', Oi.anaEstima('fiel', 0), 0);
+
+    const av = (r) => Oi.anaAviso(r, 0.45, 0.72);
+    t.eq('lo de antes de los oídos, como antes: 0,30 no cuadra', av({ sim: 0.3 }), 'mal');
+    t.eq('0,60 dudoso', av({ sim: 0.6 }), 'dudoso');
+    t.eq('0,45 ya es dudoso, no «no cuadra»', av({ sim: 0.45 }), 'dudoso');
+    t.eq('0,72 cuadra', av({ sim: 0.72 }), null);
+    t.eq('con el fiel, una palabra distinta en una frase larga YA avisa', av({ sim: 0.95, dif: 1, o: 'fiel' }), 'dudoso',
+         'por parecido, una palabra de veinte es un 95 % y pasaba por buena');
+    t.eq('una casi igual sola, no', av({ sim: 0.95, dif: 0.5, o: 'fiel' }), null,
+         'el reconocedor se come una ese a menudo: avisar de cada una es avisar de medio capítulo');
+    t.eq('dos casi iguales, sí', av({ sim: 0.9, dif: 1, o: 'muyfiel' }), 'dudoso');
+    t.eq('igual, nada', av({ sim: 1, dif: 0, o: 'fiel' }), null);
+    t.eq('con el rápido, dos palabras distintas se toleran', av({ sim: 0.88, dif: 2, o: 'rapido' }), null);
+    t.eq('tres, no', av({ sim: 0.85, dif: 3, o: 'rapido' }), 'dudoso');
+    t.eq('ni una frase que no se parece, aunque sea corta', av({ sim: 0.5, dif: 2, o: 'rapido' }), 'dudoso');
+    t.eq('lo que no cuadra no cuadra con ningún oído', av({ sim: 0.4, dif: 3, o: 'muyfiel' }), 'mal');
+    t.eq('un oído que no existe se mide como antes', av({ sim: 0.95, dif: 1, o: 'sordo' }), null);
+    t.eq('y sin la cuenta de palabras, también', av({ sim: 0.6, o: 'fiel' }), 'dudoso');
+    t.eq('también con el rápido: sin cuenta, su listón no vale', av({ sim: 0.65, o: 'rapido' }), 'dudoso',
+         'el 60 % del rápido va con su regla de las tres palabras; sin palabras que contar, el listón de antes');
+    t.eq('ni lo que hereda cualquier objeto es un oído', av({ sim: 0.6, dif: 1, o: 'toString' }), 'dudoso',
+         'tomado por oído, «toString» no tiene listón y el 60 % pasaría por bueno');
+    t.eq('ni «constructor»', av({ sim: 0.6, dif: 1, o: 'constructor' }), 'dudoso');
+    t.eq('sin resultado, nada', av(null), null);
+  }
 
   t.seccion('1 · dónde hay voz');
   const e1 = L.anaEnergia(new Float32Array(1000).fill(0.25), 100, 0.1);
@@ -250,6 +341,47 @@ exports.pruebas = async function(t){
   t.eq('contra nada, cero', L.anaCasar([], ['hola']).sim, 0);
   t.ok('el orden cuenta', sim('uno dos tres cuatro cinco', 'cinco cuatro tres dos uno') < 1);
 
+  t.seccion('6b · lo que se funde al hablar, y lo casi igual');
+  /* Todo esto salió del premix de prueba oído con el oído fiel: eran la mitad
+     de sus avisos falsos. */
+  t.eq('«de espacio» es «despacio»', sim('Me lo cuentas despacio.', 'me lo cuentas de espacio'), 1);
+  t.eq('«estado» es «he estado»', sim('He estado de viaje.', 'Estado de viaje.'), 1);
+  t.eq('«esta segura» es «estás segura»: la ese se funde', sim('¿Estás segura?', 'esta segura'), 1);
+  t.eq('«no os has» es «nos has»', sim('Qué susto nos has dado.', 'que susto no os has dado'), 1);
+  t.eq('«de lospital» es «del hospital»: mismas letras, otro corte',
+       sim('Son las normas del hospital.', 'son las normas de lospital'), 1);
+  t.eq('«cerebre be» es «seré breve»', sim('No se preocupe, seré breve.', 'no se preocupe cerebre be'), 1);
+  t.eq('«leer» partido en «le er» sigue siendo «leer»',
+       L.anaJuntar(L.anaPalabras('quiero leer'), L.anaPalabras('quiero le er'))[1].join(' '),
+       L.anaPalabras('quiero leer').join(' '), 'juntas tal cual, aunque fundidas no casen');
+  t.eq('la erre no se funde: «dar risa» no es «darisa»', L.anaUnir('dar', 'risa'), 'darrisa');
+  t.eq('ni la i', L.anaUnir('casi', 'ido'), 'casiido');
+  t.eq('la ese sí', L.anaUnir('estas', 'segura'), 'estasegura');
+  t.eq('y con una vacía, la otra tal cual', L.anaUnir('', 'sol') + '|' + L.anaUnir('sol', ''), 'sol|sol');
+  t.eq('dos parejas que están tal cual en el otro lado no se tocan',
+       L.anaJuntar(['de', 'la', 'sal'], ['de', 'la', 'sal']).map(x => x.join(' ')).join('|'), 'de la sal|de la sal');
+  t.eq('una palabra cambiada sigue siendo un cambio', sim('Tuerce a la derecha.', 'tuerce a la izquierda') < 1, true);
+  [['esta', 'estas'], ['deje', 'dejen'], ['puede', 'puedes'], ['de', 'del']]
+    .forEach(([a, b]) => t.ok('«' + a + '» y «' + b + '» son casi iguales', L.anaCasi(L.anaFonetica(a), L.anaFonetica(b))
+                                && L.anaCasi(L.anaFonetica(b), L.anaFonetica(a))));
+  [['niño', 'niña'], ['hijo', 'hija']]
+    .forEach(([a, b]) => t.ok('«' + a + '» y «' + b + '» NO son casi iguales', !L.anaCasi(L.anaFonetica(a), L.anaFonetica(b)),
+                              'cambiar una letra por otra es otra palabra: niño y niña es un cambio de verdad'));
+  t.ok('«a» y «as» tampoco: en una palabra de una letra, una más es otra palabra', !L.anaCasi('a', 'as'));
+  [['hola', 'hola'], ['dia', 'dias2'], ['casa', 'casitas'], ['', 'y']]
+    .forEach(([a, b]) => t.ok('«' + a + '» y «' + b + '» no son «casi» iguales', !L.anaCasi(a, b),
+                              'iguales no es casi, y dos letras de más ya es otra palabra'));
+  t.ok('la letra de más puede ir en medio', L.anaCasi('kasa', 'kaxsa'));
+  const ca = L.anaCasar(['esta', 'bien'], ['estas', 'bien']);
+  t.cerca('una casi igual cuenta media', ca.comunes, 1.5, 1e-9);
+  t.cerca('y media palabra de diferencia', ca.dif, 0.5, 1e-9);
+  const c8 = L.anaCasar(L.anaPalabras('Si todo va bien, en unos diez días.'), L.anaPalabras('si todo va bien en unos quince días'));
+  t.eq('una palabra cambiada es una de diferencia', c8.dif, 1);
+  const c6 = L.anaCasar(L.anaPalabras('Mamá pregunta por ti todos los días.'),
+                        L.anaPalabras('Mamá pregunta por ti todos los días y todas las noches sin parar.'));
+  t.eq('seis añadidas son seis', c6.dif, 6);
+  t.eq('contra nada, todas', L.anaCasar(['a', 'b', 'c'], []).dif, 3);
+
   t.seccion('7 · lo que devuelve el reconocedor, a su sitio y limpio');
   const mapa = [{ t: 0, a: 100, d: 5 }, { t: 5.3, a: 200, d: 5 }];
   const oi = L.anaOidas([
@@ -289,6 +421,8 @@ exports.pruebas = async function(t){
   const R2 = L.anaRepartir([{ si: 1, texto: 'Cuatro, cinco.', v0: 12, v1: 14 }],
                            [w('cuatro', 12.6), w('seis', 13.2)], 100);
   t.eq('una palabra cambiada, a la mitad', R2.por[1].sim, 0.5);
+  t.eq('y una palabra de diferencia, que es lo que decide el aviso', R2.por[1].dif, 1);
+  t.eq('lo que cuadra, ninguna', R.por[0].dif, 0);
   const R3 = L.anaRepartir([{ si: 2, texto: 'Hola, amigo.', v0: 30, v1: 34 }],
                            [w('hola', 30.5), w('amigo', 31), w('que', 31.5), w('tal', 32), w('estas', 32.5)], 100);
   t.eq('lo que cae BIEN DENTRO es suyo, coincida o no', R3.por[2].sim, 0.4,
@@ -296,6 +430,7 @@ exports.pruebas = async function(t){
   const R4 = L.anaRepartir([{ si: 3, texto: 'Yo prefiero quedarme.', v0: 50, v1: 52 }], O, 100);
   t.eq('lo que no se dijo, cero', R4.por[3].sim, 0);
   t.eq('y oído, nada', R4.por[3].oido, '');
+  t.eq('lo que no se dijo son todas sus palabras de diferencia', R4.por[3].dif, 3);
   const R5 = L.anaRepartir([{ si: 4, texto: 'Fuera.', v0: 120, v1: 122 },
                             { si: 5, texto: 'Antes.', v0: -5, v1: -1 },
                             { si: 6, texto: '(risas)', v0: 10, v1: 11 }], O, 100);
@@ -316,6 +451,11 @@ exports.pruebas = async function(t){
   t.eq('con poca memoria, dos como mucho', Rp.anaCuantos(8, 10, 4), 2,
        'cada uno carga su copia del reconocedor');
   t.eq('sin saber nada, uno', Rp.anaCuantos(undefined, 5, 0), 1);
+  t.eq('un oído grande pone su tope', Rp.anaCuantos(16, 10, 16, 2), 2,
+       'cada copia de un modelo grande pesa tanto que con más no se gana: se pelean por la memoria');
+  t.eq('su tope, pero no más que núcleos', Rp.anaCuantos(3, 10, 16, 3), 2);
+  t.eq('ni más que el tope de siempre', Rp.anaCuantos(16, 10, 16, 9), 4);
+  t.eq('sin tope, el de siempre', Rp.anaCuantos(16, 10, 16, 0), 4);
   t.eq('al principio no se promete nada', Rp.anaQueda(5, 100, 10), '',
        'un «quedan 40 minutos» calculado con el primer tramo asusta y es mentira');
   t.eq('a la mitad, lo que queda', Rp.anaQueda(50, 100, 30), 'quedan unos 30 s');
@@ -352,6 +492,26 @@ exports.pruebas = async function(t){
     t.ok('y va a más', avisos.every((a, i) => i === 0 || a[0] >= avisos[i - 1][0]));
     t.ok('al acabar se cierran todos', M._creados.every(w => w.terminado));
     t.eq('y no queda ninguno en marcha', M.ANA_ACTIVOS.length, 0);
+    const prep = M._creados.map(w => w.recibidos[0]);
+    t.ok('sin decir oído, se oye con el fiel', prep.every(p => p.modelo === M.ANA_OIDOS.fiel.modelo),
+         JSON.stringify(prep.map(p => p.modelo)));
+    t.ok('con sus opciones: la pieza que escucha, sin comprimir',
+         prep.every(p => p.opciones && p.opciones.dtype && p.opciones.dtype.encoder_model === 'fp32'));
+  }
+  {
+    const M = reparto(null, { hardwareConcurrency: 16, deviceMemory: 16 });
+    const { pcm, tramos } = tramosDePrueba(6);
+    const r = await conTope(M.anaTranscribir(pcm, tramos, { oido: 'muyfiel' }));
+    t.eq('con el muy fiel también se oyen todos', r && r.length, 6);
+    t.ok('con su modelo', M._creados.every(w => w.recibidos[0].modelo === M.ANA_OIDOS.muyfiel.modelo));
+    t.eq('y con sus dos trabajadores, aunque haya dieciséis núcleos', M._creados.length, 2);
+    const R2 = reparto(null, { hardwareConcurrency: 16, deviceMemory: 16 });
+    await conTope(R2.anaTranscribir(pcm, tramos, { oido: 'rapido' }));
+    t.eq('el rápido, con cuatro', R2._creados.length, 4);
+    t.ok('y el suyo', R2._creados.every(w => w.recibidos[0].modelo === R2.ANA_OIDOS.rapido.modelo));
+    const R3 = reparto();
+    await conTope(R3.anaTranscribir(pcm, tramos, { oido: 'sordo' }));
+    t.ok('un oído que no existe, el de por defecto', R3._creados.every(w => w.recibidos[0].modelo === R3.ANA_OIDOS.fiel.modelo));
   }
   {
     const intentos = {};
@@ -463,6 +623,25 @@ exports.pruebas = async function(t){
   t.ok('y está en el SHELL, para que funcione sin conexión',
        sw.indexOf("'" + REAL.ANA_TRABAJADOR + "'") >= 0,
        'index.html no lo carga con un <script>, así que la carcasa no lo ve: se mira aquí');
+  {
+    /* Al actualizar la app, el service worker tira sus cajas viejas. Tiraba
+       TODAS las que no eran la suya, y entre ellas la del modelo de voz: con
+       cada versión había que volver a bajar el oído, 60 a 240 MB. Se vio
+       validando la app en el navegador. Se corre el sw.js de verdad. */
+    const version = (sw.match(/const VERSION = '([^']+)'/) || [])[1];
+    const oyentes = {}, tiradas = [];
+    const yo = { addEventListener: (ev, f) => { oyentes[ev] = f; }, skipWaiting: () => {},
+                 clients: { claim: async () => {} }, location: { origin: 'https://dubbipt.vercel.app' } };
+    const cajas = { keys: async () => ['dubbipt-2020-01-01T00:00', 'dubbipt-' + version, 'transformers-cache', 'otra-cosa'],
+                    delete: async (k) => { tiradas.push(k); return true; },
+                    open: async () => ({ addAll: async () => {} }) };
+    new Function('self', 'caches', sw)(yo, cajas);
+    let espera = null;
+    oyentes.activate({ waitUntil: (p) => { espera = p; } });
+    await espera;
+    t.eq('al actualizar se tiran solo las cajas viejas de Dubbipt', tiradas.join(','), 'dubbipt-2020-01-01T00:00',
+         'la del modelo de voz la llena la librería del reconocedor: no es nuestra, y tirarla es bajar el oído otra vez');
+  }
 
   const correrTrabajador = () => {
     const yo = { enviados: [], postMessage(m){ yo.enviados.push(m); } };
@@ -530,7 +709,7 @@ exports.pruebas = async function(t){
       window: w, karIa: karIa,
       karIaAudio: async () => { diario.push('audio'); if(o.audioFalla) throw new Error('formato raro'); return true; },
       karIaPreparar: async () => { diario.push('preparar en la página'); return o.preparaAqui !== false; },
-      anaPlan: () => ({ tramos: o.sinVoz ? [] : [{ piezas: [{ a: 0, b: 5 }], dur: 5 }], duracion: 300, voz: 5 }),
+      anaPlan: () => ({ tramos: o.sinVoz ? [] : [{ piezas: [{ a: 0, b: 5 }], dur: 5 }], duracion: 300, voz: o.voz || 5 }),
       anaVentanas: () => [{ si: 0, texto: 'a', v0: 1, v1: 2 }],
       anaTranscribir: o.transcribir || (async () => { diario.push('trabajadores'); return [{ items: [], mapa: [] }]; }),
       anaTranscribirAqui: async () => { diario.push('en la página'); return [{ items: [], mapa: [] }]; },
@@ -548,10 +727,12 @@ exports.pruebas = async function(t){
       studio: o.sinAudio ? {} : { dlgUrl: 'blob:x' },
       perfilLlevaVideo: (m) => m !== 'qc',
       DDL_MODO: o.modo || 'qc',
+      localStorage: o.ls || almacen(),
       console: callado
     };
-    const M = montar([['/* `total`, `vistos`, `mal` y `dudosos`', '/* ── El panel de los planos']],
-                     ['cotejarTodo', 'COTEJO', 'cotejoTardo'], ctx);
+    /* Los oídos, los de verdad: de ellos depende qué se avisa. */
+    const M = montar([R_OIDOS, ['/* `total`, `vistos`, `mal` y `dudosos`', '/* ── El panel de los planos']],
+                     ['cotejarTodo', 'COTEJO', 'cotejoTardo', 'cotejoAviso', 'cotejoOidoUsado'], ctx);
     return { M, w, karIa, diario, avisos };
   };
   {
@@ -564,7 +745,7 @@ exports.pruebas = async function(t){
     t.ok('por los trabajadores, sin pasar por la página', X.diario.includes('trabajadores') && !X.diario.includes('en la página'));
     t.eq('al acabar ya no trabaja', X.M.COTEJO.trabajando, false);
     t.eq('y la barra llega al final', X.M.COTEJO.vistos, X.M.COTEJO.total);
-    t.ok('dice cuánto ha tardado', X.avisos.some(a => /analizados en \d+ s/.test(a)), JSON.stringify(X.avisos));
+    t.ok('dice cuánto ha tardado', X.avisos.some(a => /analizados con el oído fiel en \d+ s/.test(a)), JSON.stringify(X.avisos));
     t.ok('y devuelve lo que tardó, para el informe', isFinite(r.segundos));
     t.ok('en QC manda a «≠ Cambios»', X.avisos.some(a => /TOAST.*«≠ Cambios»/.test(a)));
     t.ok('en Grabación, a «📋 Cues»', await (async () => {
@@ -634,6 +815,64 @@ exports.pruebas = async function(t){
     const X = orquesta({ fuera: 7 });
     const r = await X.M.cotejarTodo();
     t.eq('cuenta los que cayeron fuera del audio', r.fuera, 7);
+  }
+
+  t.seccion('12b · el análisis, con el oído elegido');
+  {
+    let pedido = null;
+    const ls = almacen({ ddl_oido: 'muyfiel' });
+    const X = orquesta({ ls: ls, voz: 120,
+      por: { 0: { sim: 1, dif: 0, oido: 'a' }, 1: { sim: 0.3, dif: 4, oido: 'b' }, 2: { sim: 0.95, dif: 1, oido: 'c' },
+             3: { sim: 0.97, dif: 0.5, oido: 'd' } },
+      transcribir: async (pcm, tramos, o) => {
+        pedido = o;
+        o.avisa(0, 5, 1);
+        await new Promise(r => setTimeout(r, 30));
+        o.avisa(5, 5, 1);
+        return [{ items: [], mapa: [] }];
+      } });
+    const r = await X.M.cotejarTodo();
+    t.eq('se oye con el oído elegido', pedido && pedido.oido, 'muyfiel');
+    t.ok('cada resultado dice con qué oído se oyó', ['0', '1', '2', '3'].every(k => X.w._cotejo[k].o === 'muyfiel'),
+         JSON.stringify(X.w._cotejo));
+    t.eq('y se cuenta con SU listón: una palabra distinta es dudosa, media no', r.mal + '/' + r.dudosos, '1/1',
+         'con el listón de antes, el 95 % habría pasado por bueno');
+    t.eq('lo mismo que dice después cada parlamento', X.M.cotejoAviso(2) && X.M.cotejoAviso(2).nivel, 'dudoso');
+    t.eq('el casi igual, sin aviso', X.M.cotejoAviso(3), null);
+    t.ok('el aviso dice el oído', X.avisos.some(a => /con el oído muy fiel/.test(a)), JSON.stringify(X.avisos));
+    t.eq('y lo devuelve, para el informe', r.oido + '|' + r.oidoNombre, 'muyfiel|muy fiel');
+    t.eq('el informe sabe con qué se oyó', X.M.cotejoOidoUsado(), 'muy fiel');
+    const ritmo = JSON.parse(ls.d.ddl_oido_ritmo || '{}');
+    t.ok('lo que tardó queda apuntado para la próxima vez', ritmo.muyfiel > 0 && ritmo.muyfiel < 1,
+         JSON.stringify(ritmo));
+  }
+  {
+    const X = orquesta({ por: { 0: { sim: 0.95, dif: 1, oido: 'a' } } });
+    const r = await X.M.cotejarTodo();
+    t.eq('sin elegir, con el fiel', X.w._cotejo[0].o, 'fiel');
+    t.eq('que también avisa de una palabra', r.dudosos, 1);
+  }
+  {
+    const X = orquesta({ ls: almacen({ ddl_oido: 'rapido' }), por: { 0: { sim: 0.9, dif: 2, oido: 'a' } } });
+    const r = await X.M.cotejarTodo();
+    t.eq('con el rápido, dos palabras distintas no avisan', r.dudosos, 0,
+         'se equivoca en una o dos a menudo: avisaría de medio capítulo');
+  }
+  {
+    const e = new Error('el navegador no deja'); e.sinTrabajadores = true;
+    const X = orquesta({ transcribir: async () => { throw e; }, por: { 0: { sim: 0.95, dif: 1, oido: 'a' } } });
+    const r = await X.M.cotejarTodo();
+    t.ok('oído en la propia página, el resultado NO lleva oído', !('o' in X.w._cotejo[0]),
+         'ahí se oye con el de siempre: medirlo con el listón del fiel sería inventarse avisos');
+    t.eq('y se mide como antes: el 95 % cuadra', r.dudosos, 0);
+    t.eq('sin decir un oído que no se usó', r.oidoNombre, '');
+  }
+  {
+    const X = orquesta();
+    X.w._cotejo = { 0: { sim: 1 }, 1: { sim: 1, o: 'fiel' }, 2: { sim: 1, o: 'fiel' }, 3: { sim: 1, o: 'rapido' } };
+    t.eq('con varios, el que más oyó', X.M.cotejoOidoUsado(), 'fiel');
+    X.w._cotejo = { 0: { sim: 1 } };
+    t.eq('lo de antes de los oídos, sin nombre', X.M.cotejoOidoUsado(), '');
   }
   {
     const X = orquesta();

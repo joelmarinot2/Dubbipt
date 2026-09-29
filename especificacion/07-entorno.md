@@ -40,6 +40,7 @@ saltárselas al probar significa probar otra aplicación.
 | **ENT-N3** | Nunca añadir un archivo al proyecto sin meterlo en `SHELL`. | ✅ |
 | **ENT-N4** | Nunca confiar en `requestAnimationFrame` para nada que deba ocurrir aunque la pestaña no esté pintando. No se dispara. Ya rompió el cajón de ocupación y el bucle de ensayo. | 👁 |
 | **ENT-N5** | Nunca usar `window.open` para imprimir: las ventanas emergentes se bloquean y el botón se queda sin hacer nada. Se imprime desde un iframe oculto. | 👁 |
+| **ENT-N6** | Nunca tirar una caché **que no sea de Dubbipt** al actualizar. El service worker, al activarse una versión nueva, borraba toda caja que no fuera la suya, y entre ellas la del **modelo de voz** —la llena la librería del reconocedor, con su nombre—: con cada versión había que volver a bajar el oído, de 60 a 240 MB. Solo se tiran las que empiezan por `dubbipt-`. Se vio validando la app en v11.9.0: tras actualizar, la caja del modelo no estaba. | ✅ |
 
 ## Cómo se demuestra
 

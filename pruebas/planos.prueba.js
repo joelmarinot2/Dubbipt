@@ -35,7 +35,9 @@ exports.pruebas = function(t){
      el que usan la hoja de cues y QC. Se prueba aquí con las mismas frases de
      siempre: si cambia cómo se compara, estas tienen que seguir saliendo. */
   const A = montar([['/* ── 3 · Las palabras', '/**\n * Lo que se oyó en UN parlamento']],
-                   ['anaPalabras', 'anaCasar'], { karNorm: karNormReal() });
+                   ['anaPalabras', 'anaCasar'],
+                   { karNorm: karNormReal(),
+                     ANA: montar([['/* Las medidas del análisis', '/* ── 0 · Con qué se escucha']], ['ANA'], {}).ANA });
   G.cotPalabras = A.anaPalabras;
   G.cotParecido = (a, b) => A.anaCasar(a, b).sim;
 

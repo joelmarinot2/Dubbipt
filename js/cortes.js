@@ -260,9 +260,12 @@ function cortesPegar(margen){
 const COTEJO = { res:new Map(), trabajando:false, cancelar:false, parado:false,
                  hechos:0, vistos:0, total:0, mal:0, dudosos:0, fase:'' };
 
-/* Desde cuánto parecido se avisa. Los mismos dos números para el análisis, la
+/* Desde cuánto parecido se avisa. Los mismos números para el análisis, la
    hoja de cues y el informe: si cada uno tuviera los suyos, un parlamento
-   saldría como cambio en un sitio y bien en otro. */
+   saldría como cambio en un sitio y bien en otro. Por debajo de `COTEJO_MAL`
+   no cuadra con ningún oído; `COTEJO_DUDOSO` es el listón de lo analizado
+   antes de que hubiera oídos. Lo de ahora avisa según el oído con que se oyó:
+   lo decide `anaAviso`. */
 const COTEJO_MAL = 0.45;
 const COTEJO_DUDOSO = 0.72;
 
@@ -278,9 +281,21 @@ function cotejoDe(si){
 function cotejoAviso(si){
   const r = cotejoDe(si);
   if(!r) return null;
-  if(r.sim < COTEJO_MAL) return { nivel:'mal', et:'no cuadra', color:'#F87171', sim:r.sim, oido:r.oido };
-  if(r.sim < COTEJO_DUDOSO) return { nivel:'dudoso', et:'dudoso', color:'#FBBF24', sim:r.sim, oido:r.oido };
+  const nivel = anaAviso(r, COTEJO_MAL, COTEJO_DUDOSO);
+  if(nivel === 'mal') return { nivel:'mal', et:'no cuadra', color:'#F87171', sim:r.sim, oido:r.oido };
+  if(nivel === 'dudoso') return { nivel:'dudoso', et:'dudoso', color:'#FBBF24', sim:r.sim, oido:r.oido };
   return null;
+}
+
+/** Con qué oído se analizó lo que hay: el nombre del que más parlamentos oyó,
+    o vacío si es de antes de que hubiera oídos. Para decirlo en el informe. */
+function cotejoOidoUsado(){
+  const cuenta = {};
+  const d = cotejoDatos();
+  for(const si in d){ const o = d[si] && d[si].o; if(o) cuenta[o] = (cuenta[o] || 0) + 1; }
+  let mejor = '', n = 0;
+  for(const o in cuenta) if(cuenta[o] > n){ mejor = o; n = cuenta[o]; }
+  return (mejor && typeof ANA_OIDOS !== 'undefined' && ANA_OIDOS[mejor]) ? ANA_OIDOS[mejor].nombre : '';
 }
 
 /** El tiempo que ha tardado, dicho como se dice. */
@@ -335,17 +350,22 @@ async function cotejarTodo(){
       return null;
     }
     const ventanas = anaVentanas();
+    /* El oído elegido en QC, y si no se eligió, el fiel. */
+    const oido = anaOidoElegido();
+    const O = ANA_OIDOS[oido];
 
     /* Se publica ANTES de empezar: es lo que convierte «está pensando» en «va
        por el 37 %». */
     COTEJO.total = 1000; COTEJO.fase = 'cotejando';
     let arranque = 0;
     const o = {
+      oido: oido,
       idioma: karIa.idioma,
       parado: parado,
       bajando: (m) => {
-        const mb = (m && m.bytes > 0) ? (' ' + Math.round(m.bytes / 1048576) + ' MB') : '';
-        stMsg('⏳ Bajando el modelo de voz, solo la primera vez…' + mb);
+        const mb = (m && m.bytes > 0)
+          ? (' ' + Math.min(O.mb, Math.round(m.bytes / 1048576)) + ' de ' + O.mb + ' MB') : '';
+        stMsg('⏳ Bajando el oído ' + O.nombre + ', solo la primera vez…' + mb);
       },
       avisa: (hecho, total, cuantos) => {
         if(!arranque) arranque = Date.now();
@@ -354,10 +374,13 @@ async function cotejarTodo(){
         stMsg('🔎 Analizando… ' + Math.round(100 * hecho / total) + ' %' + (queda ? (' · ' + queda) : ''));
       }
     };
-    stMsg('⏳ Preparando el reconocimiento de voz…');
-    let oido = null;
+    stMsg('⏳ Preparando el oído ' + O.nombre + '…');
+    let oidos = null;
+    /* En la propia página se oye con el de siempre, no con el elegido: lo que
+       salga así se mide como se medía entonces. */
+    let aqui = false;
     try{
-      oido = await anaTranscribir(karIa.pcm, plan.tramos, o);
+      oidos = await anaTranscribir(karIa.pcm, plan.tramos, o);
     }catch(e){
       if(parado()){ COTEJO.parado = true; return null; }
       if(!(e && e.sinTrabajadores)){
@@ -373,19 +396,26 @@ async function cotejarTodo(){
       fallo('anaTranscribir · js/cortes.js:cotejarTodo', e);
       stMsg('⏳ Preparando el reconocimiento de voz…');
       if(!(await karIaPreparar())) return null;
-      arranque = 0; COTEJO.vistos = 0;
-      oido = await anaTranscribirAqui(karIa.pcm, plan.tramos, o);
+      arranque = 0; COTEJO.vistos = 0; aqui = true;
+      oidos = await anaTranscribirAqui(karIa.pcm, plan.tramos, o);
     }
-    if(!oido || parado()){ COTEJO.parado = true; return null; }
+    if(!oidos || parado()){ COTEJO.parado = true; return null; }
+    /* Lo que ha tardado de verdad en este equipo, para decirlo bien la próxima
+       vez. Desde que empezó a oír: la descarga de la primera vez no cuenta. */
+    if(!aqui && arranque) anaRitmoGuardar(oido, (Date.now() - arranque) / 1000, plan.voz);
 
     const palabras = [];
-    oido.forEach(h => anaOidas(h.items, h.mapa).forEach(p => palabras.push(p)));
+    oidos.forEach(h => anaOidas(h.items, h.mapa).forEach(p => palabras.push(p)));
     const r = anaRepartir(ventanas, palabras, plan.duracion);
     let mal = 0, dudosos = 0, hechos = 0;
     for(const si in r.por){
+      /* Cada resultado dice con qué oído se midió: de eso depende desde cuándo
+         avisa, también cuando se abra otro día con otro oído elegido. */
+      if(!aqui) r.por[si].o = oido;
       hechos++;
-      if(r.por[si].sim < COTEJO_MAL) mal++;
-      else if(r.por[si].sim < COTEJO_DUDOSO) dudosos++;
+      const nivel = anaAviso(r.por[si], COTEJO_MAL, COTEJO_DUDOSO);
+      if(nivel === 'mal') mal++;
+      else if(nivel === 'dudoso') dudosos++;
     }
     window._cotejo = r.por;
     COTEJO.hechos = hechos; COTEJO.mal = mal; COTEJO.dudosos = dudosos;
@@ -396,7 +426,9 @@ async function cotejarTodo(){
     try{ adrRepintar(); }catch(e){ fallo('adrRepintar · js/cortes.js:cotejarTodo', e); }
 
     const segundos = (Date.now() - t0) / 1000;
-    const msg = '🔎 ' + hechos + ' analizados en ' + cotejoTardo(segundos) + ' · '
+    const nombre = aqui ? '' : O.nombre;
+    const msg = '🔎 ' + hechos + ' analizados' + (nombre ? (' con el oído ' + nombre) : '')
+              + ' en ' + cotejoTardo(segundos) + ' · '
               + mal + ' no cuadran · ' + dudosos + ' dudosos';
     stMsg(msg);
     /* Dónde mirarlos depende del perfil. «📋 Cues» es del Video Estudio, y QC no
@@ -405,7 +437,8 @@ async function cotejarTodo(){
                    && !perfilLlevaVideo(DDL_MODO)) ? '«≠ Cambios»' : '«📋 Cues»';
     castAviso(msg + ' — míralos en ' + donde + ', no se ha cambiado ni una palabra del libreto');
     return { hechos: hechos, mal: mal, dudosos: dudosos, fuera: r.fuera, sinTexto: r.sinTexto,
-             segundos: segundos, tramos: plan.tramos.length, voz: plan.voz, duracion: plan.duracion };
+             segundos: segundos, tramos: plan.tramos.length, voz: plan.voz, duracion: plan.duracion,
+             oido: aqui ? '' : oido, oidoNombre: nombre };
   }finally{
     COTEJO.trabajando = false; COTEJO.fase = '';
   }

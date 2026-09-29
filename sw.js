@@ -1,5 +1,5 @@
 // Service Worker · Dubbipt  (VERSION autogenerada en cada build)
-const VERSION = '2026-09-30T00:05';
+const VERSION = '2026-09-30T02:00';
 const CACHE   = 'dubbipt-' + VERSION;
 
 const SHELL = [
@@ -53,7 +53,11 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
+    // Solo las cajas VIEJAS DE DUBBIPT. La del modelo de voz -la llena la
+    // libreria del reconocedor, con su propio nombre- no es nuestra: tirarla
+    // obligaba a bajar el oido otra vez, 60 a 240 MB, con cada version nueva.
+    // Se vio validando la app: tras actualizar, la caja del modelo no estaba.
+    await Promise.all(keys.filter(k => k !== CACHE && k.indexOf('dubbipt-') === 0).map(k => caches.delete(k)));
     await self.clients.claim();
   })());
 });

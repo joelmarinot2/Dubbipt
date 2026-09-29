@@ -49,11 +49,131 @@ const ANA = {
   margen: 1.2,      // cuánto puede salirse una palabra de la ventana de su parlamento
   holgura: 0.3,     // lo que no se fía uno de los bordes de esa ventana
   acotacion: 6,     // palabras que puede durar un paréntesis sin cerrar
+  casi: 0.5,        // lo que cuenta una palabra casi igual: una letra de más o de menos
   trabajadores: 4,  // como mucho, por muchos núcleos que haya
   espera: 240000    // un tramo que tarda más que esto es que el trabajador se colgó
 };
 
 const ANA_TRABAJADOR = './js/analisis-worker.js';
+
+/* ── 0 · Con qué se escucha ──────────────────────────────────────────────── */
+
+/**
+ * Los tres OÍDOS, de más rápido a más fiel. Pedido de sala: «la transcripción
+ * aún no es tan fiel, mejora cómo escucha». Se elige en QC y se recuerda.
+ *
+ * Medidos con el premix de prueba —72 parlamentos, 8 cambiados a propósito,
+ * dos minutos y medio de voz— en el equipo de sala, de cuatro hilos:
+ *
+ *                   palabras mal oídas   avisos falsos   cambios cazados   tarda
+ *     antes              14 de 100           9 de 64          7 de 8        35 s
+ *     rápido              9 de 100           1 de 64          7 de 8        34 s
+ *     fiel                4 de 100           3 de 64          8 de 8        60 s
+ *     muy fiel            1 de 100           0 de 64          8 de 8       160 s
+ *
+ * Por qué el rápido oye mejor que el de antes sin tardar más: el modelo son dos
+ * piezas, la que ESCUCHA —el codificador— y la que escribe. La que escucha se
+ * bajaba comprimida a 8 bits, y es donde más se pierde: sin comprimir se
+ * equivoca un tercio menos y tarda lo mismo. Pesa 20 MB más, una vez.
+ * En el muy fiel no: sin comprimir serían 350 MB más.
+ *
+ * Desde cuándo AVISA cada uno —`dif`, `u`—. Con un oído fiel, UNA palabra
+ * distinta ya es un cambio. El rápido se equivoca en una o dos palabras a
+ * menudo, y si avisara de cada una avisaría de medio capítulo: pide tres
+ * palabras, o que la frase no se parezca. Por eso no caza una palabra suelta
+ * cambiada; para eso está el fiel.
+ *
+ * `ritmo`: segundos de trabajo por segundo de voz, medidos ahí. Solo para decir
+ * cuánto va a tardar antes de empezar; el equipo de cada uno lo corrige.
+ */
+const ANA_OIDOS = {
+  rapido: {
+    nombre: 'rápido', modelo: 'Xenova/whisper-tiny',
+    opciones: { dtype: { encoder_model: 'fp32', decoder_model_merged: 'q8' } },
+    mb: 63, trabajadores: 4, dif: 3, u: 0.6, ritmo: 0.23,
+    dice: 'Para un primer vistazo. Avisa de las frases que cambian, no de una palabra suelta.'
+  },
+  fiel: {
+    nombre: 'fiel', modelo: 'Xenova/whisper-base',
+    opciones: { dtype: { encoder_model: 'fp32', decoder_model_merged: 'q8' } },
+    mb: 133, trabajadores: 3, dif: 1, u: 0.72, ritmo: 0.4,
+    dice: 'El de cada día. Avisa en cuanto una palabra no es la del libreto.'
+  },
+  muyfiel: {
+    nombre: 'muy fiel', modelo: 'Xenova/whisper-small',
+    opciones: { dtype: 'q8' },
+    mb: 240, trabajadores: 2, dif: 1, u: 0.72, ritmo: 1.05,
+    dice: 'Para la entrega final. Casi no se equivoca, y tarda unas cinco veces más que el rápido.'
+  }
+};
+const ANA_OIDO_DEFECTO = 'fiel';
+const ANA_OIDO_GUARDADO = 'ddl_oido';
+const ANA_RITMO_GUARDADO = 'ddl_oido_ritmo';
+
+/** La clave de un oído que existe: la que se pide, o la de por defecto. */
+function anaOido(clave){
+  return Object.prototype.hasOwnProperty.call(ANA_OIDOS, clave) ? clave : ANA_OIDO_DEFECTO;
+}
+
+/** El oído elegido en este equipo. Sin elegir, el fiel. */
+function anaOidoElegido(){
+  try{ return anaOido(localStorage.getItem(ANA_OIDO_GUARDADO)); }
+  catch(e){ return ANA_OIDO_DEFECTO; /* sin almacén se usa el de por defecto */ }
+}
+
+/** Elige un oído y lo recuerda. Devuelve la clave que queda. */
+function anaOidoElegir(clave){
+  const k = anaOido(clave);
+  try{ localStorage.setItem(ANA_OIDO_GUARDADO, k); }
+  catch(e){ /* sin almacén se usa, pero no se recuerda */ }
+  return k;
+}
+
+/** Segundos de trabajo por segundo de voz: lo medido en ESTE equipo si ya se
+    analizó con ese oído, y si no el de la tabla. */
+function anaRitmo(clave){
+  const k = anaOido(clave);
+  try{
+    const g = JSON.parse(localStorage.getItem(ANA_RITMO_GUARDADO) || '{}');
+    if(g && isFinite(+g[k]) && +g[k] > 0) return +g[k];
+  }catch(e){ /* sin almacén, o guardado roto: el de la tabla */ }
+  return ANA_OIDOS[k].ritmo;
+}
+
+/** Apunta lo que ha tardado de verdad. Un audio de menos de medio minuto de voz
+    no dice nada —casi todo es arrancar— y no se apunta. */
+function anaRitmoGuardar(clave, segundos, voz){
+  if(!(+voz >= 30) || !(+segundos > 0)) return false;
+  const k = anaOido(clave);
+  try{
+    let g = {};
+    try{ g = JSON.parse(localStorage.getItem(ANA_RITMO_GUARDADO) || '{}') || {}; }catch(e){ g = {}; }
+    g[k] = +(+segundos / +voz).toPrecision(4);
+    localStorage.setItem(ANA_RITMO_GUARDADO, JSON.stringify(g));
+    return true;
+  }catch(e){ return false; /* sin almacén no se apunta */ }
+}
+
+/** Cuánto va a tardar con ese oído, en segundos, para `voz` segundos de voz. */
+function anaEstima(clave, voz){
+  return (+voz > 0) ? +voz * anaRitmo(clave) : 0;
+}
+
+/**
+ * Si un parlamento se avisa, y cómo: 'mal' si no cuadra, 'dudoso' si algo no
+ * es lo del libreto, y nulo si cuadra.
+ *
+ * `r` es un resultado: `{ sim, dif, o }`. Sin `o` es de antes de que hubiera
+ * oídos —o se oyó en la propia página, con el de siempre—, y se mide como
+ * entonces: solo por el parecido.
+ */
+function anaAviso(r, mal, dudoso){
+  if(!r || !isFinite(+r.sim)) return null;
+  if(+r.sim < mal) return 'mal';
+  const oido = (r.o && Object.prototype.hasOwnProperty.call(ANA_OIDOS, r.o)) ? ANA_OIDOS[r.o] : null;
+  if(!oido || !isFinite(+r.dif)) return (+r.sim < dudoso) ? 'dudoso' : null;
+  return (+r.dif >= oido.dif - 1e-9 || +r.sim < oido.u) ? 'dudoso' : null;
+}
 
 /* ── 1 · Dónde hay voz ────────────────────────────────────────────────────── */
 
@@ -301,30 +421,87 @@ function anaPalabras(texto){
 }
 
 /**
+ * Dos palabras dichas seguidas, juntas como SUENAN: cuando una acaba con la
+ * letra con la que empieza la otra, al hablar se funden en una sola. «De
+ * espacio» suena «despacio», «he estado» suena «estado» y «estás segura»
+ * suena «estasegura». La erre y la i no se funden: «dar risa» no es «darisa».
+ */
+function anaUnir(x, y){
+  x = x || ''; y = y || '';
+  if(!x || !y) return x + y;
+  const c = x[x.length - 1];
+  return (c === y[0] && /[aeobdfjklmnpstx§]/.test(c)) ? x + y.slice(1) : x + y;
+}
+
+/**
  * Junta las palabras que el reconocedor partió, o que partió el libreto.
  *
  * Oye bien, pero corta mal: «está vais» por «estabais», «hoy es» por «oyes»,
  * «adormido» por «ha dormido». Dos palabras seguidas de un lado que juntas son
  * una del otro lado se tratan como una. Solo si juntas son esa palabra y no
  * son ya las dos palabras del otro lado: «de la» contra «de la» no se toca.
+ *
+ * Y a veces corta por OTRO sitio: «de lospital» por «del hospital», «cerebre
+ * be» por «seré breve». Mismas letras, otro corte: dos y dos que juntas suenan
+ * igual se juntan en los dos lados. Medido con el oído fiel: la mitad de los
+ * avisos falsos eran esto.
  * Devuelve `[escritas, oidas]`, las dos ya juntadas.
  */
 function anaJuntar(a, b){
-  const enA = new Set(a);
-  const b2 = [];
-  for(let j = 0; j < b.length; j++){
-    const k = (j + 1 < b.length) ? (b[j] + b[j + 1]) : null;
-    if(k && enA.has(k) && !(enA.has(b[j]) && enA.has(b[j + 1]))){ b2.push(k); j++; }
-    else b2.push(b[j]);
-  }
-  const enB = new Set(b2);
-  const a2 = [];
-  for(let i = 0; i < a.length; i++){
-    const k = (i + 1 < a.length) ? (a[i] + a[i + 1]) : null;
-    if(k && enB.has(k) && !(enB.has(a[i]) && enB.has(a[i + 1]))){ a2.push(k); i++; }
-    else a2.push(a[i]);
-  }
-  return [a2, b2];
+  /* Dos de `lado` que juntas son una de `otro`: fundidas o tal cual, que
+     «leer» partido en «le er» también es «leer». */
+  const uno = (lado, otro) => {
+    const hay = new Set(otro);
+    const out = [];
+    for(let j = 0; j < lado.length; j++){
+      let k = null;
+      if(j + 1 < lado.length && !(hay.has(lado[j]) && hay.has(lado[j + 1]))){
+        const f = anaUnir(lado[j], lado[j + 1]), t = lado[j] + lado[j + 1];
+        k = hay.has(f) ? f : (hay.has(t) ? t : null);
+      }
+      if(k){ out.push(k); j++; }
+      else out.push(lado[j]);
+    }
+    return out;
+  };
+  const b1 = uno(b, a);
+  const a1 = uno(a, b1);
+  /* Dos de `lado` que juntas suenan como dos de `otro` juntas. */
+  const dos = (lado, otro) => {
+    const juntas = new Set(), tal = new Set();
+    for(let i = 0; i + 1 < otro.length; i++){
+      juntas.add(anaUnir(otro[i], otro[i + 1]));
+      tal.add(otro[i] + ' ' + otro[i + 1]);
+    }
+    const out = [];
+    for(let i = 0; i < lado.length; i++){
+      if(i + 1 < lado.length){
+        const k = anaUnir(lado[i], lado[i + 1]);
+        if(juntas.has(k) && !tal.has(lado[i] + ' ' + lado[i + 1])){ out.push(k); i++; continue; }
+      }
+      out.push(lado[i]);
+    }
+    return out;
+  };
+  return [dos(a1, b1), dos(b1, a1)];
+}
+
+/**
+ * Si dos palabras son CASI la misma: una letra de más o de menos, nada más.
+ *
+ * Es el fallo más común del reconocedor: se come una ese final —«esta» por
+ * «estás», «puede» por «puedes»— o le sobra una letra —«dejen» por «dejé»—.
+ * Cambiar una letra por OTRA no es casi lo mismo: «niño» y «niña», «hijo» e
+ * «hija» son cambios de verdad, y un reconocedor bueno no los confunde.
+ */
+function anaCasi(x, y){
+  x = x || ''; y = y || '';
+  const c = x.length < y.length ? x : y;
+  const l = x.length < y.length ? y : x;
+  if(c.length < 2 || l.length !== c.length + 1) return false;
+  let i = 0;
+  while(i < c.length && c[i] === l[i]) i++;
+  return c.slice(i) === l.slice(i + 1);
 }
 
 /**
@@ -375,18 +552,26 @@ function anaOidas(items, mapa){
  * Por la más larga y no por la escrita: así una frase a la que le han añadido
  * media docena de palabras tampoco cuadra, que es un cambio igual que quitarlas.
  * El orden cuenta —las mismas palabras al revés no son la misma frase—.
+ *
+ * Una palabra CASI igual —`anaCasi`— cuenta media. Y `dif` es cuántas palabras
+ * no cuadran: las que faltan, las que sobran y las distintas, con las casi
+ * iguales a media. Es lo que decide si se avisa —«una palabra distinta» se
+ * entiende; un 88 % no—.
  */
 function anaCasar(a0, b0){
   const [a, b] = anaJuntar(a0 || [], b0 || []);
   const m = a.length, n = b.length;
-  if(!m || !n) return { comunes: 0, sim: 0 };
-  let prev = new Int32Array(n + 1), cur = new Int32Array(n + 1);
+  if(!m || !n) return { comunes: 0, sim: 0, dif: Math.max(m, n) };
+  let prev = new Float64Array(n + 1), cur = new Float64Array(n + 1);
   for(let i = 1; i <= m; i++){
-    for(let j = 1; j <= n; j++)
-      cur[j] = (a[i - 1] === b[j - 1]) ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+    for(let j = 1; j <= n; j++){
+      const e = (a[i - 1] === b[j - 1]) ? 1 : (anaCasi(a[i - 1], b[j - 1]) ? ANA.casi : 0);
+      cur[j] = Math.max(prev[j], cur[j - 1], e ? prev[j - 1] + e : 0);
+    }
     const t = prev; prev = cur; cur = t; cur.fill(0);
   }
-  return { comunes: prev[n], sim: prev[n] / Math.max(m, n) };
+  const mas = Math.max(m, n);
+  return { comunes: prev[n], sim: prev[n] / mas, dif: mas - prev[n] };
 }
 
 /**
@@ -414,7 +599,7 @@ function anaParlamento(escritas, v0, v1, oidas){
     c1 = i + 1;
     if(t >= v0 + ANA.holgura && t <= v1 - ANA.holgura){ if(m0 < 0) m0 = i; m1 = i + 1; }
   }
-  if(c0 < 0) return { sim: 0, oido: '', n: 0 };
+  if(c0 < 0) return { sim: 0, oido: '', n: 0, dif: escritas.length };
 
   let mejor = null;
   const probar = (i0, i1) => {
@@ -424,9 +609,9 @@ function anaParlamento(escritas, v0, v1, oidas){
     /* A igual parecido, el que más palabras casa; y a igual también, el más
        corto, que es el que menos le quita a los vecinos. */
     if(!mejor || c.sim > mejor.sim + 1e-9
-       || (Math.abs(c.sim - mejor.sim) <= 1e-9 && (c.comunes > mejor.comunes
-           || (c.comunes === mejor.comunes && (i1 - i0) < (mejor.i1 - mejor.i0)))))
-      mejor = { sim: c.sim, comunes: c.comunes, i0: i0, i1: i1 };
+       || (Math.abs(c.sim - mejor.sim) <= 1e-9 && (c.comunes > mejor.comunes + 1e-9
+           || (Math.abs(c.comunes - mejor.comunes) <= 1e-9 && (i1 - i0) < (mejor.i1 - mejor.i0)))))
+      mejor = { sim: c.sim, comunes: c.comunes, dif: c.dif, i0: i0, i1: i1 };
   };
   if(m0 >= 0){
     for(let i0 = c0; i0 <= m0; i0++) for(let i1 = m1; i1 <= c1; i1++) probar(i0, i1);
@@ -436,7 +621,8 @@ function anaParlamento(escritas, v0, v1, oidas){
   }
   const txt = [];
   for(let i = mejor.i0; i < mejor.i1; i++) if(oidas[i].txt) txt.push(oidas[i].txt);
-  return { sim: mejor.sim, oido: txt.join(' ').replace(/\s+/g, ' ').trim(), n: mejor.i1 - mejor.i0 };
+  return { sim: mejor.sim, oido: txt.join(' ').replace(/\s+/g, ' ').trim(), n: mejor.i1 - mejor.i0,
+           dif: mejor.dif };
 }
 
 /**
@@ -457,7 +643,7 @@ function anaRepartir(ventanas, oidas, duracion){
     const escritas = anaPalabras(v.texto);
     if(!escritas.length){ sinTexto++; continue; }
     const r = anaParlamento(escritas, +v.v0, +v.v1, lista);
-    por[v.si] = { sim: +r.sim.toFixed(3), oido: String(r.oido || '').slice(0, 300) };
+    por[v.si] = { sim: +r.sim.toFixed(3), dif: +(+r.dif || 0).toFixed(1), oido: String(r.oido || '').slice(0, 300) };
   }
   return { por: por, fuera: fuera, sinTexto: sinTexto };
 }
@@ -469,10 +655,12 @@ function anaRepartir(ventanas, oidas, duracion){
  * equipo con poca memoria, dos como mucho —cada uno carga su copia del
  * reconocedor—; y nunca más trabajadores que tramos.
  */
-function anaCuantos(nucleos, tramos, memoria){
+function anaCuantos(nucleos, tramos, memoria, tope){
   let n = Math.floor(+nucleos || 2) - 1;
   if(isFinite(+memoria) && +memoria > 0 && +memoria <= 4) n = Math.min(n, 2);
-  n = Math.max(1, Math.min(ANA.trabajadores, n));
+  /* `tope`: los que admite el oído. Uno grande pesa tanto por copia que con
+     más trabajadores no se gana: se pelean por la memoria. */
+  n = Math.max(1, Math.min((+tope > 0) ? Math.min(+tope, ANA.trabajadores) : ANA.trabajadores, n));
   return Math.max(1, Math.min(n, Math.floor(+tramos) || 1));
 }
 
@@ -573,7 +761,8 @@ function anaParar(){
 /**
  * Transcribe los tramos y devuelve, de cada uno, lo oído y su mapa.
  *
- * `o`: { idioma, avisa(hechoSeg, totalSeg, cuantos), bajando(m), parado() }.
+ * `o`: { oido, idioma, avisa(hechoSeg, totalSeg, cuantos), bajando(m), parado() }.
+ * `oido` es la clave de `ANA_OIDOS`; sin ella, el de por defecto.
  * Devuelve nulo si se paró a medias.
  *
  * El primer trabajador arranca solo: es el que baja el modelo la primera vez,
@@ -586,10 +775,12 @@ function anaParar(){
 async function anaTranscribir(pcm, tramos, o){
   o = o || {};
   const total = tramos.reduce((a, t) => a + t.dur, 0);
+  const oido = ANA_OIDOS[anaOido(o.oido)];
   const n = anaCuantos((typeof navigator !== 'undefined' && navigator.hardwareConcurrency) || 2,
                        tramos.length,
-                       (typeof navigator !== 'undefined' && navigator.deviceMemory) || 0);
-  const pide = { lib: KARIA_LIB, modelo: KARIA_MODELO, opciones: {} };
+                       (typeof navigator !== 'undefined' && navigator.deviceMemory) || 0,
+                       oido.trabajadores);
+  const pide = { lib: KARIA_LIB, modelo: oido.modelo, opciones: oido.opciones || {} };
   const como = { return_timestamps: 'word', language: o.idioma || 'spanish', task: 'transcribe' };
   const hechos = new Array(tramos.length);
   const cola = tramos.map((t, i) => i);
