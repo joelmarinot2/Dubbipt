@@ -9,10 +9,16 @@
  *      nada ni hacen falta cables.
  *   2. Se marca UNA vez el recuadro del contador grande. Se guarda en
  *      proporciones, no en pixeles, para que siga valiendo si cambia la
- *      resolucion o el tamaño de la ventana.
- *   3. Se le enseñan las diez cifras: se escribe lo que pone el contador en ese
- *      momento y se queda con el dibujo de cada cifra.
- *   4. A partir de ahi lee quince veces por segundo.
+ *      resolucion o el tamaño de la ventana. Si se coge de más, se ajusta
+ *      solo a las cifras.
+ *   3. Se le enseñan las diez cifras: se escribe UNA vez lo que pone el
+ *      contador, con Pro Tools parado, y se le da al play. Las que falten las
+ *      aprende solo contando cómo cambian los segundos.
+ *   4. A partir de ahi lee quince veces por segundo. Los días siguientes solo
+ *      hay que volver a compartir: en cuanto se comparte, arranca.
+ *
+ * Es el seguimiento de todos los perfiles, y el ÚNICO de QC, que no lleva
+ * vídeo.
  *
  * LO IMPORTANTE, y es lo que hace que esto valga: leer cifras de una pantalla
  * no acierta siempre. Medido, ronda el 90% por cifra, que sobre ocho cifras es
@@ -67,6 +73,8 @@ const TCP = {
   _timer: 0,
   _leidas: 0, _malas: 0,
   _hist: [], _dudas: [],
+  aprendiendo: null,    // la cuenta de las cifras con Pro Tools rodando
+  _aprTimer: 0,
   _cv: null, _g: null
 };
 
@@ -428,6 +436,228 @@ function tcpAprender(f, t){
   }
 }
 
+/* ── Aprender las cifras solas, con Pro Tools rodando ──────────────────── */
+
+/*
+ * Enseñarle las diez cifras era lo más pesado de todo: hay que escribir lo que
+ * pone el contador, y un timecode como 01:00:00:00 solo trae dos. Había que ir
+ * moviendo el cursor de Pro Tools y volver a escribir hasta que salieran todas.
+ *
+ * Ahora se escribe UNA vez, con Pro Tools parado, y se le da al play. La casilla
+ * de las unidades de segundo cambia una vez por segundo y pasa por las diez
+ * cifras en diez segundos, en orden: contando sus cambios se sabe qué cifra hay
+ * en cada momento SIN LEERLA, y de ahí se aprende su dibujo.
+ *
+ * Solo esa casilla: los fotogramas cambian demasiado deprisa para saber cuál se
+ * ha capturado, y el resto demasiado despacio para servir. Y solo si el RITMO es
+ * el de reproducir, un cambio por segundo: si en vez de darle al play se
+ * arrastra el cursor, los cambios no llevan ese ritmo y no se aprende nada.
+ * Aprender un dibujo con la cifra equivocada estropearía la lectura para
+ * siempre, que es mucho peor que tener que repetir.
+ */
+
+/* Parecido desde el que dos fotos de la casilla son la MISMA cifra. */
+const TCP_IGUAL = 0.95;
+/* Dos cifras distintas no pueden parecerse tanto: si una recién aprendida se
+   parece así a otra que ya conocía, algo se contó mal y no se guarda. */
+const TCP_GEMELA = 0.97;
+/* Lo que se espera a que salgan todas, en segundos de reloj. */
+const TCP_APRENDER_S = 30;
+/* El hueco más largo entre dos fotos que deja saber cuándo cambió la cifra.
+   Con la ventana tapada el navegador frena los temporizadores a uno por
+   segundo —se vio probándolo—, y un cambio que cae en un hueco así no se sabe
+   cuándo pasó: contarlo a ciegas es contar mal. */
+const TCP_HUECO_S = 0.3;
+
+/** Empieza a contar desde el timecode que se ha escrito. `img` es la casilla de
+    las unidades de segundo tal y como está ahora, con Pro Tools parado. */
+function tcpAprendizajeNuevo(txt, img, ahora){
+  const t = String(txt == null ? '' : txt).replace(/[^0-9]/g, '');
+  return { d: +t[5], ref: img, cand: null, cambios: [], vistos: {},
+           inicio: ahora, estado: 'esperando', motivo: '' };
+}
+
+/**
+ * Una foto nueva de la casilla. Cuenta los cambios; no toca las plantillas, que
+ * eso lo hace `tcpAprendizajeGuardar` cuando la cuenta ya es de fiar.
+ *
+ * Un cambio se da por bueno cuando DOS fotos seguidas coinciden entre sí y no
+ * con la de antes: una sola puede ser la de en medio de la transición, con las
+ * dos cifras mezcladas. Y cada cambio tiene que llegar un segundo después del
+ * anterior —o dos o tres, si uno no se vio: el 8 y el 9 se parecen—.
+ */
+function tcpAprendizajePaso(A, img, ahora){
+  if(!A || A.estado !== 'esperando' || !img) return A;
+  const hueco = (A.ultimo != null) ? (ahora - A.ultimo) / 1000 : 0;
+  A.ultimo = ahora;
+  if(tcpParecido(img, A.ref) >= TCP_IGUAL){ A.cand = null; return A; }
+  /* Ha cambiado, y entre esta foto y la anterior hay un hueco demasiado largo
+     para saber cuándo. Un hueco sin cambio no importa -la cifra solo cambia
+     una vez por segundo-, pero uno con cambio deja la cuenta a ciegas. */
+  if(hueco > TCP_HUECO_S){ A.estado = 'mal'; A.motivo = 'pausa'; return A; }
+  if(!A.cand || tcpParecido(img, A.cand.img) < TCP_IGUAL){ A.cand = { img: img, t: ahora }; return A; }
+  const t = A.cand.t;
+  const ult = A.cambios.length ? A.cambios[A.cambios.length - 1] : null;
+  /* A menos de medio segundo del cambio anterior no es otra cifra: es la misma
+     transición asentándose. Una captura puede tardar dos fotos en cambiar, con
+     las dos cifras mezcladas en proporciones distintas, y esas dos fotos se
+     parecen entre sí: se tomaban por la cifra nueva, y luego llegaba la de
+     verdad como un «segundo cambio» imposible. Lo cazó una prueba. */
+  if(ult != null && (t - ult) < 500){ A.ref = img; A.cand = null; return A; }
+  let pasos = 1;
+  if(ult != null){
+    const dt = (t - ult) / 1000;
+    pasos = Math.round(dt);
+    if(pasos < 1 || pasos > 3 || Math.abs(dt - pasos) > 0.25){
+      A.estado = 'mal'; A.motivo = 'ritmo';
+      return A;
+    }
+  }
+  /* El dibujo de una cifra se guarda cuando SE VA, no cuando llega: para
+     entonces ya se ha visto entera y asentada, y no una mezcla con la de antes.
+     Y de paso solo se guarda con el ritmo ya visto: la primera cifra que se
+     va es la que se escribió, que ya se aprendió al escribirla, y la segunda
+     se va con el primer intervalo, que acaba de pasar la prueba del segundo.
+     Un primer cambio de haber arrastrado el cursor no deja nada guardado. */
+  if(ult != null) A.vistos[String(A.d)] = A.ref;
+  A.cambios.push(t);
+  A.d = (A.d + pasos) % 10;
+  A.ref = img;
+  A.cand = null;
+  return A;
+}
+
+/** Pasa a las plantillas lo aprendido. Devuelve las cifras nuevas. */
+function tcpAprendizajeGuardar(A){
+  if(!A) return [];
+  const nuevas = [];
+  for(const k in A.vistos){
+    const img = A.vistos[k];
+    if(!TCP.plantillas[k]){
+      let gemela = false;
+      for(const j in TCP.plantillas)
+        if(j !== k && tcpParecido(img, TCP.plantillas[j]) > TCP_GEMELA) gemela = true;
+      if(!gemela){ TCP.plantillas[k] = img; nuevas.push(k); }
+    }
+  }
+  A.vistos = {};
+  if(!tcpFaltan().length) A.estado = 'hecho';
+  return nuevas;
+}
+
+/**
+ * Una vuelta del aprendizaje: foto, cuenta y guardar. Devuelve el estado, que
+ * dice cómo va: 'esperando', 'hecho', 'mal' (el ritmo no era el de reproducir)
+ * o 'tarde' (no han salido todas a tiempo).
+ */
+function tcpAprenderVuelta(ahora){
+  const A = TCP.aprendiendo;
+  if(!A) return null;
+  const f = tcpFoto();
+  if(f && TCP.celdas && TCP.celdas[5]) tcpAprendizajePaso(A, tcpCelda(f, TCP.celdas[5]), ahora);
+  if(tcpAprendizajeGuardar(A).length) tcpGuardar();
+  if(A.estado === 'esperando' && (ahora - A.inicio) / 1000 > TCP_APRENDER_S) A.estado = 'tarde';
+  return A;
+}
+
+/* ── El recuadro, ajustado solo a las cifras ───────────────────────────── */
+
+/*
+ * Marcar a mano, sobre la pantalla entera, un contador que en el lienzo es un
+ * sello es difícil, y coger de más —la etiqueta, el borde, un trozo de ventana—
+ * dejaba el contador sin leer: «veo 13 trozos y tienen que ser 8». Ahora se
+ * busca DENTRO de lo marcado.
+ *
+ * Primero la franja de texto más alta, que en el contador son las cifras. Y en
+ * ella, once trozos con forma de timecode: dos cifras, dos puntos, dos cifras…
+ * Los dos puntos se reconocen por las FILAS con tinta, no por su ancho ni por
+ * su alto. Un 1 puede ser más estrecho que unos dos puntos, y unos dos puntos
+ * de verdad llegan de arriba abajo casi lo que una cifra —medido con Consolas:
+ * el 77 %—. Pero una cifra tiene tinta en casi todas sus filas, y unos dos
+ * puntos solo en las de sus dos puntos, con un hueco en medio.
+ */
+
+/** Cuántas filas de una franja tienen tinta en unas columnas. */
+function tcpAltoTinta(f, a, b, y0, y1){
+  let n = 0;
+  for(let y = y0; y <= y1; y++){
+    for(let x = a; x <= b; x++) if(f.g[y * f.w + x] > 0.5){ n++; break; }
+  }
+  return n;
+}
+
+/** En una franja de filas, el tramo de trozos que es un timecode. */
+function tcpRecortarFranja(f, y0, y1){
+  const alto = y1 - y0 + 1;
+  if(alto < 5) return null;
+  const gr = [];
+  let a = -1;
+  for(let x = 0; x <= f.w; x++){
+    let n = 0;
+    if(x < f.w) for(let y = y0; y <= y1; y++) if(f.g[y * f.w + x] > 0.5){ if(++n >= 2) break; }
+    const hay = n >= 2;
+    if(hay && a < 0) a = x;
+    if(!hay && a >= 0){ gr.push({ a: a, b: x - 1, alto: tcpAltoTinta(f, a, x - 1, y0, y1) }); a = -1; }
+  }
+  /* Una cifra tiene tinta en casi todas las filas —medido con Consolas, del 95
+     al 100 %; la que menos, un 1 de siete segmentos, el 68 % por su hueco en
+     medio— y unos dos puntos, en la mitad o menos: el 51 % con Consolas y el
+     21 % con siete segmentos. El corte va entre el 51 y el 68. */
+  const esCifra = (g) => g.alto >= alto * 0.62;
+  const esPunto = (g) => !esCifra(g);
+  const DIG = [0, 1, 3, 4, 6, 7, 9, 10], SEP = [2, 5, 8];
+  let tramo = null;
+  for(let i = 0; i + 11 <= gr.length && !tramo; i++){
+    const w = gr.slice(i, i + 11);
+    if(DIG.every(k => esCifra(w[k])) && SEP.every(k => esPunto(w[k]))) tramo = w;
+  }
+  if(!tramo && gr.length === 8 && gr.every(esCifra)) tramo = gr;
+  if(!tramo) return null;
+  const anchos = tramo.filter(esCifra).map(g => g.b - g.a + 1).sort((p, q) => p - q);
+  const md = anchos[anchos.length >> 1] || 1;
+  const mx = Math.max(1, Math.round(md * 0.3)), my = Math.max(1, Math.round(alto * 0.15));
+  const x0 = Math.max(0, tramo[0].a - mx), x1 = Math.min(f.w - 1, tramo[tramo.length - 1].b + mx);
+  const ya = Math.max(0, y0 - my), yb = Math.min(f.h - 1, y1 + my);
+  return { x: x0 / f.w, y: ya / f.h, w: (x1 - x0 + 1) / f.w, h: (yb - ya + 1) / f.h };
+}
+
+/**
+ * El recuadro de las cifras dentro de una foto de lo marcado, en proporciones
+ * de esa foto, o nulo si ahí no hay un timecode.
+ */
+function tcpRecortar(f){
+  if(!f || !f.w || !f.h) return null;
+  const cuenta = new Int32Array(f.h);
+  let mx = 0;
+  for(let y = 0; y < f.h; y++){
+    let n = 0;
+    for(let x = 0; x < f.w; x++) if(f.g[y * f.w + x] > 0.5) n++;
+    cuenta[y] = n; if(n > mx) mx = n;
+  }
+  if(!mx) return null;
+  /* Una fila cuenta si tiene tinta de verdad, no un borde: la raya vertical
+     del marco pinta un par de píxeles en TODAS las filas y juntaría la etiqueta
+     y las cifras en una sola franja. */
+  const umbral = Math.max(2, mx * 0.12);
+  const franjas = [];
+  for(let y = 0; y < f.h; y++){
+    if(cuenta[y] < umbral) continue;
+    const u = franjas[franjas.length - 1];
+    if(u && y - u.b <= 2) u.b = y; else franjas.push({ a: y, b: y });
+  }
+  franjas.sort((p, q) => (q.b - q.a) - (p.b - p.a));
+  for(const r of franjas){
+    const x = tcpRecortarFranja(f, r.a, r.b);
+    if(x) return x;
+  }
+  return null;
+}
+
+/** Un recuadro de dentro de otro, pasado a proporciones de la pantalla. */
+function tcpDentroDe(R, r){
+  return { x: R.x + r.x * R.w, y: R.y + r.y * R.h, w: r.w * R.w, h: r.h * R.h };
+}
+
 /* ── El bucle ──────────────────────────────────────────────────────────── */
 
 /**
@@ -473,6 +703,9 @@ function tcpMirar(){
 
 function tcpArrancar(){
   tcpParar(true);
+  /* Seguir y aprender a la vez no: las dos cosas leen la misma casilla con
+     criterios distintos. Si se arranca, lo aprendido hasta ahora se queda. */
+  try{ if(typeof tcpAprenderParar === 'function') tcpAprenderParar(); }catch(e){ /* no estaba aprendiendo */ }
   const paso = () => {
     if(!TCP.on) return;
     try{ tcpMirar(); }catch(e){ /* una lectura mala no puede tirar el bucle */ }
@@ -502,6 +735,19 @@ function tcpParar(soloElBucle){
 
 /** ¿Esta Pro Tools mandando el reloj ahora mismo? */
 function tcpActivo(){ return !!(TCP.on && TCP.tc != null); }
+
+/**
+ * Qué falta para poder seguir a Pro Tools: 'compartir', 'marcar', 'ensenar' o
+ * 'listo'. Es lo que decide qué se enseña en el panel y qué se hace solo al
+ * compartir: con el recuadro y las diez cifras ya guardados de otro día, lo
+ * único que queda es compartir, y en cuanto se comparte se arranca.
+ */
+function tcpQueFalta(){
+  if(!TCP.video) return 'compartir';
+  if(!TCP.rect) return 'marcar';
+  if(tcpFaltan().length) return 'ensenar';
+  return 'listo';
+}
 
 /* ── Compartir la ventana ──────────────────────────────────────────────── */
 
@@ -626,55 +872,219 @@ function tcpPintarEstado(){
   if(c) c.textContent = TCP.on ? ('⏱ PT ' + tcpTexto(tcpAhora(TCP, performance.now()), TCP.fps)) : '';
 }
 
+/* ── Aprender con Pro Tools rodando: el bucle y lo que se ve ───────────── */
+
+/** Lo que dice la línea del aprendizaje en el panel. */
+function tcpAprenderTexto(){
+  const A = TCP.aprendiendo;
+  const sabe = 10 - tcpFaltan().length;
+  if(!A) return '';
+  if(A.estado === 'esperando')
+    return A.cambios.length
+      ? ('Aprendiendo con Pro Tools rodando… ya conoce ' + sabe + ' de 10')
+      : 'Ahora dale al PLAY en Pro Tools y déjalo correr unos diez segundos';
+  return '';
+}
+
+function tcpAprenderParar(){
+  if(TCP._aprTimer){ try{ TCP._aprTimer.parar(); }catch(e){ /* ya estaba parado */ } TCP._aprTimer = 0; }
+  TCP.aprendiendo = null;
+}
+
+/**
+ * Un latido que NO se duerme con la ventana tapada.
+ *
+ * Para darle al play hay que ir a Pro Tools, y Pro Tools tapa Dubbipt: con la
+ * ventana tapada el navegador frena los temporizadores de la página a uno por
+ * segundo, y contando los segundos a una foto por segundo la cuenta se pierde.
+ * Los de un trabajador en segundo plano no se frenan así, así que el latido
+ * sale de uno. Si el navegador no deja crearlo, un temporizador normal.
+ */
+function tcpLatido(ms, fn){
+  let w = null, url = '', t = 0;
+  try{
+    url = URL.createObjectURL(new Blob(['setInterval(function(){ postMessage(0); }, ' + (+ms || 66) + ');'],
+                                       { type: 'text/javascript' }));
+    w = new Worker(url);
+    w.onmessage = () => { try{ fn(); }catch(e){ /* una vuelta mala no para el latido */ } };
+    w.onerror = () => { try{ w.terminate(); }catch(e){ /* ya estaba parado */ } w = null; if(!t) t = setInterval(fn, ms); };
+  }catch(e){
+    w = null;
+  }
+  if(!w) t = setInterval(fn, ms);
+  return { parar(){
+    try{ if(w) w.terminate(); }catch(e){ /* ya estaba parado */ }
+    if(t) clearInterval(t);
+    try{ if(url) URL.revokeObjectURL(url); }catch(e){ /* nada que soltar */ }
+    w = null; t = 0;
+  } };
+}
+
+/**
+ * Se queda con las cifras que hay en pantalla —como siempre— y, si faltan,
+ * se pone a contar la casilla de los segundos para aprender las demás en
+ * cuanto le den al play. Devuelve lo mismo que `tcpEnsenar`.
+ */
+function tcpAprenderArrancar(txt){
+  const r = tcpEnsenar(txt);
+  if(!r.ok || !r.faltan.length) return r;
+  const f = tcpFoto();
+  if(!f || !TCP.celdas || !TCP.celdas[5]) return r;
+  tcpAprenderParar();
+  TCP.aprendiendo = tcpAprendizajeNuevo(txt, tcpCelda(f, TCP.celdas[5]), performance.now());
+  const vuelta = () => {
+    const A = tcpAprenderVuelta(performance.now());
+    if(!A) return;
+    const e = document.getElementById('tcpAprEstado');
+    if(e) e.textContent = tcpAprenderTexto();
+    if(A.estado === 'esperando') return;
+    tcpAprenderParar();
+    if(A.estado === 'hecho'){
+      castAviso('🎉 Ya conoce las diez cifras');
+      /* Con todo listo no se hace esperar a nadie: se engancha ya. */
+      if(tcpQueFalta() === 'listo') tcpEmpezarASeguir();
+      else tcpPanel();
+      return;
+    }
+    const falta = tcpFaltan().join(', ');
+    castAviso(A.estado === 'mal'
+      ? (A.motivo === 'pausa'
+          ? '⚠️ Se perdió la vista del contador un momento: vuelve a escribir lo que pone con Pro Tools parado y dale al play'
+          : '⚠️ El contador no avanzaba de segundo en segundo: con Pro Tools parado, vuelve a escribir lo que pone y dale al play sin tocar nada más')
+      : ('⚠️ No han salido todas a tiempo · faltan ' + falta + ' · vuelve a escribir lo que pone y dale al play un poco más'));
+    tcpPanel();
+  };
+  TCP._aprTimer = tcpLatido(66, vuelta);
+  return r;
+}
+
+/** Engancha el seguimiento y quita el panel de en medio: el libreto tiene que
+    verse, que es lo que se viene a mirar. */
+function tcpEmpezarASeguir(){
+  TCP.tc = null; TCP._leidas = 0; TCP._malas = 0; TCP._hist = []; TCP._dudas = [];
+  tcpArrancar();
+  const ov = document.getElementById('tcpOv'); if(ov) ov.remove();
+  castAviso('▶ El libreto sigue ya al contador de Pro Tools');
+}
+
+/**
+ * Lo que viene después de compartir, según lo que falte. Con el recuadro y las
+ * cifras de otro día guardados, compartir es lo ÚNICO que hay que hacer: se
+ * arranca solo. Si falta el recuadro se abre directamente la pantalla de
+ * marcarlo, que es lo siguiente que habría que pulsar.
+ */
+function tcpTrasCompartir(){
+  const q = tcpQueFalta();
+  if(q === 'listo'){ tcpEmpezarASeguir(); return q; }
+  if(q === 'marcar'){
+    castAviso('Compartido · ahora marca el recuadro del contador');
+    const ov = document.getElementById('tcpOv'); if(ov) ov.remove();
+    tcpMarcarRect();
+    return q;
+  }
+  castAviso('Compartido · falta enseñarle las cifras');
+  tcpPanel();
+  return q;
+}
+
+/**
+ * Enseña en el panel lo que se está leyendo AHORA, con el recorte del contador
+ * al lado. Es la única manera de saber de un vistazo si está bien: antes había
+ * que arrancar y mirar si el libreto se movía.
+ */
+function tcpVistaEnMarcha(ov){
+  const cv = ov.querySelector('#tcpVista'), lee = ov.querySelector('#tcpLee');
+  if(!cv || !lee) return;
+  const vuelta = () => {
+    if(!ov.isConnected || !TCP.video || !TCP.rect) return;
+    try{
+      const v = TCP.video, R = TCP.rect;
+      const sw = Math.max(1, Math.round(R.w * v.videoWidth)), sh = Math.max(1, Math.round(R.h * v.videoHeight));
+      const k = Math.max(1, Math.min(4, Math.floor(320 / sw)));
+      if(cv.width !== sw * k || cv.height !== sh * k){ cv.width = sw * k; cv.height = sh * k; }
+      const g = cv.getContext('2d');
+      g.imageSmoothingEnabled = false;
+      g.drawImage(v, Math.round(R.x * v.videoWidth), Math.round(R.y * v.videoHeight), sw, sh, 0, 0, cv.width, cv.height);
+    }catch(e){ /* todavía sin fotograma: se vuelve a probar en la siguiente vuelta */ }
+    let txt = '', bien = false;
+    try{
+      const r = tcpLeerUna();
+      if(tcpFaltan().length === 10) txt = 'todavía no sabe leerlo: enséñale las cifras';
+      else if(r && r.seg != null && r.conf >= 0.55){ txt = 'lee ' + tcpTexto(r.seg, TCP.fps); bien = true; }
+      else if(r && r.celdas && r.celdas !== 8) txt = 'en el recuadro ve ' + r.celdas + ' trozos: vuelve a marcarlo';
+      else txt = tcpFaltan().length ? ('no lo entiende todavía · le faltan ' + tcpFaltan().join(', ')) : 'no lo entiende ahora mismo';
+    }catch(e){ txt = 'no lo entiende ahora mismo'; }
+    lee.textContent = txt;
+    lee.style.color = bien ? '#4ADE80' : '#F59E0B';
+    setTimeout(vuelta, 250);
+  };
+  vuelta();
+}
+
 function tcpPanel(){
   const viejo = document.getElementById('tcpOv'); if(viejo) viejo.remove();
   const ov = document.createElement('div');
   ov.id = 'tcpOv'; ov.className = 'modo-cap';
   const esc2 = (s) => (typeof esc === 'function') ? esc(String(s)) : String(s);
   const faltan = tcpFaltan();
-  /* Los pasos se numeran solos. El de enseñar las cifras solo sale cuando ya se
-     comparte la ventana, asi que antes el panel ponia «1 ·» y saltaba a «3 ·»,
-     y un numero que falta parece una averia. */
+  const q = tcpQueFalta();
+  /* Los pasos se numeran solos y llevan su marca de hecho: se ve de un golpe
+     qué queda. Antes el panel ponía «1 ·» y saltaba a «3 ·», y un número que
+     falta parece una avería. */
   let paso = 0;
-  const nPaso = (txt) => '<div class="io-tit">' + (++paso) + ' · ' + txt + '</div>';
+  const nPaso = (txt, hecho) => '<div class="io-tit">' + (++paso) + ' · ' + txt
+    + (hecho ? ' <span style="color:#4ADE80">✓</span>' : '') + '</div>';
+  const aprendiendo = !!TCP.aprendiendo;
 
   ov.innerHTML = '<div class="modo-caja" style="max-width:600px;text-align:left">'
-    + '<div class="modo-tit">Timecode de Pro Tools</div>'
+    + '<div class="modo-tit">Seguir a Pro Tools</div>'
     + '<div class="modo-sub" style="margin-bottom:8px" id="tcpEstado">' + esc2(tcpEstadoTexto()) + '</div>'
-    + '<div class="meta-nota">El reloj lo lleva <b>Pro Tools</b>, no el vídeo ni el audio que subas '
-    +   'aquí. Se comparte su ventana, se marca <b>una vez</b> el recuadro del contador grande y '
-    +   'Dubbipt lo lee quince veces por segundo.<br><br>No hay que instalar nada ni hace falta '
-    +   'ningún cable. Hace falta <b>Chrome o Edge</b>, y que el contador se vea en pantalla.</div>'
-    + nPaso('qué se comparte')
+    + '<div class="meta-nota">El libreto sigue al <b>contador de Pro Tools</b>, leyéndolo de una '
+    +   '<b>captura de pantalla</b>: no hace falta vídeo, ni instalar nada, ni ningún cable. Hace falta '
+    +   '<b>Chrome o Edge</b> y que el contador se vea en pantalla. Lo del recuadro y las cifras se hace '
+    +   '<b>una sola vez</b>: los días siguientes basta con compartir.</div>'
+    + nPaso('compartir la pantalla', !!TCP.video)
     /* Las DOS rutas, dichas antes de elegir. El Big Counter de Pro Tools es una
        ventana flotante y el selector de Windows solo lista ventanas
        principales: ahí no sale, y quien lo busca se queda atascado sin saber
        por qué —pasó—. Así que se dice cuál es cuál. */
-    + '<div class="meta-nota">El <b>Big Counter</b> es una ventana flotante y <b>no aparece</b> en la '
-    +   'lista de ventanas de Windows. Para usarlo hay que compartir la <b>pantalla entera</b>, y '
-    +   'dejarlo quieto donde esté.<br><br>Si prefieres compartir solo la ventana de Pro Tools, vale '
-    +   'igual: usa entonces el contador de la <b>barra de transporte</b> de la ventana de edición. Se '
-    +   'lee igual de bien aunque sea más pequeño.</div>'
+    + (TCP.video ? '' :
+        '<div class="meta-nota">El <b>Big Counter</b> es una ventana flotante y <b>no aparece</b> en la '
+      +   'lista de ventanas de Windows: para usarlo hay que compartir la <b>pantalla entera</b>. '
+      +   'Compartiendo solo la ventana de Pro Tools vale el contador de la <b>barra de transporte</b>.</div>')
     + '<div class="io-rej" style="margin-bottom:12px">'
-    +   '<button class="io-b" id="tcpVerPant">🖥 Compartir la pantalla entera</button>'
+    +   '<button class="io-b" id="tcpVerPant">🖥 ' + (TCP.video ? 'Compartir otra pantalla' : 'Compartir la pantalla entera') + '</button>'
     +   '<button class="io-b" id="tcpVer">🗔 Compartir solo una ventana</button>'
-    +   (TCP.video ? '<button class="io-b" id="tcpRect">⬚ Marcar el contador</button>' : '')
     + '</div>'
     + (TCP.video
-        ? nPaso('enseñarle las cifras')
-          + '<div class="meta-nota">Con Pro Tools <b>parado</b>: mira el contador y escribe aquí lo '
-          +   'que pone <b>ahora mismo</b>. Con eso aprende el dibujo de cada cifra.'
+        ? nPaso('el contador', !!TCP.rect)
+          + '<div class="io-rej" style="margin-bottom:10px;align-items:center">'
+          +   '<button class="io-b" id="tcpRect">⬚ ' + (TCP.rect ? 'Volver a marcarlo' : 'Marcar el contador') + '</button>'
+          +   (TCP.rect
+                ? '<canvas id="tcpVista" style="image-rendering:pixelated;border:1px solid #2b3040;'
+                  + 'border-radius:6px;background:#0b0d12;max-width:100%;height:auto"></canvas>'
+                  + '<span id="tcpLee" style="font-family:monospace;font-size:12.5px"></span>'
+                : '<span class="meta-nota" style="margin:0">Un recuadro sobre las cifras. No hace falta '
+                  + 'ser preciso: si coges de más, se ajusta solo.</span>')
+          + '</div>'
+        : '')
+    + (TCP.video && TCP.rect
+        ? nPaso('las cifras', !faltan.length)
           + (faltan.length
-              ? '<br><b style="color:#F59E0B">Todavía no conoce: ' + faltan.join(', ')
-                + '</b> — mueve el cursor en Pro Tools hasta que salgan y vuelve a enseñárselo.'
-              : '<br><b style="color:#4ADE80">Ya conoce las diez cifras.</b>')
-          + '</div>'
-          + '<div class="io-rej" style="margin-bottom:12px">'
-          +   '<input id="tcpQue" type="text" placeholder="01:18:23:04" autocomplete="off" '
-          +     'style="flex:1;min-width:130px;background:#11131a;color:#e7ebf3;border:1px solid #2b3040;'
-          +     'border-radius:9px;padding:8px 10px;font-size:13px;font-family:monospace">'
-          +   '<button class="io-b" id="tcpAprende">Es lo que pone</button>'
-          + '</div>'
+              ? '<div class="meta-nota">Con Pro Tools <b>parado</b>, escribe lo que pone el contador '
+                + '<b>ahora mismo</b> y pulsa «Es lo que pone». Después dale al <b>play</b> y déjalo correr '
+                + 'unos diez segundos: aprende solo las cifras que falten.'
+                + (faltan.length < 10 ? '<br><b style="color:#F59E0B">Todavía no conoce: ' + faltan.join(', ') + '</b>' : '')
+                + '</div>'
+                + '<div class="io-rej" style="margin-bottom:6px">'
+                +   '<input id="tcpQue" type="text" placeholder="01:18:23:04" autocomplete="off" '
+                +     'style="flex:1;min-width:130px;background:#11131a;color:#e7ebf3;border:1px solid #2b3040;'
+                +     'border-radius:9px;padding:8px 10px;font-size:13px;font-family:monospace">'
+                +   '<button class="io-b" id="tcpAprende">Es lo que pone</button>'
+                + '</div>'
+                + '<div id="tcpAprEstado" style="font-size:12.5px;color:#60A5FA;margin-bottom:12px">'
+                +   esc2(aprendiendo ? tcpAprenderTexto() : '') + '</div>'
+              : '<div class="meta-nota"><b style="color:#4ADE80">Ya conoce las diez cifras.</b></div>')
         : '')
     + nPaso('ajustes')
     + '<div class="sala-rej">'
@@ -706,9 +1116,7 @@ function tcpPanel(){
   const compartir = async (pantallaEntera) => {
     const r = await tcpCompartir(pantallaEntera);
     if(!r.ok){ castAviso('❌ ' + r.motivo); return; }
-    castAviso(TCP.rect ? 'Compartido · el recuadro de antes sigue valiendo'
-                       : 'Compartido · ahora marca el recuadro del contador');
-    tcpPanel();
+    tcpTrasCompartir();
   };
   ov.querySelector('#tcpVerPant').onclick = () => compartir(true);
   ov.querySelector('#tcpVer').onclick = () => compartir(false);
@@ -716,14 +1124,24 @@ function tcpPanel(){
   if(br) br.onclick = () => { cerrar(); tcpMarcarRect(); };
 
   const ba = ov.querySelector('#tcpAprende');
+  const caja = ov.querySelector('#tcpQue');
   if(ba) ba.onclick = () => {
-    const r = tcpEnsenar(ov.querySelector('#tcpQue').value);
+    const r = tcpAprenderArrancar(caja ? caja.value : '');
     if(!r.ok){ castAviso('❌ ' + r.motivo); return; }
-    castAviso(r.faltan.length
-      ? ('Aprendidas · faltan: ' + r.faltan.join(', '))
-      : '🎉 Ya conoce las diez cifras');
-    tcpPanel();
+    if(!r.faltan.length){
+      castAviso('🎉 Ya conoce las diez cifras');
+      if(tcpQueFalta() === 'listo') tcpEmpezarASeguir(); else tcpPanel();
+      return;
+    }
+    const e = ov.querySelector('#tcpAprEstado');
+    if(e) e.textContent = tcpAprenderTexto();
   };
+  if(caja){
+    caja.addEventListener('keydown', (ev) => { if(ev.key === 'Enter' && ba){ ev.preventDefault(); ba.click(); } });
+    /* Si lo que falta es esto, el cursor ya está donde hay que escribir. */
+    if(q === 'ensenar' && !aprendiendo){ try{ caja.focus(); }catch(e){ /* sin foco se escribe igual */ } }
+  }
+  tcpVistaEnMarcha(ov);
 
   ov.querySelector('#tcpFps').onchange = (e) => { TCP.fps = +e.target.value || 25; tcpGuardar(); };
   ov.querySelector('#tcpLat').onchange = (e) => {
@@ -732,13 +1150,10 @@ function tcpPanel(){
 
   const on = ov.querySelector('#tcpOn');
   if(on) on.onclick = () => {
-    if(!TCP.video){ castAviso('❌ Primero comparte la ventana de Pro Tools'); return; }
+    if(!TCP.video){ castAviso('❌ Primero comparte la pantalla de Pro Tools'); return; }
     if(!TCP.rect){ castAviso('❌ Primero marca el recuadro del contador'); return; }
     if(tcpFaltan().length === 10){ castAviso('❌ Primero enséñale las cifras'); return; }
-    TCP.tc = null; TCP._leidas = 0; TCP._malas = 0; TCP._hist = []; TCP._dudas = [];
-    tcpArrancar();
-    castAviso('▶ El libreto sigue ya al timecode de Pro Tools');
-    tcpPanel();
+    tcpEmpezarASeguir();
   };
   const off = ov.querySelector('#tcpOff');
   if(off) off.onclick = () => { tcpParar(); castAviso('El libreto deja de seguir a Pro Tools'); tcpPanel(); };
@@ -801,23 +1216,28 @@ function tcpMarcarRect(){
   };
   pintar();
 
-  let a = null, sel = null;
+  /* `ajustada`: el recuadro recortado a las cifras, si lo que se marcó cogía de
+     más. Es el que se guarda. */
+  let a = null, sel = null, ajustada = null;
   const pos = (ev) => {
     const r = cv.getBoundingClientRect();
     return { x: (ev.clientX - r.left) / r.width, y: (ev.clientY - r.top) / r.height };
   };
-  cv.addEventListener('pointerdown', (ev) => { a = pos(ev); marco.style.display = 'block'; });
+  const ponerMarco = (s) => {
+    const rc = cv.getBoundingClientRect(), cc = caja.getBoundingClientRect();
+    marco.style.left = Math.round(rc.left - cc.left + s.x * rc.width) + 'px';
+    marco.style.top = Math.round(rc.top - cc.top + s.y * rc.height) + 'px';
+    marco.style.width = Math.round(s.w * rc.width) + 'px';
+    marco.style.height = Math.round(s.h * rc.height) + 'px';
+  };
+  cv.addEventListener('pointerdown', (ev) => { a = pos(ev); ajustada = null; marco.style.display = 'block'; });
   cv.addEventListener('pointermove', (ev) => {
     if(!a) return;
     const b = pos(ev);
     const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y);
     const w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
     sel = { x: x, y: y, w: w, h: h };
-    const rc = cv.getBoundingClientRect(), cc = caja.getBoundingClientRect();
-    marco.style.left = Math.round(rc.left - cc.left + x * rc.width) + 'px';
-    marco.style.top = Math.round(rc.top - cc.top + y * rc.height) + 'px';
-    marco.style.width = Math.round(w * rc.width) + 'px';
-    marco.style.height = Math.round(h * rc.height) + 'px';
+    ponerMarco(sel);
   });
   /**
    * Enseña aumentado lo que se ha cogido, y dice cuantas cifras ve ahi. Es la
@@ -841,16 +1261,30 @@ function tcpMarcarRect(){
     /* Se mide sobre el recuadro de verdad, con el mismo codigo que leera
        despues: no vale enseñar una cosa y medir otra. */
     const antes = TCP.rect;
-    TCP.rect = sel;
-    let n = 0;
-    try{ const f = tcpFoto(); n = f ? tcpGrupos(f).length : 0; }
-    catch(e){ /* sin imagen todavia: se queda en cero y lo dice */ }
+    const trozos = (r) => {
+      TCP.rect = r;
+      try{ const f = tcpFoto(); return { n: f ? tcpGrupos(f).length : 0, f: f }; }
+      catch(e){ return { n: 0, f: null }; /* sin imagen todavia: cero, y lo dice */ }
+    };
+    let m = trozos(sel);
+    ajustada = null;
+    /* Si no salen las ocho, se busca el contador DENTRO de lo marcado: coger
+       de más —la etiqueta, el borde— era el fallo de siempre. */
+    if(m.n !== 11 && m.n !== 8 && m.f){
+      const r = tcpRecortar(m.f);
+      if(r){
+        const s2 = tcpDentroDe(sel, r);
+        const m2 = trozos(s2);
+        if(m2.n === 11 || m2.n === 8){ ajustada = s2; m = m2; ponerMarco(s2); }
+      }
+    }
     TCP.rect = antes;
+    const n = m.n;
     const bien = (n === 11 || n === 8);
     cuenta.innerHTML = bien
-      ? '<b style="color:#4ADE80">✓ veo las ocho cifras</b>'
+      ? '<b style="color:#4ADE80">✓ veo las ocho cifras' + (ajustada ? ' · he ajustado el recuadro a ellas' : '') + '</b>'
       : '<b style="color:#F59E0B">Aquí veo ' + n + ' trozos y tienen que ser 8 cifras'
-        + (n > 11 ? ' — coge solo las cifras, sin la etiqueta ni el borde' : '')
+        + (n > 11 ? ' — coge el contador, sin otras cosas escritas al lado' : '')
         + (n < 8 ? ' — coge el contador entero, de la primera cifra a la última' : '') + '</b>';
   };
   cv.addEventListener('pointerup', () => { a = null; lupa(); });
@@ -859,16 +1293,23 @@ function tcpMarcarRect(){
   ov.querySelector('#tcpRectNo').onclick = () => { fin(); tcpPanel(); };
   ov.querySelector('#tcpRectOk').onclick = () => {
     if(!sel || sel.w < 0.01 || sel.h < 0.005){ castAviso('❌ Arrastra un recuadro sobre el contador'); return; }
-    TCP.rect = sel;
+    TCP.rect = ajustada || sel;
     /* Recuadro nuevo, casillas nuevas: las de antes eran de otro sitio. Las
-       plantillas SI se conservan, que el dibujo de un 7 sigue siendo un 7. */
+       plantillas SI se conservan, que el dibujo de un 7 sigue siendo un 7. Y
+       las casillas se sacan YA, de lo que se ve ahora (PT-5): si no, se
+       recalculaban en cada lectura hasta que alguien enseñara las cifras. */
     TCP.celdas = null;
+    try{ const f = tcpFoto(); const L = f ? tcpLayout(f) : null; if(L) TCP.celdas = L; }
+    catch(e){ /* se sacarán al enseñarle las cifras */ }
     tcpGuardar();
     fin();
     const r = tcpLeerUna();
-    castAviso(r && r.celdas === 8
+    const ocho = !!(r && r.celdas === 8);
+    castAviso(ocho
       ? '⬚ Recuadro guardado · veo 8 cifras'
       : ('⚠️ En el recuadro veo ' + ((r && r.celdas) || 0) + ' cifras y tienen que ser 8'));
-    tcpPanel();
+    /* Lo siguiente, sin más clics: si ya conocía las cifras, a seguir. */
+    if(ocho && tcpQueFalta() === 'listo') tcpEmpezarASeguir();
+    else tcpPanel();
   };
 }

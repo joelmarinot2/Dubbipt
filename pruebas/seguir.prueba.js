@@ -58,6 +58,8 @@ function conSeguir(opts){
   const avisos = [];
   const pintados = opts.pintados || [0, 1, 2];
   const casilla = { checked: opts.seguir !== false };
+  /* La etiqueta del botón: es lo que dice de qué reloj cuelga el libreto. */
+  const etiqueta = { textContent: '' };
   const boton = { clases: new Set(opts.seguir === false ? [] : ['on']), atrib: {}, title: '',
     classList: { toggle: (c, v) => { if(v) boton.clases.add(c); else boton.clases.delete(c); },
                  contains: (c) => boton.clases.has(c) },
@@ -65,7 +67,7 @@ function conSeguir(opts){
     /* El estilo en linea CON su prioridad: es lo que decide si el boton se ve,
        porque la barra del libreto impone el suyo con !important. */
     style: { props: {}, setProperty: (k, v, p) => { boton.style.props[k] = v + (p ? ' !' + p : ''); } },
-    querySelector: () => null };
+    querySelector: (q) => (q === 'span' ? etiqueta : null) };
   const _guardado = {};
   const doc = {
     getElementById: (id) => (id === 'lSeguir' ? boton : null),
@@ -85,8 +87,11 @@ function conSeguir(opts){
   const M = montar(recortes, ['stSeguirOn', 'stSeguirPoner', 'libPintarSeguir', 'SEG',
                               'studioSeguirLibreto', 'studioAvisarFueraDeAlcance',
                               'stCurBlock', 'verAvisado: () => _stFueraAvisado',
-                              'verGuardado: () => _guardado', 'studioTick'], Object.assign(
-                              opts.perfil ? { DDL_MODO: opts.perfil } : {}, {
+                              'verGuardado: () => _guardado', 'studioTick', 'seguirEncendido'], Object.assign(
+                              opts.perfil ? { DDL_MODO: opts.perfil } : {},
+                              /* El lector de la pantalla de Pro Tools, de mentira: encendido o no, y
+                                 enganchado o no al contador. */
+                              opts.tcp ? { TCP: opts.tcp, tcpActivo: () => !!(opts.tcp.on && opts.tcp.tc != null) } : {}, {
     /* El seguimiento ya no vive en una casilla de la tira de video: es un
        estado propio que se recuerda entre sesiones. Se enciende y se apaga
        por ahi. */
@@ -110,7 +115,7 @@ function conSeguir(opts){
     console: { warn: () => {}, log: () => {} }
   }));
   M._movidos = movidos; M._avisos = avisos;
-  M._casilla = casilla; M._boton = boton; M._guardado = _guardado;
+  M._casilla = casilla; M._boton = boton; M._guardado = _guardado; M._etiqueta = etiqueta;
   return M;
 }
 
@@ -275,26 +280,40 @@ exports.pruebas = function(t){
   t.eq('no se mueve nada', SV._movidos.length, 0,
        'y sobre todo: no revienta');
 
-  t.seccion('18 · en un perfil sin vídeo el botón no está, se repinte lo que se repinte');
-  /* Pedido de sala: «quita la opcion de video en QC y todas las herramientas
-     de video». El boton se viste a mano con `display` en linea y !important,
-     asi que esconderlo desde fuera no basta: cada vez que algo lo repinta
-     -encender, apagar, Pro Tools enganchando- volveria a la vista. */
-  const QV = conSeguir({ hace: 99999, perfil: 'qc' });
+  t.seccion('18 · en QC, Seguir es la captura de la pantalla de Pro Tools');
+  /* Salió de QC con el vídeo y volvió a pedido de sala: «agrega la opción de
+     seguimiento en QC, que sea por captura de pantalla». En QC el ÚNICO reloj
+     es el contador de Pro Tools leído de la pantalla, así que el botón está
+     encendido cuando se está leyendo, y nunca dice «vídeo». */
+  const QV = conSeguir({ hace: 99999, perfil: 'qc', tcp: { on: false, tc: null } });
   QV.libPintarSeguir();
-  t.eq('escondido, y con prioridad', QV._boton.style.props.display, 'none !important',
-       'la barra del libreto impone su display con !important');
-  QV.stSeguirPoner(false);
-  QV.stSeguirPoner(true);
-  t.eq('encenderlo y apagarlo no lo devuelve', QV._boton.style.props.display, 'none !important',
-       'si volviera, en QC saldría «Seguir · vídeo» sobre un vídeo que no hay');
-  t.ok('y no se le pone ni el fondo', !('background' in QV._boton.style.props),
-       JSON.stringify(QV._boton.style.props));
+  t.eq('se ve, vestido de pastilla', QV._boton.style.props.display, 'inline-flex !important');
+  t.eq('con el seguimiento de otro perfil encendido pero sin leer pantalla, sale APAGADO',
+       QV._boton.clases.has('on'), false,
+       'antes salía «Seguir · vídeo» sobre un vídeo que no hay');
+  t.eq('y dice solo «Seguir»', QV._etiqueta.textContent, 'Seguir');
+  t.ok('y qué hace pulsarlo', /leyéndolo de la pantalla/.test(QV._boton.title), QV._boton.title);
+  t.eq('pulsarlo NO apaga nada: abre la captura', QV.seguirEncendido(), false,
+       'el clic pregunta por lo que enseña el botón, no por el estado a secas');
+
+  const QB = conSeguir({ hace: 99999, perfil: 'qc', tcp: { on: true, tc: null } });
+  QB.libPintarSeguir();
+  t.ok('leyendo la pantalla sin haberse enganchado todavía, encendido', QB._boton.clases.has('on'));
+  t.eq('y dice que está leyendo', QB._etiqueta.textContent, 'Seguir · leyendo…',
+       'antes esto salía como «Seguir · vídeo», que era mentira dos veces');
+
+  const QP = conSeguir({ hace: 99999, perfil: 'qc', tcp: { on: true, tc: 3600 } });
+  QP.libPintarSeguir();
+  t.eq('enganchado al contador, «Seguir · PT»', QP._etiqueta.textContent, 'Seguir · PT');
 
   ['grabacion', 'casting'].forEach(p => {
-    const GV = conSeguir({ hace: 99999, perfil: p });
+    const GV = conSeguir({ hace: 99999, perfil: p, tcp: { on: false, tc: null } });
     GV.libPintarSeguir();
-    t.eq(p + ': se viste como siempre', GV._boton.style.props.display, 'inline-flex !important',
-         'solo se pidió quitarlo de QC');
+    t.eq(p + ': con vídeo, lo de siempre: el seguimiento encendido sigue al vídeo',
+         GV._etiqueta.textContent, 'Seguir · vídeo');
+    t.eq(p + ': y encendido', GV.seguirEncendido(), true);
   });
+  const GB = conSeguir({ hace: 99999, perfil: 'grabacion', tcp: { on: true, tc: null } });
+  GB.libPintarSeguir();
+  t.eq('también en Grabación, leyendo sin enganchar no es «vídeo»', GB._etiqueta.textContent, 'Seguir · leyendo…');
 };

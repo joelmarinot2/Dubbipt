@@ -2300,7 +2300,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.7.0-nube';
+const APP_VER_NUM = 'v11.8.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4043,15 +4043,17 @@ const PERFIL_CON_CAJON = ['lTablet'];
 /* El vídeo NO es de QC. Pedido de sala: «quita la opción de vídeo en QC y
    todas las herramientas de vídeo».
    Quien revisa coteja un AUDIO —el premix, solo las voces— contra lo escrito.
-   El Video Estudio es de la sala: karaoke, banda, cues, planos, pausas. Y el
-   botón «Seguir» va con él: cuelga el libreto del vídeo o del contador de Pro
-   Tools, y sin vídeo lo que decía era «Seguir · vídeo» sobre nada.
+   El Video Estudio es de la sala: karaoke, banda, cues, planos, pausas.
    No tiene un dueño único —lo llevan Grabación y Casting—, así que no cabe en
    la tabla de arriba: aquí se dice qué perfiles NO lo llevan. */
 const PERFIL_SIN_VIDEO = ['qc'];
-/* Lo que es vídeo: los dos botones de la barra del libreto y el de la pantalla
-   del capítulo, que abre el mismo panel por otra puerta. */
-const PERFIL_VIDEO = ['lVid', 'lSeguir', 'btnModoEst'];
+/* Lo que es vídeo: el botón de la barra del libreto y el de la pantalla del
+   capítulo, que abre el mismo panel por otra puerta.
+   «Seguir» NO está: salió de QC con el vídeo y volvió a pedido de sala —«agrega
+   la opción de seguimiento en QC, que sea por captura de pantalla»—. En QC
+   sigue al contador de Pro Tools leído de la pantalla, que es el reloj de la
+   sala y no necesita vídeo ninguno (ver `seguirEncendido`). */
+const PERFIL_VIDEO = ['lVid', 'btnModoEst'];
 
 /** ¿Lleva vídeo este perfil? */
 function perfilLlevaVideo(m){
@@ -4265,9 +4267,9 @@ function perfilPistaDelTc(m){
  * Esconder el botón no basta: si el panel estaba desplegado se quedaría ahí,
  * sin botón con el que cerrarlo. Devuelve lo que ha cerrado, para poder decirlo.
  *
- * También se suelta la lectura de Pro Tools, que es del botón «Seguir»: sin
- * botón seguiría leyendo la pantalla quince veces por segundo, y compartiéndola,
- * sin nada a la vista que lo apague.
+ * La lectura de Pro Tools NO se suelta: es el seguimiento de QC, y cortarla al
+ * entrar obligaría a volver a compartir la pantalla —el navegador no deja
+ * recordar ese permiso— justo cuando más falta hace.
  */
 function perfilSoltarVideo(m){
   const cerrado = [];
@@ -4278,16 +4280,6 @@ function perfilSoltarVideo(m){
   try{
     if(typeof karWinAbierta === 'function' && karWinAbierta()){ karWinCerrar(); cerrado.push('karaoke'); }
   }catch(e){ fallo('karWinCerrar · index.html:perfilSoltarVideo', e); }
-  try{
-    if(typeof TCP !== 'undefined' && TCP && (TCP.on || TCP.stream)){
-      if(typeof tcpParar === 'function') tcpParar();
-      if(typeof tcpSoltar === 'function') tcpSoltar();
-      cerrado.push('protools');
-    }
-  }catch(e){ fallo('tcpParar · index.html:perfilSoltarVideo', e); }
-  try{
-    const p = document.getElementById('tcpOv'); if(p) p.remove();
-  }catch(e){ /* el panel de Pro Tools no estaba abierto */ }
   return cerrado;
 }
 
@@ -4504,16 +4496,32 @@ function qcCerrar(){
   pop2._qcNueva = null;
 }
 
+/** Siguiendo a Pro Tools, el timecode que marca AHORA el contador; si no, nulo. */
+function qcTcAhora(){
+  try{
+    if(typeof tcpActivo !== 'function' || !tcpActivo() || typeof tcpFuente !== 'function') return null;
+    const s = tcpFuente();
+    return (s != null && isFinite(+s)) ? +s : null;
+  }catch(e){ return null; /* sin lector de pantalla no hay ahora que dar */ }
+}
+
 /** El borrador de una corrección nueva, relleno con dónde está el libreto:
     el tiempo y el personaje del parlamento seleccionado. Escribirlos a mano en
-    cada corrección, con el actor esperando, no lo hace nadie. */
+    cada corrección, con el actor esperando, no lo hace nadie.
+
+    Siguiendo a Pro Tools va más fino: el tiempo es el que marca el contador en
+    el instante de pulsar —no el principio del parlamento, que puede estar diez
+    segundos antes— y el parlamento, el que SUENA. Es donde está el fallo que se
+    acaba de oír. */
 function qcBorrador(){
-  const si = (typeof libActiveSi === 'function') ? libActiveSi() : null;
+  const ahora = qcTcAhora();
+  let si = (typeof libActiveSi === 'function') ? libActiveSi() : null;
+  if(ahora != null && typeof studio !== 'undefined' && studio && studio.cur >= 0) si = studio.cur;
   const b = (si != null && script && script[si]) ? script[si] : null;
   const quien = (b && b.key && charIdx && charIdx[b.key] && charIdx[b.key].display)
                   ? charIdx[b.key].display : (b && b.display) || '';
   return { si: (b ? si : null),
-           tcSec: (b && isFinite(+b.tcEff)) ? +b.tcEff : null,
+           tcSec: (ahora != null) ? ahora : ((b && isFinite(+b.tcEff)) ? +b.tcEff : null),
            quien: quien, texto: '', tipo: QC_TIPO_POR_DEFECTO };
 }
 
@@ -4558,7 +4566,10 @@ function qcPanelHtml(){
         ? '<div class="qc-form">'
           + '<div class="qc-fr"><label>Tiempo</label>'
             + '<input id="qcTc" type="text" placeholder="00:00:00:00" value="' + esc(qcTC(nue.tcSec)) + '">'
-            + '<button id="qcTcAqui" title="Coger el tiempo del parlamento seleccionado">del libreto</button></div>'
+            /* Siguiendo a Pro Tools el botón coge el timecode de AHORA, y lo dice. */
+            + (qcTcAhora() != null
+                ? '<button id="qcTcAqui" title="Coger el timecode que marca Pro Tools ahora mismo">ahora</button></div>'
+                : '<button id="qcTcAqui" title="Coger el tiempo del parlamento seleccionado">del libreto</button></div>')
           + '<div class="qc-fr"><label>Personaje</label>'
             + '<input id="qcQuien" type="text" list="qcChars" placeholder="(quién)" value="' + esc(nue.quien || '') + '">'
             + '<datalist id="qcChars">' + chars.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist></div>'
@@ -4646,7 +4657,10 @@ function qcPanelEnganchar(ov){
     leer();
     const b2 = qcBorrador();
     const b = pop2._qcNueva || {};
-    pop2._qcNueva = { si: b2.si, tcSec: b2.tcSec, quien: b.quien || b2.quien, texto: b.texto || '' };
+    /* El tipo elegido a mano se conserva: coger el tiempo no es cambiar de tipo,
+       y antes se perdía y volvía la sugerencia. */
+    pop2._qcNueva = { si: b2.si, tcSec: b2.tcSec, quien: b.quien || b2.quien, texto: b.texto || '',
+                      tipo: b.tipo || b2.tipo, tipoManual: !!b.tipoManual };
     qcPanel(false);
   };
 
@@ -13674,7 +13688,11 @@ function buildLibretoDoc(pc){
      en la barra del libreto y no dentro de la tira. */
   d.getElementById('lSeguir').addEventListener('click', ()=>{
     try{
-      if(stSeguirOn()){ stSeguirPoner(false); return; }
+      /* Se pregunta lo que ENSEÑA el botón, no el estado a secas: en QC el
+         seguimiento puede haberse quedado encendido de otro perfil sin leer
+         ninguna pantalla, y pulsar tiene que abrir la captura, no apagar algo
+         que no se veía encendido. */
+      if(seguirEncendido()){ stSeguirPoner(false); return; }
       /* Encender NO es solo bajar un interruptor: hay que volver a compartir la
          ventana de Pro Tools, porque el navegador no deja recordar ese permiso
          de una sesión a otra. Por eso al encender se abre el panel, que es
@@ -18685,6 +18703,27 @@ const SEG = { on: (function(){
 
 function stSeguirOn(){ return !!SEG.on; }
 
+/** ¿Lleva vídeo el perfil de ahora? Sin saber cuál es, sí: como siempre. */
+function seguirHayVideo(){
+  return !(typeof perfilLlevaVideo === 'function' && typeof DDL_MODO !== 'undefined'
+           && !perfilLlevaVideo(DDL_MODO));
+}
+
+/**
+ * ¿Está encendido el seguimiento, tal como lo ve quien mira el botón?
+ *
+ * Donde hay vídeo es el estado de siempre: el libreto sigue al vídeo de aquí, o
+ * a Pro Tools si se está leyendo. En QC el ÚNICO reloj es el contador de Pro
+ * Tools leído de la pantalla —el vídeo no está—, así que encendido quiere decir
+ * que se está leyendo la pantalla. Sin esto, el seguimiento que se quedó
+ * encendido en otro perfil salía en QC como «Seguir · vídeo» sobre un vídeo que
+ * no hay, y pulsarlo lo apagaba en vez de abrir la captura.
+ */
+function seguirEncendido(){
+  if(seguirHayVideo()) return !!SEG.on;
+  return !!(typeof TCP !== 'undefined' && TCP && TCP.on);
+}
+
 /** Enciende o apaga el seguimiento, y deja los dos mandos de acuerdo. */
 function stSeguirPoner(on){
   const antes = SEG.on;
@@ -18711,18 +18750,9 @@ function libPintarSeguir(){
   if(typeof pop2 === 'undefined' || !pop2 || !pop2.doc) return;
   const b = pop2.doc.getElementById('lSeguir');
   if(!b) return;
-  /* En un perfil sin vídeo este botón no está, y hay que decirlo AQUÍ: más
-     abajo se le pone `display` en línea con !important, y eso lo devolvería a
-     la vista cada vez que algo lo repinta —encender, apagar, Pro Tools
-     enganchando—. */
-  if(typeof perfilVeLaHerramienta === 'function' && typeof DDL_MODO !== 'undefined'
-     && !perfilVeLaHerramienta('lSeguir', DDL_MODO)){
-    try{ b.style.setProperty('display', 'none', 'important'); }
-    catch(e){ /* sin estilo que tocar, se queda como estaba */ }
-    return;
-  }
-  b.classList.toggle('on', !!SEG.on);
-  b.setAttribute('aria-pressed', SEG.on ? 'true' : 'false');
+  const on = seguirEncendido();
+  b.classList.toggle('on', on);
+  b.setAttribute('aria-pressed', on ? 'true' : 'false');
   /* El color se pone AQUÍ, no en la hoja de estilos. La barra del libreto tiene
      reglas con !important para todos sus botones, y ni un selector por
      identificador con !important las gana: comprobado midiendo en el navegador,
@@ -18747,7 +18777,7 @@ function libPintarSeguir(){
        libreto es verde en modo grabación y un botón verde encima desaparece.
        En oscuro contrasta en los dos temas, que es lo que se pide de un
        interruptor que hay que ver de un vistazo desde la mesa. */
-    if(SEG.on){
+    if(on){
       S.setProperty('background', 'rgba(0,0,0,.55)', 'important');
       S.setProperty('color', '#4ADE80', 'important');
       S.setProperty('border-color', 'transparent', 'important');
@@ -18766,14 +18796,22 @@ function libPintarSeguir(){
      de aquí, y son cosas muy distintas: pasó ya que se diera por hecho que iba
      con Pro Tools cuando en realidad seguía al vídeo. */
   const pt = (typeof tcpActivo === 'function') && tcpActivo();
+  /* Leyendo la pantalla pero sin haberse enganchado todavía al contador. Antes
+     esto salía como «Seguir · vídeo», que era mentira dos veces: ni había vídeo
+     ni el libreto se estaba moviendo con nada. */
+  const buscando = !pt && typeof TCP !== 'undefined' && TCP && TCP.on;
+  const et = !on ? 'Seguir' : (pt ? 'Seguir · PT' : (buscando ? 'Seguir · leyendo…' : 'Seguir · vídeo'));
   try{
     const sp = b.querySelector('span');
-    if(sp) sp.textContent = SEG.on ? (pt ? 'Seguir · PT' : 'Seguir · vídeo') : 'Seguir';
+    if(sp) sp.textContent = et;
   }catch(e){ /* el botón se pinta sin etiqueta: queda el icono */ }
-  b.title = !SEG.on
-    ? 'El libreto no sigue a ningún reloj · pulsa para engancharlo al contador de Pro Tools'
+  b.title = !on
+    ? (seguirHayVideo()
+        ? 'El libreto no sigue a ningún reloj · pulsa para engancharlo al contador de Pro Tools'
+        : 'Pulsa para que el libreto siga al contador de Pro Tools, leyéndolo de la pantalla')
     : (pt ? 'El libreto va con el contador de Pro Tools · pulsa para soltarlo'
-          : 'El libreto va con el vídeo de aquí, no hay Pro Tools leyendo · pulsa para soltarlo');
+          : (buscando ? 'Buscando el contador de Pro Tools en la pantalla compartida · pulsa para soltarlo'
+                      : 'El libreto va con el vídeo de aquí, no hay Pro Tools leyendo · pulsa para soltarlo'));
 }
 
 function studioSeguirLibreto(bi, forzado){
@@ -18838,7 +18876,10 @@ function studioTick(forzado){
       if(doc){
         doc.querySelectorAll('.blk.stcur').forEach(x=>x.classList.remove('stcur'));
         const node = doc.querySelector('.blk[data-si="'+bi+'"]');
-        if(node) node.classList.add('stcur');
+        /* El recuadro del parlamento que suena solo tenía estilo con la tira
+           de vídeo abierta: se ponía al abrirla. Siguiendo a Pro Tools sin
+           vídeo —QC entero— la clase se ponía y no se veía nada. */
+        if(node){ try{ studioInjectCurCss(); }catch(e){ /* sin estilo, sigue colocándose */ } node.classList.add('stcur'); }
       }
     }catch(e){ /* sin libreto abierto no hay nada que marcar */ }
     studioSeguirLibreto(bi, !!forzado);

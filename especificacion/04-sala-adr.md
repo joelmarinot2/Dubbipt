@@ -77,6 +77,12 @@ qué dijo el director.
 | **PT-7** | El recuadro y las cifras aprendidas **se recuerdan** entre sesiones. La ventana compartida no se puede recordar —el navegador no deja—, así que cada sesión hay que volver a compartirla, pero **nada más**. Por eso el botón Seguir abre el panel en vez de encenderse a secas. | ✅ |
 | **PT-8** | Pro Tools **parado** deja el reloj quieto; no sigue corriendo solo. Se distingue por el **ritmo** de las lecturas aceptadas, no por creerse una sola. | ✅ |
 | **PT-9** | Con Pro Tools llevando el reloj, el libreto se coloca **aunque no haya vídeo cargado**. El reloj del transporte y la onda son del vídeo y entonces no se pintan; el libreto sí. | ✅ |
+| **PT-10** | **Las cifras se aprenden solas con Pro Tools rodando.** Se escribe **una vez** lo que pone el contador, con Pro Tools parado, y se le da al play. La casilla de las unidades de segundo pasa por las diez cifras en diez segundos, en orden, y contando sus cambios se sabe qué cifra hay **sin leerla**. Antes había que escribir el timecode varias veces moviendo el cursor hasta ver las diez: un 01:00:00:00 solo trae dos. Un cambio cuenta cuando **dos fotos seguidas** coinciden entre sí y no con la anterior —la de en medio de la transición trae las dos cifras mezcladas—, y solo si llega **un segundo** después del anterior, o dos o tres si uno no se vio. Arrastrando el cursor en vez de reproducir no se aprende **nada**: una cifra aprendida con el dibujo de otra estropea la lectura para siempre. Lo contado no se guarda hasta haber visto el ritmo, ni si se parece demasiado a otra cifra ya conocida. | ✅ |
+| **PT-11** | Mientras aprende, el latido sale de un **trabajador en segundo plano**, no de un temporizador de la página. Para darle al play hay que ir a Pro Tools, que tapa Dubbipt, y con la ventana tapada el navegador frena los temporizadores **a uno por segundo** —se vio probándolo—. Si aun así queda un **hueco** entre dos fotos y en él cambió la cifra, se para y se dice: un cambio que no se sabe cuándo pasó no se cuenta. | ✅ |
+| **PT-12** | El recuadro **se ajusta solo** a las cifras cuando se coge de más —la etiqueta, el marco del contador, un trozo de ventana—, que era el fallo de siempre al marcarlo sobre la pantalla entera. Se busca la franja de texto más alta y en ella once trozos con forma de timecode. Los dos puntos se reconocen por las **filas con tinta**, no por su ancho ni por su alto: un 1 es tan estrecho como unos dos puntos, y unos dos puntos de verdad llegan casi tan arriba como una cifra, pero tienen un hueco en medio. Medido con Consolas: las cifras, del 95 al 100 % de las filas; los dos puntos, el 51 %. Las casillas se sacan al aceptar el recuadro, no en cada lectura (PT-5). | ✅ |
+| **PT-13** | **Los días siguientes solo hay que compartir.** Con el recuadro y las diez cifras guardados, en cuanto se comparte se arranca y el panel se quita de en medio. Si falta el recuadro, compartir abre directamente la pantalla de marcarlo; si faltan cifras, el panel con el cursor ya en la casilla. Aceptar el recuadro con las cifras ya conocidas también arranca. | ✅ |
+| **PT-14** | El panel enseña **lo que está leyendo ahora**, con el recorte del contador al lado: se sabe de un vistazo si está bien, sin arrancar y mirar si el libreto se mueve. Y los pasos llevan su marca de hecho. | 👁 |
+| **PT-15** | El botón dice **«Seguir · leyendo…»** mientras lee la pantalla sin haberse enganchado todavía; antes salía «Seguir · vídeo», que era mentira dos veces. Y el **parlamento que suena se recuadra** también sin la tira de vídeo abierta: el estilo solo se ponía al abrirla. | ✅ |
 
 | | |
 |---|---|
@@ -117,7 +123,7 @@ qué dijo el director.
   código crea, y aplica la semántica de la regla a cada uno. Nada está escrito
   dos veces, así que un panel nuevo entra solo en la prueba. Quitar `.modo-cap`
   de las excepciones pone cinco comprobaciones en rojo.
-- **PT-1** a **PT-9**, en `pruebas/tcpantalla.prueba.js`. Las cifras se dibujan
+- **PT-1** a **PT-15**, en `pruebas/tcpantalla.prueba.js`. Las cifras se dibujan
   en la propia prueba como un contador de siete segmentos, así que el
   reconocimiento se prueba entero sin navegador. La sección 8 es la que
   justifica el diseño: simula una sesión con **la mitad de las lecturas

@@ -487,11 +487,16 @@ exports.pruebas = async function(t){
        'solo se pidió quitarlo de QC: quitarlo de más es romperle la sala a quien graba');
   t.eq('y un perfil que no se sabe cuál es no lo pierde', V.perfilLlevaVideo(undefined), true,
        'ante la duda se deja como estaba');
-  ['lVid', 'lSeguir', 'btnModoEst'].forEach(id => {
+  ['lVid', 'btnModoEst'].forEach(id => {
     t.ok('en QC no se ve ' + id, !V.perfilVeLaHerramienta(id, 'qc'));
     t.ok('en Grabación sí se ve ' + id, V.perfilVeLaHerramienta(id, 'grabacion'));
     t.ok('y en Casting también ' + id, V.perfilVeLaHerramienta(id, 'casting'));
   });
+  /* «Seguir» salió de QC con el vídeo y volvió a pedido de sala: en QC sigue al
+     contador de Pro Tools leído de la pantalla, que no necesita vídeo. */
+  t.ok('Seguir se ve en los tres perfiles', ['qc', 'grabacion', 'casting'].every(m => V.perfilVeLaHerramienta('lSeguir', m)),
+       'es el seguimiento de QC: se lee de la pantalla, no del vídeo');
+  t.eq('y ya no cuenta como herramienta de vídeo', V.PERFIL_VIDEO.indexOf('lSeguir'), -1);
   t.ok('lo de QC sigue siendo de QC', V.perfilVeLaHerramienta('tQcCotejar', 'qc')
        && !V.perfilVeLaHerramienta('tQcCotejar', 'grabacion'),
        'la tabla del vídeo no puede llevarse por delante la de los dueños');
@@ -542,16 +547,16 @@ exports.pruebas = async function(t){
   Q.M.perfilAjustarVideo(Q.doc, 'qc');
   t.eq('en QC se esconde el botón Vídeo', Q.dentro.lVid.style.props.display, 'none !important',
        'la barra del libreto impone su display con !important: sin prioridad, el botón se queda a la vista');
-  t.eq('y el de Seguir', Q.dentro.lSeguir.style.props.display, 'none !important');
+  t.ok('pero Seguir NO se esconde', !('display' in Q.dentro.lSeguir.style.props),
+       JSON.stringify(Q.dentro.lSeguir.style.props));
   t.eq('y el Video Estudio de la pantalla del capítulo', Q.fuera.btnModoEst.style.props.display, 'none !important',
        'abre el mismo panel por otra puerta');
   t.ok('el timecode deja de prometer el vídeo', Q.tcs.every(x => !('title' in x.atrib)),
        JSON.stringify(Q.tcs.map(x => x.atrib)));
   Q.M.perfilAjustarVideo(Q.doc, 'grabacion');
-  t.ok('al volver a Grabación, vuelven los tres',
-       !('display' in Q.dentro.lVid.style.props) && !('display' in Q.dentro.lSeguir.style.props)
-       && !('display' in Q.fuera.btnModoEst.style.props),
-       JSON.stringify([Q.dentro.lVid.style.props, Q.dentro.lSeguir.style.props, Q.fuera.btnModoEst.style.props]));
+  t.ok('al volver a Grabación, vuelven los dos',
+       !('display' in Q.dentro.lVid.style.props) && !('display' in Q.fuera.btnModoEst.style.props),
+       JSON.stringify([Q.dentro.lVid.style.props, Q.fuera.btnModoEst.style.props]));
   t.ok('y Seguir se vuelve a vestir', Q.diario.includes('viste Seguir'),
        'sin su display en línea cae en el círculo de 34 px, con la etiqueta saliéndose');
   t.ok('y el timecode vuelve a decir lo suyo',
@@ -575,11 +580,12 @@ exports.pruebas = async function(t){
   const cerrado = AB.M.perfilSoltarVideo('qc');
   t.eq('se cierra el estudio', AB.e.estudio, false);
   t.ok('y el karaoke', AB.diario.includes('cierra el karaoke'));
-  t.ok('se deja de leer Pro Tools', AB.diario.includes('para Pro Tools'));
-  t.ok('y se suelta la pantalla compartida', AB.diario.includes('suelta la pantalla'),
-       'sin botón a la vista, seguiría compartiéndose sin nada que lo apague');
-  t.ok('y su panel, si estaba abierto', AB.diario.includes('cierra el panel de Pro Tools'));
-  t.eq('y dice qué ha cerrado', cerrado.join(','), 'estudio,karaoke,protools');
+  /* La lectura de Pro Tools NO se suelta: es el seguimiento de QC, y cortarla
+     obligaría a volver a compartir la pantalla justo al entrar. */
+  t.ok('la lectura de Pro Tools sigue', !AB.diario.includes('para Pro Tools') && !AB.diario.includes('suelta la pantalla'),
+       'es el seguimiento de QC: el navegador no deja recordar el permiso de compartir');
+  t.ok('ni se le cierra su panel', !AB.diario.includes('cierra el panel de Pro Tools'));
+  t.eq('y dice qué ha cerrado', cerrado.join(','), 'estudio,karaoke');
 
   const CE = conVideo({ estudio: false });
   CE.M.perfilSoltarVideo('qc');
@@ -1207,6 +1213,39 @@ exports.pruebas = async function(t){
   t.ok('y de ahí sale ya el audio del reconocedor', /karIa\.pcm = karIaMono\(buf\);/.test(cuerpoDlg),
        'sin esto se volvía a descodificar entero al pulsar «Analizar cambios»');
   t.eq('una sola descodificación al cargar', (cuerpoDlg.match(/decodeAudioData|karIaA16k\(/g) || []).length, 1);
+
+  t.seccion('12r · siguiendo a Pro Tools, la corrección va donde suena');
+  /* Pedido de sala: seguimiento en QC por captura de pantalla. Y lo que da en
+     QC: apuntar la corrección en el timecode que marca el contador AL PULSAR,
+     no en el principio del parlamento, que puede estar diez segundos antes. */
+  const conBorrador = (o) => montar([['/** Siguiendo a Pro Tools, el timecode que marca AHORA', '/** El tiempo, como lo escribe el resto de la casa.']],
+    ['qcTcAhora', 'qcBorrador'], {
+      tcpActivo: () => !!o.pt, tcpFuente: () => o.pt,
+      studio: { cur: ('cur' in o) ? o.cur : 2 },
+      libActiveSi: () => 0,
+      script: [{ key: 'ANA', tcEff: 3600 }, { key: 'BETO', tcEff: 3610 }, { key: 'CARLA', tcEff: 3720 }],
+      charIdx: { ANA: { display: 'ANA' }, BETO: { display: 'BETO' }, CARLA: { display: 'CARLA' } },
+      QC_TIPO_POR_DEFECTO: 'ajuste', console: { warn: () => {}, log: () => {} } });
+  const BP = conBorrador({ pt: 3725.44 }).qcBorrador();
+  t.eq('con Pro Tools leyéndose, el timecode de AHORA', BP.tcSec, 3725.44,
+       'el principio del parlamento puede estar diez segundos antes del fallo');
+  t.eq('y el parlamento que SUENA, no el que se tocó', BP.si + ' ' + BP.quien, '2 CARLA');
+  const BS = conBorrador({ pt: null }).qcBorrador();
+  t.eq('sin seguir, lo de siempre: el parlamento seleccionado y su tiempo', BS.si + ' ' + BS.tcSec + ' ' + BS.quien, '0 3600 ANA');
+  const BN = conBorrador({ pt: 3725.44, cur: -1 }).qcBorrador();
+  t.eq('siguiendo pero sin parlamento sonando, el tiempo de ahora igual', BN.tcSec + ' ' + BN.si, '3725.44 0');
+  t.ok('el botón de coger el tiempo dice «ahora» cuando se sigue a Pro Tools',
+       /\(qcTcAhora\(\) != null\s*\? '<button id="qcTcAqui" title="Coger el timecode que marca Pro Tools ahora mismo">ahora<\/button><\/div>'/.test(TODO));
+  t.ok('y coger el tiempo no le quita al borrador el tipo elegido a mano',
+       /tipo: b\.tipo \|\| b2\.tipo, tipoManual: !!b\.tipoManual \};/.test(TODO),
+       'antes se perdía y volvía la sugerencia');
+  t.ok('el parlamento que suena se recuadra también sin la tira de vídeo',
+       /if\(node\)\{ try\{ studioInjectCurCss\(\); \}catch\(e\)\{[^}]*\} node\.classList\.add\('stcur'\); \}/.test(TODO),
+       'el estilo solo se ponía al abrir la tira: en QC la clase se ponía y no se veía nada');
+  t.ok('el botón Seguir pregunta por lo que enseña, no por el estado a secas',
+       /if\(seguirEncendido\(\)\)\{ stSeguirPoner\(false\); return; \}/.test(TODO));
+  t.ok('y entrar en QC no apaga la lectura de Pro Tools',
+       !/function perfilSoltarVideo[\s\S]{0,900}?tcpParar\(\)/.test(TODO));
 
   t.seccion('13 · la sección QC está en el panel de herramientas');
   t.ok('con su título', />QC<\/div>/.test(TODO) || /class="tt">QC</.test(TODO));

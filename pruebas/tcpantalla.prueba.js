@@ -46,7 +46,10 @@ const M = montar(
    'tcpLeerUna', 'tcpEnsenar', 'tcpAprender', 'tcpActivo', 'tcpParar', 'tcpGuardar',
    'ponFoto: (f) => { tcpFoto = f; }',
    'tcpCompartir', 'tcpPrimerFotograma', 'tcpSoltar',
-   'ponLeer: (f) => { tcpLeerUna = f; }'],
+   'ponLeer: (f) => { tcpLeerUna = f; }',
+   'tcpAprendizajeNuevo', 'tcpAprendizajePaso', 'tcpAprendizajeGuardar', 'tcpAprenderVuelta',
+   'TCP_IGUAL', 'TCP_GEMELA', 'TCP_APRENDER_S',
+   'tcpRecortar', 'tcpDentroDe', 'tcpQueFalta', 'tcpFoto: () => tcpFoto'],
   { performance: perf, localStorage: almacen, document: doc, navigator: nav }
 );
 const TCP = M.TCP;
@@ -429,5 +432,250 @@ t.seccion('13 · compartir: que se pueda, y que si no, lo diga');
   t.ok('compartido pero sin imagen no cuenta como compartido', !r5.ok, r5.motivo);
   t.ok('y lo dice con esas palabras', /no llega imagen/.test(r5.motivo), r5.motivo);
   M.tcpSoltar();
+}
+
+/* ── 14 · las cifras se aprenden solas con Pro Tools rodando ───────────── */
+t.seccion('14 · las cifras se aprenden solas con Pro Tools rodando');
+{
+  /* Lo que había que hacer antes: escribir el timecode, mover el cursor hasta
+     que salieran otras cifras y volver a escribir, hasta ver las diez. Ahora se
+     escribe una vez y se le da al play: la casilla de las unidades de segundo
+     pasa por las diez en diez segundos, y contando sus cambios se sabe cuál es
+     cada una SIN LEERLA. */
+  const FPS = 25;
+  /* Una sesión de mentira: el contador empieza en `desde`, se le da al play a
+     los `play` segundos, y `cuadro(seg)` da lo que se ve. Con `mezcla`, la
+     transición de cada cambio de segundo dura DOS fotos, con las dos cifras
+     encima en proporciones distintas, como en una captura de verdad: cada foto
+     de en medio se parece poco a la de antes y poco a la siguiente. */
+  const sesion = (desde, play, o) => {
+    o = o || {};
+    TCP.celdas = null; TCP.plantillas = {}; TCP.fps = FPS; TCP.rect = { x: 0, y: 0, w: 1, h: 1 };
+    let t = 0;
+    const tcDe = (tt) => (o.tc ? o.tc(tt) : desde + Math.max(0, tt - play));
+    M.ponFoto(() => {
+      const s = tcDe(t);
+      const f = pantalla(M.tcpTexto(s, FPS));
+      const fase = s - Math.floor(s);
+      if(o.mezcla && fase < 0.14 && s > desde + 0.5){
+        const alfa = 0.25 + 0.5 * (fase / 0.14);          // cuánto hay ya de la cifra nueva
+        const g = pantalla(M.tcpTexto(s - 0.5, FPS));
+        for(let i = 0; i < f.g.length; i++) f.g[i] = f.g[i] * alfa + g.g[i] * (1 - alfa);
+      }
+      return f;
+    });
+    const r = M.tcpEnsenar(M.tcpTexto(desde, FPS));
+    const f0 = M.tcpFoto()();
+    TCP.aprendiendo = M.tcpAprendizajeNuevo(M.tcpTexto(desde, FPS), M.tcpCelda(f0, TCP.celdas[5]), 0);
+    const correr = (hasta) => {
+      let A = TCP.aprendiendo;
+      for(; t <= hasta && A && A.estado === 'esperando'; t += 0.066) A = M.tcpAprenderVuelta(t * 1000);
+      return A;
+    };
+    return { r, correr };
+  };
+
+  const S = sesion(3600, 0.4, { mezcla: true });
+  t.eq('con 01:00:00:00 solo se ven dos cifras', S.r.faltan.length, 8,
+       'es justo el caso que obligaba a ir moviendo el cursor');
+  const A = S.correr(13);
+  t.eq('dándole al play, las aprende todas', A && A.estado, 'hecho',
+       'faltan: ' + M.tcpFaltan().join(','));
+  t.eq('las diez', M.tcpFaltan().length, 0);
+  t.ok('en unos diez segundos', A && (A.cambios[A.cambios.length - 1] / 1000) < 11.5,
+       A ? ('tardó ' + (A.cambios[A.cambios.length - 1] / 1000).toFixed(1) + ' s') : '');
+  t.ok('sin dejarse engañar por el fotograma de en medio del cambio',
+       A && A.cambios.length >= 8 && A.cambios.length <= 10, A ? String(A.cambios.length) : '');
+  M.ponFoto(() => pantalla('23:45:67:89'));
+  t.eq('y con lo aprendido lee un timecode que no había visto', (M.tcpLeerUna() || {}).txt, '23456789');
+  M.ponFoto(() => pantalla('17:08:59:36'));
+  t.eq('y otro', (M.tcpLeerUna() || {}).txt, '17085936');
+}
+{
+  /* Empezando cerca del final de un minuto también: 57, 58, 59, 00… */
+  TCP.celdas = null; TCP.plantillas = {}; TCP.rect = { x: 0, y: 0, w: 1, h: 1 };
+  let reloj = 0;
+  const desde = 3600 + 57;
+  M.ponFoto(() => pantalla(M.tcpTexto(desde + Math.max(0, reloj - 0.2), 25)));
+  M.tcpEnsenar(M.tcpTexto(desde, 25));
+  TCP.aprendiendo = M.tcpAprendizajeNuevo(M.tcpTexto(desde, 25), M.tcpCelda(M.tcpFoto()(), TCP.celdas[5]), 0);
+  let A = TCP.aprendiendo;
+  for(; reloj <= 13 && A.estado === 'esperando'; reloj += 0.066) A = M.tcpAprenderVuelta(reloj * 1000);
+  t.eq('pasando por el cambio de minuto, igual', A.estado + ' ' + M.tcpFaltan().join(''), 'hecho ');
+}
+{
+  /* Si en vez de darle al play se ARRASTRA el cursor, los cambios no llevan
+     el ritmo de reproducir. Aprender ahí un dibujo con la cifra equivocada
+     estropearía la lectura para siempre: no se aprende nada. */
+  TCP.celdas = null; TCP.plantillas = {}; TCP.rect = { x: 0, y: 0, w: 1, h: 1 };
+  const saltos = [0, 0.3, 0.55, 1.9, 2.1, 3.7, 3.8, 6.0];
+  let reloj = 0;
+  const tcA = (tt) => { let k = 0; for(let i = 0; i < saltos.length; i++) if(tt >= saltos[i]) k = i; return 3600 + [0, 7, 3, 11, 5, 19, 2, 13][k]; };
+  M.ponFoto(() => pantalla(M.tcpTexto(tcA(reloj), 25)));
+  M.tcpEnsenar(M.tcpTexto(3600, 25));
+  const antes = M.tcpFaltan().length;
+  TCP.aprendiendo = M.tcpAprendizajeNuevo(M.tcpTexto(3600, 25), M.tcpCelda(M.tcpFoto()(), TCP.celdas[5]), 0);
+  let A = TCP.aprendiendo;
+  for(; reloj <= 8 && A.estado === 'esperando'; reloj += 0.066) A = M.tcpAprenderVuelta(reloj * 1000);
+  t.eq('arrastrando el cursor, se planta', A.estado, 'mal');
+  t.eq('y dice por qué', A.motivo, 'ritmo');
+  t.eq('sin aprender ni una cifra más', M.tcpFaltan().length, antes,
+       'una cifra aprendida con el dibujo de otra no se arregla sola');
+}
+{
+  /* Sin tocar el play, no pasa nada... y al rato se dice. */
+  TCP.celdas = null; TCP.plantillas = {}; TCP.rect = { x: 0, y: 0, w: 1, h: 1 };
+  M.ponFoto(() => pantalla('01:00:00:00'));
+  M.tcpEnsenar('01:00:00:00');
+  TCP.aprendiendo = M.tcpAprendizajeNuevo('01:00:00:00', M.tcpCelda(M.tcpFoto()(), TCP.celdas[5]), 0);
+  let A = TCP.aprendiendo;
+  for(let tt = 0; tt <= M.TCP_APRENDER_S + 1 && A.estado === 'esperando'; tt += 0.25) A = M.tcpAprenderVuelta(tt * 1000);
+  t.eq('si nadie le da al play, avisa pasado el tiempo', A.estado, 'tarde');
+}
+{
+  /* Un cambio que no se vio -el 8 y el 9 se parecen- no rompe la cuenta: dos
+     segundos entre cambios son dos pasos. */
+  const img = (d) => M.tcpCelda(pantalla('0000000' + d), M.tcpLayout(pantalla('00000000'))[7]);
+  TCP.plantillas = {};
+  const A = M.tcpAprendizajeNuevo('00:00:00:00', img(0), 0);
+  /* Fotos cada 66 ms, como de verdad: `d` desde `desde` hasta `hasta`. */
+  const tramo = (d, desde, hasta) => { for(let ms = desde; ms < hasta; ms += 66) M.tcpAprendizajePaso(A, img(d), ms); };
+  tramo(0, 0, 1000);
+  tramo(1, 1000, 2000);
+  t.eq('tras un solo cambio todavía no se fía', M.tcpAprendizajeGuardar(A).length, 0,
+       'el primer cambio puede ser de haber arrastrado el cursor');
+  /* El 2 se ve igual que el 1 -como si se parecieran tanto como el 8 y el 9-, y
+     el siguiente cambio que se ve es ya el 3, dos segundos después. */
+  tramo(1, 2000, 3000);
+  tramo(3, 3000, 3200);
+  t.eq('dos segundos después, dos pasos: va por el 3', A.d, 3);
+  t.eq('y guarda la que se fue, que ya se vio entera', M.tcpAprendizajeGuardar(A).join(''), '1',
+       'la de ahora todavía puede estar a media transición');
+  tramo(3, 3200, 4000);
+  tramo(4, 4000, 4200);
+  t.eq('la siguiente, cuando se va', M.tcpAprendizajeGuardar(A).join(''), '3');
+  t.ok('sin inventarse la de en medio', !TCP.plantillas['2']);
+
+  /* Un parpadeo de la captura: dos fotos seguidas que no son ni la cifra de
+     antes ni la misma entre sí, y vuelta a la de antes. No es un cambio: un
+     cambio son dos fotos seguidas IGUALES entre sí. */
+  const P = M.tcpAprendizajeNuevo('00:00:00:00', img(0), 0);
+  for(let ms = 0; ms < 500; ms += 66) M.tcpAprendizajePaso(P, img(0), ms);
+  M.tcpAprendizajePaso(P, img(8), 528);
+  M.tcpAprendizajePaso(P, img(5), 594);
+  M.tcpAprendizajePaso(P, img(0), 660);
+  t.eq('un parpadeo de dos fotos distintas no cuenta como cambio', P.cambios.length + ' ' + P.d, '0 0');
+
+  /* Con la ventana tapada el navegador frena los temporizadores a uno por
+     segundo -se vio probándolo en el navegador-: un cambio que cae en un hueco
+     así no se sabe cuándo pasó, y contarlo a ciegas es contar mal. */
+  const H = M.tcpAprendizajeNuevo('00:00:00:00', img(0), 0);
+  for(let ms = 0; ms < 900; ms += 66) M.tcpAprendizajePaso(H, img(0), ms);
+  M.tcpAprendizajePaso(H, img(0), 1500);
+  t.eq('un hueco sin cambio no importa', H.estado, 'esperando',
+       'la cifra solo cambia una vez por segundo: si sigue la misma, no se perdió nada');
+  M.tcpAprendizajePaso(H, img(1), 2100);
+  t.eq('un cambio que cae en un hueco para la cuenta', H.estado + ' ' + H.motivo, 'mal pausa');
+  /* Y una cifra recién aprendida que es clavada a otra ya conocida es que algo
+     se contó mal: no se guarda. */
+  TCP.plantillas = { '0': img(0) };
+  const B = M.tcpAprendizajeNuevo('00:00:00:00', img(0), 0);
+  B.vistos = { '5': img(0) };
+  t.eq('una cifra clavada a otra no se guarda', M.tcpAprendizajeGuardar(B).length, 0);
+  t.ok('las dos cifras que más se parecen no llegan a gemelas',
+       M.tcpParecido(img(6), img(8)) < M.TCP_GEMELA && M.tcpParecido(img(8), img(9)) < M.TCP_IGUAL,
+       '6/8 ' + M.tcpParecido(img(6), img(8)).toFixed(3) + ' · 8/9 ' + M.tcpParecido(img(8), img(9)).toFixed(3));
+}
+
+/* ── 15 · el recuadro se ajusta solo a las cifras ──────────────────────── */
+t.seccion('15 · el recuadro se ajusta solo a las cifras');
+{
+  /* Marcar a mano un contador que en la pantalla entera es un sello era
+     difícil, y coger de más —la etiqueta, el borde— dejaba el contador sin
+     leer: «veo 13 trozos y tienen que ser 8». Se fabrica eso mismo: el
+     contador con su etiqueta encima y un marco alrededor. */
+  const conMarco = (txt, o) => {
+    o = o || {};
+    const c = pantalla(txt, o);
+    const W = c.w + 60, H = c.h + 44;
+    const g = new Float32Array(W * H);
+    for(let y = 0; y < c.h; y++) for(let x = 0; x < c.w; x++) g[(y + 34) * W + (x + 30)] = c.g[y * c.w + x];
+    for(const x0 of [34, 50, 66, 82, 98])                         // la etiqueta: letras pequeñas
+      for(let y = 6; y < 16; y++) for(let x = x0; x < x0 + 9; x++) if((x + y) % 3) g[y * W + x] = 1;
+    for(let y = 0; y < H; y++) for(const x of [2, 3, W - 4, W - 3]) g[y * W + x] = 1;   // el marco
+    return { g: g, w: W, h: H };
+  };
+  const f = conMarco('01:18:23:04');
+  t.ok('con la etiqueta y el marco no salen las ocho cifras', [8, 11].indexOf(M.tcpGrupos(f).length) < 0,
+       'salen ' + M.tcpGrupos(f).length);
+  const r = M.tcpRecortar(f);
+  t.ok('pero se encuentra el contador dentro', !!r);
+  const recorte = (img, q) => {
+    const x0 = Math.round(q.x * img.w), y0 = Math.round(q.y * img.h);
+    const w = Math.round(q.w * img.w), h = Math.round(q.h * img.h);
+    const g = new Float32Array(w * h);
+    for(let y = 0; y < h; y++) for(let x = 0; x < w; x++) g[y * w + x] = img.g[(y + y0) * img.w + (x + x0)];
+    return { g: g, w: w, h: h };
+  };
+  const c = r ? recorte(f, r) : null;
+  t.eq('y ajustado a él salen los once trozos', c ? M.tcpGrupos(c).length : 0, 11);
+  t.eq('y las ocho casillas', c ? (M.tcpLayout(c) || []).length : 0, 8);
+  t.ok('sin la etiqueta: el recorte empieza por debajo de ella', !!r && r.y * f.h > 16);
+
+  /* Los dos puntos se reconocen por su ALTO, no por su ancho: en un contador
+     lleno de unos, cada 1 es tan estrecho como unos dos puntos. */
+  const f1 = conMarco('11:11:11:11');
+  const r1 = M.tcpRecortar(f1);
+  t.eq('con todo unos, también', r1 ? M.tcpGrupos(recorte(f1, r1)).length : 0, 11);
+  /* Y con un contador grande, donde los dos puntos miden más que un 1 pequeño:
+     por el ancho no se distinguirían, por las filas con tinta sí. */
+  const fG = conMarco('01:18:23:04', { cw: 54, ch: 84, hueco: 21, sw: 15, gro: 9, pad: 18 });
+  const rG = M.tcpRecortar(fG);
+  t.eq('con el contador grande, también', rG ? M.tcpGrupos(recorte(fG, rG)).length : 0, 11);
+
+  t.eq('donde no hay un timecode no se inventa uno', M.tcpRecortar(pantalla('011823', { sinPuntos: true })), null,
+       'mejor decir que no se ven las cifras que guardar un recuadro que no lee');
+  const ya = pantalla('01:18:23:04');
+  const rYa = M.tcpRecortar(ya);
+  t.eq('un recuadro ya bueno sigue siendo bueno', rYa ? M.tcpGrupos(recorte(ya, rYa)).length : 0, 11);
+
+  const D = M.tcpDentroDe({ x: 0.5, y: 0.2, w: 0.2, h: 0.1 }, { x: 0.25, y: 0.5, w: 0.5, h: 0.5 });
+  t.ok('y el ajuste se pasa a proporciones de la pantalla',
+       Math.abs(D.x - 0.55) < 1e-9 && Math.abs(D.y - 0.25) < 1e-9 && Math.abs(D.w - 0.1) < 1e-9 && Math.abs(D.h - 0.05) < 1e-9,
+       JSON.stringify(D));
+}
+
+/* ── 16 · lo que falta para seguir, y los días siguientes ──────────────── */
+t.seccion('16 · lo que falta para seguir, y los días siguientes');
+{
+  /* Con el recuadro y las diez cifras guardados de otro día, lo único que hay
+     que hacer es compartir: en cuanto se comparte, se arranca. */
+  const antes = { video: TCP.video, rect: TCP.rect, pl: TCP.plantillas };
+  TCP.video = null;
+  t.eq('sin compartir, compartir', M.tcpQueFalta(), 'compartir');
+  TCP.video = { videoWidth: 10 }; TCP.rect = null;
+  t.eq('sin recuadro, marcarlo', M.tcpQueFalta(), 'marcar');
+  TCP.rect = { x: 0, y: 0, w: 1, h: 1 }; TCP.plantillas = { '0': [1] };
+  t.eq('sin las diez cifras, enseñarlas', M.tcpQueFalta(), 'ensenar');
+  TCP.plantillas = {}; for(let i = 0; i < 10; i++) TCP.plantillas[String(i)] = [i];
+  t.eq('con todo, listo', M.tcpQueFalta(), 'listo');
+  TCP.video = antes.video; TCP.rect = antes.rect; TCP.plantillas = antes.pl;
+
+  const src = fs.readFileSync(path.join(__dirname, '..', 'js', 'tcpantalla.js'), 'utf8').replace(/\r\n/g, '\n');
+  t.ok('al compartir se hace lo siguiente sin más clics',
+       /const r = await tcpCompartir\(pantallaEntera\);\n\s*if\(!r\.ok\)\{ castAviso\('❌ ' \+ r\.motivo\); return; \}\n\s*tcpTrasCompartir\(\);/.test(src));
+  t.ok('y con todo listo, lo siguiente es seguir', /if\(q === 'listo'\)\{ tcpEmpezarASeguir\(\); return q; \}/.test(src));
+  t.ok('y sin recuadro, marcarlo', /if\(q === 'marcar'\)\{[\s\S]{0,200}?tcpMarcarRect\(\);/.test(src));
+  t.ok('«Es lo que pone» se pone a aprender el resto', /const r = tcpAprenderArrancar\(caja \? caja\.value : ''\);/.test(src));
+  t.ok('al marcar se guarda el recuadro ajustado', /TCP\.rect = ajustada \|\| sel;/.test(src));
+  t.ok('y las casillas se sacan ya', /const L = f \? tcpLayout\(f\) : null; if\(L\) TCP\.celdas = L;/.test(src),
+       'si no, se recalculaban en cada lectura (PT-5)');
+  t.ok('seguir y aprender a la vez no', /function tcpArrancar\(\)\{\n\s*tcpParar\(true\);[\s\S]{0,300}?tcpAprenderParar\(\)/.test(src));
+  /* Con la ventana tapada el navegador frena los temporizadores de la página a
+     uno por segundo, y así la cuenta de los segundos se pierde: se vio en el
+     navegador. El latido del aprendizaje sale de un trabajador. */
+  t.ok('el aprendizaje late desde un trabajador', /TCP\._aprTimer = tcpLatido\(66, vuelta\);/.test(src)
+       && /function tcpLatido\(ms, fn\)\{[\s\S]{0,500}?w = new Worker\(url\);/.test(src),
+       'con un temporizador de la página, la ventana tapada deja la cuenta a una foto por segundo');
 }
 };
