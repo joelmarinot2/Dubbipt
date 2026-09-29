@@ -2294,7 +2294,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.1.0-nube';
+const APP_VER_NUM = 'v11.2.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3847,6 +3847,130 @@ function docxCue(text){
   return { name:head.trim(), rest };
 }
 
+
+/* ═══ LA BARRA DEL PERFIL ══════════════════════════════════════════════════
+
+   Las herramientas del perfil elegido, arriba del libreto y siempre a la
+   vista. Antes vivían en el cajón de la derecha, que hay que abrir y que
+   además lo trae TODO: quien viene a hacer QC tenía que pasar por Vista,
+   Página, Letra, Tiempo, Marcar y Grabación para llegar a lo suyo.
+
+   Cada perfil saca SOLO lo suyo. Y lleva su propio botón para cambiarlo, que
+   es la promesa que hace el selector al abrir el capítulo. */
+
+const PERFIL_HERRAMIENTAS = {
+  qc: [
+    { id:'pQcAudio',   et:'⤒ Audio',      tit:'Cargar el audio del programa para cotejarlo' },
+    { id:'pQcCotejar', et:'🔎 Cotejar',   tit:'Transcribir el capítulo y compararlo con el libreto' },
+    { id:'pQcNueva',   et:'＋ Corrección', tit:'Apuntar una corrección en el parlamento seleccionado', fuerte:true },
+    { id:'pQcLista',   et:'Correcciones', tit:'Las correcciones de este capítulo', cuenta:true },
+    { id:'pQcPdf',     et:'⤓ Informe',    tit:'Descargar el informe de QC en PDF' }
+  ],
+  grabacion: [
+    { id:'pGrEdit',   et:'✎ Editar',    tit:'Editar el texto del parlamento' },
+    { id:'pGrPausa',  et:'/ Pausa',     tit:'Marcar una pausa' },
+    { id:'pGrAcento', et:'á Acento',    tit:'Marcar un acento' },
+    { id:'pGrPincel', et:'✏ Pincel',    tit:'Marcado libre sobre el libreto' },
+    { id:'pGrLimpiar',et:'Limpiar',     tit:'Quitar las marcas del parlamento' },
+    { id:'pGrRec',    et:'✓ Grabada',   tit:'Marcar la intervención como grabada', fuerte:true }
+  ],
+  /* Casting NO lleva botones aquí, y es a propósito. Reparte desde la banda de
+     talento que ya sale justo debajo con el personaje abierto, y el resto de
+     sus herramientas -la tabla, la ocupación, descargar el desglose- viven
+     FUERA del libreto, en la pantalla de las tarjetas: un botón aquí que las
+     llamara no enseñaría nada, porque el libreto las tapa. Poner botones que
+     no hacen nada es peor que no ponerlos. */
+  casting: []
+};
+
+/** La pista que se enseña cuando el perfil no tiene botones propios. */
+const PERFIL_PISTA = {
+  casting: 'El talento se reparte en la banda de abajo · la tabla y el desglose, al salir'
+};
+
+/** Pinta la barra del perfil dentro del libreto. Sin libreto abierto no hace
+    nada: se vuelve a llamar cuando se abre. */
+function perfilPintar(){
+  const d = (typeof pop2 !== 'undefined' && pop2) ? pop2.doc : null;
+  if(!d) return;
+  const barra = d.getElementById('lPerfil');
+  if(!barra) return;
+  const m = (typeof DDL_MODO !== 'undefined' && DDL_MODO) || 'grabacion';
+  const lista = PERFIL_HERRAMIENTAS[m] || [];
+  const esc_ = (typeof esc === 'function') ? esc : (s)=> String(s == null ? '' : s);
+  const n = (typeof qcPendientes === 'function') ? qcPendientes() : 0;
+
+  barra.className = 'lperfil perfil-' + m;
+  barra.innerHTML =
+      '<button class="lp-modo" id="lpModo" title="Cambiar de perfil">'
+    +   '<i></i>' + esc_((typeof DDL_MODO_ET !== 'undefined' && DDL_MODO_ET[m]) || m) + ' ▾</button>'
+    + '<span class="lp-tools">'
+    +   lista.map(h => '<button class="lp-b' + (h.fuerte ? ' fuerte' : '') + '" id="' + h.id + '"'
+    +     ' title="' + esc_(h.tit) + '">' + esc_(h.et)
+    +     (h.cuenta ? ('<b class="lp-n' + (n ? ' hay' : '') + '">' + (n || '') + '</b>') : '')
+    +     '</button>').join('')
+    + '</span>'
+    + (lista.length ? '' : '<span class="lp-pista">' + esc_(PERFIL_PISTA[m] || '') + '</span>');
+
+  const q = (id) => barra.querySelector('#' + id);
+  { const b = q('lpModo'); if(b) b.onclick = ()=>{ try{ cambiarModo(); }catch(e){ fallo('cambiarModo · perfilPintar', e); } }; }
+
+  /* QC: lo mismo que hace el cajón, para que no haya dos verdades. */
+  { const b = q('pQcNueva');   if(b) b.onclick = ()=> qcPanel(true); }
+  { const b = q('pQcLista');   if(b) b.onclick = ()=> qcPanel(false); }
+  { const b = q('pQcCotejar'); if(b) b.onclick = ()=> qcCotejar(); }
+  { const b = q('pQcPdf');     if(b) b.onclick = ()=> qcInformePdf(); }
+  { const b = q('pQcAudio');
+    if(b) b.onclick = ()=>{
+      const i = d.getElementById('tQcAudioIn');
+      if(i) i.click();
+      else qcAviso('Abre el cajón de herramientas para cargar el audio');
+    }; }
+
+  /* Grabación: los mismos botones del cajón, pulsados desde aquí. Se delega en
+     ellos a propósito: duplicar la lógica es garantizar que un día una de las
+     dos copias se quede atrás. */
+  const comoSi = (idDelCajon) => () => {
+    const b = d.getElementById(idDelCajon);
+    if(b) b.click();
+    else if(typeof libMsg === 'function') libMsg('Esa herramienta no está disponible aquí');
+  };
+  { const b = q('pGrEdit');    if(b) b.onclick = comoSi('tEdit'); }
+  { const b = q('pGrPausa');   if(b) b.onclick = comoSi('tPause'); }
+  { const b = q('pGrAcento');  if(b) b.onclick = comoSi('tAccent'); }
+  { const b = q('pGrPincel');  if(b) b.onclick = comoSi('tDraw'); }
+  { const b = q('pGrLimpiar'); if(b) b.onclick = comoSi('tClear'); }
+  { const b = q('pGrRec');     if(b) b.onclick = comoSi('tRec'); }
+
+  perfilAjustarCajon(d, m);
+}
+
+/* Lo que ESCRIBE en el libreto: marcas, pausas, acentos y dar por grabada una
+   intervención. En QC no se ofrece —quien revisa no marca el libreto, y tener
+   el botón delante es invitar a tocarlo por error—. */
+const PERFIL_CAJON_ESCRIBEN = ['tEdit', 'tPause', 'tUnpause', 'tAccent', 'tClear', 'tDraw', 'tRec'];
+
+/** Deja en el cajón de la derecha solo lo que toca a este perfil.
+    Lo que se queda SIEMPRE es lo de leer y moverse —página, letra, tiempo,
+    buscar, pronunciaciones, significado—: sin eso el libreto no se puede ni
+    recorrer, y quien hace QC lo recorre entero. */
+function perfilAjustarCajon(d, m){
+  const esQc = (m === 'qc');
+  for(const id of PERFIL_CAJON_ESCRIBEN){
+    const b = d.getElementById(id);
+    if(b) b.style.display = esQc ? 'none' : '';
+  }
+  /* Y sus dos títulos, que si no se quedan encabezando el vacío. */
+  try{
+    const tts = Array.prototype.slice.call(d.querySelectorAll('#lTools .tt'));
+    for(const t of tts){
+      const nombre = String(t.textContent || '').trim().toLowerCase();
+      if(nombre === 'marcar' || nombre === 'grabación' || nombre === 'grabacion')
+        t.style.display = esQc ? 'none' : '';
+    }
+  }catch(e){ /* sin el cajón pintado no hay títulos que esconder */ }
+}
+
 /* ═══ QC · CONTROL DE CALIDAD ══════════════════════════════════════════════
    Las correcciones que salen al revisar el capítulo: dónde, quién, y qué hay
    que arreglar. Es lo que luego se entrega como informe.
@@ -4255,10 +4379,18 @@ function qcGuardado(){
 /** El número que va pegado al botón, para saber si queda algo sin mirar. */
 function qcPintarCuenta(){
   const d = pop2 && pop2.doc; if(!d) return;
-  const el = d.getElementById('tQcN'); if(!el) return;
   const n = qcPendientes();
-  el.textContent = n ? (' ' + n) : '';
-  el.className = n ? 'qc-n hay' : 'qc-n';
+  const el = d.getElementById('tQcN');
+  if(el){
+    el.textContent = n ? (' ' + n) : '';
+    el.className = n ? 'qc-n hay' : 'qc-n';
+  }
+  /* Y el de la barra del perfil, que es el que se ve sin abrir nada. */
+  const p = d.querySelector('#lPerfil .lp-n');
+  if(p){
+    p.textContent = n ? String(n) : '';
+    p.className = n ? 'lp-n hay' : 'lp-n';
+  }
 }
 
 /** El informe de QC, en PDF y con el diseño de la casa.
@@ -7172,13 +7304,30 @@ function castCatalogo(buf){
 
 let DDL_MODO = 'grabacion';
 
+/* Los perfiles que hay, y lo que cada uno saca a la barra del libreto. */
+const DDL_MODOS = ['grabacion', 'qc', 'casting'];
+const DDL_MODO_ET = { grabacion:'Grabación', qc:'QC', casting:'Casting' };
+function modoValido(m){ return DDL_MODOS.indexOf(String(m || '')) >= 0 ? String(m) : ''; }
+
 function modoDe(epId){
-  try{ return localStorage.getItem('ddl_modo::' + epId) || ''; }catch(e){ return ''; }
+  try{ return modoValido(localStorage.getItem('ddl_modo::' + epId)); }catch(e){ return ''; }
+}
+/* El último perfil elegido, para no preguntarlo en cada capítulo nuevo: quien
+   está de QC hace QC todo el día, y quien reparte, reparte. */
+function modoUltimo(){
+  try{ return modoValido(localStorage.getItem('ddl_modo_ultimo')); }catch(e){ return ''; }
 }
 function ponerModo(epId, m){
+  m = modoValido(m) || 'grabacion';
   DDL_MODO = m;
   try{ if(epId) localStorage.setItem('ddl_modo::' + epId, m); }catch(e){}
+  /* Sin almacén local el perfil no se recuerda y se volverá a preguntar: es
+     molesto, no un fallo, y avisar de esto en cada cambio de perfil sería peor. */
+  try{ localStorage.setItem('ddl_modo_ultimo', m); }catch(e){ /* se preguntará otra vez */ }
   document.body.classList.toggle('modo-casting', m === 'casting');
+  document.body.classList.toggle('modo-qc', m === 'qc');
+  /* La barra del perfil vive dentro del libreto, que puede no estar abierto. */
+  try{ perfilPintar(); }catch(e){ fallo('perfilPintar · index.html:ponerModo', e); }
   const b = document.getElementById('btnCastOut');
   if(b) b.style.display = (m === 'casting') ? '' : 'none';
   const bu = document.getElementById('btnUndo');
@@ -7232,11 +7381,16 @@ function preguntarModo(nombreEp){
     +     '<button class="modo-op" data-m="grabacion">'
     +       '<b>Grabación</b>'
     +       '<small>El libreto, el marcado y la sincronía entre equipos.</small></button>'
+    +     '<button class="modo-op" data-m="qc">'
+    +       '<b>QC</b>'
+    +       '<small>Revisar el capítulo: cotejar el audio con el libreto, apuntar '
+    +       'correcciones y entregar el informe.</small></button>'
     +     '<button class="modo-op" data-m="casting">'
     +       '<b>Casting</b>'
     +       '<small>Repartir los talentos entre los personajes y descargar el desglose relleno.</small></button>'
     +   '</div>'
-    +   '<div class="modo-pie">Se puede cambiar luego desde el menú.</div>'
+    +   '<div class="modo-pie">Se puede cambiar luego desde el botón del perfil, '
+    +     'en la barra del libreto.</div>'
     + '</div>';
     document.body.appendChild(cap);
     const elegir = (m) => { cap.remove(); resolve(m); };
@@ -9130,13 +9284,23 @@ async function cambiarModo(){
   const m = await preguntarModo(currentEp.name);
   ponerModo(currentEp.id, m);
   if(typeof DDL_UI !== 'undefined' && DDL_UI.toast)
-    DDL_UI.toast(m === 'casting' ? 'Modo casting' : 'Modo grabación');
+    DDL_UI.toast('Perfil: ' + (DDL_MODO_ET[m] || m));
 }
 
-/** Se llama al terminar de abrir un capítulo. */
+/**
+ * Se llama al terminar de abrir un capítulo.
+ *
+ * El perfil se elige UNA VEZ y se queda hasta que se cambie: si este capítulo
+ * ya tiene uno, ese manda; si no, se hereda el último que se usó. Solo se
+ * pregunta la primera vez de todas. Preguntarlo en cada capítulo nuevo era un
+ * toque de más en una jornada de veinte capítulos, y siempre la misma
+ * respuesta.
+ */
 async function modoAlAbrir(epId, nombre){
   const guardado = modoDe(epId);
   if(guardado){ ponerModo(epId, guardado); return guardado; }
+  const ultimo = modoUltimo();
+  if(ultimo){ ponerModo(epId, ultimo); return ultimo; }
   const m = await preguntarModo(nombre);
   ponerModo(epId, m);
   return m;
@@ -11808,6 +11972,27 @@ body.haschips .lchips .pgchip{text-align:center}
 body.haschips .ltools{display:flex}
 body.haschips.rclosed .ltools{transform:translateX(100%)}
 .ltools .tt{font-size:9.5px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;margin-top:5px;font-weight:700}
+/* ─── La barra del perfil: las herramientas de lo que vienes a hacer ─── */
+.lperfil{display:none;align-items:center;gap:8px;padding:6px 10px;background:var(--head);
+  border-bottom:1px solid var(--card-b);flex-wrap:wrap;position:sticky;top:0;z-index:12}
+body.haschips .lperfil{display:flex}
+.lp-modo{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;font-size:11px;
+  font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--ink);
+  background:var(--card);border:1px solid var(--card-b);border-radius:999px;
+  padding:5px 11px;cursor:pointer}
+.lp-modo i{width:7px;height:7px;border-radius:50%;background:var(--dim);display:inline-block}
+.perfil-qc .lp-modo i{background:#4ADE80}
+.perfil-grabacion .lp-modo i{background:#F87171}
+.perfil-casting .lp-modo i{background:#60A5FA}
+.lp-tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.lp-b{display:inline-flex;align-items:center;gap:5px;font-size:12px;padding:6px 11px;
+  border-radius:9px;border:1px solid var(--card-b);background:var(--card);color:var(--ink);
+  cursor:pointer;white-space:nowrap}
+.lp-b:hover{border-color:#4ADE80}
+.lp-b.fuerte{border-color:#4ADE80;color:#4ADE80;font-weight:700}
+.lp-n{font-size:10px;font-weight:800;color:var(--dim);min-width:8px}
+.lp-n.hay{color:#F87171}
+.lp-pista{font-size:11px;color:var(--dim)}
 /* ─── QC · control de calidad ─── */
 .qc-n{font-size:10px;font-weight:800;margin-left:5px;color:var(--dim)}
 .qc-n.hay{color:#F87171}
@@ -12265,6 +12450,7 @@ function buildLibretoDoc(pc){
       <button id="lFindNext" title="Siguiente">▼</button>
       <button id="lFindClose" title="Cerrar">✕</button>
     </div>
+    <div class="lperfil" id="lPerfil"></div>
     <div class="lbarras" id="lBarras">
       <div class="lcuenta" id="lCuenta" style="display:none"></div>
       <div class="ltal" id="lTal" style="display:none"></div>
@@ -14850,6 +15036,9 @@ function renderLibretoChips(){
      que pasan todas las aperturas y todos los refrescos. */
   try{ libBarraCuenta(); }catch(e){ fallo('libBarraCuenta · index.html:12958', e); }
   try{ talBarraLibreto(); }catch(e){ fallo('talBarraLibreto · index.html:12959', e); }
+  /* La barra del perfil, por el mismo motivo: el documento del iframe se
+     reconstruye al abrirlo y sus botones se van con él. */
+  try{ perfilPintar(); }catch(e){ fallo('perfilPintar · index.html:renderLibretoChips', e); }
   // se vuelve a medir DESPUÉS del talento: con él la banda puede pasar a dos filas
   try{ libMedirBarras(); }catch(e){ fallo('libMedirBarras · index.html:12960', e); }
   // …y se queda vigilada, porque el alto cambia con el ancho de la ventana
