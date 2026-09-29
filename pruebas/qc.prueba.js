@@ -264,9 +264,19 @@ exports.pruebas = function(t){
        'sin el total no hay barra: solo «está pensando»');
   t.ok('y por dónde va', /COTEJO\.vistos = n \+ 1/.test(TODO));
   t.ok('lo que el cotejo cuenta se espeja en la barra de QC',
-       /function stMsg\(t\)\{[\s\S]{0,600}?qcAvance\(t\)/.test(TODO),
+       /function stMsg\(t\)\{[\s\S]{0,900}?qcAvance\(t\)/.test(TODO),
        'es el único sitio por el que pasan todas las fases; sin este espejo, '
        + 'desde QC no se ve nada de lo que ya se cuenta');
+  /* Pero SOLO mientras coteja. Sin esta condicion se espejaba cualquier aviso
+     del Video Estudio, y llego de sala «Sin medio cargado» colgado en la
+     barra, en los tres perfiles. */
+  t.ok('y solo mientras el cotejo trabaja',
+       /function stMsg\(t\)\{[\s\S]{0,900}?COTEJO\.trabajando\) qcAvance\(t\)/.test(TODO),
+       'un aviso de otra pantalla puesto en una barra que es de otra cosa');
+  t.ok('la fila del avance es solo del perfil QC',
+       /function qcAvance\(txt\)\{[\s\S]{0,700}?DDL_MODO\) !== 'qc'\)\{[\s\S]{0,160}?remove\(\)/
+         .test(TODO),
+       'en Grabación y en Casting esa fila no tiene nada que decir y ocupa sitio');
   t.ok('y el aviso se pinta ANTES de empezar, no al acabar',
        /qcAvance\('⏳ Empezando/.test(TODO),
        'el primer trozo puede tardar un minuto sin decir nada, y es justo donde '

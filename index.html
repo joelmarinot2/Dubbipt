@@ -2300,7 +2300,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.3.0-nube';
+const APP_VER_NUM = 'v11.3.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4464,6 +4464,13 @@ function qcAvance(txt){
   if(!d) return;
   const barra = d.getElementById('lPerfil');
   if(!barra) return;
+  /* Solo en QC. En Grabación y en Casting esta fila no tiene nada que decir, y
+     ahí se vio: salía el aviso del Video Estudio ocupando sitio en una barra
+     que es de otra cosa. Si queda alguna de antes, se quita. */
+  if((typeof DDL_MODO === 'undefined' ? '' : DDL_MODO) !== 'qc'){
+    const v = d.getElementById('qcAvance'); if(v) v.remove();
+    return;
+  }
   const activo = (typeof COTEJO !== 'undefined' && COTEJO && COTEJO.trabajando);
   let caja = d.getElementById('qcAvance');
 
@@ -17292,8 +17299,14 @@ function stMsg(t){
      mensaje vive en el panel del Video Estudio, y desde QC no se ve. Llegó de
      sala: «no sé si está haciendo algo». Así se aprovecha lo que el cotejo ya
      cuenta —bajar el modelo, descodificar el audio, ir parlamento a
-     parlamento— sin tener que contarlo dos veces. */
-  try{ qcAvance(t); }catch(e){ /* sin libreto abierto no hay barra que pintar */ }
+     parlamento— sin tener que contarlo dos veces.
+     SOLO mientras el cotejo trabaja. Sin esta condición se espejaba CUALQUIER
+     mensaje del Video Estudio, y llegó de sala «Sin medio cargado — pulsa
+     Cargar» colgado en la barra, en los tres perfiles: un aviso de otra
+     pantalla puesto donde no le toca. */
+  try{
+    if(typeof COTEJO !== 'undefined' && COTEJO && COTEJO.trabajando) qcAvance(t);
+  }catch(e){ /* sin libreto abierto no hay barra que pintar */ }
 }
 function studioStripOn(){ const l=$('stLeft'); return !!(l && l.style.display!=='none'); }
 function studioTc0(){ const m = sync.marks && sync.marks._tcOff; return (m && +m.v) || 0; }
