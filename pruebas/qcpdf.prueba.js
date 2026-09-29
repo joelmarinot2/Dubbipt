@@ -414,6 +414,24 @@ exports.pruebas = function(t){
   t.eq('cabe en cuatro hojas, no en dos', dc.topeHojas, 4,
        'dos columnas de texto por fila: encoger a dos hojas lo haría ilegible');
 
+  /* Se vio mirando la hoja: el timecode salia partido -«01:00:40:0» arriba y
+     «7» abajo- y la coincidencia tambien. Las columnas eran estrechas para lo
+     que llevan. Se mide el ancho que les toca en la hoja mas holgada. */
+  const util = M.QCPDF_HOJA.w - M.QCPDF_PASOS[0].margen * 2;
+  const anchosCam = M.qcpdfAnchos(dc.columnas, util);
+  t.ok('el timecode cabe en un renglón', anchosCam[0] >= 25,
+       'mide ' + anchosCam[0].toFixed(1) + ' mm y un timecode en negrita pide unos 25');
+  t.ok('y «41 % · no cuadra» también', anchosCam[4] >= 31,
+       'mide ' + anchosCam[4].toFixed(1) + ' mm y pide unos 31');
+  t.ok('sin dejar a lo escrito y lo oído sin sitio', anchosCam[2] >= 44 && anchosCam[3] >= 44,
+       'son las dos columnas que se leen: ' + anchosCam[2].toFixed(1) + ' mm cada una');
+  t.cerca('escrito y oído miden lo mismo', anchosCam[2], anchosCam[3], 1e-9,
+         'se comparan una con otra: si una es más ancha, la vista se va a ella');
+  /* Y el de correcciones, que lleva el mismo timecode. */
+  const anchosCor = M.qcpdfAnchos(d.columnas, util);
+  t.ok('en el informe de correcciones el timecode también cabe', anchosCor[0] >= 25,
+       'mide ' + anchosCor[0].toFixed(1) + ' mm');
+
   t.seccion('19 · la hoja es A4 y el último paso no baja de 7,5 pt');
   t.eq('ancho A4', M.QCPDF_HOJA.w, 210);
   t.eq('alto A4', M.QCPDF_HOJA.h, 297);

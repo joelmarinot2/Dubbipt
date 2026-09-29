@@ -820,12 +820,16 @@ function qcpdfDeCambios(lista, opts){
     /* Solo las pastillas que tienen algo: una en cero no dice nada. */
     chips: [ mal ? { k:'mal',    et:'No cuadran', n:mal, rgb:[220, 38, 38] }  : null,
              dud ? { k:'dudoso', et:'Dudosos',    n:dud, rgb:[217, 119, 6] } : null ].filter(Boolean),
+    /* Los anchos salen de lo que tiene que CABER en un renglón, no de repartir
+       a ojo: un timecode en negrita pide unos 25 mm y «41 % · no cuadra» unos
+       31. Con menos se partían -«01:00:40:0» arriba y «7» abajo-, que se vio
+       mirando la hoja y no en ninguna prueba. */
     columnas: [
-      { et:'Timecode',     peso:0.95, clase:'tc', negrita:true },
-      { et:'Actor',        peso:1.0,  clase:'nombre', negrita:true },
-      { et:'Escrito',      peso:2.4,  clase:'texto' },
-      { et:'Oído',    peso:2.4,  clase:'texto' },
-      { et:'Coincidencia', peso:0.95, clase:'texto' }
+      { et:'Timecode',     peso:1.3,  clase:'tc', negrita:true },
+      { et:'Actor',        peso:1.05, clase:'nombre', negrita:true },
+      { et:'Escrito',      peso:2.25, clase:'texto' },
+      { et:'Oído',    peso:2.25, clase:'texto' },
+      { et:'Coincidencia', peso:1.55, clase:'texto' }
     ],
     filas: filas,
     nombreDoc: 'Cambios · ' + base,
