@@ -1642,6 +1642,12 @@ body:not(.modo-casting) .gestbtn{ display:none; }
 .modo-sub{ font-size:19px; font-weight:700; margin:6px 0 20px; }
 .modo-ops{ display:flex; gap:14px; }
 @media (max-width:520px){ .modo-ops{ flex-direction:column; } }
+/* El perfil de la última vez, marcado. No elige por ti: solo se ve cuál fue. */
+.modo-op.ultimo{ border-color:#22C55E; }
+.modo-op.ultimo::after{
+  content:'la última vez'; font-size:9.5px; letter-spacing:.7px; text-transform:uppercase;
+  color:#22C55E; font-weight:700;
+}
 .modo-op{
   flex:1; display:flex; flex-direction:column; align-items:center; gap:8px;
   background:#1c1f28; color:inherit; border:1px solid #2b3040; border-radius:13px;
@@ -2294,7 +2300,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.2.0-nube';
+const APP_VER_NUM = 'v11.2.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -7369,7 +7375,8 @@ function ponerModo(epId, m){
 }
 
 /** Pregunta el modo. Devuelve una promesa con 'grabacion' o 'casting'. */
-function preguntarModo(nombreEp){
+function preguntarModo(nombreEp, sugerido){
+  const marca = modoValido(sugerido);
   return new Promise((resolve) => {
     const cap = document.createElement('div');
     cap.className = 'modo-cap';
@@ -7395,11 +7402,19 @@ function preguntarModo(nombreEp){
     document.body.appendChild(cap);
     const elegir = (m) => { cap.remove(); resolve(m); };
     cap.querySelectorAll('.modo-op').forEach(b => b.onclick = () => elegir(b.dataset.m));
+    /* El de la última vez queda marcado: se ve de un golpe cuál elegiste antes
+       sin que deje de preguntar. */
+    if(marca){
+      const b = cap.querySelector('.modo-op[data-m="' + marca + '"]');
+      if(b){ b.classList.add('ultimo'); b.focus(); }
+    }
     cap.addEventListener('click', (e) => { if(e.target === cap) elegir('grabacion'); });
     document.addEventListener('keydown', function esc(e){
       if(e.key === 'Escape'){ document.removeEventListener('keydown', esc); elegir('grabacion'); }
     });
-    const p = cap.querySelector('.modo-op'); if(p) p.focus();
+    /* Solo si no se ha marcado ya el de la última vez: si no, el foco se lo
+       llevaría el primero y la marca no serviría de nada. */
+    if(!marca){ const p = cap.querySelector('.modo-op'); if(p) p.focus(); }
   });
 }
 
@@ -9290,18 +9305,17 @@ async function cambiarModo(){
 /**
  * Se llama al terminar de abrir un capítulo.
  *
- * El perfil se elige UNA VEZ y se queda hasta que se cambie: si este capítulo
- * ya tiene uno, ese manda; si no, se hereda el último que se usó. Solo se
- * pregunta la primera vez de todas. Preguntarlo en cada capítulo nuevo era un
- * toque de más en una jornada de veinte capítulos, y siempre la misma
- * respuesta.
+ * Se PREGUNTA en cada capítulo nuevo. Probé a heredar el último perfil para
+ * ahorrar el toque y llegó de vuelta de sala: la pregunta hace falta, porque
+ * no se abre un capítulo para lo mismo que el anterior. El capítulo que ya
+ * tiene perfil guardado no se vuelve a preguntar —ese ya se contestó—, y el
+ * último elegido solo sirve para dejar marcada la opción de antes y que sea
+ * un toque en vez de dos.
  */
 async function modoAlAbrir(epId, nombre){
   const guardado = modoDe(epId);
   if(guardado){ ponerModo(epId, guardado); return guardado; }
-  const ultimo = modoUltimo();
-  if(ultimo){ ponerModo(epId, ultimo); return ultimo; }
-  const m = await preguntarModo(nombre);
+  const m = await preguntarModo(nombre, modoUltimo());
   ponerModo(epId, m);
   return m;
 }
@@ -11847,7 +11861,7 @@ body.haschips.finding  .lfind{ padding-left:100px; }
    GODBY» se leía como si el actor se llamara igual que el personaje. */
 .lbarras{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 14px;
   background:var(--head); border-bottom:1px solid var(--card-b);
-  position:sticky; top:var(--lhH,54px); z-index:39; padding:7px 13px; }
+  position:sticky; top:calc(var(--lhH,54px) + var(--lperfH,0px)); z-index:39; padding:7px 13px; }
 .lbarras:empty{ display:none }
 body.deskchips .lbarras{ padding-right:100px; }
 body.haschips  .lbarras{ padding-left:100px; }
@@ -11973,9 +11987,17 @@ body.haschips .ltools{display:flex}
 body.haschips.rclosed .ltools{transform:translateX(100%)}
 .ltools .tt{font-size:9.5px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;margin-top:5px;font-weight:700}
 /* ─── La barra del perfil: las herramientas de lo que vienes a hacer ─── */
-.lperfil{display:none;align-items:center;gap:8px;padding:6px 10px;background:var(--head);
-  border-bottom:1px solid var(--card-b);flex-wrap:wrap;position:sticky;top:0;z-index:12}
-body.haschips .lperfil{display:flex}
+/* Siempre a la vista, y pegada JUSTO debajo de la barra de herramientas.
+   Nació apagada y encendiéndose con la clase haschips —copiado del cajón de la
+   tablet—, y esa clase solo se pone en modo tablet: en escritorio la barra no
+   se veía NUNCA. Y pegada arriba del todo quedaba DETRÁS de la barra de
+   herramientas, que es fija. Llegó de sala: «no veo la barra de qc». */
+.lperfil{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--head);
+  border-bottom:1px solid var(--card-b);flex-wrap:wrap;
+  position:sticky;top:var(--lhH,54px);z-index:40}
+.lperfil:empty{display:none}
+/* Con el riel de páginas a la izquierda, la banda se aparta; esta también. */
+body.haschips .lperfil{padding-left:100px}
 .lp-modo{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;font-size:11px;
   font-weight:800;letter-spacing:.4px;text-transform:uppercase;color:var(--ink);
   background:var(--card);border:1px solid var(--card-b);border-radius:999px;
@@ -14958,12 +14980,22 @@ function libBarraCuenta(){
 function libMedirBarras(){
   if(typeof pop2 === 'undefined' || !pop2 || !pop2.doc) return;
   const d = pop2.doc;
-  const b = d.getElementById('lBarras');
-  const alto = b ? Math.round(b.getBoundingClientRect().height) : 0;
+  const mide = (id)=>{
+    const e = d.getElementById(id);
+    return e ? Math.round(e.getBoundingClientRect().height) : 0;
+  };
+  /* La barra del perfil va por su cuenta porque la banda se pega DEBAJO de
+     ella; y el total es lo que miran las páginas y la ocupación para empezar
+     donde acaba todo esto. Sin separarlas, la banda se metía detrás. */
+  const perf = mide('lPerfil');
+  const alto = mide('lBarras');
+  const p = d.documentElement.style;
+  if(p.getPropertyValue('--lperfH') !== perf + 'px') p.setProperty('--lperfH', perf + 'px');
   /* Solo se escribe si CAMBIA: esto lo llama ahora un observador, y reescribir
      la variable en cada vuelta sería tocar el DOM para nada. */
-  if(d.documentElement.style.getPropertyValue('--lbarsH') === alto + 'px') return;
-  d.documentElement.style.setProperty('--lbarsH', alto + 'px');
+  const total = perf + alto;
+  if(p.getPropertyValue('--lbarsH') === total + 'px') return;
+  p.setProperty('--lbarsH', total + 'px');
 }
 
 /**
@@ -15025,6 +15057,12 @@ function libVigilarBarras(){
     try{ pop2.win.addEventListener('resize', pop2._resBarras); }catch(e){ /* sin ventana propia */ }
 
     pop2._obsBarras = libVigilarAlto(pop2.win, pop2.doc.getElementById('lBarras'), remedir);
+    /* Y la del perfil, que también parte en dos filas al estrechar. */
+    if(pop2._obsPerfil){
+      try{ pop2._obsPerfil.disconnect(); }catch(e){ /* el documento ya no está */ }
+      pop2._obsPerfil = null;
+    }
+    pop2._obsPerfil = libVigilarAlto(pop2.win, pop2.doc.getElementById('lPerfil'), remedir);
   }catch(e){ /* sin observador se sigue midiendo al pintar, como antes */ }
 }
 

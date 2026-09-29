@@ -52,6 +52,9 @@ El modelo es siempre el mismo:
 | **QC-6** | Las correcciones **viajan con el capítulo**, en los **dos** caminos por los que se sube; si solo se toca uno, se pierden según cómo se haya guardado. Al volver, lo que llega de la nube se sanea: sin comentario no entra, y un tiempo imposible entra **sin tiempo**, no con uno inventado. | ✅ |
 | **QC-8** | Una corrección lleva un **tipo**: Falta, Cambiar, Pegar o Ajuste. **Se sugiere y manda quien apunta**: «Falta el take. Pegar.» es Pegar y «Falta el take.» es Falta, y las dos frases empiezan igual, así que no se puede deducir a ciegas. Gana la **acción** que hay que hacer, no la palabra con la que empieza la frase. Un tipo que no se reconoce cae en **Ajuste**, que es el más inofensivo: no convoca a nadie. | ✅ |
 | **QC-9** | El capítulo guarda **quién hace el QC** y **qué estudio hace los cambios**, y se recuerdan para el siguiente: casi siempre revisa la misma persona y lo arregla el mismo estudio. Si los dos están vacíos no se sube nada. | ✅ |
+| **QC-10** | Al abrir el libreto se elige un **perfil de trabajo** —Grabación, QC o Casting— y sus herramientas salen en una **barra propia arriba del libreto, siempre a la vista**, con su botón para cambiar de perfil. Antes vivían en el cajón de la derecha, que hay que abrir y que lo trae todo. En QC el cajón **deja de ofrecer lo que escribe** en el libreto —editar, pausa, acento, limpiar, pincel, «grabada»—: quien revisa no marca el libreto. Lo de **leer y moverse se queda entero**: sin eso el libreto no se puede ni recorrer. | ✅ |
+| **QC-11** | El perfil **se pregunta en cada capítulo nuevo**. Se probó a heredar el último para ahorrar el toque y llegó de vuelta de sala: no se abre un capítulo para lo mismo que el anterior. El capítulo que ya tiene perfil guardado no se vuelve a preguntar, y el último elegido solo **deja marcada** su opción para que sea un toque en vez de dos. | ✅ |
+| **QC-12** | La barra del perfil se ve **con cualquier dispositivo**, y se pega **justo debajo** de la barra de herramientas. Nació apagada y encendiéndose con la clase `haschips` —copiada del cajón de la tablet—, y esa clase solo se pone en modo tablet: en escritorio no se veía nunca. Y pegada arriba del todo quedaba **detrás** de la barra de herramientas, que es fija. Su alto se **mide** y entra en `--lbarsH`, que es lo que miran el riel de páginas y la pestaña de Ocupación para empezar donde acaba todo: si no, vuelve el solape de LIB-22. | ✅ |
 | **QC-7** | El audio que se carga en QC queda en **`studio.dlgUrl`**, que es lo que el reconocedor prefiere al vídeo, y se **olvida el audio ya preparado**. Ese campo se leía en `karIaPreparar` y no lo escribía nadie: hasta ahora Whisper oía siempre el vídeo aunque cargaras otra pista, y sin olvidar el anterior se cotejaría el capítulo nuevo contra la voz del viejo. | ✅ |
 
 ## Nunca
@@ -88,7 +91,7 @@ una entrega: cargar un guion real, contar las intervenciones por personaje y
 compararlas con el desglose de la empresa, y comprobar que el primer timecode
 de cada personaje coincide.
 
-**QC-1 a QC-9**: `pruebas/qc.prueba.js`. La frontera de QC-2 se comprueba
+**QC-1 a QC-12**: `pruebas/qc.prueba.js`. La frontera de QC-2 se comprueba
 leyendo el cuerpo de `cotejarTodo` y exigiendo que no nombre las correcciones:
 es una regla sobre quién escribe dónde, y solo el código lo puede decir.
 Quince mutaciones comprobadas en rojo. Dos de las comprobaciones nacieron
