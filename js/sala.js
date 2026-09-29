@@ -153,13 +153,15 @@ function salaAudio(){
     return SALA.ac;
   }catch(e){ return null; }
 }
-/** Un pitido corto. 1 kHz es el de sala; el de entrada, más agudo. */
-function salaBeep(hz, ms){
+/** Un pitido corto. 1 kHz es el de sala; el de entrada, más agudo.
+    `retraso`: dentro de cuántos segundos, con el reloj del audio, que es
+    exacto. Sin él, suena ya. */
+function salaBeep(hz, ms, retraso){
   const ac = salaAudio(); if(!ac) return;
   try{
     const o = ac.createOscillator(), g = ac.createGain();
     o.type = 'sine'; o.frequency.value = hz || 1000;
-    const t = ac.currentTime, d = (ms || 60) / 1000;
+    const t = ac.currentTime + ((retraso > 0) ? retraso : 0), d = (ms || 60) / 1000;
     g.gain.setValueAtTime(0, t);
     g.gain.linearRampToValueAtTime(0.25, t + 0.005);
     g.gain.setValueAtTime(0.25, t + d - 0.01);
@@ -475,7 +477,17 @@ function salaParar(){
   try{ const cv = document.getElementById('salaCv'); if(cv) cv.getContext('2d').clearRect(0,0,cv.width,cv.height); }catch(e){}
 }
 
-/** Tres pitidos, uno por segundo. El cuarto no suena: ese es el de entrar. */
+/* Cuánto antes de su marca se programa cada pitido, y cuánto tarde se da aún
+   por bueno si el bucle llega con retraso. La ventana es más ancha que un
+   fotograma aunque la imagen vaya a diez por segundo. */
+const SALA_BEEP_ANTES = 0.12;
+const SALA_BEEP_TARDE = 0.06;
+
+/** Tres pitidos, uno por segundo. El cuarto no suena: ese es el de entrar.
+    Cada uno se PROGRAMA para su instante exacto en cuanto el vídeo se acerca
+    a su marca. Antes sonaba en el primer fotograma que caía cerca, y eso era
+    hasta 60 ms antes de tiempo -un fotograma y medio-: el actor entraba antes.
+    Lo midió la prueba de los beeps. */
 function salaBeeps(t){
   if(!SALA.on || !SALA.beeps) return;
   const el = studioEl();
@@ -486,11 +498,14 @@ function salaBeeps(t){
   if(falta < 0 || falta > 3.2) return;
   const n = Math.round(falta);                 // 3, 2, 1
   if(n < 1 || n > 3) return;
-  if(Math.abs(falta - n) > 0.06) return;       // solo justo al cruzar el segundo
+  const queda = falta - n;                     // hasta la marca, en tiempo del vídeo
+  if(queda > SALA_BEEP_ANTES || queda < -SALA_BEEP_TARDE) return;
   const marca = prox.si * 10 + n;
   if(SALA.beepHecho === marca) return;
   SALA.beepHecho = marca;
-  salaBeep(1000, 55);
+  /* El vídeo puede ir a otra velocidad: lo que queda se pasa a tiempo real. */
+  const vel = (+el.playbackRate > 0) ? +el.playbackRate : 1;
+  salaBeep(1000, 55, Math.max(0, queda) / vel);
 }
 
 /* ── Botones y ajustes ────────────────────────────────────────────────── */
@@ -588,10 +603,12 @@ function salaPanel(){
   const cerrar = () => ov.remove();
   ov.addEventListener('click', e => { if(e.target === ov) cerrar(); });
   ov.querySelector('#salaOk').onclick = cerrar;
+  /* Al ritmo de sala: uno por segundo (SALA-5). Sonaban cada 0,7 s, y probar
+     los beeps enseñaba un ritmo que no es el que luego oye el actor. */
   ov.querySelector('#salaProbar').onclick = () => {
     salaBeep(1000, 55);
-    setTimeout(() => salaBeep(1000, 55), 700);
-    setTimeout(() => salaBeep(1000, 55), 1400);
+    setTimeout(() => salaBeep(1000, 55), 1000);
+    setTimeout(() => salaBeep(1000, 55), 2000);
   };
   const num = (id, campo, min, max) => {
     const e = ov.querySelector('#' + id);

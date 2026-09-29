@@ -14,8 +14,8 @@ qué dijo el director.
 | **SALA-2** | Dos sentidos: de izquierda a derecha, o una barra desde cada borde hacia el centro. En el segundo, las dos se juntan en el punto de entrada. | 👁 |
 | **SALA-3** | Las duraciones son las de sala: **1 · 2 · 2,67 · 3 · 3,3 · 5 s**. Las de 2,67 y 3,3 son los 4 y 5 metros de película a 24 fotogramas. | 👁 |
 | **SALA-4** | Al llegar la raya, desaparece. No se queda pegada al borde. | 👁 |
-| **SALA-5** | **Tres beeps** de 1 kHz, uno por segundo. **El cuarto no suena: ese es el de entrar.** | ⚠️ |
-| **SALA-6** | Los beeps solo suenan con el vídeo rodando, y una sola vez por segundo y por cue. | 👁 |
+| **SALA-5** | **Tres beeps** de 1 kHz, uno por segundo. **El cuarto no suena: ese es el de entrar.** Cada uno se **programa para su instante exacto** con el reloj del audio en cuanto el vídeo se acerca a su marca —hasta 0,12 s antes—, y si el bucle llega tarde suena ya, hasta 0,06 s después; más tarde, no. Antes sonaban en el primer fotograma que caía cerca, hasta **60 ms antes de tiempo**: se vio midiéndolos. Con el vídeo a otra velocidad, lo que falta se pasa a tiempo real. «Probar beeps» los da **uno por segundo**, no cada 0,7 s. | ✅ |
+| **SALA-6** | Los beeps solo suenan con el vídeo rodando, y una sola vez por segundo y por cue. Volver atrás y pasar otra vez los vuelve a dar, los tres. | ✅ |
 | **SALA-7** | El **punch** es un destello en el fotograma de entrada, y dura menos de dos décimas. | 👁 |
 | **SALA-8** | La **barra** de progreso va de la entrada a la salida del cue. | 👁 |
 | **SALA-9** | La señalización sigue los timecodes del **cue**, no los del libreto. Si alguien corrige una entrada a mano o la pega a un corte de plano, el streamer llega al sitio nuevo. | 👁 |
@@ -158,10 +158,15 @@ qué dijo el director.
   exacta porque el ancho de un carácter se fija en la prueba. Se comprueba el
   caso que llegó de sala: ninguna palabra se pisa **y** cada una sigue cruzando
   la línea en su instante. Quitar el estrechado pone dos comprobaciones en rojo.
-- **SALA-5**, los beeps, **no se han oído nunca en una prueba**. La lógica que
-  decide cuándo suenan está escrita y revisada, pero nadie ha comprobado con un
-  cronómetro que caen a −3, −2 y −1 s. Es lo primero que hay que verificar en
-  sala.
+- **SALA-5** y **SALA-6**, en `pruebas/beeps.prueba.js`: se corre el `salaBeeps` de
+  verdad con el vídeo avanzando fotograma a fotograma —a 60, 30, 25, 24 y 10 imágenes
+  por segundo, con cualquier desfase, y al doble de velocidad— y se apunta el
+  instante al que queda programado cada pitido. La prueba encontró que sonaban
+  **50 ms antes de tiempo** a 60 imágenes por segundo, y hasta 60 ms con otras;
+  ahora caen en su marca. Doce mutaciones, todas en rojo; una nació verde y se
+  cerró. Lo que la prueba **no** mide es lo que tarda el altavoz de sala en dar
+  lo programado —la latencia de salida del equipo, decenas de milisegundos en
+  Windows—: eso sigue siendo para comprobar en sala, con el cronómetro.
 - El canvas de mentira ya existe (`pruebas/banda.prueba.js`) y cerró **BAN-3** y
   **BAN-7**. Con él se pueden cerrar también **SALA-1** a **SALA-4** y **BAN-1**,
   **BAN-2** y **BAN-4**, que siguen abiertas: es medir posiciones, y la máquina
