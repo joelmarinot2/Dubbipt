@@ -704,6 +704,353 @@ exports.pruebas = function(t){
   t.ok('y un aviso terminado se puede quitar', /id="qcAvFuera"/.test(TODO)
        && /fuera\.onclick = \(\)=>\{ const c = d\.getElementById\('qcAvance'\); if\(c\) c\.remove\(\); \};/.test(TODO));
 
+  t.seccion('12n · la barra de arriba, también: solo las herramientas de cada quien');
+  /* Pedido de sala, el mismo de 12c. El cajon ya lo cumplia, pero la barra de
+     arriba seguia enseñando en QC y en Casting el lapiz, el pincel, el
+     engranaje entero y «✓ Pagina grabada»: lo de marcar, por otra puerta. */
+  const R_BARRA = ['/**\n * Deja en la barra de arriba SOLO', '/**\n * Quita lo que es vídeo en los perfiles'];
+  const PB = montar([R_TABLA],
+    ['PERFIL_BARRA_DE', 'PERFIL_ENGRANAJE_DE', 'PERFIL_CON_CAJON', 'PERFIL_CAJON_DE',
+     'perfilVeLaHerramienta', 'perfilVeEnLaBarra'],
+    { window: {}, console: { warn: () => {}, log: () => {} } });
+  const TRES = ['grabacion', 'qc', 'casting'];
+  const DE_LA_BARRA = ['lTablet', 'lDraw', 'lBrushFab', 'lRec'];
+  const DEL_ENGRANAJE = ['gmDone', 'gmEdit', 'gmPause', 'gmUnpause', 'gmAccent', 'gmClear',
+                         'gmComp', 'gmSplit', 'gmMerge'];
+
+  DE_LA_BARRA.forEach(id => {
+    t.eq('marcar es de quien graba, esté el botón donde esté: ' + id, PB.PERFIL_BARRA_DE[id], 'grabacion');
+    t.ok('quien graba lo ve: ' + id, PB.perfilVeLaHerramienta(id, 'grabacion'));
+    t.ok('quien revisa no: ' + id, !PB.perfilVeLaHerramienta(id, 'qc'));
+    t.ok('y quien reparte tampoco: ' + id, !PB.perfilVeLaHerramienta(id, 'casting'));
+  });
+  DEL_ENGRANAJE.forEach(id => {
+    t.eq('lo que actúa sobre la caja es de quien graba: ' + id, PB.PERFIL_ENGRANAJE_DE[id], 'grabacion');
+    t.ok('quien graba lo ve: ' + id, PB.perfilVeLaHerramienta(id, 'grabacion'));
+    t.ok('quien revisa no: ' + id, !PB.perfilVeLaHerramienta(id, 'qc'));
+    t.ok('y quien reparte tampoco: ' + id, !PB.perfilVeLaHerramienta(id, 'casting'));
+  });
+  t.eq('en la barra no hay más dueños que esos', Object.keys(PB.PERFIL_BARRA_DE).sort().join(','),
+       DE_LA_BARRA.slice().sort().join(','),
+       'un botón de leer con dueño desaparece de las otras dos fases');
+  t.eq('ni en el engranaje', Object.keys(PB.PERFIL_ENGRANAJE_DE).sort().join(','),
+       DEL_ENGRANAJE.slice().sort().join(','));
+
+  /* El engranaje y los colores NO son de marcar: son como se ve el libreto. */
+  TRES.forEach(m => {
+    t.ok('el engranaje se queda en ' + m, PB.perfilVeLaHerramienta('lGear', m),
+         'dentro viven los colores, y su panel se coloca midiendo dónde está el botón');
+    t.ok('y los colores también en ' + m, PB.perfilVeLaHerramienta('gmColors', m),
+         'es una preferencia de vista, no una herramienta de marcar');
+  });
+  ['lBack', 'lGoto', 'lScope', 'lCharSel', 'lTheme', 'lFontDn', 'lFontUp', 'lFind', 'lPron', 'lHide',
+   'lGear', 'lGearMenu', 'gmColors']
+    .forEach(id => t.ok('leer, moverse y la vista no tienen dueño: ' + id,
+      !(id in PB.PERFIL_BARRA_DE) && !(id in PB.PERFIL_ENGRANAJE_DE) && !(id in PB.PERFIL_CAJON_DE),
+      'con dueño, en las otras fases el libreto no se podría ni recorrer'));
+  t.ok('las tablas nuevas no se llevan por delante la del cajón',
+       PB.perfilVeLaHerramienta('tQcCotejar', 'qc') && !PB.perfilVeLaHerramienta('tQcCotejar', 'grabacion')
+       && PB.perfilVeLaHerramienta('tEdit', 'grabacion') && !PB.perfilVeLaHerramienta('tEdit', 'qc'));
+  t.ok('ni la del vídeo', !PB.perfilVeLaHerramienta('lVid', 'qc') && PB.perfilVeLaHerramienta('lVid', 'casting'));
+
+  /* El lapiz tiene dos oficios: en rol tablet abre el cajon de la derecha, que
+     en QC trae las herramientas de QC. Donde hay cajon no se esconde. */
+  t.eq('el lápiz es el único que hace de puerta del cajón', PB.PERFIL_CON_CAJON.join(','), 'lTablet');
+  t.eq('en escritorio, en QC, el lápiz se va', PB.perfilVeEnLaBarra('lTablet', 'qc', false), false);
+  t.eq('y en Casting', PB.perfilVeEnLaBarra('lTablet', 'casting', false), false);
+  t.eq('con cajón, en QC, se queda', PB.perfilVeEnLaBarra('lTablet', 'qc', true), true,
+       'es la puerta del cajón, que en QC trae las herramientas de QC');
+  t.eq('y en Casting', PB.perfilVeEnLaBarra('lTablet', 'casting', true), true);
+  t.eq('en Grabación se ve con cajón', PB.perfilVeEnLaBarra('lTablet', 'grabacion', true), true);
+  t.eq('y sin él', PB.perfilVeEnLaBarra('lTablet', 'grabacion', false), true);
+  ['lDraw', 'lBrushFab', 'lRec'].forEach(id => {
+    t.eq('el cajón no salva a lo demás: ' + id, PB.perfilVeEnLaBarra(id, 'qc', true), false,
+         'la excepción es del lápiz, no de todo lo que haya en la barra');
+  });
+
+  /* Un DOM de mentira, como el del video, con lo que aqui ademas se toca: las
+     clases -la del cajon en el cuerpo, la del menu- y pulsar un boton. */
+  const pieza = (clases) => {
+    const e = boton();
+    const cl = new Set(clases || []);
+    e.clases = cl;
+    e.classList = {
+      contains: (c) => cl.has(c),
+      add: (c) => { cl.add(c); },
+      remove: (c) => { cl.delete(c); },
+      toggle: (c, on) => {
+        const pon = (on === undefined) ? !cl.has(c) : !!on;
+        if(pon) cl.add(c); else cl.delete(c);
+        return pon;
+      }
+    };
+    e.pulsado = 0;
+    e.click = () => { e.pulsado++; if(e.alPulsar) e.alPulsar(); };
+    return e;
+  };
+  const DE_LEER = ['lBack', 'lScope', 'lTheme', 'lFontDn', 'lFontUp', 'lFind', 'lPron', 'lHide'];
+  const conBarra = (opciones) => {
+    const o = Object.assign({ cajon: false, sin: [] }, opciones || {});
+    const piezas = {};
+    DE_LA_BARRA.concat(DEL_ENGRANAJE, DE_LEER, ['lGear', 'lGearMenu', 'gmColors'])
+      .filter(id => o.sin.indexOf(id) < 0)
+      .forEach(id => { piezas[id] = pieza(); });
+    const cuerpo = pieza(o.cajon ? ['haschips', 'dark'] : ['deskchips', 'dark']);
+    const doc = { body: cuerpo, getElementById: (id) => piezas[id] || null, querySelectorAll: () => [] };
+    const M = montar([R_TABLA, R_BARRA], ['perfilAjustarBarra'], {
+      window: {}, pop2: { doc: doc }, fallo: () => {}, console: { warn: () => {}, log: () => {} }
+    });
+    const escondidos = () => Object.keys(piezas).filter(id => 'display' in piezas[id].style.props).sort();
+    return { M, doc, piezas, cuerpo, escondidos };
+  };
+  const LO_DE_MARCAR = DE_LA_BARRA.concat(DEL_ENGRANAJE).sort();
+
+  ['qc', 'casting'].forEach(m => {
+    const E = conBarra();
+    E.M.perfilAjustarBarra(E.doc, m);
+    DE_LA_BARRA.concat(DEL_ENGRANAJE).forEach(id => {
+      t.eq('en ' + m + ' se esconde ' + id, E.piezas[id].style.props.display, 'none !important',
+           'la barra impone su display con !important: sin prioridad, el botón se queda a la vista');
+    });
+    t.eq('y en ' + m + ' no se esconde NADA más', E.escondidos().join(','), LO_DE_MARCAR.join(','),
+         'leer, moverse, el engranaje y los colores son de los tres perfiles');
+    t.ok('el menú se queda sin lo de la caja en ' + m, E.piezas.lGearMenu.clases.has('sin-caja'),
+         'sin herramientas de caja, «Caja seleccionada: ninguna» no dice nada');
+    t.eq('y el engranaje dice lo que tiene en ' + m, E.piezas.lGear.atrib.title, 'Colores del libreto',
+         'prometer «herramientas de la caja» donde no las hay es mandar a buscar lo que no está');
+    t.eq('también a quien no lo ve, en ' + m, E.piezas.lGear.atrib['aria-label'], 'Colores del libreto');
+    t.eq('y el menú igual en ' + m, E.piezas.lGearMenu.atrib['aria-label'], 'Colores del libreto');
+
+    E.M.perfilAjustarBarra(E.doc, 'grabacion');
+    t.eq('al volver de ' + m + ' a Grabación vuelve todo', E.escondidos().join(','), '',
+         JSON.stringify(E.escondidos()));
+    t.ok('y el menú vuelve a hablar de la caja', !E.piezas.lGearMenu.clases.has('sin-caja'));
+    t.eq('y el engranaje a decir lo suyo', E.piezas.lGear.atrib.title, 'Herramientas de la caja seleccionada');
+    t.eq('con su etiqueta', E.piezas.lGear.atrib['aria-label'], 'Herramientas de la caja seleccionada');
+    t.eq('y la del menú', E.piezas.lGearMenu.atrib['aria-label'], 'Herramientas de la caja seleccionada');
+  });
+
+  const EG = conBarra();
+  EG.M.perfilAjustarBarra(EG.doc, 'grabacion');
+  t.eq('en Grabación no se esconde nada', EG.escondidos().join(','), '');
+  t.ok('ni se toca el menú', !EG.piezas.lGearMenu.clases.has('sin-caja'));
+
+  /* Rol tablet: con el cajon, el lapiz se queda y lo demas se va igual. */
+  ['qc', 'casting'].forEach(m => {
+    const C = conBarra({ cajon: true });
+    C.M.perfilAjustarBarra(C.doc, m);
+    t.ok('con cajón, en ' + m + ' el lápiz se queda', !('display' in C.piezas.lTablet.style.props),
+         JSON.stringify(C.piezas.lTablet.style.props));
+    t.eq('y lo demás se va igual en ' + m, C.escondidos().join(','),
+         LO_DE_MARCAR.filter(id => id !== 'lTablet').join(','));
+  });
+  /* Y si venia escondido de antes -el libreto no se reconstruye al cambiar de
+     perfil-, con cajon se le DEVUELVE, no basta con no tocarlo. */
+  const CV = conBarra({ cajon: true });
+  CV.piezas.lTablet.style.setProperty('display', 'none', 'important');
+  CV.M.perfilAjustarBarra(CV.doc, 'qc');
+  t.ok('con cajón, un lápiz que venía escondido vuelve', !('display' in CV.piezas.lTablet.style.props));
+
+  /* Lo que falte no puede tirar lo demas: la tablet del actor, el libreto a
+     medio montar, o un boton que mañana se quite de la plantilla. */
+  const F = conBarra({ sin: ['lBrushFab', 'lGear', 'lGearMenu', 'gmSplit'] });
+  let rotoB = null;
+  try{ F.M.perfilAjustarBarra(F.doc, 'qc'); }catch(e){ rotoB = e.message; }
+  t.eq('si falta un botón no revienta', rotoB, null);
+  t.eq('y los que sí están se esconden', F.piezas.lRec.style.props.display, 'none !important');
+  t.eq('hasta el último', F.piezas.gmMerge.style.props.display, 'none !important');
+  let rotoN = null;
+  try{ F.M.perfilAjustarBarra(null, 'qc'); F.M.perfilAjustarBarra({}, 'qc'); }catch(e){ rotoN = e.message; }
+  t.eq('y sin libreto abierto tampoco', rotoN, null);
+
+  /* La plantilla. La tabla va por nombres, asi que cada entrada del engranaje
+     tiene que llevar el suyo: una sin nombre no la puede esconder nadie, y una
+     herramienta de caja nueva sin dueño saldria en las tres fases. */
+  const menuTxt = TODO.slice(TODO.indexOf('<div class="gmenu" id="lGearMenu"'), TODO.indexOf('id="gmHint"'));
+  const entradas = menuTxt.match(/<button class="gm-b[^>]*>/g) || [];
+  t.ok('el menú del engranaje tiene entradas que mirar', entradas.length >= 10, String(entradas.length));
+  const nombres = entradas.map(x => (x.match(/\sid="([^"]+)"/) || [])[1] || '');
+  t.eq('todas llevan nombre', nombres.filter(x => !x).length, 0,
+       'una entrada sin nombre no la puede esconder nadie: ' + entradas.filter(x => !/\sid="/.test(x)).join(' '));
+  t.eq('y la única sin dueño es Colores',
+       nombres.filter(id => !(id in PB.PERFIL_ENGRANAJE_DE)).join(','), 'gmColors',
+       'una herramienta de caja nueva sin dueño saldría en QC y en Casting');
+  DEL_ENGRANAJE.forEach(id => t.ok('está en el menú: ' + id, nombres.indexOf(id) >= 0,
+    'un dueño de algo que no existe no esconde nada'));
+  DE_LA_BARRA.concat(['lGear']).forEach(id => t.ok('está en el libreto: ' + id,
+    new RegExp('<button[^>]*\\sid="' + id + '"').test(TODO)));
+  t.ok('sin lo de la caja, el menú calla la cabecera y la pista',
+       /\.gmenu\.sin-caja \.gm-head, \.gmenu\.sin-caja \.gm-hint\{ display:none !important; \}/.test(TODO),
+       'la pista la repinta gearSync a cada caja que se toca: tiene que mandar la hoja de estilos');
+  /* Los colores no pueden depender de que haya una caja elegida: en QC y en
+     Casting son lo unico del menu, y ahi nadie elige caja para marcar. */
+  t.ok('los colores se abren sin caja elegida',
+       /if\(b\.id === 'gmColors'\)\{ gearToggle\(false\); try\{ libColorsPanel\(\); \}catch\(err\)\{ console\.error\(err\); \} return; \}\s*if\(b\.disabled\) return;/.test(TODO),
+       'si la guarda de la caja fuera antes, en QC el botón no haría nada');
+  t.ok('y nunca se quedan apagados',
+       /if\(btn\.id === 'gmColors'\)\{ btn\.disabled = false; return; \}/.test(TODO));
+
+  /* Los cables. Se vio con el cajon: la tabla perfecta y nadie mirandola. */
+  t.ok('la barra del perfil ajusta la de arriba al pintarse',
+       /perfilAjustarVideo\(d, m\);\s*perfilAjustarBarra\(d, m\);/.test(TODO),
+       'el libreto se reconstruye entero al abrirlo y sus botones nacen a la vista');
+  t.ok('y pregunta por el cajón en el propio libreto',
+       /const conCajon = !!\(d\.body && d\.body\.classList && d\.body\.classList\.contains\('haschips'\)\);/.test(TODO));
+
+  t.seccion('12o · al entrar en un perfil que no marca se suelta lo de marcar');
+  /* Esconder el boton no basta: con el pincel puesto se seguiria pintando sobre
+     el libreto, y con la pausa armada cada toque dejaria una, sin nada delante
+     con que apagarlo. Lo mismo que con el video en 12k. */
+  const conMarcas = (estado) => {
+    const e = Object.assign({ pincel: false, clase: false, modo: null, editando: false,
+                              abiertas: [], sin: [], sinLibreto: false, rompe: '' }, estado || {});
+    const diario = [];
+    const piezas = {};
+    ['lpDone', 'tEdit', 'tPause', 'tUnpause', 'tAccent', 'gmEdit']
+      .filter(id => e.sin.indexOf(id) < 0)
+      .forEach(id => { piezas[id] = pieza(['on']); });
+    const cuerpo = pieza(e.clase ? ['dark', 'drawmode'] : ['dark']);
+    const p2 = { _draw: { on: e.pincel }, markMode: e.modo, editMode: e.editando, doc: null };
+    if(piezas.lpDone) piezas.lpDone.alPulsar = () => {
+      diario.push('pulsa Listo'); p2._draw.on = false; cuerpo.classList.remove('drawmode');
+    };
+    if(piezas.tEdit) piezas.tEdit.alPulsar = () => { diario.push('pulsa Editar del cajón'); p2.editMode = false; };
+    const cajas = e.abiertas.map(a => {
+      const tx = pieza();
+      tx.atrib.contenteditable = 'true';
+      tx.innerText = a.texto;
+      tx.closest = (s) => (s === '.blk'
+        ? { getAttribute: (k) => (k === 'data-si' ? (a.si == null ? null : String(a.si)) : null) }
+        : null);
+      return tx;
+    });
+    const doc = { body: cuerpo, getElementById: (id) => piezas[id] || null,
+                  querySelectorAll: (s) => (s === '.blk .tx[contenteditable="true"]'
+                    ? cajas.filter(c => c.atrib.contenteditable === 'true') : []) };
+    if(!e.sinLibreto) p2.doc = doc;
+    const M = montar([R_TABLA, R_BARRA], ['perfilSoltarMarcar'], {
+      window: {}, pop2: p2,
+      setMarkMode: (x) => {
+        if(e.rompe === 'marcas') throw new Error('no hay libreto');
+        diario.push('desarma: ' + x); p2.markMode = x;
+      },
+      saveEditBox: () => diario.push('guarda la caja del cajón'),
+      syncSendMark: (si, marca) => diario.push('guarda ' + si + ': ' + marca.text),
+      LIB_ICON: { edit: '[lápiz]' },
+      fallo: (d) => diario.push('fallo: ' + d),
+      console: { warn: () => {}, log: () => {} }
+    });
+    return { M, p2, doc, piezas, cuerpo, cajas, diario };
+  };
+
+  ['qc', 'casting'].forEach(m => {
+    const P = conMarcas({ pincel: true, clase: true });
+    const s = P.M.perfilSoltarMarcar(m);
+    t.eq('al entrar en ' + m + ' se apaga el pincel', P.p2._draw.on, false,
+         'sin botón a la vista seguiría pintando sobre el libreto');
+    t.ok('por su propio «Listo»', P.diario.includes('pulsa Listo'),
+         'es quien suelta los dedos a medio trazo');
+    t.ok('y se va su barra de colores', !P.cuerpo.clases.has('drawmode'));
+    t.eq('y lo dice', s.join(','), 'pincel');
+  });
+
+  const PS = conMarcas({ pincel: true, clase: true, sin: ['lpDone'] });
+  PS.M.perfilSoltarMarcar('qc');
+  t.eq('sin el botón «Listo» el pincel se apaga igual', PS.p2._draw.on, false);
+  t.ok('y su barra se va igual', !PS.cuerpo.clases.has('drawmode'));
+  const PV = conMarcas({ pincel: false, clase: true });
+  t.eq('una barra del pincel que se quedó puesta también se quita',
+       PV.M.perfilSoltarMarcar('qc').join(',') + '|' + PV.cuerpo.clases.has('drawmode'), 'pincel|false');
+  const PO = conMarcas({ pincel: true, clase: false });
+  t.eq('y un pincel encendido sin su barra, también',
+       PO.M.perfilSoltarMarcar('qc').join(',') + '|' + PO.p2._draw.on, 'pincel|false');
+
+  ['pause', 'unpause', 'accent'].forEach(modo => {
+    const A = conMarcas({ modo: modo });
+    const s = A.M.perfilSoltarMarcar('casting');
+    t.eq('se desarma lo que estuviera armado: ' + modo, A.p2.markMode, null,
+         'cada toque en una palabra seguiría dejando una marca');
+    t.ok('pasando por donde se desarma siempre: ' + modo, A.diario.includes('desarma: null'));
+    t.ok('y se apagan sus botones del cajón: ' + modo,
+         ['tPause', 'tUnpause', 'tAccent'].every(id => !A.piezas[id].clases.has('on')),
+         'al volver a Grabación saldrían encendidos sin estarlo');
+    t.eq('y lo dice: ' + modo, s.join(','), 'marcas');
+  });
+
+  const ED = conMarcas({ editando: true });
+  const sEd = ED.M.perfilSoltarMarcar('qc');
+  t.eq('se sale del modo de editar del cajón', ED.p2.editMode, false,
+       'tocar una caja la abriría para escribir');
+  t.ok('por su propio botón, que guarda lo que hubiera abierto', ED.diario.includes('pulsa Editar del cajón'));
+  t.eq('sin guardar dos veces', ED.diario.filter(x => /guarda/.test(x)).length, 0, JSON.stringify(ED.diario));
+  t.eq('y lo dice', sEd.join(','), 'edicion');
+  const EDS = conMarcas({ editando: true, sin: ['tEdit'] });
+  EDS.M.perfilSoltarMarcar('qc');
+  t.eq('sin ese botón se sale igual', EDS.p2.editMode, false);
+  t.ok('y se guarda lo abierto', EDS.diario.includes('guarda la caja del cajón'));
+
+  const CJ = conMarcas({ abiertas: [{ si: 2, texto: '  lo que se estaba escribiendo ' }, { si: 7, texto: 'otra' }] });
+  const sCj = CJ.M.perfilSoltarMarcar('qc');
+  t.ok('las cajas abiertas desde el engranaje se cierran',
+       CJ.cajas.every(c => c.atrib.contenteditable === 'false'), JSON.stringify(CJ.cajas.map(c => c.atrib)));
+  t.ok('y lo tecleado SE GUARDA', CJ.diario.includes('guarda 2: lo que se estaba escribiendo'),
+       'cambiar de perfil no puede costarle a nadie lo que acaba de escribir — ' + JSON.stringify(CJ.diario));
+  t.ok('en todas', CJ.diario.includes('guarda 7: otra'));
+  t.ok('el botón del engranaje deja de decir «Guardar»',
+       !CJ.piezas.gmEdit.clases.has('on') && CJ.piezas.gmEdit.innerHTML === '[lápiz] Editar',
+       String(CJ.piezas.gmEdit.innerHTML));
+  t.eq('y lo dice', sCj.join(','), 'cajas');
+  const CS = conMarcas({ abiertas: [{ si: null, texto: 'sin caja' }] });
+  CS.M.perfilSoltarMarcar('qc');
+  t.ok('una caja que no dice cuál es se cierra', CS.cajas[0].atrib.contenteditable === 'false');
+  t.eq('pero no se guarda a ciegas', CS.diario.filter(x => /^guarda/.test(x)).length, 0,
+       'guardarla en el parlamento que no es sería peor que perderla');
+
+  const TD = conMarcas({ pincel: true, clase: true, modo: 'accent', editando: true,
+                         abiertas: [{ si: 4, texto: 'a medias' }] });
+  t.eq('todo a la vez, se suelta todo', TD.M.perfilSoltarMarcar('qc').join(','), 'pincel,marcas,edicion,cajas');
+
+  /* Un paso que falla no puede dejar los demas sin hacer. */
+  const RT = conMarcas({ pincel: true, clase: true, modo: 'pause', editando: true, rompe: 'marcas',
+                         abiertas: [{ si: 4, texto: 'a medias' }] });
+  let rotoM = null, sRt = [];
+  try{ sRt = RT.M.perfilSoltarMarcar('qc'); }catch(e){ rotoM = e.message; }
+  t.eq('si un paso falla no revienta', rotoM, null);
+  t.eq('los demás se hacen igual', sRt.join(','), 'pincel,edicion,cajas');
+  t.ok('y el fallo se oye', RT.diario.some(x => /^fallo: las marcas/.test(x)), JSON.stringify(RT.diario));
+
+  /* Y en Grabacion no se toca NADA: es quien marca. */
+  const GB = conMarcas({ pincel: true, clase: true, modo: 'pause', editando: true,
+                         abiertas: [{ si: 4, texto: 'a medias' }] });
+  t.eq('al entrar en Grabación no se suelta nada', GB.M.perfilSoltarMarcar('grabacion').length, 0);
+  t.eq('el pincel sigue puesto', GB.p2._draw.on && GB.cuerpo.clases.has('drawmode'), true);
+  t.eq('la pausa, armada', GB.p2.markMode, 'pause');
+  t.eq('el modo de editar, encendido', GB.p2.editMode, true);
+  t.eq('la caja, abierta', GB.cajas[0].atrib.contenteditable, 'true');
+  t.eq('y nada se ha tocado', GB.diario.length, 0, JSON.stringify(GB.diario));
+
+  const NA = conMarcas();
+  t.eq('sin nada encendido, en QC no se toca nada',
+       NA.M.perfilSoltarMarcar('qc').length + NA.diario.length, 0, JSON.stringify(NA.diario));
+  t.ok('ni se apagan botones que nadie encendió', NA.piezas.tPause.clases.has('on') && NA.piezas.gmEdit.clases.has('on'),
+       'el diario vacío no basta: apagar una clase no deja rastro en él');
+  const SL2 = conMarcas({ pincel: true, sinLibreto: true });
+  let rotoS = null, sSl = null;
+  try{ sSl = SL2.M.perfilSoltarMarcar('qc'); }catch(e){ rotoS = e.message; }
+  t.eq('sin libreto abierto no revienta', rotoS, null);
+  t.eq('y no suelta nada', (sSl || []).length, 0);
+  t.eq('ni da un fallo que no lo es', SL2.diario.join(' | '), '',
+       'al entrar, el perfil se elige ANTES de abrir ningún libreto: avisaría de cuatro fallos cada vez');
+
+  t.ok('cambiar de perfil suelta lo de marcar', /try\{ perfilSoltarMarcar\(m\); \}/.test(TODO),
+       'la función puede estar perfecta y no llamarla nadie');
+  const cuerpoPoner = TODO.slice(TODO.indexOf('function ponerModo(epId, m){'),
+                                 TODO.indexOf('function ponerModo(epId, m){') + 1800);
+  t.ok('y lo hace ANTES de pintar la barra',
+       cuerpoPoner.indexOf('perfilSoltarMarcar(m)') > 0
+       && cuerpoPoner.indexOf('perfilSoltarMarcar(m)') < cuerpoPoner.indexOf('perfilPintar()'),
+       'primero se apaga lo que hubiera encendido y luego se esconden sus botones');
+
   t.seccion('13 · la sección QC está en el panel de herramientas');
   t.ok('con su título', />QC<\/div>/.test(TODO) || /class="tt">QC</.test(TODO));
   ['tQcAudio', 'tQcCotejar', 'tQcNueva', 'tQcLista'].forEach(id => {

@@ -2300,7 +2300,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.6.2-nube';
+const APP_VER_NUM = 'v11.6.3-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4001,6 +4001,7 @@ function perfilPintar(){
 
   perfilAjustarCajon(d, m);
   perfilAjustarVideo(d, m);
+  perfilAjustarBarra(d, m);
 }
 
 /* De quién es cada herramienta del cajón.
@@ -4015,6 +4016,29 @@ const PERFIL_CAJON_DE = {
   /* Y cotejar, apuntar y entregar es de quien revisa. */
   tQcAudio:'qc', tQcCotejar:'qc', tQcNueva:'qc', tQcLista:'qc', tQcPdf:'qc'
 };
+
+/* La barra de ARRIBA del libreto y los dos botones flotantes.
+   Marcar es de quien graba, esté el botón donde esté. El cajón ya lo cumplía,
+   pero arriba seguían a la vista en QC y en Casting el lápiz, el pincel y
+   «✓ Página grabada»: las mismas herramientas, por otra puerta.
+   Lo que no aparece aquí es de TODOS, igual que en el cajón. */
+const PERFIL_BARRA_DE = {
+  lTablet:'grabacion', lDraw:'grabacion', lBrushFab:'grabacion', lRec:'grabacion'
+};
+/* Y lo de DENTRO del engranaje, que actúa sobre la caja elegida.
+   El engranaje en sí no tiene dueño y se queda en los tres perfiles, porque
+   dentro vive también «Colores» —gmColors—, que no marca nada: es cómo se ve
+   el libreto, y eso es de todos. Por eso Colores no está en esta tabla. */
+const PERFIL_ENGRANAJE_DE = {
+  gmDone:'grabacion', gmEdit:'grabacion', gmPause:'grabacion', gmUnpause:'grabacion',
+  gmAccent:'grabacion', gmClear:'grabacion', gmComp:'grabacion', gmSplit:'grabacion',
+  gmMerge:'grabacion'
+};
+/* El lápiz tiene dos oficios. En escritorio enseña las herramientas de marcar;
+   en rol tablet —con el cajón de la derecha, la clase haschips— abre y cierra
+   ese cajón, que en QC trae las herramientas de QC. Donde hay cajón no se
+   esconde en ningún perfil: sería quitarle a quien revisa la puerta de lo suyo. */
+const PERFIL_CON_CAJON = ['lTablet'];
 
 /* El vídeo NO es de QC. Pedido de sala: «quita la opción de vídeo en QC y
    todas las herramientas de vídeo».
@@ -4038,8 +4062,15 @@ function perfilLlevaVideo(m){
     mundo, que es lo de leer y moverse. */
 function perfilVeLaHerramienta(id, m){
   if(PERFIL_VIDEO.indexOf(id) >= 0) return perfilLlevaVideo(m);
-  const de = PERFIL_CAJON_DE[id];
+  const de = PERFIL_CAJON_DE[id] || PERFIL_BARRA_DE[id] || PERFIL_ENGRANAJE_DE[id];
   return !de || de === m;
+}
+
+/** ¿Se ve este botón de la barra de arriba? Lo mismo que lo anterior, salvo
+    el que hace de puerta del cajón: donde hay cajón se queda. */
+function perfilVeEnLaBarra(id, m, conCajon){
+  if(conCajon && PERFIL_CON_CAJON.indexOf(id) >= 0) return true;
+  return perfilVeLaHerramienta(id, m);
 }
 
 /**
@@ -4072,6 +4103,120 @@ function perfilAjustarCajon(d, m){
       t.style.display = algoVivo ? '' : 'none';
     }
   }catch(e){ /* sin el cajón pintado no hay títulos que esconder */ }
+}
+
+/**
+ * Deja en la barra de arriba SOLO las herramientas de este perfil, y lo mismo
+ * con los dos botones flotantes y con lo que hay dentro del engranaje.
+ *
+ * Se esconde EN LÍNEA y con !important, como el vídeo y por lo mismo: la barra
+ * impone su `display` a todos sus botones con !important, y contra eso ni una
+ * clase ni un `style.display` a secas pueden.
+ *
+ * El engranaje NO se esconde. Dentro viven los colores del libreto, que son de
+ * los tres perfiles, y además su panel se coloca midiendo dónde está el botón:
+ * con el engranaje escondido saldría fuera de la pantalla. Lo que se va es lo
+ * de dentro que actúa sobre la caja, y con ello la cabecera que habla de «la
+ * caja seleccionada», que sin herramientas de caja no dice nada.
+ */
+function perfilAjustarBarra(d, m){
+  if(!d || !d.getElementById) return;
+  const conCajon = !!(d.body && d.body.classList && d.body.classList.contains('haschips'));
+  const poner = (id, seVe) => {
+    const b = d.getElementById(id);
+    if(!b || !b.style) return;
+    if(seVe) b.style.removeProperty('display');
+    else b.style.setProperty('display', 'none', 'important');
+  };
+  for(const id in PERFIL_BARRA_DE) poner(id, perfilVeEnLaBarra(id, m, conCajon));
+  let deCaja = 0;
+  for(const id in PERFIL_ENGRANAJE_DE){
+    const seVe = perfilVeLaHerramienta(id, m);
+    poner(id, seVe);
+    if(seVe) deCaja++;
+  }
+  const menu = d.getElementById('lGearMenu');
+  if(menu && menu.classList) menu.classList.toggle('sin-caja', !deCaja);
+  const que = deCaja ? 'Herramientas de la caja seleccionada' : 'Colores del libreto';
+  const g = d.getElementById('lGear');
+  if(g && g.setAttribute){ g.setAttribute('title', que); g.setAttribute('aria-label', que); }
+  if(menu && menu.setAttribute) menu.setAttribute('aria-label', que);
+}
+
+/**
+ * Al entrar en un perfil que no marca se SUELTA lo que de marcar hubiera
+ * encendido. Esconder el botón no basta: con el pincel puesto se seguiría
+ * pintando sobre el libreto, con su barra de colores delante; con «/ Pausa»
+ * armada, cada toque en una palabra seguiría dejando una pausa; y una caja
+ * abierta para editar se quedaría abierta, sin botón con el que guardarla.
+ *
+ * Cada cosa se suelta solo si este perfil no ve la herramienta que la enciende,
+ * y lo que se estuviera escribiendo SE GUARDA: cambiar de perfil no puede
+ * costarle a nadie lo tecleado. Devuelve lo que ha soltado, para poder decirlo.
+ */
+function perfilSoltarMarcar(m){
+  const suelto = [];
+  const d = (typeof pop2 !== 'undefined' && pop2) ? pop2.doc : null;
+  if(!d || !d.getElementById) return suelto;
+  const ve = (id) => perfilVeLaHerramienta(id, m);
+
+  /* El pincel se apaga por su «Listo», que es quien sabe hacerlo: suelta los
+     dedos a medio trazo además de quitar la barra de colores. */
+  try{
+    const puesto = !!(pop2._draw && pop2._draw.on)
+                || !!(d.body && d.body.classList && d.body.classList.contains('drawmode'));
+    if(puesto && !ve('lDraw')){
+      const b = d.getElementById('lpDone');
+      if(b && b.click) b.click();
+      if(pop2._draw) pop2._draw.on = false;
+      if(d.body && d.body.classList) d.body.classList.remove('drawmode');
+      suelto.push('pincel');
+    }
+  }catch(e){ fallo('el pincel · index.html:perfilSoltarMarcar', e); }
+
+  /* Pausa, quitar pausa o acento, armados a la espera de un toque. */
+  try{
+    const de = { pause:'gmPause', unpause:'gmUnpause', accent:'gmAccent' }[pop2.markMode];
+    if(de && !ve(de)){
+      setMarkMode(null);
+      for(const id of ['tPause', 'tUnpause', 'tAccent']){
+        const b = d.getElementById(id);
+        if(b && b.classList) b.classList.remove('on');
+      }
+      suelto.push('marcas');
+    }
+  }catch(e){ fallo('las marcas · index.html:perfilSoltarMarcar', e); }
+
+  /* Editar desde el cajón: su propio botón guarda la caja abierta y apaga el modo. */
+  try{
+    if(pop2.editMode && !ve('tEdit')){
+      const b = d.getElementById('tEdit');
+      if(b && b.click) b.click();
+      if(pop2.editMode){ saveEditBox(); pop2.editMode = false; }
+      suelto.push('edicion');
+    }
+  }catch(e){ fallo('la edición · index.html:perfilSoltarMarcar', e); }
+
+  /* Y las cajas abiertas desde el engranaje, que no pasan por ese modo. */
+  try{
+    if(!ve('gmEdit') && d.querySelectorAll){
+      const abiertas = d.querySelectorAll('.blk .tx[contenteditable="true"]');
+      for(let i = 0; i < abiertas.length; i++){
+        const tx = abiertas[i];
+        const caja = tx.closest ? tx.closest('.blk') : null;
+        const si = caja ? parseInt(caja.getAttribute('data-si'), 10) : NaN;
+        tx.setAttribute('contenteditable', 'false');
+        if(isFinite(si)) syncSendMark(si, { text: String(tx.innerText || '').trim() });
+      }
+      if(abiertas.length){
+        const b = d.getElementById('gmEdit');
+        if(b && b.classList){ b.classList.remove('on'); b.innerHTML = LIB_ICON.edit + ' Editar'; }
+        suelto.push('cajas');
+      }
+    }
+  }catch(e){ fallo('las cajas · index.html:perfilSoltarMarcar', e); }
+
+  return suelto;
 }
 
 /**
@@ -7937,6 +8082,9 @@ function ponerModo(epId, m){
      «Video Estudio» de la pantalla del capítulo vive fuera de él. */
   try{ perfilSoltarVideo(m); }catch(e){ fallo('perfilSoltarVideo · index.html:ponerModo', e); }
   try{ perfilAjustarVideo(null, m); }catch(e){ fallo('perfilAjustarVideo · index.html:ponerModo', e); }
+  /* Y lo mismo con lo de marcar: un perfil que no marca apaga el pincel y las
+     marcas que hubiera armadas. Sus botones los esconde la barra al pintarse. */
+  try{ perfilSoltarMarcar(m); }catch(e){ fallo('perfilSoltarMarcar · index.html:ponerModo', e); }
   /* La barra del perfil vive dentro del libreto, que puede no estar abierto. */
   try{ perfilPintar(); }catch(e){ fallo('perfilPintar · index.html:ponerModo', e); }
   const b = document.getElementById('btnCastOut');
@@ -12191,6 +12339,13 @@ body.toolhidden .ltoolhide{ top:0; border-top:1px solid #1c1e22; }
 .gm-hint{ margin-top:10px; font-size:11.5px; color:#6b7280; line-height:1.5; }
 body.light .gmenu{ background:#fff; border-color:#e2ddf2; }
 body.light .gm-b{ background:#f7f6fc; border-color:#e2ddf2; color:#2a2540; }
+/* En los perfiles que no marcan -QC y Casting- el menu se queda solo con los
+   colores. La cabecera de «caja seleccionada» y la pista de tocar una caja se
+   van con las herramientas de caja, que sin ellas no dicen nada, y Colores
+   ocupa el ancho entero en vez de media fila. La clase la pone
+   perfilAjustarBarra. */
+.gmenu.sin-caja .gm-head, .gmenu.sin-caja .gm-hint{ display:none !important; }
+.gmenu.sin-caja .gm-col{ grid-column:1 / -1; }
 /* la tablet del ACTOR solo tiene el pincel */
 body.is-talent #lGear, body.is-talent .gmenu{ display:none !important; }
 
@@ -13200,15 +13355,15 @@ function buildLibretoDoc(pc){
     <div class="gmenu" id="lGearMenu" role="menu" aria-label="Herramientas de la caja">
       <div class="gm-head">Caja seleccionada <b id="gmWho">ninguna</b></div>
       <div class="gm-grid">
-        <button class="gm-b done" data-act="done">✓ Completar</button>
-        <button class="gm-b edit">${LIB_ICON.edit} Editar</button>
-        <button class="gm-b" data-act="pause">/ Pausa</button>
-        <button class="gm-b" data-act="unpause" title="Borrar pausas una a una: toca la / que quieres quitar">✕ Pausa</button>
-        <button class="gm-b" data-act="accent">á Acento</button>
-        <button class="gm-b" data-act="clear">Limpiar</button>
-        <button class="gm-b" data-act="compress">${LIB_ICON.sliders} Ajustar</button>
-        <button class="gm-b" data-act="split">⊟ Dividir</button>
-        <button class="gm-b" data-act="merge">⊞ Unir</button>
+        <button class="gm-b done" id="gmDone" data-act="done">✓ Completar</button>
+        <button class="gm-b edit" id="gmEdit">${LIB_ICON.edit} Editar</button>
+        <button class="gm-b" id="gmPause" data-act="pause">/ Pausa</button>
+        <button class="gm-b" id="gmUnpause" data-act="unpause" title="Borrar pausas una a una: toca la / que quieres quitar">✕ Pausa</button>
+        <button class="gm-b" id="gmAccent" data-act="accent">á Acento</button>
+        <button class="gm-b" id="gmClear" data-act="clear">Limpiar</button>
+        <button class="gm-b" id="gmComp" data-act="compress">${LIB_ICON.sliders} Ajustar</button>
+        <button class="gm-b" id="gmSplit" data-act="split">⊟ Dividir</button>
+        <button class="gm-b" id="gmMerge" data-act="merge">⊞ Unir</button>
         <button class="gm-b gm-col" id="gmColors">🎨 Colores</button>
       </div>
       <div class="gm-hint" id="gmHint">Toca una caja del libreto para elegirla.</div>
