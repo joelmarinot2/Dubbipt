@@ -66,7 +66,8 @@ const M = montar(
    'tcpFranjas', 'tcpDosPuntos', 'tcpSeparadores', 'tcpGruposEn', 'tcpPasoCifra',
    'tcpLayoutPuntos', 'tcpLayoutTrozos', 'tcpCorridas', 'tcpAlinear',
    'tcpCargar', 'tcpOlvidar', 'tcpPorQueNoLee', 'tcpArrancar', 'tcpFotoDeVerdad: tcpFoto', 'TCP_FOTO_MAX',
-   'TCP_HOLGURA', 'TCP_RENUEVA', 'TCP_AVISO_MS', 'TCP_GUARDADO_V'],
+   'TCP_HOLGURA', 'TCP_RENUEVA', 'TCP_AVISO_MS', 'TCP_GUARDADO_V',
+   'TCP_SUAVE', 'TCP_PERIODO_MS', 'tcpRetardo'],
   { performance: perf, localStorage: almacen, document: doc, navigator: nav,
     castAviso: (t) => { avisos.push(String(t)); },
     /* El latido del trabajador de la aplicación, de mentira: se apunta a qué
@@ -390,6 +391,56 @@ t.seccion('9 · lo que se recuerda');
   t.eq('y las diez cifras aprendidas', Object.keys(o.plantillas).length, 10);
   t.ok('las cifras se guardan como numeros, no como objetos raros',
     Array.isArray(o.plantillas['7']) && o.plantillas['7'].length === 12 * 18);
+}
+
+/* ── 9b · el reloj no tiembla: se acerca a cada lectura, no salta a ella ── */
+t.seccion('9b · el reloj no tiembla: se acerca a cada lectura, no salta a ella');
+{
+  /* Cada lectura es un fotograma ENTERO: el contador enseña el mismo número
+     durante 40 ms. Saltando a cada lectura el reloj iba a trompicones de hasta
+     un fotograma: medido con el contador de mentira, 20 ms de desviación y
+     saltos de 100 ms. Se simula Pro Tools rodando de verdad y leído cada 66 ms
+     con el número de fotograma truncado, y se mira cuánto se separa el reloj
+     de donde está Pro Tools de verdad. */
+  const FPS = 25;
+  const sesion = (suave) => {
+    ahora = 70000;
+    TCP.on = true; TCP.tc = null; TCP.t0 = ahora; TCP.rodando = false; TCP.fps = FPS; TCP.lat = 0;
+    TCP._hist = []; TCP._dudas = []; TCP._leidas = 0; TCP._malas = 0;
+    const real = () => 100 + (ahora - 70000) / 1000;
+    /* La imagen que hay al leer llegó hace entre nada y una imagen de la
+       captura (33 ms a 30 por segundo): se sortea. */
+    let z = 4321;
+    const azar = () => { z = (z * 1103515245 + 12345) & 0x7fffffff; return z / 0x7fffffff; };
+    M.ponLeer(() => ({ celdas: 8, txt: '', conf: 0.9, seg: Math.floor((real() - azar() / 30) * FPS) / FPS }));
+    const difs = [];
+    for(let i = 0; i < 300; i++){
+      ahora += 66; M.tcpMirar();
+      if(i > 60) difs.push((M.tcpFuente() - real()) * 1000);
+    }
+    const m = difs.reduce((a, b) => a + b, 0) / difs.length;
+    const sd = Math.sqrt(difs.reduce((a, b) => a + (b - m) * (b - m), 0) / difs.length);
+    return { media: m, desv: sd, saltoMax: Math.max.apply(null, difs.map(d => Math.abs(d - m))) };
+  };
+  const R = sesion();
+  t.ok('rodando, el reloj va a menos de 10 ms del contador de verdad', Math.abs(R.media) < 10, 'media ' + R.media.toFixed(1) + ' ms');
+  t.ok('con la cuenta del retardo puesta: sin ella iría unos 35 ms por detrás',
+       Math.abs(R.media - M.tcpRetardo(FPS) * 1000) > 25, 'media ' + R.media.toFixed(1) + ' ms');
+  t.ok('y sin temblar: desviación de menos de 8 ms', R.desv < 8, 'desviación ' + R.desv.toFixed(1) + ' ms');
+  t.ok('sin trompicones de un fotograma', R.saltoMax < 20, 'el mayor, ' + R.saltoMax.toFixed(1) + ' ms');
+  t.ok('se cree cada lectura en parte, no entera', M.TCP_SUAVE > 0.1 && M.TCP_SUAVE < 0.5, String(M.TCP_SUAVE));
+  /* Lo que se sabe que va por detrás una lectura: medio bucle y medio fotograma. */
+  t.cerca('el retardo de leer: medio fotograma del contador y media imagen de la captura', M.tcpRetardo(25), 0.02 + 1 / 60, 0.002);
+  t.cerca('a 30 fotogramas, medio fotograma es menos', M.tcpRetardo(30), 1 / 60 + 1 / 60, 0.002);
+  t.eq('el bucle late cada 66 ms', M.TCP_PERIODO_MS, 66);
+  /* Parado, la lectura es exacta: el reloj se pone en ella tal cual, sin
+     acercarse poco a poco, y sin sumar ningún retardo de rodar. */
+  ahora = 80000;
+  TCP.on = true; TCP.tc = 100; TCP.t0 = ahora; TCP.rodando = false; TCP._hist = []; TCP._dudas = [];
+  M.ponLeer(() => ({ celdas: 8, txt: '', conf: 0.9, seg: 100.2 }));
+  ahora += 66; M.tcpMirar();
+  t.cerca('parado, una lectura que cuadra se toma tal cual', M.tcpFuente(), 100.2, 1e-9);
+  TCP.on = false;
 }
 
 /* ── 10 · encendido y apagado ──────────────────────────────────────────── */

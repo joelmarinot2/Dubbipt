@@ -59,6 +59,21 @@ const TCP_TOL = 0.30;
    digan casualmente lo mismo y ademas encajen en una recta es despreciable. */
 const TCP_SEGUIDAS = 3;
 
+/* Cada cuánto se lee el contador, en milisegundos. */
+const TCP_PERIODO_MS = 66;
+
+/* A cuántas imágenes por segundo se pide la captura de pantalla. */
+const TCP_CAPTURA_FPS = 30;
+
+/* Cuánto se cree el reloj cada lectura que cuadra, rodando: la parte del
+   camino hasta ella que recorre. No se salta a ella, y esto es lo que quita el
+   temblor: cada lectura es un fotograma ENTERO -el contador enseña el mismo
+   número durante 40 ms-, así que saltando a cada una el reloj iba a
+   trompicones de hasta un fotograma. Medido con el contador de mentira: 20 ms
+   de desviación y saltos de 100 ms; con esto, 5 ms. Parado, se salta: parado
+   la lectura es exacta y no hay nada que suavizar. */
+const TCP_SUAVE = 0.25;
+
 /* Cuánto se deja bailar una cifra dentro de su casilla al compararla, en
    proporción del ancho de la casilla. La casilla se calcula con los dos puntos
    y el paso medidos en pantalla, y medir falla por un píxel o dos: sin esta
@@ -161,7 +176,20 @@ function tcpAhora(T, ahora){
 function tcpFuente(){
   if(!TCP.on) return null;
   const s = tcpAhora(TCP, (typeof performance !== 'undefined' ? performance.now() : Date.now()));
-  return s == null ? null : s + (TCP.lat || 0);
+  return s == null ? null : s + (TCP.lat || 0) + (TCP.rodando ? tcpRetardo(TCP.fps) : 0);
+}
+
+/**
+ * Lo que va por detrás del contador una lectura, rodando, en segundos. Es lo
+ * que se sabe: medio fotograma del contador -enseña un número entero de
+ * fotogramas, y lo que se lee es el que empezó hace entre nada y un
+ * fotograma- y media imagen de la captura -la imagen que hay al leer llegó
+ * hace entre nada y una imagen-. Con el contador de mentira daba 43 ms por
+ * detrás; con esto, cero. Lo que tarde además la captura de pantalla del
+ * equipo va aparte, en el ajuste fino.
+ */
+function tcpRetardo(fps){
+  return 0.5 / (fps || 25) + 0.5 / TCP_CAPTURA_FPS;
 }
 
 /**
@@ -217,7 +245,11 @@ function tcpAnclar(seg, ahora, seguido){
       TCP.rodando = TCP.ritmo > 0.5;
     }
   }
-  TCP.tc = seg;
+  /* Rodando y cuadrando, el reloj se ACERCA a la lectura en vez de saltar a
+     ella (TCP_SUAVE): la lectura es un fotograma entero y saltando se temblaba.
+     Parado, o tras un salto, a la lectura tal cual. */
+  const p = (seguido && TCP.rodando) ? tcpAhora(TCP, ahora) : null;
+  TCP.tc = (p == null) ? seg : p + TCP_SUAVE * (seg - p);
   TCP.t0 = ahora;
   if(!era){
     try{ if(typeof libPintarSeguir === 'function') libPintarSeguir(); }catch(e){ /* sin libreto */ }
@@ -1022,8 +1054,8 @@ function tcpArrancar(){
      medio: con uno por segundo no enganchaba NUNCA. Se vio probándolo, con el
      aprendizaje ya hecho y cada lectura bien leída. */
   TCP._timer = (typeof tcpLatido === 'function')
-    ? tcpLatido(66, paso)
-    : ((id) => ({ parar(){ clearInterval(id); } }))(setInterval(paso, 66));
+    ? tcpLatido(TCP_PERIODO_MS, paso)
+    : ((id) => ({ parar(){ clearInterval(id); } }))(setInterval(paso, TCP_PERIODO_MS));
   paso();
 }
 
@@ -1098,7 +1130,7 @@ async function tcpCompartir(pantallaEntera){
   if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia)
     return { ok: false, motivo: 'Este navegador no sabe compartir pantalla · hace falta Chrome o Edge' };
   try{
-    const v0 = { frameRate: 30 };
+    const v0 = { frameRate: TCP_CAPTURA_FPS };
     if(pantallaEntera) v0.displaySurface = 'monitor';
     const st = await navigator.mediaDevices.getDisplayMedia({ video: v0, audio: false });
     tcpSoltar();

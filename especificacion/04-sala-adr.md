@@ -43,6 +43,9 @@ qué dijo el director.
 | **EST-9** | Encenderlo **coloca el libreto ya**, sin esperar al siguiente parlamento, que puede ser medio minuto mirando otra página. | ✅ |
 | **EST-10** | El botón **no abre el vídeo**: es un interruptor aparte. Y encendido va **oscuro con la letra verde**, no verde: la barra del libreto es verde en modo grabación y un botón verde encima desaparece. | 👁 |
 | **EST-7** | Si el parlamento que suena **no está en pantalla** —hay un solo personaje abierto— se dice por quién va el vídeo, con el botón para abrir el libreto entero. Antes no pasaba nada y parecía que el seguimiento estaba roto. Una vez por personaje. | ✅ |
+| **EST-11** | **El libreto se coloca desde el código, en píxeles, nunca con el deslizar suave del navegador.** Con la pestaña tapada por Pro Tools —lo normal en la sala— ese deslizar no avanza, y el libreto se quedaba arriba mientras el parlamento marcado se iba página abajo: medido con el contador de mentira, el parlamento 7 a 1050 px y el visor en 0. Tapado se coloca **de golpe**; mirando, con el **deslizar corto y acotado** de la casa (el de las páginas), y con un **plazo**: si el deslizar no llega —va con `requestAnimationFrame`, que se para si se tapa la pestaña a mitad de camino (ENT-N4)— pasados 450 ms se pone donde tocaba. Un salto va de golpe también mirando. El parlamento queda con su centro en la **línea de lectura** (el 42 % del visor, la misma con la que se entienden la tablet y el escritorio); uno **largo** deja el principio a la vista, que centrado entero empezaba fuera de pantalla. | ✅ |
+| **EST-12** | **El parlamento se marca tres décimas antes de su timecode.** La vista tiene que estar en la línea cuando empieza a sonar, no llegar a ella entonces: quien lee se adelanta. Y entre leer el contador, mandar la posición y que la tablet se coloque pasan unas décimas: la marca salía de 40 a 130 ms después del timecode, y la tablet tardaba casi medio segundo más en asentarse. Con el adelanto la tablet llega a tiempo y en el escritorio la marca se enciende un parpadeo antes de que hable. Lo que **suena** sigue siendo lo que suena: la corrección de QC se apunta al parlamento sin adelanto (QC-29). | ✅ |
+| **EST-13** | Siguiendo al **vídeo de aquí**, el libreto late cada **66 ms** mientras suena, desde un trabajador, como la lectura de Pro Tools. Antes solo se miraba con `timeupdate`, que el navegador dispara cuatro veces por segundo: la marca llegaba hasta un cuarto de segundo tarde. El latido solo mira si ha cambiado el parlamento; lo que se pinta en la tira sigue con `timeupdate`. | ✅ |
 | **EST-1** | El modo estudio parte la ventana del libreto en **dos columnas**: el panel de vídeo a la izquierda y el libreto a la derecha. Al apagarlo, el libreto vuelve a ocupar todo el ancho. | ✅ |
 | **EST-2** | Se puede encender **sin haber abierto antes el libreto incrustado**: si el contenedor no existe, se crea, y se vuelve a pedir antes de usarlo. | ✅ |
 | **EST-3** | Los paneles de las herramientas —sala, cues, formatos, planos— se abren desde botones que viven **dentro** del libreto, así que siempre con `body.ddlov` puesto. Tienen que **verse igual**. La lista de excepciones de esa regla va por **clase** (`.modo-cap`, `.ddl-encima`), no por identificador. | ✅ |
@@ -90,6 +93,7 @@ qué dijo el director.
 | **PT-20** | **El seguimiento late desde un trabajador en segundo plano**, como el aprendizaje (PT-11), y no desde un temporizador de la página. Con Dubbipt tapado por Pro Tools —lo normal en la sala— el navegador frena los temporizadores de la página a **uno por segundo**, y para enganchar hacen falta tres lecturas en segundo y medio: **no enganchaba nunca**. Se vio en el navegador, con las diez cifras aprendidas y cada lectura bien leída. Si una vuelta tarda más que el latido, los latidos pegados se saltan en vez de hacer cola. | ✅ |
 | **PT-21** | **Si no engancha, dice por qué**, una vez, a los **seis segundos** de arrancar —antes no, que al principio la ventana puede estar tapada—: que no llega imagen, que en el recuadro **no está el contador** —se ha movido la ventana o está tapada— o que el contador está pero **no entiende sus cifras**. Son tres cosas que se arreglan distinto, y antes no se decía ninguna. | ✅ |
 | **PT-22** | La foto del recuadro se **reduce** a 480 píxeles de lado mayor antes de leerla. El Big Counter en una pantalla grande, a tamaño real, costaba **60 ms** cada lectura: el hilo de la página casi entero, quince veces por segundo. Reducido lee igual. | ✅ |
+| **PT-23** | **El reloj no tiembla ni va por detrás.** Rodando, cada lectura que cuadra **acerca** el reloj a ella un cuarto del camino, en vez de saltar a ella: una lectura es un fotograma entero —el contador enseña el mismo número durante 40 ms— y saltando el reloj iba a trompicones de hasta un fotograma (medido: 20 ms de desviación y saltos de 100 ms; ahora, 5 ms). Parado, o tras un salto, a la lectura tal cual. Y se suma lo que se **sabe** que va por detrás una lectura: medio fotograma del contador y media imagen de la captura, 37 ms a 25 fotogramas. Con el contador de mentira iba 43 ms por detrás; ahora, a menos de un fotograma. Lo que tarde además la captura de pantalla del equipo sigue siendo del ajuste fino. | ✅ |
 
 | | |
 |---|---|
@@ -116,6 +120,25 @@ qué dijo el director.
   **Nada de esto está automatizado.**
 - Los carriles: tres personajes solapados salen en 0, 1 y 2, y el primero
   recupera su carril al volver.
+- **EST-11** a **EST-13**, en las secciones 6b a 6f de `pruebas/seguir.prueba.js`,
+  con un libreto de mentira que tiene geometría —cada parlamento a 400 px y de
+  120 de alto, el visor de 1000— y un deslizar de mentira que apunta a qué
+  píxel se coloca el visor y cómo: se comprueba el píxel exacto (40 para el
+  segundo parlamento), que tapado va de golpe, que un parlamento de dos
+  pantallas deja su principio en el tercio de arriba, que el plazo pone el
+  visor si el deslizar se quedó a medias y no si entre medias se pidió otro
+  sitio, que la posición se manda al momento marcada como del seguimiento, el
+  adelanto de tres décimas, y el latido del vídeo dado a mano. En la sección
+  19, la tablet: lo marcado como del seguimiento va con el deslizar corto —o de
+  golpe tapada—, sin el motor de los gestos y sin reenviarse, y mi mano manda.
+- **PT-23**, en la sección 9b de `pruebas/tcpantalla.prueba.js`: un Pro Tools
+  rodando de verdad, leído cada 66 ms con el fotograma truncado y la imagen de
+  la captura con hasta 33 ms de edad; el reloj tiene que ir a menos de 10 ms
+  del contador, con menos de 8 de desviación y sin saltos de un fotograma.
+- Y **medido en el navegador** con el libreto abierto y el contador de mentira:
+  antes, la marca 40–130 ms después del timecode y el visor quieto en 0 con la
+  pestaña tapada; ahora, la marca unos 250 ms antes, el visor en su píxel
+  también tapado, y el reloj a 26 ms del contador rodando.
 - **EST-5** a **EST-9**: `pruebas/seguir.prueba.js`. Quitar la guarda de la mano
   pone dos comprobaciones en rojo; volver a atar el seguimiento a que la tira de
   vídeo esté desplegada, una — y esa prueba se escribió justo después de romperlo a

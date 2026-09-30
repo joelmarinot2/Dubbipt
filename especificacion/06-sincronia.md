@@ -20,6 +20,7 @@ que dos personas trabajando a la vez no se borren el trabajo.
 | **SYN-14** | Con la posición viaja una **huella del libreto** —cuántas intervenciones, de quién, con qué timecode y en qué página—. Sin ella, dos aparatos con libretos distintos se sincronizan a ciegas: el índice 300 es una intervención en cada uno y lo único que se ve es que **las páginas no coinciden**. | ✅ |
 | **SYN-15** | Si las huellas no casan **se dice, con el botón de ponerse al día**, y una sola vez por pareja de huellas: los mensajes de posición llegan a veinte por segundo. | ✅ |
 | **SYN-16** | Un guardado en la nube que **falla se reintenta** sin perder nada —lo tocado sigue pendiente y viaja en el intento siguiente—, pero **cada vez más despacio**: a los 5 s, y el doble con cada fallo seguido, hasta 2 minutos. Y se dice **una vez por racha**, no en cada intento; si el fallo es de **sesión o de permiso** se dice que hay que volver a entrar, porque reintentar no lo arregla. Antes se reintentaba cada 5 s para siempre con un aviso rojo en cada intento: se vio validando la app, 190 intentos seguidos. Vale para el progreso de las páginas y para las marcas del libreto. | ✅ |
+| **SYN-17** | **La posición del seguimiento viaja al momento, y marcada.** Cuando el libreto del escritorio se coloca en un parlamento nuevo siguiendo a Pro Tools o al vídeo, la posición se manda desde ahí mismo, no desde el evento de scroll: con la pestaña tapada ese evento **no se dispara**, y la tablet se quedaba sin saber que el libreto se había movido. Se manda la posición de **destino** —el visor puede estar todavía deslizando hacia ella— y marcada como del seguimiento (`seg`): la tablet la aplica con su **deslizar corto** —o de golpe si está tapada—, no con el suavizado de los gestos, que se acerca poco a poco y tardaba casi medio segundo en asentarse. Mientras se coloca no se reenvía, y si la tablet se acaba de tocar con la mano, manda la mano. | ✅ |
 
 ## Reglas · el puente con DublajeCast
 
@@ -44,6 +45,7 @@ que dos personas trabajando a la vez no se borren el trabajo.
 ## Cómo se demuestra
 
 - **SYN-16**: `pruebas/nube.prueba.js`, con la nube y el reloj de mentira: las esperas de cada intento, que se avise una vez por racha y con qué aviso, que cada intento lleve lo tocado y solo eso, y que la racha se acabe al entrar. Doce mutaciones, todas en rojo; dos nacieron verdes y se cerraron.
+- **SYN-17**: la sección 6d de `pruebas/seguir.prueba.js` (el escritorio manda la posición de destino, marcada, también tapado, y nada sin sincronía) y la 19 (la tablet la aplica con el deslizar corto, de golpe tapada, sin reenviar, y la mano manda). Los mismos números que en EST-11.
 - **SYN-14**, **SYN-15** y **SYN-N5**: `pruebas/seguir.prueba.js`. Se comprueba que
   la huella cambia ante **cualquier** diferencia que descoloque los índices —una
   intervención de más o de menos, otro personaje, otro timecode, otra página, el

@@ -2354,7 +2354,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.13.0-nube';
+const APP_VER_NUM = 'v11.14.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4197,13 +4197,24 @@ function perfilPintar(){
     +     (h.inicio && ini ? ('<b class="lp-tc">' + esc_(ini) + '</b>') : '')
     +     (h.oido && oidoNombre ? ('<b class="lp-tc">' + esc_(oidoNombre) + '</b>') : '')
     +     '</button>').join('')
+    /* QC: esconder las herramientas y ver solo el libreto. Pedido de sala. Va
+       con los demás botones, al final; la pestaña de volver a verlas es lo
+       único que queda de la barra. */
+    + (m === 'qc' ? '<button class="lp-ocultar" id="lpOcultar" title="Esconder las herramientas y ver solo el libreto">▴ Ocultar</button>' : '')
     + '</span>'
-    + (lista.length ? '' : '<span class="lp-pista">' + esc_(PERFIL_PISTA[m] || '') + '</span>');
+    + (lista.length ? '' : '<span class="lp-pista">' + esc_(PERFIL_PISTA[m] || '') + '</span>')
+    + (m === 'qc' ? '<button id="lpVer" title="Volver a ver las herramientas de QC">▾ Herramientas</button>' : '');
   /* Solo vuelve en QC: en los otros dos perfiles esa fila no pinta nada. */
   if(avance && m === 'qc') barra.appendChild(avance);
 
   const q = (id) => barra.querySelector('#' + id);
   { const b = q('lpModo'); if(b) b.onclick = ()=>{ try{ cambiarModo(); }catch(e){ fallo('cambiarModo · perfilPintar', e); } }; }
+  /* Se recuerda: quien esconde las herramientas las quiere escondidas también
+     mañana. Y solo en QC: en los otros perfiles la clase no hace nada. */
+  try{ if(d.body && d.body.classList) d.body.classList.toggle('sinherr', m === 'qc' && qcSinHerramientas()); }
+  catch(e){ /* sin body no hay barra que esconder */ }
+  { const b = q('lpOcultar'); if(b) b.onclick = ()=> qcSinHerramientasPoner(true); }
+  { const b = q('lpVer');     if(b) b.onclick = ()=> qcSinHerramientasPoner(false); }
 
   /* QC: lo mismo que hace el cajón, para que no haya dos verdades. */
   { const b = q('pQcNueva');   if(b) b.onclick = ()=> qcPanel(true); }
@@ -4238,6 +4249,42 @@ function perfilPintar(){
   perfilAjustarCajon(d, m);
   perfilAjustarVideo(d, m);
   perfilAjustarBarra(d, m);
+}
+
+/** ¿Se prefieren las herramientas de QC escondidas? Se recuerda en el aparato. */
+function qcSinHerramientas(){
+  try{ return localStorage.getItem('ddl_qc_sinherr') === '1'; }catch(e){ return false; }
+}
+function qcSinHerramientasPoner(si){
+  try{ localStorage.setItem('ddl_qc_sinherr', si ? '1' : '0'); }catch(e){ /* no se recuerda */ }
+  const d = (typeof pop2 !== 'undefined' && pop2) ? pop2.doc : null;
+  try{ if(d && d.body && d.body.classList) d.body.classList.toggle('sinherr', !!si); }catch(e){ /* sin libreto */ }
+  /* La barra de arriba cambia de alto y el libreto se coloca debajo de ella. */
+  try{ if(typeof libSyncHeadH === 'function') libSyncHeadH(); }catch(e){ /* sin barra que medir */ }
+}
+
+/* La letra en QC: el libreto entero, y aparte del tamaño de la sala.
+   Pedido de sala: «los botones de agrandar letra no sirven en QC, agrandan solo
+   el personaje que se seleccione, y como no se selecciona ninguno no agranda».
+   A− y A+ tocan --minefs, que es la letra del personaje ABIERTO y va compartida
+   entre los aparatos de la sala. En QC se revisa el libreto entero y no hay
+   personaje abierto: ahí los mismos botones tocan --qcfs, que es de todas las
+   cajas, y se recuerda en el aparato. */
+const QC_FS_DEFECTO = 16;
+function qcFs(){
+  try{ const v = +localStorage.getItem('ddl_qc_fs'); return (v >= 13 && v <= 60) ? v : QC_FS_DEFECTO; }
+  catch(e){ return QC_FS_DEFECTO; }
+}
+function qcFsPoner(v){
+  v = Math.max(13, Math.min(60, +v || QC_FS_DEFECTO));
+  try{ localStorage.setItem('ddl_qc_fs', String(v)); }catch(e){ /* no se recuerda */ }
+  const d = (typeof pop2 !== 'undefined' && pop2) ? pop2.doc : null;
+  try{ if(d && d.documentElement) d.documentElement.style.setProperty('--qcfs', v + 'px'); }catch(e){ /* sin libreto */ }
+  return v;
+}
+/** ¿Los botones de la letra tocan el libreto entero (QC) o el personaje abierto? */
+function letraDeTodo(){
+  return (typeof DDL_MODO !== 'undefined' && DDL_MODO === 'qc');
 }
 
 /* De quién es cada herramienta del cajón.
@@ -4379,6 +4426,10 @@ function perfilAjustarBarra(d, m){
   const g = d.getElementById('lGear');
   if(g && g.setAttribute){ g.setAttribute('title', que); g.setAttribute('aria-label', que); }
   if(menu && menu.setAttribute) menu.setAttribute('aria-label', que);
+  /* En QC la letra es de TODO el libreto (letraDeTodo): que el botón lo diga. */
+  const tit = (id, t) => { const b = d.getElementById(id); if(b && b.setAttribute) b.setAttribute('title', t); };
+  tit('lFontUp', m === 'qc' ? 'Letra más grande' : 'Letra del personaje más grande');
+  tit('lFontDn', m === 'qc' ? 'Letra más pequeña' : 'Letra del personaje más pequeña');
 }
 
 /**
@@ -4752,7 +4803,14 @@ function qcTcAhora(){
 function qcBorrador(){
   const ahora = qcTcAhora();
   let si = (typeof libActiveSi === 'function') ? libActiveSi() : null;
-  if(ahora != null && typeof studio !== 'undefined' && studio && studio.cur >= 0) si = studio.cur;
+  /* El que SUENA en este instante, sin el adelanto con el que se marca el
+     libreto (SEG_ADELANTO): en las últimas décimas de un parlamento el marcado
+     ya es el siguiente, y el fallo que se acaba de oír es de este. */
+  if(ahora != null){
+    const que = (typeof stCurBlock === 'function') ? stCurBlock(ahora) : -1;
+    if(que >= 0) si = que;
+    else if(typeof studio !== 'undefined' && studio && studio.cur >= 0) si = studio.cur;
+  }
   const b = (si != null && script && script[si]) ? script[si] : null;
   const quien = (b && b.key && charIdx && charIdx[b.key] && charIdx[b.key].display)
                   ? charIdx[b.key].display : (b && b.display) || '';
@@ -13144,6 +13202,31 @@ html[data-perfil="qc"] body #lBlocks .blk.blk:not(.narr){
 html[data-perfil="qc"] body #lBlocks .blk.blk.mine:not(.narr){
   border-color:color-mix(in srgb, var(--pc,#5FC85A) 70%, transparent) !important;
 }
+/* QC: A− y A+ agrandan la letra de TODO el libreto, no la del personaje
+   abierto. Pedido de sala: «los botones de agrandar letra no sirven en QC,
+   agrandan solo el personaje que se seleccione, y como no se selecciona
+   ninguno no agranda». En QC se revisa el libreto entero, y el tamaño se
+   guarda aparte (--qcfs) para no tocar el de la sala de grabacion, que va
+   compartido entre los aparatos. El selector pesa mas que el de la caja
+   abierta y que el del area escalada: en QC manda este. */
+html[data-perfil="qc"] body #lBlocks .blk .tx,
+html[data-perfil="qc"] body.fixedlay #lBlocks .blk .tx,
+html[data-perfil="qc"] body.fixedlay #lBlocks .blk.mine .tx{
+  font-size:var(--qcfs,16px) !important;
+  line-height:1.55 !important;
+}
+/* La barra de herramientas de QC, escondida: solo el libreto. Queda una
+   pestaña para volver a sacarla. */
+html[data-perfil="qc"] body.sinherr .lperfil{
+  padding:0 !important; min-height:0 !important; border-bottom:none !important;
+  background:transparent !important; justify-content:flex-end !important;
+}
+html[data-perfil="qc"] body.sinherr .lperfil > :not(#lpVer){ display:none !important; }
+.lp-ocultar, #lpVer{ flex:0 0 auto; font-size:11px; padding:5px 9px;
+  border-radius:9px; border:1px solid var(--card-b); background:var(--card); color:var(--dim);
+  cursor:pointer; white-space:nowrap }
+#lpVer{ display:none; margin:4px 10px 0 auto; }
+html[data-perfil="qc"] body.sinherr #lpVer{ display:inline-flex !important; }
 `;
 /* El cajón de ocupación DENTRO del libreto. Va aparte de LIB_CSS porque solo
    se inyecta en modo casting: en grabación no se mete ni una regla. */
@@ -14394,8 +14477,20 @@ function buildLibretoDoc(pc){
   pop2.mineFs = pop2.mineFs || 26;   // por defecto mas grande: se lee desde el atril
   const setMineFs = ()=> d.documentElement.style.setProperty('--minefs', pop2.mineFs+'px');
   setMineFs();
-  d.getElementById('lFontUp').addEventListener('click', ()=>{ pop2.mineFs=libFsUp(pop2.mineFs); setMineFs(); if(typeof syncSendTool==='function') syncSendTool('font', pop2.mineFs); setTimeout(()=>{ try{ libApplyZoom(); libDrawRenderAll(); }catch(e){} }, 40); });
-  d.getElementById('lFontDn').addEventListener('click', ()=>{ pop2.mineFs=libFsDn(pop2.mineFs); setMineFs(); if(typeof syncSendTool==='function') syncSendTool('font', pop2.mineFs); setTimeout(()=>{ try{ libApplyZoom(); libDrawRenderAll(); }catch(e){} }, 40); });
+  try{ qcFsPoner(qcFs()); }catch(e){ /* sin la letra de QC guardada, la de siempre */ }
+  /* En QC los botones agrandan el libreto entero (letraDeTodo), que no hay
+     personaje abierto; en los demás perfiles, el personaje abierto, compartido. */
+  const letra = (arriba)=>{
+    if(letraDeTodo()){
+      qcFsPoner(arriba ? libFsUp(qcFs()) : libFsDn(qcFs()));
+    }else{
+      pop2.mineFs = arriba ? libFsUp(pop2.mineFs) : libFsDn(pop2.mineFs); setMineFs();
+      if(typeof syncSendTool==='function') syncSendTool('font', pop2.mineFs);
+    }
+    setTimeout(()=>{ try{ libApplyZoom(); libDrawRenderAll(); }catch(e){} }, 40);
+  };
+  d.getElementById('lFontUp').addEventListener('click', ()=> letra(true));
+  d.getElementById('lFontDn').addEventListener('click', ()=> letra(false));
   d.getElementById('lScope').addEventListener('click', ()=>{
     pop2.scopeAll = !pop2.scopeAll;
     pop2.els.scope.innerHTML = pop2.scopeAll ? LIB_ICON.scopeAll : LIB_ICON.scopeOne;
@@ -18153,6 +18248,7 @@ function onRemoteScroll(p){
   const target = resolveTargetPx(p);
   if(target==null) return;
   const now = performance.now();
+  if(p.seg){ libColocarRemoto(target); return; }
   if(p.snap){
     // posición FINAL del gesto: encajar de golpe (evita el desfase al devolverse brusco)
     try{ pop2._rTargetPx = null; pop2._rVel = 0; const wr = pop2.els.wrap; wr.scrollTop = target; libHighlightCenter(); }catch(e){}
@@ -18168,6 +18264,29 @@ function onRemoteScroll(p){
   pop2._rTargetPx = target;      // el bucle permanente se encarga de acercarse suave
   pop2._rSeenAt = now;
   ensureMirrorLoop();
+}
+/**
+ * Colocado por el SEGUIMIENTO en el otro aparato: ha cambiado el parlamento.
+ * Se va con el deslizar corto y acotado de la casa, no con el suavizado de los
+ * gestos —ese se acerca poco a poco y tarda casi medio segundo en asentarse,
+ * que para un dedo deslizando está bien y para un parlamento nuevo es llegar
+ * tarde—. Con la pantalla tapada, de golpe: el deslizar no avanza sin pintar.
+ * Mientras se coloca, este movimiento no se reenvía: vino del otro lado.
+ */
+function libColocarRemoto(target){
+  if(!pop2 || !pop2.els || !pop2.els.wrap) return;
+  pop2._rTargetPx = null; pop2._rVel = 0;
+  pop2._applyRemote = true;
+  const oculto = !!((typeof document !== 'undefined' && document.hidden) || (pop2.doc && pop2.doc.hidden));
+  if(oculto){
+    try{ if(pop2._pageAnim) (pop2.win || window).cancelAnimationFrame(pop2._pageAnim); }catch(e){ /* sin animación que cortar */ }
+    pop2._pageAnim = 0; pop2._pageAnimating = false;
+    pop2.els.wrap.scrollTop = target;
+  }else{ libAnimScroll(target); libAsegurarTop(target); }
+  try{ libHighlightCenter(); }catch(e){ /* sin chip de página que poner al día */ }
+  const w = pop2.win || window;
+  try{ w.clearTimeout(pop2._appTmr); pop2._appTmr = w.setTimeout(()=>{ pop2._applyRemote = false; }, 450); }
+  catch(e){ clearTimeout(pop2._appTmr); pop2._appTmr = setTimeout(()=>{ pop2._applyRemote = false; }, 450); }
 }
 // BUCLE DE SEGUIMIENTO PERMANENTE: corre con el rAF de la PROPIA ventana del
 // libreto (la superficie visible) — antes usaba el de la pestaña principal,
@@ -19132,6 +19251,9 @@ function studioWireStrip(){
   for(const id of ['stVideo','stAudio']){
     const el = $(id);
     el.addEventListener('timeupdate', studioTick);
+    el.addEventListener('play', studioLatidoArrancar);
+    el.addEventListener('pause', studioLatidoParar);
+    el.addEventListener('ended', studioLatidoParar);
     el.addEventListener('play', ()=>{ try{ salaAudio(); salaArrancar(); }catch(e){} });
     el.addEventListener('seeked', ()=>{
       SALA.beepHecho = -1;
@@ -19472,6 +19594,105 @@ function libPintarSeguir(){
                       : 'El libreto va con el vídeo de aquí, no hay Pro Tools leyendo · pulsa para soltarlo'));
 }
 
+/* Cuánto ANTES de su timecode se marca un parlamento, en segundos.
+
+   La vista tiene que estar en la línea cuando empieza a sonar, no llegar a ella
+   entonces: quien lee se adelanta. Y entre leer el contador, mandar la posición
+   y que la tablet se coloque pasan unas décimas —medido con el contador de
+   mentira: la marca sale de 40 a 130 ms después del timecode, y la tablet
+   tardaba casi medio segundo más en asentarse—. Con tres décimas de adelanto
+   la tablet llega a tiempo y en el escritorio la marca se enciende un
+   parpadeo antes de que hable. Lo que SUENA sigue siendo lo que suena: la
+   corrección de QC se apunta al parlamento sin adelanto. */
+const SEG_ADELANTO = 0.3;
+
+/* La línea de lectura: a qué altura del visor se pone lo que se está leyendo.
+   Es la misma que usan la tablet y el escritorio para entenderse (libViewPos),
+   así el parlamento marcado en un aparato es el que la tablet resalta al
+   recibir la posición. */
+const SEG_LINEA = 0.42;
+
+/**
+ * Dónde tiene que quedar el visor para leer este parlamento: su principio en la
+ * línea de lectura. Un parlamento corto se centra en ella; uno largo deja el
+ * principio a la vista, que centrándolo entero empezaba fuera de pantalla.
+ */
+function studioTopPara(node){
+  const wrap = pop2 && pop2.els && pop2.els.wrap; if(!wrap || !node) return null;
+  const vh = wrap.clientHeight || 600;
+  const alto = Math.min(oH(node), vh * 0.3);
+  const top = oTop(node) - vh * SEG_LINEA + alto / 2;
+  if(!isFinite(top)) return null;
+  return Math.max(0, Math.min(libMaxTop(), top));
+}
+
+/**
+ * Coloca el visor en `top`. Desde el código y en píxeles, NUNCA con el deslizar
+ * suave del navegador: con la pestaña tapada por Pro Tools —lo normal en la
+ * sala— ese deslizar no avanza, y el libreto se quedaba arriba mientras el
+ * parlamento marcado se iba página abajo. Medido: el parlamento 7 a 1050 px y
+ * el visor en 0. Deslizar es un adorno para cuando se está mirando; la
+ * posición se fija siempre (ENT-18). Un salto va de golpe también mirando:
+ * deslizar treinta páginas es peor que aparecer donde toca.
+ */
+function studioColocar(top, deGolpe){
+  const wrap = pop2 && pop2.els && pop2.els.wrap; if(!wrap) return;
+  const oculto = !!((typeof document !== 'undefined' && document.hidden) || (pop2.doc && pop2.doc.hidden));
+  if(deGolpe || oculto){
+    try{ if(pop2._pageAnim) (pop2.win || window).cancelAnimationFrame(pop2._pageAnim); }catch(e){ /* sin animación que cortar */ }
+    pop2._pageAnim = 0; pop2._pageAnimating = false;
+    wrap.scrollTop = top;
+    try{ libHighlightCenter(); }catch(e){ /* tapado no hay evento de scroll que lo haga */ }
+    return;
+  }
+  libAnimScroll(top);
+  libAsegurarTop(top);
+}
+
+/**
+ * Que el visor acabe en `top` aunque el deslizar no llegue. El deslizar va con
+ * requestAnimationFrame, y ese no se dispara si la pestaña no se está pintando
+ * (ENT-N4): si se tapa a mitad de camino, el libreto se quedaba a medias.
+ * Pasado el tiempo de un deslizar, si todavía no ha llegado, se pone. Solo si
+ * el destino sigue siendo este: si entre medias se pidió otro, manda el otro.
+ */
+function libAsegurarTop(top){
+  pop2._segTop = top;
+  const w = pop2.win || window;
+  const fin = ()=>{
+    try{
+      if(pop2._segTop !== top || !pop2.els || !pop2.els.wrap) return;
+      if(Math.abs(pop2.els.wrap.scrollTop - top) < 2) return;
+      if(pop2._pageAnim) w.cancelAnimationFrame(pop2._pageAnim);
+      pop2._pageAnim = 0; pop2._pageAnimating = false;
+      pop2.els.wrap.scrollTop = top;
+      try{ libHighlightCenter(); }catch(e){ /* sin chip que poner al día */ }
+    }catch(e){ /* el libreto se ha cerrado */ }
+  };
+  try{ w.clearTimeout(pop2._segTmr); pop2._segTmr = w.setTimeout(fin, 450); }
+  catch(e){ clearTimeout(pop2._segTmr); pop2._segTmr = setTimeout(fin, 450); }
+}
+
+/**
+ * Le dice al otro aparato dónde se ha colocado el libreto, ya mismo. Desde aquí
+ * y no desde el evento de scroll: con la pestaña tapada ese evento no se
+ * dispara, y la tablet se quedaba sin saber que el libreto se había movido.
+ * Va marcada como del seguimiento (`seg`), para que la tablet se coloque con su
+ * deslizar corto y no con el suavizado de los gestos, que tarda casi medio
+ * segundo en asentarse. Se manda la posición de DESTINO, no la de ahora: aquí
+ * el visor puede estar todavía deslizando hacia ella.
+ */
+function studioEmitirSitio(bi, node, top){
+  try{
+    if(typeof sync === 'undefined' || !sync.isOn) return;
+    if(typeof isTalent === 'function' && isTalent()) return;
+    if(typeof TP !== 'undefined' && TP.on) return;
+    const wrap = pop2.els.wrap, vh = wrap.clientHeight || 600;
+    const f = Math.max(0, Math.min(1, (top + vh * SEG_LINEA - oTop(node)) / Math.max(1, oH(node))));
+    syncSendScroll({ si: bi, f: Math.round(f * 1000) / 1000, seg: true });
+  }catch(e){ /* sin sincronía no hay a quién decírselo */ }
+}
+
 function studioSeguirLibreto(bi, forzado){
   if(!stSeguirOn() || bi == null || bi < 0) return;
   const doc = pop2 && pop2.doc; if(!doc) return;
@@ -19480,7 +19701,10 @@ function studioSeguirLibreto(bi, forzado){
   if(!forzado && (performance.now() - (pop2._interact || 0)) < 2500) return;
   const node = doc.querySelector('.blk[data-si="' + bi + '"]');
   if(!node){ studioAvisarFueraDeAlcance(bi); return; }
-  try{ node.scrollIntoView({ block:'center', behavior: forzado ? 'auto' : 'smooth' }); }catch(e){}
+  const top = studioTopPara(node);
+  if(top == null) return;
+  studioColocar(top, !!forzado);
+  studioEmitirSitio(bi, node, top);
 }
 
 /* El parlamento que suena no está pintado: con un personaje abierto, el libreto
@@ -19525,7 +19749,8 @@ function studioTick(forzado){
   const t = (pt != null) ? pt
           : ((el && el.duration) ? el.currentTime + studioTc0() + ((aj ? +aj.value : 0) || 0)/10 : null);
   if(t == null) return;
-  const bi = stCurBlock(t);
+  /* Con el adelanto: la vista tiene que estar en el parlamento cuando empieza. */
+  const bi = stCurBlock(t + SEG_ADELANTO);
   if(bi!==studio.cur){
     studio.cur = bi;
     _stFueraAvisado = '';                      // personaje nuevo: se puede volver a avisar
@@ -19560,6 +19785,37 @@ function studioTick(forzado){
   }catch(e){ /* la tira se acaba de plegar: nada que refrescar */ }
   stDrawWave();
   try{ adrRepintar(); }catch(e){ fallo('adrRepintar · index.html:15504', e); }
+}
+
+/* ── El latido del vídeo ────────────────────────────────────────────────
+   Siguiendo al vídeo de aquí, el libreto solo se miraba con `timeupdate`, que
+   el navegador dispara cuatro veces por segundo: la marca llegaba hasta un
+   cuarto de segundo tarde. Mientras el vídeo suena late esto cada 66 ms, como
+   la lectura de Pro Tools, y del mismo sitio —un trabajador— para que no lo
+   frene la pestaña tapada. Solo mira si ha cambiado el parlamento: lo que se
+   pinta en la tira sigue yendo con `timeupdate`, que para eso sobra. */
+const SEG_LATIDO_MS = 66;
+let _stLatido = null;
+function studioLatidoArrancar(){
+  if(_stLatido) return;
+  const paso = ()=>{
+    try{
+      const el = studioEl();
+      if(!el || el.paused || el.ended){ studioLatidoParar(); return; }
+      if(typeof tcpFuente === 'function' && tcpFuente() != null) return;   // Pro Tools lleva el reloj, y ya late
+      if(!stSeguirOn()) return;
+      const t = el.currentTime + studioTc0() + studioFine();
+      if(stCurBlock(t + SEG_ADELANTO) !== studio.cur) studioTick();
+    }catch(e){ /* una vuelta mala no para el latido */ }
+  };
+  _stLatido = (typeof tcpLatido === 'function')
+    ? tcpLatido(SEG_LATIDO_MS, paso)
+    : ((id)=>({ parar(){ clearInterval(id); } }))(setInterval(paso, SEG_LATIDO_MS));
+}
+function studioLatidoParar(){
+  if(!_stLatido) return;
+  try{ _stLatido.parar(); }catch(e){ /* ya estaba parado */ }
+  _stLatido = null;
 }
 /* ═══ KARAOKE ═══ enciende el parlamento palabra por palabra al ritmo del audio.
    Se apoya en lo que ya hay: cada bloque trae su timecode (tcEff) y el audio ya

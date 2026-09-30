@@ -787,6 +787,58 @@ exports.pruebas = async function(t){
          /data-pg="'\+b\.page\+'" style="--pc:'\+bcolor\+'"/.test(TODO));
   }
 
+  t.seccion('12i4 · en QC, A− y A+ agrandan el libreto entero; y las herramientas se esconden');
+  /* Pedido de sala: «los botones de agrandar letra no sirven en QC porque
+     agrandan solo el personaje que se seleccione, pero como no se selecciona
+     ningún personaje entonces no agranda». Y «que se pueda ocultar las
+     herramientas que tiene QC y solo ver el libreto». */
+  {
+    const R_LETRA = ['/** ¿Se prefieren las herramientas de QC escondidas?', '/* De quién es cada herramienta del cajón.'];
+    const conLetra = (o) => {
+      o = o || {};
+      const guardado = Object.assign({}, o.guardado || {});
+      const vars = {}, clases = new Set(o.clases || []);
+      const M = montar([R_LETRA], ['qcSinHerramientas', 'qcSinHerramientasPoner', 'qcFs', 'qcFsPoner', 'letraDeTodo', 'QC_FS_DEFECTO'], {
+        DDL_MODO: o.modo || 'qc',
+        localStorage: { getItem: (k) => (k in guardado ? guardado[k] : null), setItem: (k, v) => { guardado[k] = String(v); } },
+        pop2: { doc: { documentElement: { style: { setProperty: (k, v) => { vars[k] = v; } } },
+                       body: { classList: { toggle: (c, on) => { if(on) clases.add(c); else clases.delete(c); } } } } },
+        libSyncHeadH: () => { M._medida = (M._medida || 0) + 1; } });
+      M._guardado = guardado; M._vars = vars; M._clases = clases;
+      return M;
+    };
+    const L = conLetra();
+    t.eq('en QC los botones de la letra son del libreto entero', L.letraDeTodo(), true);
+    t.eq('en Grabación, del personaje abierto, como siempre', conLetra({ modo: 'grabacion' }).letraDeTodo(), false);
+    t.eq('la letra de QC empieza en la de siempre, 16', L.qcFs(), 16);
+    t.eq('y se pone en el libreto entero por --qcfs', (L.qcFsPoner(20), L._vars['--qcfs']), '20px');
+    t.eq('se recuerda en el aparato', L._guardado['ddl_qc_fs'], '20');
+    t.eq('y se lee de ahí', conLetra({ guardado: { ddl_qc_fs: '24' } }).qcFs(), 24);
+    t.eq('una guardada absurda no vale', conLetra({ guardado: { ddl_qc_fs: '900' } }).qcFs(), 16);
+    t.eq('con tope por arriba y por abajo', L.qcFsPoner(500) + ' ' + L.qcFsPoner(2), '60 13');
+    t.ok('la regla manda sobre TODAS las cajas de QC, incluida la del personaje abierto y el área escalada',
+         /html\[data-perfil="qc"\] body #lBlocks \.blk \.tx,\s*html\[data-perfil="qc"\] body\.fixedlay #lBlocks \.blk \.tx,\s*html\[data-perfil="qc"\] body\.fixedlay #lBlocks \.blk\.mine \.tx\{\s*font-size:var\(--qcfs,16px\) !important;/.test(TODO));
+    t.ok('los botones de la letra preguntan si son de todo antes de tocar el personaje abierto',
+         /const letra = \(arriba\)=>\{\s*if\(letraDeTodo\(\)\)\{\s*qcFsPoner\(arriba \? libFsUp\(qcFs\(\)\) : libFsDn\(qcFs\(\)\)\);/.test(TODO));
+    t.ok('y al abrir el libreto se pone la letra de QC guardada', /try\{ qcFsPoner\(qcFs\(\)\); \}catch/.test(TODO));
+    t.ok('y el botón lo dice: en QC es la letra, no la del personaje',
+         /tit\('lFontUp', m === 'qc' \? 'Letra más grande' : 'Letra del personaje más grande'\);/.test(TODO));
+
+    t.eq('las herramientas empiezan a la vista', L.qcSinHerramientas(), false);
+    L.qcSinHerramientasPoner(true);
+    t.ok('esconderlas pone la clase y se recuerda', L._clases.has('sinherr') && L._guardado['ddl_qc_sinherr'] === '1');
+    t.eq('y se vuelve a medir la barra de arriba, que cambia de alto', L._medida, 1);
+    L.qcSinHerramientasPoner(false);
+    t.ok('sacarlas la quita', !L._clases.has('sinherr') && L._guardado['ddl_qc_sinherr'] === '0');
+    t.eq('lo recordado se lee', conLetra({ guardado: { ddl_qc_sinherr: '1' } }).qcSinHerramientas(), true);
+    t.ok('la barra de QC lleva el botón de esconderla y la pestaña de volver a verla',
+         /\+ \(m === 'qc' \? '<button class="lp-ocultar" id="lpOcultar"/.test(TODO) && /\+ \(m === 'qc' \? '<button id="lpVer"/.test(TODO));
+    t.ok('al pintar la barra se aplica lo recordado, y solo en QC',
+         /d\.body\.classList\.toggle\('sinherr', m === 'qc' && qcSinHerramientas\(\)\);/.test(TODO));
+    t.ok('escondidas, de la barra solo queda la pestaña',
+         /html\[data-perfil="qc"\] body\.sinherr \.lperfil > :not\(#lpVer\)\{ display:none !important; \}/.test(TODO));
+  }
+
   t.seccion('12j · QC no lleva vídeo');
   /* Pedido de sala: «quita la opcion de video en QC y todas las herramientas
      de video». El video no tiene un dueño unico -lo llevan Grabacion y
@@ -1615,6 +1667,21 @@ exports.pruebas = async function(t){
   t.eq('sin seguir, lo de siempre: el parlamento seleccionado y su tiempo', BS.si + ' ' + BS.tcSec + ' ' + BS.quien, '0 3600 ANA');
   const BN = conBorrador({ pt: 3725.44, cur: -1 }).qcBorrador();
   t.eq('siguiendo pero sin parlamento sonando, el tiempo de ahora igual', BN.tcSec + ' ' + BN.si, '3725.44 0');
+  /* El libreto se marca con adelanto (SEG_ADELANTO): en las últimas décimas de
+     un parlamento el marcado ya es el siguiente. La corrección va al que SUENA. */
+  const conSuena = (o) => montar([['function stCurBlock(t){', '/* ═══ EL LIBRETO SIGUE AL VÍDEO'],
+                                   ['/** Siguiendo a Pro Tools, el timecode que marca AHORA', '/** El tiempo, como lo escribe el resto de la casa.']],
+    ['qcBorrador'], {
+      tcpActivo: () => true, tcpFuente: () => o.pt,
+      studio: { cur: o.cur },
+      libActiveSi: () => 0,
+      script: [{ key: 'ANA', tcEff: 3600 }, { key: 'BETO', tcEff: 3610 }, { key: 'CARLA', tcEff: 3720 }],
+      charIdx: { ANA: { display: 'ANA' }, BETO: { display: 'BETO' }, CARLA: { display: 'CARLA' } },
+      QC_TIPO_POR_DEFECTO: 'ajuste', console: { warn: () => {}, log: () => {} } });
+  const BA = conSuena({ pt: 3719.9, cur: 2 }).qcBorrador();
+  t.eq('a una décima del siguiente, ya marcado, la corrección va al que todavía suena', BA.si + ' ' + BA.quien, '1 BETO');
+  const BB = conSuena({ pt: 3599, cur: 0 }).qcBorrador();
+  t.eq('antes del primero, el marcado', BB.si, 0);
   t.ok('el botón de coger el tiempo dice «ahora» cuando se sigue a Pro Tools',
        /\(qcTcAhora\(\) != null\s*\? '<button id="qcTcAqui" title="Coger el timecode que marca Pro Tools ahora mismo">ahora<\/button><\/div>'/.test(TODO));
   t.ok('y coger el tiempo no le quita al borrador el tipo elegido a mano',
