@@ -153,6 +153,66 @@ function qcpdfParrafos(txt){
   return partido.split(/\n+/).map(p => p.replace(/\s+/g, ' ').trim()).filter(Boolean);
 }
 
+/* ── Una celda con lo que cambió marcado ─────────────────────────────────── */
+
+/* Los colores de las marcas: lo que falta -escrito y no oído- en rojo y
+   tachado; lo que sobra o es distinto -oído y no escrito- en naranja. En gris
+   van igual pero sin color: el tachado y la negrita se ven igual. */
+const QCPDF_MARCAS = { f: [220, 38, 38], s: [234, 88, 12], c: [217, 119, 6] };
+
+/** ¿Es una celda de trozos marcados -`[{ t, m }]`- y no un texto? */
+function qcpdfEsTrozos(v){ return Array.isArray(v) && v.every(x => x && typeof x.t === 'string'); }
+
+/**
+ * Los renglones que ocupan unos trozos en un ancho: cada renglon es una lista
+ * de `{ t, m, w }` con su ancho medido. Se parte por palabras, nunca dentro de
+ * una; una palabra mas ancha que el renglon va sola en el suyo.
+ */
+function qcpdfRenglonesTrozos(doc, trozos, ancho){
+  const esp = doc.getTextWidth(' ');
+  const lineas = [[]];
+  let x = 0;
+  for(const tr of trozos){
+    const palabras = qcpdfTextoSeguro(tr.t).split(/\s+/).filter(Boolean);
+    /* Se mide con la letra con la que se va a pintar: lo que sobra va en
+       negrita, que es mas ancha, y medido en redonda la palabra siguiente se
+       le montaba encima. Se vio en la hoja: «Estuvede viaje». */
+    doc.setFont('helvetica', tr.m === 's' ? 'bold' : 'normal');
+    for(const w of palabras){
+      const anchoW = doc.getTextWidth(w);
+      const linea = lineas[lineas.length - 1];
+      if(linea.length && x + esp + anchoW > ancho){ lineas.push([]); x = 0; }
+      const l2 = lineas[lineas.length - 1];
+      l2.push({ t: w, m: tr.m || '', w: anchoW });
+      x += (l2.length > 1 ? esp : 0) + anchoW;
+    }
+  }
+  doc.setFont('helvetica', 'normal');
+  return lineas.filter(l => l.length);
+}
+
+/** Pinta unos renglones de trozos desde (x, y), un renglon cada `alto`. */
+function qcpdfPintarTrozos(doc, lineas, x, y, alto, P, tam){
+  const esp = doc.getTextWidth(' ');
+  for(const linea of lineas){
+    let cx = x;
+    for(const tr of linea){
+      const col = (tr.m && QCPDF_MARCAS[tr.m] && !P.plano) ? QCPDF_MARCAS[tr.m] : P.texto;
+      doc.setTextColor(col[0], col[1], col[2]);
+      doc.setFont('helvetica', tr.m === 's' ? 'bold' : 'normal');
+      doc.text(tr.t, cx, y);
+      /* Lo que falta va tachado: se ve tambien en gris y en una fotocopia. */
+      if(tr.m === 'f'){
+        doc.setDrawColor(col[0], col[1], col[2]); doc.setLineWidth(0.3);
+        doc.line(cx, y - tam * 0.12, cx + tr.w, y - tam * 0.12);
+      }
+      cx += tr.w + esp;
+    }
+    y += alto;
+  }
+  doc.setFont('helvetica', 'normal');
+}
+
 /* ── Dibujar ─────────────────────────────────────────────────────────────── */
 
 function qcpdfRect(doc, x, y, w, h, r, relleno, borde){
@@ -355,10 +415,13 @@ function qcpdfAltoFila(doc, fila, cols, anchos, paso){
   cols.forEach((c, i) => {
     /* La pastilla y el circulo no crecen: no pueden mandar sobre el alto. */
     if(c.clase === 'tipo' || c.clase === 'marca') return;
-    const parr = qcpdfParrafos(fila[i]);
     doc.setFont('helvetica', c.negrita ? 'bold' : 'normal');
-    let n = 0;
-    for(const p of parr) n += doc.splitTextToSize(p, anchos[i] - 4).length;
+    let n = 0, parr = [''];
+    if(qcpdfEsTrozos(fila[i])) n = qcpdfRenglonesTrozos(doc, fila[i], anchos[i] - 4).length;
+    else{
+      parr = qcpdfParrafos(fila[i]);
+      for(const p of parr) n += doc.splitTextToSize(p, anchos[i] - 4).length;
+    }
     const alto = 2.6 + n * (paso.fuente * 0.41) + (parr.length - 1) * 1.2;
     if(alto > max) max = alto;
   });
@@ -488,6 +551,12 @@ function qcpdfPintar(doc, d, paso, medir){
         doc.setFont('helvetica', c.negrita ? 'bold' : 'normal');
         doc.setFontSize(paso.fuente);
         let ty = y + 2.6 + paso.fuente * 0.30;
+        /* Una celda con lo que cambio marcado se pinta palabra a palabra. */
+        if(qcpdfEsTrozos(f[j])){
+          qcpdfPintarTrozos(doc, qcpdfRenglonesTrozos(doc, f[j], anchos[j] - 4), cx + 2, ty, paso.fuente * 0.41, P, paso.fuente);
+          cx += anchos[j];
+          return;
+        }
         for(const p of qcpdfParrafos(f[j])){
           const ls = doc.splitTextToSize(p, anchos[j] - 4);
           for(const l of ls){ doc.text(l, cx + 2, ty); ty += paso.fuente * 0.41; }
@@ -808,21 +877,38 @@ function qcpdfDeInforme(inf, opts){
     qué audio y qué inicio se cotejó, porque de eso depende todo lo demás. */
 function qcpdfDeCambios(lista, opts){
   opts = opts || {};
-  const l = lista || [];
-  const filas = l.map(c => [
+  const todos = lista || [];
+  /* Los cambios de verdad primero; los leves y los sin comprobar, aparte al
+     final, cada grupo con su rotulo, y NO cuentan como cambio. Pedido de sala. */
+  const cambios = todos.filter(c => c.nivel === 'mal' || c.nivel === 'dudoso');
+  const leves = todos.filter(c => c.nivel === 'leve');
+  const sin = todos.filter(c => c.nivel === 'sin');
+  const l = cambios;
+  const fila = (c) => [
     (typeof qcTC === 'function' ? qcTC(c.tcSec) : ''),
     c.quien || '',
-    c.escrito || '',
+    /* Con lo que cambio marcado palabra a palabra, si el analisis lo trae. */
+    (Array.isArray(c.escritoTrozos) && c.escritoTrozos.length) ? c.escritoTrozos : (c.escrito || ''),
     /* Lo no oído se dice: una celda en blanco parece que se olvidó. */
-    (c.oido && String(c.oido).trim()) ? c.oido : '(nada)',
+    (c.oido && String(c.oido).trim())
+      ? ((Array.isArray(c.oidoTrozos) && c.oidoTrozos.length) ? c.oidoTrozos : c.oido) : '(nada)',
     Math.round((+c.sim || 0) * 100) + ' % · ' + (c.et || (c.nivel === 'mal' ? 'no cuadra' : 'dudoso'))
-  ]);
+  ];
+  const filas = cambios.map(fila);
+  if(leves.length){
+    filas.push({ grupo: 'Cambios leves · conectores y palabras casi iguales · no cuentan como cambio' });
+    leves.forEach(c => filas.push(fila(c)));
+  }
+  if(sin.length){
+    filas.push({ grupo: 'Sin comprobar · parlamentos muy cortos de los que no se oyó nada claro · no cuentan' });
+    sin.forEach(c => filas.push(fila(c)));
+  }
   const mal = l.filter(c => c.nivel === 'mal').length;
   const dud = l.filter(c => c.nivel === 'dudoso').length;
   /* Cuántos parlamentos se analizaron en total. Nunca menos que los cambios
      que se enseñan: un «3 cambios de 2» no lo cree nadie. */
   const analizados = (isFinite(+opts.analizados) && +opts.analizados > 0)
-                       ? Math.max(l.length, Math.floor(+opts.analizados)) : 0;
+                       ? Math.max(todos.length, Math.floor(+opts.analizados)) : 0;
   const prog = String(opts.programa || 'Diálogos que cambiaron');
   const base = (prog + (opts.episodio ? (' ' + opts.episodio) : '')).replace(/[\\/:*?"<>|]/g, '-').trim();
   const pie = [];
@@ -846,9 +932,12 @@ function qcpdfDeCambios(lista, opts){
        que dice el informe cuando no hay cambios, y lo que da la medida cuando
        los hay. Las de los cambios, solo si tienen algo: una en cero no dice nada. */
     chips: [ analizados ? { k:'analizados', et:'Analizados', n:analizados, rgb:[71, 85, 105] } : null,
-             analizados ? { k:'coinciden',  et:'Coinciden',  n:analizados - l.length, rgb:[22, 163, 74] } : null,
+             analizados ? { k:'coinciden',  et:'Coinciden',  n:analizados - todos.length, rgb:[22, 163, 74] } : null,
              mal ? { k:'mal',    et:'No cuadran', n:mal, rgb:[220, 38, 38] }  : null,
-             dud ? { k:'dudoso', et:'Dudosos',    n:dud, rgb:[217, 119, 6] } : null ].filter(Boolean),
+             dud ? { k:'dudoso', et:'Dudosos',    n:dud, rgb:[217, 119, 6] } : null,
+             leves.length ? { k:'leve', et:'Leves', n:leves.length, rgb:[37, 99, 235] } : null,
+             sin.length ? { k:'sin', et:'Sin comprobar', n:sin.length, rgb:[100, 116, 139] } : null,
+             (isFinite(+opts.graficas) && +opts.graficas > 0) ? { k:'graficas', et:'Gráficas (no se doblan)', n:+opts.graficas, rgb:[100, 116, 139] } : null ].filter(Boolean),
     /* Los anchos salen de lo que tiene que CABER en un renglón, no de repartir
        a ojo: un timecode en negrita pide unos 25 mm y «41 % · no cuadra» unos
        31. Con menos se partían -«01:00:40:0» arriba y «7» abajo-, que se vio

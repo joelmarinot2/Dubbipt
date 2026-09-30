@@ -11,7 +11,7 @@
  * esa frontera es justo lo que se prueba abajo.
  */
 'use strict';
-const { montar, fuentes } = require('./ayuda');
+const { montar, fuentes, karNormReal } = require('./ayuda');
 
 exports.nombre = 'QC: las correcciones del capítulo, y de quién son';
 
@@ -393,10 +393,12 @@ exports.pruebas = async function(t){
      planos, para que los umbrales sean los mismos que en la hoja de cues. */
   const w = {};
   const C = montar([['/* ── 0 · Con qué se escucha', '/* ── 1 · Dónde hay voz'],
+                    /* Las palabras del análisis, las de verdad: las marcas se cuelgan de ellas. */
+                    ['/* ── 3 · Las palabras', '/* ── 4 · A qué parlamento'],
                     ['/* Desde cuánto parecido se avisa.', '/** El tiempo que ha tardado'],
                     ['/* ═══ QC · LOS DIÁLOGOS QUE CAMBIARON', '/** El panel con la lista']],
-                   ['qcCambiosLista', 'qcCambiosCuenta'],
-                   { window: w,
+                   ['qcCambiosLista', 'qcCambiosCuenta', 'qcTrozosEscrito', 'qcTrozosOido', 'qcTrozosHtml', 'qcGraficasCuenta'],
+                   { window: w, esc: (x) => String(x).replace(/</g, '&lt;'), karNorm: karNormReal(), ANA: { acotacion: 6, casi: 0.5 },
                      script: [ { tcEff: 3700, key: 'A', lines: ['Hola.'] },
                                { tcEff: 3650, key: 'B', lines: ['Adiós', 'amigo'] },
                                /* Antes que el de arriba en TIEMPO aunque vaya después en el
@@ -438,6 +440,45 @@ exports.pruebas = async function(t){
   const camF = C.qcCambiosLista();
   t.eq('con el oído fiel, una palabra distinta sale en la lista', camF.map(c => c.si + ':' + c.nivel).join(','), '0:dudoso',
        'la lista, la hoja de cues y el informe usan el mismo `cotejoAviso`');
+
+  t.seccion('12g2 · los leves y los sin comprobar van aparte, y lo que cambió se marca');
+  /* Pedido de sala con el informe de Dofus: los cambios leves -conectores,
+     palabras casi iguales- y los parlamentos muy cortos de los que no se oyó
+     nada no cuentan como cambio, y en el texto se marca qué palabra cambió. */
+  w._cotejo = { 1: { sim: 0.3, dif: 2, pesada: 2, o: 'fiel', oido: 'otra cosa', me: 'ff', mo: 'ss' },     // no cuadra
+                2: { sim: 0.9, dif: 1, pesada: 0, o: 'fiel', oido: 'regular pues', me: 'i', mo: 'is' },  // leve
+                4: { sim: 0, dif: 1, pesada: 1, n: 0, corto: true, o: 'fiel', oido: '', me: 'f', mo: '' }, // sin comprobar
+                5: { sim: 0.5, dif: 0.5, pesada: 0, o: 'fiel', oido: 'casis', me: 'c', mo: 'c' } };        // leve (casi)
+  const camL = C.qcCambiosLista();
+  t.eq('cada uno con su nivel', camL.map(c => c.si + ':' + c.nivel).join(','), '2:leve,1:mal,4:sin,5:leve');
+  const cntL = C.qcCambiosCuenta(camL);
+  t.eq('solo los que cuentan cuentan: leves y sin comprobar, aparte', [cntL.mal, cntL.dudosos, cntL.leves, cntL.sin, cntL.total].join('/'), '1/0/2/1/1');
+  t.eq('el sin comprobar lo dice', camL.find(c => c.si === 4).et, 'sin comprobar');
+  t.eq('en lo escrito, la palabra que no se oyó va marcada como que falta',
+       JSON.stringify(camL.find(c => c.si === 1).escritoTrozos), '[{"t":"Adiós","m":"f"},{"t":"amigo","m":"f"}]');
+  t.eq('y en lo oído, la que sobra', JSON.stringify(camL.find(c => c.si === 2).oidoTrozos), '[{"t":"regular","m":""},{"t":"pues","m":"s"}]');
+  t.eq('la casi igual, como casi, en los dos lados', camL.find(c => c.si === 5).escritoTrozos[0].m + camL.find(c => c.si === 5).oidoTrozos[0].m, 'cc');
+  /* Las marcas se cuelgan de las palabras tal como están escritas: las
+     acotaciones y los signos no se compararon y van sin marca. */
+  t.eq('las acotaciones van sin marca y no descolocan las demás',
+       JSON.stringify(C.qcTrozosEscrito('(JADEA) ¿Tú? Bueno.', 'fi')), '[{"t":"(JADEA)","m":""},{"t":"¿Tú?","m":"f"},{"t":"Bueno.","m":""}]');
+  t.eq('un número que son varias palabras se lleva la peor de sus marcas',
+       JSON.stringify(C.qcTrozosEscrito('Son 1.500', 'iif')), '[{"t":"Son","m":""},{"t":"1.500","m":"f"}]');
+  t.eq('si el texto ya no es el que se analizó, sin marcas', C.qcTrozosEscrito('Otra frase distinta', 'fi'), null,
+       'mejor nada que una marca en la palabra que no es');
+  t.eq('lo oído sin sus marcas tampoco se marca', C.qcTrozosOido('a b c', 'is'), null);
+  t.eq('en HTML, cada marca con su clase', C.qcTrozosHtml([{ t: 'Hola', m: '' }, { t: 'amigo', m: 'f' }, { t: 'x', m: 's' }, { t: 'y', m: 'c' }]),
+       'Hola <mark class="qc-falta">amigo</mark> <mark class="qc-sobra">x</mark> <mark class="qc-casi">y</mark>');
+  t.eq('y sin trozos, el texto llano', C.qcTrozosHtml(null, 'a < b'), 'a &lt; b');
+  t.eq('sin gráficas en este libreto', C.qcGraficasCuenta(), 0);
+  t.ok('el panel enseña los leves y los sin comprobar plegados, aparte de los cambios',
+       /<details class="qc-grupo"><summary>' \+ levesL\.length/.test(TODO) && /<details class="qc-grupo"><summary>' \+ sinL\.length/.test(TODO)
+       && /\+ \(cambios\.length \? cambios\.map\(item\)\.join\(''\)/.test(TODO),
+       'la lista de arriba son solo los cambios: los leves no se mezclan con ellos');
+  t.ok('y explica las marcas', /<mark class="qc-falta">Tachado<\/mark>, lo escrito que no se oyó; <mark class="qc-sobra">naranja<\/mark>/.test(TODO));
+  t.ok('al volver de la nube, las marcas y lo que decide el nivel vuelven con el resultado',
+       /if\(typeof r\.me === 'string' && \/\^\[icfs\]\*\$\/\.test\(r\.me\)\) c\.me = r\.me;/.test(TODO)
+       && /if\(r\.corto === true\) c\.corto = true;/.test(TODO));
 
   t.seccion('12h · nada se apunta solo como corrección');
   /* QC-2: el reconocedor señala; quien firma es una persona. Desde la lista

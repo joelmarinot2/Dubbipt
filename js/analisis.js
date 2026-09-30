@@ -48,6 +48,8 @@ const ANA = {
   hueco: 0.3,       // el silencio que queda entre dos trozos dentro de un tramo
   margen: 1.2,      // cuánto puede salirse una palabra de la ventana de su parlamento
   holgura: 0.3,     // lo que no se fía uno de los bordes de esa ventana
+  holguraGruesa: 1, // ...y con los timecodes en segundos enteros, que pueden ir un segundo largos
+  corto: 3,         // un parlamento de estas palabras o menos es «muy corto»: casi no se oye
   acotacion: 6,     // palabras que puede durar un paréntesis sin cerrar
   casi: 0.5,        // lo que cuenta una palabra casi igual: una letra de más o de menos
   trabajadores: 4,  // como mucho, por muchos núcleos que haya
@@ -169,11 +171,26 @@ function anaEstima(clave, voz){
  */
 function anaAviso(r, mal, dudoso){
   if(!r || !isFinite(+r.sim)) return null;
+  /* Muy corto -tres palabras o menos- y no cuadra. Pedido de sala: «el
+     tiempo es muy corto y coge el audio de otros personajes». Un «¿Tú?» del
+     que no se oye nada, o se oye una palabra de otro, no es un cambio: queda
+     SIN COMPROBAR y no cuenta. Solo es cambio si se oye claramente otra
+     frase: dos palabras o más, y que pesen. */
+  if(r.corto && +r.sim < mal) return (+r.n >= 2 && +r.pesada >= 2) ? 'mal' : 'sin';
   if(+r.sim < mal) return 'mal';
+  /* Algo no cuadra pero lo que falta o sobra son palabras ligeras -un «y»
+     por «además», un «bueno» delante- o palabras casi iguales: un cambio
+     LEVE, de los que se hacen en el estudio para que entre en boca. No cuenta
+     como cambio; se lista aparte. Solo si el análisis trae las marcas. */
+  const conMarcas = isFinite(+r.pesada) && isFinite(+r.dif);
+  if(conMarcas && +r.dif > 1e-9 && +r.pesada === 0) return 'leve';
   const oido = (r.o && Object.prototype.hasOwnProperty.call(ANA_OIDOS, r.o)) ? ANA_OIDOS[r.o] : null;
   if(!oido || !isFinite(+r.dif)) return (+r.sim < dudoso) ? 'dudoso' : null;
   return (+r.dif >= oido.dif - 1e-9 || +r.sim < oido.u) ? 'dudoso' : null;
 }
+
+/** Los avisos que cuentan como CAMBIO: los otros dos se listan aparte. */
+function anaCuentaComoCambio(nivel){ return nivel === 'mal' || nivel === 'dudoso'; }
 
 /* ── 1 · Dónde hay voz ────────────────────────────────────────────────────── */
 
@@ -402,23 +419,81 @@ function anaFonetica(p){
     .replace(/([bdfjklmnpstx§])\1+/g, '$1');   // «sc» delante de e: una sola ese
 }
 
+/** Las palabras de una palabra escrita, listas para comparar: ninguna si es
+    solo signos, una normalmente, varias si es un número («1.500»). */
+function anaPalabra(w){
+  if(!w) return [];
+  /* Las cifras con su punto de millar -«1.500»- son un número, no dos. */
+  const cifras = w.replace(/^[^\d\p{L}]+|[^\d\p{L}]+$/gu, '');
+  if(/^\d{1,3}([.,]\d{3})+$/.test(cifras) || /^\d+$/.test(cifras)){
+    const letras = anaNumero(parseInt(cifras.replace(/[.,]/g, ''), 10));
+    if(letras) return letras.map(l => anaFonetica(l));
+  }
+  const p = anaFonetica(karNorm(w));
+  return p ? [p] : [];
+}
+
+/**
+ * Un texto partido en TROZOS que se pueden volver a pintar: cada acotación
+ * entera, y cada palabra con sus signos. Cada trozo lleva sus palabras para
+ * comparar (`p`, ninguna en una acotación o en un signo suelto). Es lo que
+ * permite marcar en el texto tal como está escrito qué palabra no se oyó.
+ */
+function anaTrozos(texto){
+  const out = [];
+  const s = String(texto == null ? '' : texto);
+  /* Una palabra se lleva las rayas pegadas -«—dijo—»- para pintarse como
+     está; entre dos palabras, la raya parte: «bien-estar» son dos. */
+  const re = /\[[^\]]*\]|\([^)]*\)|\*[^*]*\*|[\-–—]*[^\s\-–—\/\[\(\*]+[\-–—]*|[\-–—\/]+/gu;
+  let m;
+  while((m = re.exec(s))){
+    const txt = m[0];
+    const acot = /^[\[(*]/.test(txt);
+    out.push({ txt: txt, acot: acot, p: (acot || /^[\-–—\/]+$/.test(txt)) ? [] : anaPalabra(txt) });
+  }
+  return out;
+}
+
 /** Las palabras de un texto, listas para comparar: sin tildes, sin signos, sin
     acotaciones, con los números en letras y escritas como suenan. */
 function anaPalabras(texto){
   const out = [];
-  anaSinAcotaciones(texto).split(/[\s\-–—\/]+/).forEach(w => {
-    if(!w) return;
-    /* Las cifras con su punto de millar -«1.500»- son un número, no dos. */
-    const cifras = w.replace(/^[^\d\p{L}]+|[^\d\p{L}]+$/gu, '');
-    if(/^\d{1,3}([.,]\d{3})+$/.test(cifras) || /^\d+$/.test(cifras)){
-      const letras = anaNumero(parseInt(cifras.replace(/[.,]/g, ''), 10));
-      if(letras){ letras.forEach(l => out.push(anaFonetica(l))); return; }
-    }
-    const p = anaFonetica(karNorm(w));
-    if(p) out.push(p);
-  });
+  anaTrozos(texto).forEach(t => t.p.forEach(p => out.push(p)));
   return out;
 }
+
+/*
+ * Lo que no se dobla: los rótulos que salen en pantalla. En el libreto vienen
+ * como un «personaje» -TEXTO, GRÁFICA, INSERTO...- y el reconocedor, claro, no
+ * oye nada: cada uno salía como «no cuadra». Pedido de sala, con el libreto de
+ * Dofus delante: «hay cambios que hay que obviar, como las gráficas que no se
+ * doblan». Ni se analizan ni salen en el informe.
+ */
+const ANA_GRAFICAS = ['TEXTO', 'GRAFICA', 'GRAFICAS', 'GRAFICO', 'INSERTO', 'INSERTOS', 'CARTEL', 'CARTELES',
+                      'LETRERO', 'LETREROS', 'ROTULO', 'ROTULOS', 'TITULO', 'TITULOS', 'SUBTITULO', 'SUBTITULOS',
+                      'PANTALLA', 'TEXTO EN PANTALLA', 'CREDITOS'];
+function anaEsGrafica(nombre){
+  const n = String(nombre == null ? '' : nombre).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  if(!n) return false;
+  return ANA_GRAFICAS.some(g => n === g || n.indexOf(g + ' ') === 0);
+}
+
+/*
+ * Lo que pesa poco: conectores, artículos, muletillas. Quitar o poner una de
+ * estas es un cambio LEVE, de los que se hacen en el estudio para que la frase
+ * entre en boca -«y» por «además», un «bueno» delante, un «que» de menos-, y
+ * no cambia lo que se dice. Pedido de sala. No está el «no», ni «nunca», ni
+ * «nadie»: quitar una negación cambia la frase entera.
+ */
+const ANA_LIGERAS_LISTA = ['y', 'e', 'o', 'u', 'a', 'de', 'del', 'al', 'el', 'la', 'lo', 'los', 'las', 'un', 'una',
+  'unos', 'unas', 'que', 'pues', 'bueno', 'ya', 'es', 'en', 'con', 'por', 'para', 'se', 'me', 'te', 'le', 'les', 'nos',
+  'mi', 'tu', 'su', 'mis', 'tus', 'sus', 'muy', 'mas', 'pero', 'ademas', 'entonces', 'oye', 'eh', 'ah', 'ay', 'oh',
+  'uy', 'ey', 'bien', 'asi', 'ahi', 'aqui', 'alli', 'tambien', 'como', 'si', 'ahora', 'luego', 'claro', 'vale',
+  'venga', 'anda', 'mira', 'vamos', 'digo', 'esto', 'eso', 'este', 'esta', 'ese', 'esa', 'aquel', 'aquella',
+  'hay', 'tan', 'solo', 'algo', 'pues', 'este', 'em', 'mm'];
+const ANA_LIGERAS = new Set(ANA_LIGERAS_LISTA.map(w => anaFonetica(w)));
+function anaLigera(p){ return ANA_LIGERAS.has(p); }
 
 /**
  * Dos palabras dichas seguidas, juntas como SUENAN: cuando una acaba con la
@@ -448,36 +523,49 @@ function anaUnir(x, y){
  * Devuelve `[escritas, oidas]`, las dos ya juntadas.
  */
 function anaJuntar(a, b){
+  const [x, y] = anaJuntarIx(a, b);
+  return [x.map(t => t.p), y.map(t => t.p)];
+}
+
+/**
+ * Lo mismo, pero cada palabra juntada sabe DE QUÉ palabras salió: `[{ p, ix }]`,
+ * con `ix` los índices en la lista de entrada. Hace falta para marcar en el
+ * texto original qué palabra no se oyó cuando la que no se oyó era una de dos
+ * que se juntaron.
+ */
+function anaJuntarIx(a, b){
+  const t = (lista) => (lista || []).map((p, i) => ({ p: p, ix: [i] }));
+  const fundir = (u, v, p) => ({ p: p, ix: u.ix.concat(v.ix) });
   /* Dos de `lado` que juntas son una de `otro`: fundidas o tal cual, que
      «leer» partido en «le er» también es «leer». */
   const uno = (lado, otro) => {
-    const hay = new Set(otro);
+    const hay = new Set(otro.map(o => o.p));
     const out = [];
     for(let j = 0; j < lado.length; j++){
       let k = null;
-      if(j + 1 < lado.length && !(hay.has(lado[j]) && hay.has(lado[j + 1]))){
-        const f = anaUnir(lado[j], lado[j + 1]), t = lado[j] + lado[j + 1];
-        k = hay.has(f) ? f : (hay.has(t) ? t : null);
+      if(j + 1 < lado.length && !(hay.has(lado[j].p) && hay.has(lado[j + 1].p))){
+        const f = anaUnir(lado[j].p, lado[j + 1].p), tt = lado[j].p + lado[j + 1].p;
+        k = hay.has(f) ? f : (hay.has(tt) ? tt : null);
       }
-      if(k){ out.push(k); j++; }
+      if(k){ out.push(fundir(lado[j], lado[j + 1], k)); j++; }
       else out.push(lado[j]);
     }
     return out;
   };
-  const b1 = uno(b, a);
-  const a1 = uno(a, b1);
+  const b1 = uno(t(b), t(a));
+  const a1 = uno(t(a), b1);
   /* Dos de `lado` que juntas suenan como dos de `otro` juntas. */
   const dos = (lado, otro) => {
     const juntas = new Set(), tal = new Set();
     for(let i = 0; i + 1 < otro.length; i++){
-      juntas.add(anaUnir(otro[i], otro[i + 1]));
-      tal.add(otro[i] + ' ' + otro[i + 1]);
+      juntas.add(anaUnir(otro[i].p, otro[i + 1].p));
+      tal.add(otro[i].p + ' ' + otro[i + 1].p);
     }
     const out = [];
     for(let i = 0; i < lado.length; i++){
       if(i + 1 < lado.length){
-        const k = anaUnir(lado[i], lado[i + 1]);
-        if(juntas.has(k) && !tal.has(lado[i] + ' ' + lado[i + 1])){ out.push(k); i++; continue; }
+        const k = anaUnir(lado[i].p, lado[i + 1].p);
+        if(juntas.has(k) && !tal.has(lado[i].p + ' ' + lado[i + 1].p)){ out.push(fundir(lado[i], lado[i + 1], k)); i++; continue; }
       }
       out.push(lado[i]);
     }
@@ -493,15 +581,51 @@ function anaJuntar(a, b){
  * «estás», «puede» por «puedes»— o le sobra una letra —«dejen» por «dejé»—.
  * Cambiar una letra por OTRA no es casi lo mismo: «niño» y «niña», «hijo» e
  * «hija» son cambios de verdad, y un reconocedor bueno no los confunde.
+ *
+ * Salvo en las palabras LARGAS. Con los nombres propios el reconocedor
+ * escribe lo que le suena -«Liluta» por «Lilota», «Gordias» por «Guardias»,
+ * visto en el informe de Dofus- y eso salía como cambio. En una de seis letras
+ * o más, una letra cambiada por otra es casi la misma; en una de siete o más,
+ * dos letras de diferencia. En una corta, no: «hija» sigue sin ser «hijo».
  */
 function anaCasi(x, y){
   x = x || ''; y = y || '';
+  if(x === y) return false;
   const c = x.length < y.length ? x : y;
   const l = x.length < y.length ? y : x;
-  if(c.length < 2 || l.length !== c.length + 1) return false;
-  let i = 0;
-  while(i < c.length && c[i] === l[i]) i++;
-  return c.slice(i) === l.slice(i + 1);
+  if(c.length < 2) return false;
+  if(l.length === c.length + 1){
+    let i = 0;
+    while(i < c.length && c[i] === l[i]) i++;
+    if(c.slice(i) === l.slice(i + 1)) return true;
+  }
+  if(c.length >= 6 && l.length === c.length){
+    let d = 0;
+    for(let i = 0; i < c.length; i++) if(c[i] !== l[i] && ++d > 1) break;
+    if(d === 1) return true;
+  }
+  if(c.length >= 7 && l.length - c.length <= 2) return anaDistancia(c, l, 2) <= 2;
+  return false;
+}
+
+/** Cuántas letras hay que cambiar, quitar o poner para pasar de una palabra a
+    otra, sin pasar de `tope` (más allá da igual cuántas). */
+function anaDistancia(x, y, tope){
+  const m = x.length, n = y.length;
+  if(Math.abs(m - n) > tope) return tope + 1;
+  let prev = new Int32Array(n + 1), cur = new Int32Array(n + 1);
+  for(let j = 0; j <= n; j++) prev[j] = j;
+  for(let i = 1; i <= m; i++){
+    cur[0] = i;
+    let fila = i;
+    for(let j = 1; j <= n; j++){
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1));
+      if(cur[j] < fila) fila = cur[j];
+    }
+    if(fila > tope) return tope + 1;
+    const t = prev; prev = cur; cur = t;
+  }
+  return prev[n];
 }
 
 /**
@@ -559,19 +683,49 @@ function anaOidas(items, mapa){
  * entiende; un 88 % no—.
  */
 function anaCasar(a0, b0){
-  const [a, b] = anaJuntar(a0 || [], b0 || []);
+  a0 = a0 || []; b0 = b0 || [];
+  const [ta, tb] = anaJuntarIx(a0, b0);
+  const a = ta.map(t => t.p), b = tb.map(t => t.p);
   const m = a.length, n = b.length;
-  if(!m || !n) return { comunes: 0, sim: 0, dif: Math.max(m, n) };
-  let prev = new Float64Array(n + 1), cur = new Float64Array(n + 1);
+  /* Las marcas: por cada palabra de ENTRADA, qué le pasó. `i` igual, `c` casi
+     igual, `f` falta (escrita y no oída), `s` sobra (oída y no escrita). Con
+     ellas se pinta qué cambió, y con las que faltan y sobran se sabe si el
+     cambio pesa (`pesada`: cuántas de esas no son palabras ligeras). */
+  const me = new Array(a0.length).fill('f'), mo = new Array(b0.length).fill('s');
+  const pesa = () => {
+    let p = 0;
+    me.forEach((k, i) => { if(k === 'f' && !anaLigera(a0[i])) p++; });
+    mo.forEach((k, j) => { if(k === 's' && !anaLigera(b0[j])) p++; });
+    return p;
+  };
+  if(!m || !n) return { comunes: 0, sim: 0, dif: Math.max(m, n), me: me.join(''), mo: mo.join(''), pesada: pesa() };
+  /* La tabla entera, para poder volver atrás y saber QUÉ casó con qué. */
+  const T = new Float64Array((m + 1) * (n + 1));
+  const E = new Uint8Array((m + 1) * (n + 1));           // 1 igual, 2 casi, 0 nada
+  const at = (i, j) => i * (n + 1) + j;
   for(let i = 1; i <= m; i++){
     for(let j = 1; j <= n; j++){
       const e = (a[i - 1] === b[j - 1]) ? 1 : (anaCasi(a[i - 1], b[j - 1]) ? ANA.casi : 0);
-      cur[j] = Math.max(prev[j], cur[j - 1], e ? prev[j - 1] + e : 0);
+      E[at(i, j)] = e === 1 ? 1 : (e ? 2 : 0);
+      T[at(i, j)] = Math.max(T[at(i - 1, j)], T[at(i, j - 1)], e ? T[at(i - 1, j - 1)] + e : 0);
     }
-    const t = prev; prev = cur; cur = t; cur.fill(0);
   }
-  const mas = Math.max(m, n);
-  return { comunes: prev[n], sim: prev[n] / mas, dif: mas - prev[n] };
+  /* Atrás: de la esquina al origen, por donde vino el mejor parecido. Un
+     empate se resuelve a favor de casar, que es lo que se quiere enseñar. */
+  let i = m, j = n;
+  while(i > 0 && j > 0){
+    const e = E[at(i, j)];
+    const diag = e ? T[at(i - 1, j - 1)] + (e === 1 ? 1 : ANA.casi) : -1;
+    if(e && Math.abs(T[at(i, j)] - diag) < 1e-9){
+      const k = e === 1 ? 'i' : 'c';
+      ta[i - 1].ix.forEach(x => { me[x] = k; });
+      tb[j - 1].ix.forEach(x => { mo[x] = k; });
+      i--; j--;
+    }else if(T[at(i - 1, j)] >= T[at(i, j - 1)]) i--;
+    else j--;
+  }
+  const mas = Math.max(m, n), comunes = T[at(m, n)];
+  return { comunes: comunes, sim: comunes / mas, dif: mas - comunes, me: me.join(''), mo: mo.join(''), pesada: pesa() };
 }
 
 /**
@@ -589,7 +743,8 @@ function anaCasar(a0, b0){
  *     dicho un poco tarde, o el principio del siguiente.
  * De todos los repartos posibles se queda el que más se parece.
  */
-function anaParlamento(escritas, v0, v1, oidas){
+function anaParlamento(escritas, v0, v1, oidas, holgura){
+  const H = (holgura != null && isFinite(+holgura)) ? +holgura : ANA.holgura;
   let c0 = -1, c1 = -1, m0 = -1, m1 = -1;
   for(let i = 0; i < oidas.length; i++){
     const t = oidas[i].t;
@@ -597,9 +752,10 @@ function anaParlamento(escritas, v0, v1, oidas){
     if(t > v1 + ANA.margen) break;
     if(c0 < 0) c0 = i;
     c1 = i + 1;
-    if(t >= v0 + ANA.holgura && t <= v1 - ANA.holgura){ if(m0 < 0) m0 = i; m1 = i + 1; }
+    if(t >= v0 + H && t <= v1 - H){ if(m0 < 0) m0 = i; m1 = i + 1; }
   }
-  if(c0 < 0) return { sim: 0, oido: '', n: 0, dif: escritas.length };
+  if(c0 < 0) return { sim: 0, oido: '', n: 0, dif: escritas.length, me: 'f'.repeat(escritas.length), mo: '',
+                      pesada: escritas.filter(p => !anaLigera(p)).length };
 
   let mejor = null;
   const probar = (i0, i1) => {
@@ -611,7 +767,7 @@ function anaParlamento(escritas, v0, v1, oidas){
     if(!mejor || c.sim > mejor.sim + 1e-9
        || (Math.abs(c.sim - mejor.sim) <= 1e-9 && (c.comunes > mejor.comunes + 1e-9
            || (Math.abs(c.comunes - mejor.comunes) <= 1e-9 && (i1 - i0) < (mejor.i1 - mejor.i0)))))
-      mejor = { sim: c.sim, comunes: c.comunes, dif: c.dif, i0: i0, i1: i1 };
+      mejor = { sim: c.sim, comunes: c.comunes, dif: c.dif, i0: i0, i1: i1, me: c.me, mo: c.mo, pesada: c.pesada };
   };
   if(m0 >= 0){
     for(let i0 = c0; i0 <= m0; i0++) for(let i1 = m1; i1 <= c1; i1++) probar(i0, i1);
@@ -619,10 +775,18 @@ function anaParlamento(escritas, v0, v1, oidas){
     /* Nada cae bien dentro: o no se dijo, o se dijo pegado a un borde. */
     for(let i0 = c0; i0 <= c1; i0++) for(let i1 = i0; i1 <= c1; i1++) probar(i0, i1);
   }
-  const txt = [];
-  for(let i = mejor.i0; i < mejor.i1; i++) if(oidas[i].txt) txt.push(oidas[i].txt);
+  /* Lo oído, como lo escribió el reconocedor, y la marca de cada trozo suyo.
+     Una palabra que se convirtió en varias -«42»- lleva el texto una vez y la
+     peor de sus marcas. */
+  const txt = [], mo = [];
+  const peor = (a, b) => (a === 's' || b === 's') ? 's' : ((a === 'c' || b === 'c') ? 'c' : 'i');
+  for(let i = mejor.i0; i < mejor.i1; i++){
+    const k = mejor.mo[i - mejor.i0] || 's';
+    if(oidas[i].txt){ txt.push(oidas[i].txt); mo.push(k); }
+    else if(mo.length) mo[mo.length - 1] = peor(mo[mo.length - 1], k);
+  }
   return { sim: mejor.sim, oido: txt.join(' ').replace(/\s+/g, ' ').trim(), n: mejor.i1 - mejor.i0,
-           dif: mejor.dif };
+           dif: mejor.dif, me: mejor.me, mo: mo.join(''), pesada: mejor.pesada };
 }
 
 /**
@@ -633,7 +797,8 @@ function anaParlamento(escritas, v0, v1, oidas){
  * caen FUERA del audio —no se pueden comparar, y no es lo mismo que no haberse
  * dicho— y cuántos no traen nada que decir, que son solo acotaciones.
  */
-function anaRepartir(ventanas, oidas, duracion){
+function anaRepartir(ventanas, oidas, duracion, opts){
+  opts = opts || {};
   const lista = (oidas || []).slice().sort((a, b) => a.t - b.t);
   const por = {};
   let fuera = 0, sinTexto = 0;
@@ -642,10 +807,30 @@ function anaRepartir(ventanas, oidas, duracion){
     if(v.v1 <= 0 || v.v0 >= duracion){ fuera++; continue; }
     const escritas = anaPalabras(v.texto);
     if(!escritas.length){ sinTexto++; continue; }
-    const r = anaParlamento(escritas, +v.v0, +v.v1, lista);
-    por[v.si] = { sim: +r.sim.toFixed(3), dif: +(+r.dif || 0).toFixed(1), oido: String(r.oido || '').slice(0, 300) };
+    const r = anaParlamento(escritas, +v.v0, +v.v1, lista, opts.holgura);
+    const o = { sim: +r.sim.toFixed(3), dif: +(+r.dif || 0).toFixed(1), oido: String(r.oido || '').slice(0, 300),
+                n: r.n, pesada: r.pesada, me: r.me, mo: r.mo };
+    /* Muy corto: tres palabras dichas o menos. Se apunta, que de eso depende
+       cómo se avisa (anaAviso). */
+    if(escritas.length <= ANA.corto) o.corto = true;
+    por[v.si] = o;
   }
   return { por: por, fuera: fuera, sinTexto: sinTexto };
+}
+
+/**
+ * Con qué holgura mirar los bordes de las ventanas. Los timecodes de muchos
+ * libretos vienen en segundos ENTEROS -Dofus: 00:04:12-, así que el parlamento
+ * empieza en cualquier momento de ese segundo y el de antes puede alargarse
+ * dentro de él: con la holgura de siempre, el «hecha» final de Julith caía
+ * «bien dentro» del parlamento del soldado y se le colgaba a la fuerza. Si
+ * todos los timecodes son enteros, un segundo de holgura; si traen fotogramas,
+ * la de siempre.
+ */
+function anaHolgura(tcs){
+  const l = (tcs || []).filter(t => isFinite(+t));
+  if(!l.length) return ANA.holgura;
+  return l.every(t => Math.abs(+t - Math.round(+t)) < 1e-6) ? ANA.holguraGruesa : ANA.holgura;
 }
 
 /* ── 5 · El reparto del trabajo ──────────────────────────────────────────── */
@@ -919,14 +1104,17 @@ async function anaTranscribirAqui(pcm, tramos, o){
 /** Las ventanas de los parlamentos, en segundos del audio. */
 function anaVentanas(){
   const out = [];
+  out.graficas = 0;
   for(let si = 0; si < script.length; si++){
     const b = script[si];
     if(!b || b.tcEff == null) continue;
+    /* Los rótulos en pantalla no se doblan: ni se analizan. */
+    if(anaEsGrafica(b.who || b.key || b.display)){ out.graficas++; continue; }
     const texto = (b.lines || []).join(' ');
     if(!texto.trim()) continue;
     const ven = karVentana(si);
     if(!ven) continue;
-    out.push({ si: si, texto: texto, v0: karVid(ven[0]), v1: karVid(ven[1]) });
+    out.push({ si: si, texto: texto, v0: karVid(ven[0]), v1: karVid(ven[1]), tc: +b.tcEff });
   }
   return out;
 }

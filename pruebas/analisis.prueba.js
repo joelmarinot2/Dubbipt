@@ -49,7 +49,7 @@ function almacen(inicial, roto){
 function oidos(ls){
   return montar([R_OIDOS],
     ['ANA_OIDOS', 'ANA_OIDO_DEFECTO', 'ANA_OIDO_GUARDADO', 'ANA_RITMO_GUARDADO', 'anaOido', 'anaOidoElegido',
-     'anaOidoElegir', 'anaRitmo', 'anaRitmoGuardar', 'anaEstima', 'anaAviso'],
+     'anaOidoElegir', 'anaRitmo', 'anaRitmoGuardar', 'anaEstima', 'anaAviso', 'anaCuentaComoCambio'],
     { localStorage: ls || almacen(), console: callado });
 }
 
@@ -58,7 +58,8 @@ function logica(ana){
   return montar([R_VOZ, R_TRAMOS, R_PALAB, R_REPARTO],
     ['anaEnergia', 'anaUmbral', 'anaVoces', 'anaPartir', 'anaTramos', 'anaMontar', 'anaTiempo',
      'anaNumero', 'anaSinAcotaciones', 'anaFonetica', 'anaPalabras', 'anaUnir', 'anaJuntar', 'anaCasi', 'anaOidas',
-     'anaCasar', 'anaParlamento', 'anaRepartir'],
+     'anaCasar', 'anaParlamento', 'anaRepartir',
+     'anaTrozos', 'anaEsGrafica', 'anaLigera', 'anaJuntarIx', 'anaDistancia', 'anaHolgura', 'ANA_GRAFICAS'],
     { ANA: ana || REAL.ANA, karNorm: karNormReal(), console: callado });
 }
 
@@ -381,6 +382,106 @@ exports.pruebas = async function(t){
                         L.anaPalabras('Mamá pregunta por ti todos los días y todas las noches sin parar.'));
   t.eq('seis añadidas son seis', c6.dif, 6);
   t.eq('contra nada, todas', L.anaCasar(['a', 'b', 'c'], []).dif, 3);
+
+  t.seccion('6c · lo que no se dobla, lo que pesa poco y lo que cambió, marcado');
+  /* Pedido de sala, con el informe de Dofus delante: 568 «cambios» de 710
+     parlamentos, y la mayoría no lo eran. */
+  ['TEXTO', 'GRÁFICA', 'Gráfica', 'INSERTO', 'CARTEL', 'LETRERO', 'RÓTULO', 'TÍTULO', 'TEXTO 2', 'GRÁFICA EN PANTALLA']
+    .forEach(g => t.ok('«' + g + '» es una gráfica: no se dobla', L.anaEsGrafica(g)));
+  ['JORIS', 'NARRADORA', 'TEXTORIO', 'CARTELERO', 'REY DE BONTA', '', null]
+    .forEach(g => t.ok('«' + g + '» no lo es', !L.anaEsGrafica(g)));
+  const una = (x) => L.anaPalabras(x)[0];
+  t.ok('«y», «además», «bueno», «pues» pesan poco', ['y', 'además', 'bueno', 'pues', 'que', 'muy'].every(x => L.anaLigera(una(x))));
+  t.ok('«no», «nunca», «casa», «Bakara» pesan', ['no', 'nunca', 'casa', 'Bakara', 'nadie'].every(x => !L.anaLigera(una(x))),
+       'quitar una negación cambia la frase entera');
+  /* Los nombres propios, que el reconocedor escribe como le suenan. */
+  t.ok('«liluta» es casi «lilota»: una letra cambiada en una palabra larga', L.anaCasi(L.anaFonetica('Liluta'), L.anaFonetica('Lilota')));
+  t.ok('«gordias» es casi «guardias»: dos letras en una de siete', L.anaCasi(una('Gordias'), una('Guardias')));
+  t.ok('pero «hija» sigue sin ser «hijo», ni «casa» «cosa»', !L.anaCasi('ija', 'ijo') && !L.anaCasi('kasa', 'kosa'),
+       'en una palabra corta, una letra cambiada es otra palabra');
+  t.ok('ni dos letras en una de seis', !L.anaCasi('lilota', 'lulita'));
+  t.ok('ni cuatro letras en una de siete: «palabra» no es «palomar»', !L.anaCasi('palabra', 'palomar'));
+  t.eq('la distancia entre palabras, con tope', [L.anaDistancia('gordias', 'guardias', 2), L.anaDistancia('abc', 'xyz', 2), L.anaDistancia('igual', 'igual', 2)].join(','), '2,3,0');
+  t.eq('más allá del tope da igual cuántas: se para y dice tope más uno', L.anaDistancia('aaaaaaa', 'bbbbbbb', 2), 3);
+  /* Los trozos: cada palabra con sus signos, cada acotación entera. */
+  const tz = L.anaTrozos('(JADEA) ¿Tú? Bueno, 1.500 —dijo— (RÍE)');
+  t.eq('cada palabra es un trozo con sus signos, y cada acotación uno sin palabras',
+       tz.map(x => x.txt + ':' + x.p.length).join('|'), '(JADEA):0|¿Tú?:1|Bueno,:1|1.500:2|—dijo—:1|(RÍE):0');
+  t.eq('una raya entre dos palabras parte, como siempre', L.anaTrozos('bien-estar').map(x => x.txt).join('|'), 'bien-|estar');
+  t.eq('y las palabras de los trozos son las de siempre', tz.reduce((a, x) => a.concat(x.p), []).join(' '), L.anaPalabras('Tú bueno mil quinientos dijo').join(' '));
+  /* Las marcas: qué palabra faltó, cuál sobró, cuál es casi. */
+  const M1 = L.anaCasar(L.anaPalabras('Tampoco es que me cambie tanto, y un huérfano puede elegir.'),
+                        L.anaPalabras('Tampoco es que me cambié tanto. Además, un huérfano puede elegir.'));
+  t.eq('en lo escrito, la «y» falta', M1.me, 'iiiiiifiiii');
+  t.eq('en lo oído, «además» sobra', M1.mo, 'iiiiiisiiii');
+  t.eq('y como las dos pesan poco, el cambio no pesa', M1.pesada, 0);
+  const M2 = L.anaCasar(L.anaPalabras('Tuerce a la derecha.'), L.anaPalabras('tuerce a la izquierda'));
+  t.eq('una palabra por otra: falta una y sobra otra', M2.me + ' ' + M2.mo, 'iiif iiis');
+  t.eq('y pesa', M2.pesada, 2);
+  const M3 = L.anaCasar(L.anaPalabras('Esta bien'), L.anaPalabras('Estás bien'));
+  t.eq('la casi igual va marcada como casi en los dos lados', M3.me + ' ' + M3.mo, 'ci ci');
+  const M4 = L.anaCasar(L.anaPalabras('Ha dormido bien'), L.anaPalabras('Adormido bien'));
+  t.eq('dos palabras que se oyeron juntas se marcan las dos como oídas', M4.me + ' ' + M4.mo, 'iii ii',
+       'la marca vuelve a las palabras de entrada, no a la juntada');
+  const M5 = L.anaCasar(L.anaPalabras('Ven aquí'), []);
+  t.eq('contra nada, todas faltan', M5.me + '|' + M5.mo + '|' + M5.pesada, 'ff||1');
+  t.ok('las marcas también cuando lo oído es más largo', L.anaCasar(['a'], ['a', 'b', 'c']).mo === 'iss');
+  /* La holgura de los bordes: gruesa con los timecodes en segundos enteros. */
+  t.eq('timecodes enteros: un segundo', L.anaHolgura([3611, 3615, 3619]), 1);
+  t.eq('con fotogramas, la de siempre', L.anaHolgura([3611.16, 3615.36]), 0.3);
+  t.eq('sin ninguno, la de siempre', L.anaHolgura([]), 0.3);
+  {
+    /* El caso de Dofus: «hecha» de Julith, dicho en el primer segundo del
+       parlamento del soldado, se le colgaba a la fuerza y bajaba el parecido. */
+    const ww = (x, tt) => ({ p: una(x), t: tt, txt: x });
+    const OO = [ww('hecha', 12.4), ww('gordias', 12.9), ww('atrapenla', 13.3)];
+    const V = [{ si: 0, texto: '¡Guardias! ¡Atrápenla!', v0: 12, v1: 15 }];
+    const fina = L.anaRepartir(V, OO, 100, { holgura: 0.3 }).por[0];
+    const gruesa = L.anaRepartir(V, OO, 100, { holgura: 1 }).por[0];
+    t.ok('con la holgura fina, «hecha» se cuela y baja el parecido', fina.sim < gruesa.sim, fina.sim + ' / ' + gruesa.sim);
+    t.eq('con la gruesa, se lee bien: «gordias» es casi «guardias»', gruesa.sim, 0.75);
+    t.eq('y lo oído es solo lo suyo', gruesa.oido, 'gordias atrapenla');
+    t.eq('las marcas viajan con el resultado', gruesa.me + ' ' + gruesa.mo, 'ci ci');
+    t.eq('y se apunta que es muy corto', gruesa.corto, true);
+    /* Una palabra oída que se convirtió en varias -«42»- es un solo trozo en
+       lo oído, y se lleva la peor de las marcas de sus palabras. */
+    const oidas42 = L.anaOidas([{ text: ' tengo', timestamp: [0.1, 0.3] }, { text: ' 42', timestamp: [0.5, 0.8] }], [{ t: 0, a: 20, d: 5 }]);
+    const r42 = L.anaRepartir([{ si: 0, texto: 'Tengo cuarenta.', v0: 20, v1: 23 }], oidas42, 100, { holgura: 0.3 });
+    t.eq('lo oído se escribe una vez por palabra oída', r42.por[0].oido, 'tengo 42');
+    t.eq('y «42» lleva la marca de lo que sobra, que «y dos» no estaba escrito', r42.por[0].mo, 'is');
+  }
+  {
+    /* Las ventanas del capítulo: las gráficas se quedan fuera, y se cuentan. */
+    const V = montar([['/** Las ventanas de los parlamentos', '/** De lo que hay que comparar']], ['anaVentanas'], {
+      script: [{ tcEff: 10, who: 'TEXTO', key: 'TEXTO', lines: ['Un Dofus es un huevo'] },
+               { tcEff: 20, who: 'NARRADORA', key: 'NARRADORA', lines: ['El Dofus Marfil'] },
+               { tcEff: 30, who: 'GRÁFICA', key: 'GRAFICA', lines: ['DOFUS'] },
+               { tcEff: 40, who: 'JORIS', key: 'JORIS', lines: ['(GRITA)'] },
+               { tcEff: null, who: 'JORIS', key: 'JORIS', lines: ['sin tiempo'] }],
+      karVentana: (si) => [10 * (si + 1), 10 * (si + 1) + 5], karVid: (t) => t - 5,
+      anaEsGrafica: L.anaEsGrafica, console: callado });
+    const vs = V.anaVentanas();
+    t.eq('las gráficas no entran en el análisis', vs.map(v => v.si).join(','), '1,3');
+    t.eq('y se cuentan, para decirlo', vs.graficas, 2);
+    t.eq('cada ventana lleva su timecode del libreto, para saber si son enteros', vs[0].tc, 20);
+  }
+  {
+    /* Lo que decide el aviso con todo eso. */
+    const A = oidos();
+    const av = (r) => A.anaAviso(Object.assign({ o: 'fiel' }, r), 0.45, 0.72);
+    t.eq('cuadra: nada', av({ sim: 1, dif: 0, pesada: 0 }), null);
+    t.eq('una palabra que pesa, dudoso, como siempre', av({ sim: 0.9, dif: 1, pesada: 2 }), 'dudoso');
+    t.eq('solo ligeras o casi iguales: leve', av({ sim: 0.9, dif: 1, pesada: 0 }), 'leve');
+    t.eq('leve aunque sean varias, si ninguna pesa', av({ sim: 0.75, dif: 2.5, pesada: 0 }), 'leve');
+    t.eq('pero sin llegar a no cuadrar', av({ sim: 0.3, dif: 5, pesada: 0 }), 'mal');
+    t.eq('muy corto y no se oyó nada: sin comprobar', av({ sim: 0, dif: 1, pesada: 1, n: 0, corto: true }), 'sin');
+    t.eq('muy corto y se oyó UNA palabra de otro: sin comprobar', av({ sim: 0, dif: 2, pesada: 2, n: 1, corto: true }), 'sin');
+    t.eq('muy corto y se oye claramente otra frase: no cuadra', av({ sim: 0.1, dif: 3, pesada: 3, n: 3, corto: true }), 'mal');
+    t.eq('muy corto que cuadra, cuadra', av({ sim: 1, dif: 0, pesada: 0, n: 2, corto: true }), null);
+    t.eq('un resultado de antes, sin marcas, se mide como antes', av({ sim: 0.9, dif: 1 }), 'dudoso');
+    t.ok('solo no cuadra y dudoso cuentan como cambio',
+         A.anaCuentaComoCambio('mal') && A.anaCuentaComoCambio('dudoso') && !A.anaCuentaComoCambio('leve') && !A.anaCuentaComoCambio('sin') && !A.anaCuentaComoCambio(null));
+  }
 
   t.seccion('7 · lo que devuelve el reconocedor, a su sitio y limpio');
   const mapa = [{ t: 0, a: 100, d: 5 }, { t: 5.3, a: 200, d: 5 }];
@@ -710,12 +811,15 @@ exports.pruebas = async function(t){
       karIaAudio: async () => { diario.push('audio'); if(o.audioFalla) throw new Error('formato raro'); return true; },
       karIaPreparar: async () => { diario.push('preparar en la página'); return o.preparaAqui !== false; },
       anaPlan: () => ({ tramos: o.sinVoz ? [] : [{ piezas: [{ a: 0, b: 5 }], dur: 5 }], duracion: 300, voz: o.voz || 5 }),
-      anaVentanas: () => [{ si: 0, texto: 'a', v0: 1, v1: 2 }],
+      anaVentanas: () => { const v = o.ventanas || [{ si: 0, texto: 'a', v0: 1, v1: 2, tc: 3601 }]; v.graficas = o.graficas || 0; return v; },
       anaTranscribir: o.transcribir || (async () => { diario.push('trabajadores'); return [{ items: [], mapa: [] }]; }),
       anaTranscribirAqui: async () => { diario.push('en la página'); return [{ items: [], mapa: [] }]; },
       anaOidas: () => [],
-      anaRepartir: () => ({ por: o.por || { 0: { sim: 1, oido: 'a' }, 1: { sim: 0.3, oido: 'b' }, 2: { sim: 0.6, oido: 'c' } },
-                            fuera: o.fuera || 0, sinTexto: 0 }),
+      /* La holgura, la de verdad: gruesa con los timecodes enteros. */
+      anaHolgura: (tcs) => (tcs.length && tcs.every(t => t === Math.round(t))) ? 1 : 0.3,
+      anaRepartir: (v, p, d, op) => { diario.push('holgura ' + (op && op.holgura));
+                            return { por: o.por || { 0: { sim: 1, oido: 'a' }, 1: { sim: 0.3, oido: 'b' }, 2: { sim: 0.6, oido: 'c' } },
+                            fuera: o.fuera || 0, sinTexto: 0 }; },
       anaQueda: () => '',
       anaParar: () => diario.push('parar trabajadores'),
       stMsg: (m) => avisos.push(m),
@@ -815,6 +919,25 @@ exports.pruebas = async function(t){
     const X = orquesta({ fuera: 7 });
     const r = await X.M.cotejarTodo();
     t.eq('cuenta los que cayeron fuera del audio', r.fuera, 7);
+    t.ok('con los timecodes en segundos enteros, un segundo de holgura en los bordes', X.diario.includes('holgura 1'),
+         'si no, el final del parlamento de antes se colgaba de este: «hecho ¡Gordias!»');
+    const F = orquesta({ ventanas: [{ si: 0, texto: 'a', v0: 1, v1: 2, tc: 3601.24 }] });
+    await F.M.cotejarTodo();
+    t.ok('con fotogramas, la de siempre', F.diario.includes('holgura 0.3'));
+  }
+  {
+    /* Lo que no cuenta como cambio se cuenta aparte, y las gráficas se dicen. */
+    const X = orquesta({ graficas: 2, por: { 0: { sim: 1, oido: 'a', dif: 0, pesada: 0 },
+                                             1: { sim: 0.3, oido: 'b', dif: 2, pesada: 2 },
+                                             2: { sim: 0.9, oido: 'c', dif: 1, pesada: 0 },
+                                             3: { sim: 0, oido: '', dif: 1, pesada: 1, n: 0, corto: true } } });
+    const r = await X.M.cotejarTodo();
+    t.eq('no cuadran, dudosos, leves y sin comprobar, cada uno en su cuenta',
+         [r.hechos, r.mal, r.dudosos, r.leves, r.sin, r.graficas].join('/'), '4/1/0/1/1/2');
+    t.ok('y se dicen', X.avisos.some(a => /1 no cuadran · 0 dudosos · 1 leves · 1 sin comprobar · 2 gráficas sin analizar/.test(a)),
+         JSON.stringify(X.avisos.slice(-2)));
+    t.eq('un cambio leve se avisa como leve, con sus marcas', X.M.cotejoAviso(2) && X.M.cotejoAviso(2).nivel, 'leve');
+    t.eq('y el muy corto del que no se oyó nada, sin comprobar', X.M.cotejoAviso(3) && X.M.cotejoAviso(3).et, 'sin comprobar');
   }
 
   t.seccion('12b · el análisis, con el oído elegido');

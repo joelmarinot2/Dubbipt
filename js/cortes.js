@@ -258,7 +258,7 @@ function cortesPegar(margen){
    no en parlamentos: los tramos se reparten entre varios trabajadores y acaban
    desordenados, así que lo único que avanza de forma pareja es el audio. */
 const COTEJO = { res:new Map(), trabajando:false, cancelar:false, parado:false,
-                 hechos:0, vistos:0, total:0, mal:0, dudosos:0, fase:'' };
+                 hechos:0, vistos:0, total:0, mal:0, dudosos:0, leves:0, sin:0, graficas:0, fase:'' };
 
 /* Desde cuánto parecido se avisa. Los mismos números para el análisis, la
    hoja de cues y el informe: si cada uno tuviera los suyos, un parlamento
@@ -282,8 +282,13 @@ function cotejoAviso(si){
   const r = cotejoDe(si);
   if(!r) return null;
   const nivel = anaAviso(r, COTEJO_MAL, COTEJO_DUDOSO);
-  if(nivel === 'mal') return { nivel:'mal', et:'no cuadra', color:'#F87171', sim:r.sim, oido:r.oido };
-  if(nivel === 'dudoso') return { nivel:'dudoso', et:'dudoso', color:'#FBBF24', sim:r.sim, oido:r.oido };
+  const con = (o) => Object.assign(o, { sim:r.sim, oido:r.oido, me:r.me || '', mo:r.mo || '' });
+  if(nivel === 'mal') return con({ nivel:'mal', et:'no cuadra', color:'#F87171' });
+  if(nivel === 'dudoso') return con({ nivel:'dudoso', et:'dudoso', color:'#FBBF24' });
+  /* Los dos que NO cuentan como cambio: un cambio leve -conectores, palabras
+     casi iguales- y un parlamento muy corto del que no se oyó nada claro. */
+  if(nivel === 'leve') return con({ nivel:'leve', et:'leve', color:'#60A5FA' });
+  if(nivel === 'sin') return con({ nivel:'sin', et:'sin comprobar', color:'#94A3B8' });
   return null;
 }
 
@@ -329,6 +334,7 @@ async function cotejarTodo(){
   if(!studio.url && !studio.dlgUrl){ stMsg('⚠️ Primero carga el audio del programa'); return null; }
   COTEJO.trabajando = true; COTEJO.cancelar = false; COTEJO.parado = false;
   COTEJO.hechos = 0; COTEJO.vistos = 0; COTEJO.total = 0; COTEJO.mal = 0; COTEJO.dudosos = 0;
+  COTEJO.leves = 0; COTEJO.sin = 0; COTEJO.graficas = 0;
   COTEJO.fase = 'preparando';
   const t0 = Date.now();
   const parado = () => !!COTEJO.cancelar;
@@ -406,8 +412,10 @@ async function cotejarTodo(){
 
     const palabras = [];
     oidos.forEach(h => anaOidas(h.items, h.mapa).forEach(p => palabras.push(p)));
-    const r = anaRepartir(ventanas, palabras, plan.duracion);
-    let mal = 0, dudosos = 0, hechos = 0;
+    /* Con los timecodes en segundos enteros, un segundo de holgura en los
+       bordes: si no, el final del parlamento de antes se colgaba de este. */
+    const r = anaRepartir(ventanas, palabras, plan.duracion, { holgura: anaHolgura(ventanas.map(v => v.tc)) });
+    let mal = 0, dudosos = 0, leves = 0, sin = 0, hechos = 0;
     for(const si in r.por){
       /* Cada resultado dice con qué oído se midió: de eso depende desde cuándo
          avisa, también cuando se abra otro día con otro oído elegido. */
@@ -416,9 +424,12 @@ async function cotejarTodo(){
       const nivel = anaAviso(r.por[si], COTEJO_MAL, COTEJO_DUDOSO);
       if(nivel === 'mal') mal++;
       else if(nivel === 'dudoso') dudosos++;
+      else if(nivel === 'leve') leves++;
+      else if(nivel === 'sin') sin++;
     }
     window._cotejo = r.por;
-    COTEJO.hechos = hechos; COTEJO.mal = mal; COTEJO.dudosos = dudosos;
+    COTEJO.hechos = hechos; COTEJO.mal = mal; COTEJO.dudosos = dudosos; COTEJO.leves = leves; COTEJO.sin = sin;
+    COTEJO.graficas = ventanas.graficas || 0;
     COTEJO.vistos = COTEJO.total;
 
     try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }
@@ -429,14 +440,18 @@ async function cotejarTodo(){
     const nombre = aqui ? '' : O.nombre;
     const msg = '🔎 ' + hechos + ' analizados' + (nombre ? (' con el oído ' + nombre) : '')
               + ' en ' + cotejoTardo(segundos) + ' · '
-              + mal + ' no cuadran · ' + dudosos + ' dudosos';
+              + mal + ' no cuadran · ' + dudosos + ' dudosos'
+              + (leves ? (' · ' + leves + ' leves') : '')
+              + (sin ? (' · ' + sin + ' sin comprobar') : '')
+              + (COTEJO.graficas ? (' · ' + COTEJO.graficas + ' gráfica' + (COTEJO.graficas === 1 ? '' : 's') + ' sin analizar') : '');
     stMsg(msg);
     /* Dónde mirarlos depende del perfil. «📋 Cues» es del Video Estudio, y QC no
        lo lleva: mandar ahí a quien revisa era mandarle a un botón que no tiene. */
     const donde = (typeof perfilLlevaVideo === 'function' && typeof DDL_MODO !== 'undefined'
                    && !perfilLlevaVideo(DDL_MODO)) ? '«≠ Cambios»' : '«📋 Cues»';
     castAviso(msg + ' — míralos en ' + donde + ', no se ha cambiado ni una palabra del libreto');
-    return { hechos: hechos, mal: mal, dudosos: dudosos, fuera: r.fuera, sinTexto: r.sinTexto,
+    return { hechos: hechos, mal: mal, dudosos: dudosos, leves: leves, sin: sin, graficas: COTEJO.graficas,
+             fuera: r.fuera, sinTexto: r.sinTexto,
              segundos: segundos, tramos: plan.tramos.length, voz: plan.voz, duracion: plan.duracion,
              oido: aqui ? '' : oido, oidoNombre: nombre };
   }finally{

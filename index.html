@@ -2363,7 +2363,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.14.1-nube';
+const APP_VER_NUM = 'v11.15.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5460,6 +5460,9 @@ async function qcCotejar(){
     const resumen = r.hechos + ' analizados' + (r.oidoNombre ? (' con el oído ' + r.oidoNombre) : '')
                   + ' en ' + cotejoTardo(r.segundos) + ' · '
                   + r.mal + ' no cuadran · ' + r.dudosos + ' dudosos'
+                  + (r.leves ? (' · ' + r.leves + ' leves') : '')
+                  + (r.sin ? (' · ' + r.sin + ' sin comprobar') : '')
+                  + (r.graficas ? (' · ' + r.graficas + ' gráfica' + (r.graficas === 1 ? '' : 's') + ' sin analizar') : '')
                   + (r.fuera ? (' · ' + r.fuera + ' fuera del audio') : '');
     qcAvance('✅ ' + resumen + ' · preparando el PDF…');
     try{ perfilPintar(); }catch(e){ fallo('perfilPintar · index.html:qcCotejar', e); }
@@ -5492,7 +5495,58 @@ async function qcCotejar(){
    siempre las dos columnas -lo escrito y lo oído- para que quien lo lea
    juzgue. Nunca se convierte solo en corrección (QC-2). */
 
-/** Los parlamentos donde lo oído no cuadra con lo escrito, por tiempo. */
+/**
+ * Lo escrito, partido en trozos con la marca de cada uno: `[{ t, m }]`, con
+ * `m` vacía (se oyó), `c` (casi igual), `f` (no se oyó). `me` son las marcas
+ * que dejó el análisis, una por palabra comparada, y aquí se vuelven a colgar
+ * de las palabras tal como están escritas: las acotaciones y los signos
+ * sueltos no se compararon y van sin marca. Si el texto ya no es el que se
+ * analizó -las cuentas no salen- se devuelve sin marcas: mejor nada que una
+ * marca en la palabra que no es.
+ */
+function qcTrozosEscrito(texto, me){
+  if(typeof anaTrozos !== 'function') return null;
+  const trozos = anaTrozos(texto);
+  const marcas = String(me || '');
+  const total = trozos.reduce((n, t) => n + t.p.length, 0);
+  if(!marcas || total !== marcas.length) return null;
+  const peor = (a, b) => (a === 'f' || b === 'f') ? 'f' : ((a === 'c' || b === 'c') ? 'c' : '');
+  const out = [];
+  let k = 0;
+  for(const t of trozos){
+    let m = '';
+    for(let i = 0; i < t.p.length; i++){ const x = marcas[k++]; m = peor(m, x === 'i' ? '' : x); }
+    out.push({ t: t.txt, m: m });
+  }
+  return out;
+}
+
+/** Lo oído, partido por palabras con la marca de cada una: `s` (dicha y no
+    escrita), `c` (casi igual) o vacía. `mo` es una marca por palabra oída. */
+function qcTrozosOido(oido, mo){
+  const palabras = String(oido || '').trim().split(/\s+/).filter(Boolean);
+  const marcas = String(mo || '');
+  if(!palabras.length || palabras.length !== marcas.length) return null;
+  return palabras.map((w, i) => ({ t: w, m: marcas[i] === 'i' ? '' : marcas[i] }));
+}
+
+/** Los trozos, como HTML con sus marcas. */
+function qcTrozosHtml(trozos, plano){
+  if(!trozos || !trozos.length) return esc(String(plano || ''));
+  const clase = { f: 'qc-falta', s: 'qc-sobra', c: 'qc-casi' };
+  return trozos.map(t => t.m && clase[t.m] ? ('<mark class="' + clase[t.m] + '">' + esc(t.t) + '</mark>') : esc(t.t)).join(' ');
+}
+
+/** Cuántas gráficas -rótulos que no se doblan- trae el libreto: se dicen en
+    el informe para que no parezca que se olvidaron. */
+function qcGraficasCuenta(){
+  if(typeof anaEsGrafica !== 'function' || !Array.isArray(script)) return 0;
+  return script.filter(b => b && b.tcEff != null && anaEsGrafica(b.who || b.key || b.display)).length;
+}
+
+/** Los parlamentos donde lo oído no cuadra con lo escrito, por tiempo. Van
+    también los leves y los sin comprobar, con su nivel: quien los lista decide
+    si los enseña aparte. */
 function qcCambiosLista(){
   const fuera = [];
   if(typeof cotejoAviso !== 'function' || !Array.isArray(script)) return fuera;
@@ -5502,14 +5556,18 @@ function qcCambiosLista(){
     if(!av) continue;                                  // cuadra, o no se cotejó
     const quien = (b.key && charIdx && charIdx[b.key] && charIdx[b.key].display)
                     ? charIdx[b.key].display : (b.display || '');
+    const escrito = (b.lines || []).join(' ').replace(/\s+/g, ' ').trim();
+    const oido = String(av.oido || '').trim();
     fuera.push({ si: si,
                  tcSec: (b.tcEff != null ? +b.tcEff : null),
                  quien: quien,
-                 escrito: (b.lines || []).join(' ').replace(/\s+/g, ' ').trim(),
-                 oido: String(av.oido || '').trim(),
+                 escrito: escrito,
+                 oido: oido,
+                 escritoTrozos: qcTrozosEscrito(escrito, av.me),
+                 oidoTrozos: qcTrozosOido(oido, av.mo),
                  sim: +av.sim,
-                 nivel: av.nivel,                       // 'mal' | 'dudoso'
-                 et: av.et });                          // 'no cuadra' | 'dudoso'
+                 nivel: av.nivel,                       // 'mal' | 'dudoso' | 'leve' | 'sin'
+                 et: av.et });                          // 'no cuadra' | 'dudoso' | 'leve' | 'sin comprobar'
   }
   fuera.sort((a, b) => {
     const A = a.tcSec == null ? Infinity : a.tcSec, B = b.tcSec == null ? Infinity : b.tcSec;
@@ -5518,12 +5576,16 @@ function qcCambiosLista(){
   return fuera;
 }
 
-/** Cuántos de cada, para las pastillas. */
+/** Cuántos de cada, para las pastillas. `total` son los que CUENTAN como
+    cambio: los leves y los sin comprobar van aparte. */
 function qcCambiosCuenta(lista){
   const l = lista || qcCambiosLista();
-  return { mal: l.filter(c => c.nivel === 'mal').length,
-           dudosos: l.filter(c => c.nivel === 'dudoso').length,
-           total: l.length };
+  const mal = l.filter(c => c.nivel === 'mal').length;
+  const dudosos = l.filter(c => c.nivel === 'dudoso').length;
+  return { mal: mal, dudosos: dudosos,
+           leves: l.filter(c => c.nivel === 'leve').length,
+           sin: l.filter(c => c.nivel === 'sin').length,
+           total: mal + dudosos };
 }
 
 /** El panel con la lista, dentro del libreto como los demás. */
@@ -5539,6 +5601,23 @@ function qcCambiosPanel(){
   const n = qcCambiosCuenta(l);
   const hayCotejo = !!(window._cotejo && Object.keys(window._cotejo).length);
   const pct = (s)=> Math.round((+s || 0) * 100) + ' %';
+  const graficas = hayCotejo ? qcGraficasCuenta() : 0;
+  const cambios = l.filter(c => c.nivel === 'mal' || c.nivel === 'dudoso');
+  const levesL = l.filter(c => c.nivel === 'leve');
+  const sinL = l.filter(c => c.nivel === 'sin');
+  const colorDe = { mal: '#F87171', dudoso: '#FBBF24', leve: '#60A5FA', sin: '#94A3B8' };
+  const item = (c) =>
+            '<div class="qc-it"><div class="qc-cu">'
+            + '<div class="qc-m"><b class="qc-tc">' + esc(qcTC(c.tcSec)) + '</b>'
+              + (c.quien ? '<span class="qc-q">' + esc(c.quien) + '</span>' : '')
+              + '<span class="qc-tipo" style="color:' + (colorDe[c.nivel] || '#FBBF24') + '">'
+                + esc(c.et) + ' · ' + pct(c.sim) + '</span></div>'
+            + '<div class="qc-t"><span class="qc-lab">Escrito</span>' + qcTrozosHtml(c.escritoTrozos, c.escrito) + '</div>'
+            + '<div class="qc-t qc-oido"><span class="qc-lab">Oído</span>' + (c.oido ? qcTrozosHtml(c.oidoTrozos, c.oido) : '<i>(nada)</i>') + '</div>'
+            + '</div>'
+            + '<button class="qc-ir" data-si="' + c.si + '" title="Ir al parlamento">ir →</button>'
+            + '<button class="qc-add" data-si="' + c.si + '" title="Apuntarlo como corrección">＋</button>'
+            + '</div>';
   ov.innerHTML = '<div class="qc-card">'
     + '<div class="qc-h"><span>≠ Diálogos que cambiaron</span>'
       + '<span class="qc-cuenta">' + (hayCotejo
@@ -5549,23 +5628,28 @@ function qcCambiosPanel(){
         ? '<div class="qc-chips">'
             + '<span class="qc-chip"><i style="background:#F87171"></i><b>' + n.mal + '</b> no cuadran</span>'
             + '<span class="qc-chip"><i style="background:#FBBF24"></i><b>' + n.dudosos + '</b> dudosos</span>'
+            + (n.leves ? '<span class="qc-chip"><i style="background:#60A5FA"></i><b>' + n.leves + '</b> leves</span>' : '')
+            + (n.sin ? '<span class="qc-chip"><i style="background:#94A3B8"></i><b>' + n.sin + '</b> sin comprobar</span>' : '')
+            + (graficas ? '<span class="qc-chip"><i style="background:#94A3B8"></i><b>' + graficas + '</b> gráficas, no se doblan</span>' : '')
           + '</div>'
           + '<div class="qc-nota">Lo «oído» es lo que creyó entender el reconocedor: una pista, no una prueba. '
-            + 'Comprueba cada uno antes de apuntarlo como corrección.</div>'
+            + 'Comprueba cada uno antes de apuntarlo como corrección. '
+            + '<mark class="qc-falta">Tachado</mark>, lo escrito que no se oyó; <mark class="qc-sobra">naranja</mark>, lo que se dijo distinto o de más.</div>'
         : '')
     + (l.length
-        ? '<div class="qc-lista">' + l.map(c =>
-            '<div class="qc-it"><div class="qc-cu">'
-            + '<div class="qc-m"><b class="qc-tc">' + esc(qcTC(c.tcSec)) + '</b>'
-              + (c.quien ? '<span class="qc-q">' + esc(c.quien) + '</span>' : '')
-              + '<span class="qc-tipo" style="color:' + (c.nivel === 'mal' ? '#F87171' : '#FBBF24') + '">'
-                + esc(c.et) + ' · ' + pct(c.sim) + '</span></div>'
-            + '<div class="qc-t"><span class="qc-lab">Escrito</span>' + esc(c.escrito) + '</div>'
-            + '<div class="qc-t qc-oido"><span class="qc-lab">Oído</span>' + (c.oido ? esc(c.oido) : '<i>(nada)</i>') + '</div>'
-            + '</div>'
-            + '<button class="qc-ir" data-si="' + c.si + '" title="Ir al parlamento">ir →</button>'
-            + '<button class="qc-add" data-si="' + c.si + '" title="Apuntarlo como corrección">＋</button>'
-            + '</div>').join('') + '</div>'
+        ? '<div class="qc-lista">'
+            + (cambios.length ? cambios.map(item).join('') : '<div class="qc-vacio">Ningún cambio de peso.</div>')
+            /* Los que no cuentan, aparte y plegados: se ven si se quiere. */
+            + (levesL.length
+                ? '<details class="qc-grupo"><summary>' + levesL.length + ' cambio' + (levesL.length === 1 ? '' : 's')
+                  + ' leve' + (levesL.length === 1 ? '' : 's') + ' · conectores y palabras casi iguales · no cuentan</summary>'
+                  + levesL.map(item).join('') + '</details>'
+                : '')
+            + (sinL.length
+                ? '<details class="qc-grupo"><summary>' + sinL.length + ' sin comprobar · muy cortos, no se oyó nada claro · no cuentan</summary>'
+                  + sinL.map(item).join('') + '</details>'
+                : '')
+          + '</div>'
         : '<div class="qc-vacio">' + (hayCotejo
             ? 'Todo lo analizado coincide con el libreto.'
             : 'Carga el audio del programa y pulsa «Analizar cambios»: aquí saldrán los parlamentos donde lo dicho no coincide con lo escrito.')
@@ -5640,6 +5724,7 @@ async function qcInformeCambios(o){
                                   revisor: m.revisor, estudio: m.estudio,
                                   desfase: qcTC(studioTc0()), audio: qcAudioNombre(),
                                   analizados: analizados,
+                                  graficas: (typeof qcGraficasCuenta === 'function') ? qcGraficasCuenta() : 0,
                                   oido: (typeof cotejoOidoUsado === 'function') ? cotejoOidoUsado() : '',
                                   tardo: (o.analisis && o.analisis.segundos)
                                            ? cotejoTardo(o.analisis.segundos) : '' });
@@ -11696,6 +11781,14 @@ function hydrateEpisode(d){ _epOpen(true);
       if(isFinite(+r.dif) && +r.dif >= 0) c.dif = +r.dif;
       if(typeof r.o === 'string' && typeof ANA_OIDOS !== 'undefined'
          && Object.prototype.hasOwnProperty.call(ANA_OIDOS, r.o)) c.o = r.o;
+      /* Las marcas de qué cambió y lo que decide si es leve o sin comprobar:
+         sin ellas, al volver a abrir, un cambio leve volvería a salir como
+         dudoso y el resaltado desaparecería. */
+      if(typeof r.me === 'string' && /^[icfs]*$/.test(r.me)) c.me = r.me;
+      if(typeof r.mo === 'string' && /^[icfs]*$/.test(r.mo)) c.mo = r.mo;
+      if(isFinite(+r.pesada) && +r.pesada >= 0) c.pesada = +r.pesada;
+      if(isFinite(+r.n) && +r.n >= 0) c.n = +r.n;
+      if(r.corto === true) c.corto = true;
       window._cotejo[k] = c;
     }
   }catch(e){}
@@ -13657,6 +13750,14 @@ body.haschips .lperfil{padding-left:100px}
 .qc-ir,.qc-del{flex:0 0 auto;background:none;border:0;color:var(--dim);cursor:pointer;font-size:11px;padding:2px 4px}
 .qc-vacio{font-size:12px;color:var(--dim);text-align:center;padding:18px 8px}
 .qc-nota{font-size:11.5px;color:var(--dim);line-height:1.45;margin-bottom:10px}
+/* Lo que cambió, marcado palabra a palabra: lo escrito que no se oyó, tachado
+   y en rojo; lo dicho distinto o de más, en naranja; lo casi igual, subrayado. */
+mark.qc-falta{background:transparent;color:#F87171;text-decoration:line-through;text-decoration-thickness:1.5px}
+mark.qc-sobra{background:rgba(251,146,60,.16);color:#FB923C;font-weight:700;border-radius:3px;padding:0 2px}
+mark.qc-casi{background:transparent;color:#FB923C;text-decoration:underline dotted}
+/* Los grupos que no cuentan -leves, sin comprobar- van plegados. */
+.qc-grupo{margin-top:10px;border-top:1px solid var(--card-b);padding-top:6px}
+.qc-grupo summary{font-size:11.5px;color:var(--dim);cursor:pointer;padding:4px 0 8px}
 .qc-lab{display:inline-block;font-size:9.5px;letter-spacing:.7px;text-transform:uppercase;
   color:var(--dim);font-weight:700;min-width:52px}
 .qc-oido{color:#FBBF24}

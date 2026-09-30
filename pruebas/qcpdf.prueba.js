@@ -29,7 +29,8 @@ const EXPORTA = ['QCPDF_HOJA', 'QCPDF_PASOS', 'qcpdfAnchos', 'qcpdfParrafos',
                  'qcpdfRenglones', 'qcpdfDatosSesion', 'qcpdfCabecera', 'qcpdfColumnaDe',
                  'qcpdfLeerInforme', 'qcpdfEsLlamado', 'qcpdfPorTurno',
                  'qcpdfPintaColumna', 'qcpdfDeInforme', 'qcpdfDeCorrecciones',
-                 'qcpdfTipoDe', 'qcpdfClaveTipo', 'qcpdfFechaHoy', 'qcpdfDeCambios'];
+                 'qcpdfTipoDe', 'qcpdfClaveTipo', 'qcpdfFechaHoy', 'qcpdfDeCambios',
+                 'qcpdfEsTrozos', 'qcpdfRenglonesTrozos', 'qcpdfPintarTrozos', 'QCPDF_MARCAS'];
 
 /* Los tipos y el que los sugiere viven en index.html -son de QC, no del
    dibujo-, asi que aqui se pasan como los pasa el navegador. Se recortan del
@@ -463,7 +464,7 @@ exports.pruebas = function(t){
      dónde. Sin esto, quitar la rama del aviso no ponía nada en rojo. */
   const D = montar([['const QCPDF_COLOR = {', 'function qcpdfCargar(){'],
                     ['/* ── Medidas de la hoja', '/* ── Una imagen en blanco y negro']],
-                   ['qcpdfPintar', 'QCPDF_PASOS', 'QCPDF_HOJA'],
+                   ['qcpdfPintar', 'QCPDF_PASOS', 'QCPDF_HOJA', 'qcpdfAltoFila'],
                    { QC_TIPOS: QC.QC_TIPOS, window: {}, document: {}, console: { warn: () => {}, log: () => {} } });
   const docFalso = () => {
     const d = { textos: [], hojas: 1, pt: 10 };
@@ -491,6 +492,85 @@ exports.pruebas = function(t){
   t.cerca('en el centro de la tabla', av ? av.x : 0, D.QCPDF_HOJA.w / 2, 0.01);
   t.eq('en una sola hoja', hojas, 1);
   t.eq('y midiendo, también una', D.qcpdfPintar(docFalso(), sinC, paso, true), 1);
+
+  t.seccion('18e · los leves y los sin comprobar van aparte, y lo que cambió se pinta marcado');
+  /* Pedido de sala con el informe de Dofus: 568 «cambios» de 710. Los leves y
+     los sin comprobar no cuentan y van al final, cada grupo con su rótulo; y
+     en el texto se ve palabra a palabra qué cambió. */
+  const conNiveles = M.qcpdfDeCambios([
+    { tcSec: 10, quien: 'A', escrito: 'Adiós amigo', oido: 'otra cosa', sim: 0.3, nivel: 'mal', et: 'no cuadra',
+      escritoTrozos: [{ t: 'Adiós', m: 'f' }, { t: 'amigo', m: 'f' }], oidoTrozos: [{ t: 'otra', m: 's' }, { t: 'cosa', m: 's' }] },
+    { tcSec: 20, quien: 'B', escrito: 'Regular', oido: 'regular pues', sim: 0.9, nivel: 'leve', et: 'leve',
+      escritoTrozos: [{ t: 'Regular', m: '' }], oidoTrozos: [{ t: 'regular', m: '' }, { t: 'pues', m: 's' }] },
+    { tcSec: 30, quien: 'C', escrito: '¿Tú?', oido: '', sim: 0, nivel: 'sin', et: 'sin comprobar', escritoTrozos: [{ t: '¿Tú?', m: 'f' }] },
+    { tcSec: 40, quien: 'D', escrito: 'Vale', oido: 'bale ya', sim: 0.5, nivel: 'leve', et: 'leve' }
+  ], { analizados: 10, graficas: 3 });
+  const tipos = conNiveles.filas.map(f => f.grupo ? ('[' + f.grupo.split(' ·')[0] + ']') : f[1]);
+  t.eq('primero los cambios, luego un rótulo y los leves, luego otro y los sin comprobar',
+       tipos.join(' '), 'A [Cambios leves] B D [Sin comprobar] C');
+  t.eq('el conteo cuenta solo los cambios', conNiveles.conteo, '1 cambio de 10 parlamentos');
+  t.eq('y las pastillas, cada cosa en la suya, con las gráficas que no se doblan',
+       conNiveles.chips.map(c => c.n + ' ' + c.et).join(' · '),
+       '10 Analizados · 6 Coinciden · 1 No cuadran · 2 Leves · 1 Sin comprobar · 3 Gráficas (no se doblan)');
+  t.eq('lo escrito va con sus marcas cuando las hay', JSON.stringify(conNiveles.filas[0][2]), '[{"t":"Adiós","m":"f"},{"t":"amigo","m":"f"}]');
+  t.eq('y sin ellas, el texto llano', conNiveles.filas[3][2], 'Vale');
+  t.eq('lo no oído sigue diciéndose aunque traiga marcas de lo escrito', conNiveles.filas[5][3], '(nada)');
+  t.eq('el veredicto de los que no cuentan lo dice', conNiveles.filas[5][4], '0 % · sin comprobar');
+  t.ok('una celda de trozos se reconoce, y una de texto no', M.qcpdfEsTrozos([{ t: 'a', m: '' }]) && !M.qcpdfEsTrozos('a') && !M.qcpdfEsTrozos([1]));
+  /* Y se pinta palabra a palabra: lo que falta en rojo y tachado, lo que sobra en naranja y negrita. */
+  const pintado = () => {
+    const d = docFalso();
+    d.lineas = []; d.colores = []; d.fuentes = [];
+    d.line = (x1, y1, x2, y2) => d.lineas.push({ x1, y1, x2, y2 });
+    d.setTextColor = (r, g, b) => d.colores.push([r, g, b]);
+    d.setFont = (f, est) => d.fuentes.push(est);
+    d.text = (s, x, y) => { d.textos.push({ s: String(s), x: x, y: y, color: d.colores[d.colores.length - 1], fuente: d.fuentes[d.fuentes.length - 1] }); };
+    return d;
+  };
+  const dd = pintado();
+  dd.setFontSize(8);
+  const lineas = M.qcpdfRenglonesTrozos(dd, [{ t: 'Adiós amigo', m: 'f' }, { t: 'mío', m: '' }], 20);
+  t.eq('se parte por palabras en el ancho que hay', lineas.map(l => l.map(x => x.t).join(' ')).join('|'), 'Adiós amigo|mío',
+       'cada palabra mide 8 × 0,18 por letra: dos caben en 20 mm, tres no');
+  M.qcpdfPintarTrozos(dd, lineas, 5, 50, 3.3, { texto: [58, 58, 60], plano: false }, 8);
+  t.eq('cada palabra se escribe donde le toca', dd.textos.map(x => x.s + '@' + x.x.toFixed(1) + ',' + x.y.toFixed(1)).join(' '),
+       'Adiós@5.0,50.0 amigo@' + (5 + 5 * 8 * 0.18 + 8 * 0.18).toFixed(1) + ',50.0 mío@5.0,53.3');
+  t.eq('lo que falta, en rojo', JSON.stringify(dd.textos[0].color), JSON.stringify(M.QCPDF_MARCAS.f));
+  t.eq('y tachado', dd.lineas.length, 2);
+  t.ok('la raya cruza la palabra', dd.lineas[0].x1 === 5 && dd.lineas[0].x2 > 5 && dd.lineas[0].y1 < 50);
+  t.eq('lo que se oyó igual, con el color del texto', JSON.stringify(dd.textos[2].color), '[58,58,60]');
+  const ds = pintado(); ds.setFontSize(8);
+  /* La negrita es mas ancha: el ancho de una palabra que sobra se mide con
+     ella, o la siguiente se le monta encima («Estuvede viaje», visto). */
+  ds.getTextWidth = (x) => String(x).length * ds.pt * (ds.fuentes[ds.fuentes.length - 1] === 'bold' ? 0.22 : 0.18);
+  const lineasS = M.qcpdfRenglonesTrozos(ds, [{ t: 'pues', m: 's' }, { t: 'no', m: '' }], 50);
+  t.cerca('una palabra que sobra se mide en negrita', lineasS[0][0].w, 4 * 8 * 0.22, 1e-9);
+  t.cerca('y la de al lado, en redonda', lineasS[0][1].w, 2 * 8 * 0.18, 1e-9);
+  M.qcpdfPintarTrozos(ds, lineasS, 5, 50, 3.3, { texto: [58, 58, 60], plano: false }, 8);
+  t.eq('lo que sobra, en naranja y negrita', JSON.stringify(ds.textos[0].color) + ' ' + ds.textos[0].fuente, JSON.stringify(M.QCPDF_MARCAS.s) + ' bold');
+  t.cerca('y la siguiente empieza donde acaba la negrita, mas el espacio', ds.textos[1].x, 5 + 4 * 8 * 0.22 + 8 * 0.18, 1e-9);
+  const dg = pintado(); dg.setFontSize(8);
+  M.qcpdfPintarTrozos(dg, M.qcpdfRenglonesTrozos(dg, [{ t: 'pues', m: 's' }, { t: 'no', m: 'f' }], 50), 5, 50, 3.3, { texto: [80, 80, 80], plano: true }, 8);
+  t.ok('en gris, sin color pero con la negrita y el tachado, que se ven en una fotocopia',
+       JSON.stringify(dg.textos[0].color) === '[80,80,80]' && dg.textos[0].fuente === 'bold' && dg.lineas.length === 1);
+  /* Y por el camino de siempre: una fila con trozos se mide y se pinta entera. */
+  const hojasT = D.qcpdfPintar(pintado(), conNiveles, D.QCPDF_PASOS[0], true);
+  t.ok('el informe con marcas se mide sin romperse', hojasT >= 1);
+  const dp = pintado();
+  D.qcpdfPintar(dp, conNiveles, D.QCPDF_PASOS[0], false);
+  t.ok('y se pinta: la palabra tachada está en la hoja con su raya', dp.textos.some(x => x.s === 'Adiós') && dp.lineas.some(l => l.x2 - l.x1 > 2 && l.x2 - l.x1 < 15));
+  t.ok('con los rótulos de los grupos', dp.textos.some(x => /^Cambios leves/.test(x.s)) && dp.textos.some(x => /^Sin comprobar/.test(x.s)));
+  /* Una celda de trozos se MIDE como lo que ocupa: si se midiera como texto
+     vacío, la fila saldría baja y la siguiente se le montaría encima. */
+  const anchosF = [30, 30, 50, 50, 30];
+  const largo = Array.from({ length: 30 }, (_, i) => ({ t: 'palabra' + i, m: i % 2 ? 'f' : '' }));
+  const altoLargo = D.qcpdfAltoFila(pintado(), ['TC', 'A', largo, 'x', 'y'], conNiveles.columnas, anchosF, D.QCPDF_PASOS[0]);
+  const altoCorto = D.qcpdfAltoFila(pintado(), ['TC', 'A', [{ t: 'una', m: '' }], 'x', 'y'], conNiveles.columnas, anchosF, D.QCPDF_PASOS[0]);
+  t.ok('treinta palabras marcadas piden una fila mucho más alta que una', altoLargo > altoCorto * 3, altoLargo + ' / ' + altoCorto);
+  const dm = pintado(); dm.setFontSize(D.QCPDF_PASOS[0].fuente);
+  const renglones = M.qcpdfRenglonesTrozos(dm, largo, 50 - 4).length;
+  t.cerca('y justo la de sus renglones, medidos palabra a palabra', altoLargo, 2.6 + renglones * (D.QCPDF_PASOS[0].fuente * 0.41), 1e-9,
+          'medida como texto salía otra cosa: los trozos no son un texto');
 
   t.seccion('19 · la hoja es A4 y el último paso no baja de 7,5 pt');
   t.eq('ancho A4', M.QCPDF_HOJA.w, 210);
