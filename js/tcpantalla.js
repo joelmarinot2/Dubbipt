@@ -35,8 +35,10 @@
  * buena de vez en cuando para no irse de sitio. Sin esto, este camino no sirve:
  * se probo leyendo a pelo y el libreto daba saltos absurdos.
  *
- * El bucle va con temporizador, no con requestAnimationFrame: rAF no se dispara
- * si la pestaña no esta pintando, y aqui lo NORMAL es tener Pro Tools delante y
+ * El bucle va con un latido de un trabajador en segundo plano, no con
+ * requestAnimationFrame ni con un temporizador de la pagina: rAF no se dispara
+ * si la pestaña no esta pintando, y los temporizadores se frenan a uno por
+ * segundo con la ventana tapada, y aqui lo NORMAL es tener Pro Tools delante y
  * Dubbipt detras (ENT-N4).
  *
  * De donde depende: castAviso, esc, DDL_UI
@@ -57,6 +59,32 @@ const TCP_TOL = 0.30;
    digan casualmente lo mismo y ademas encajen en una recta es despreciable. */
 const TCP_SEGUIDAS = 3;
 
+/* Cuánto se deja bailar una cifra dentro de su casilla al compararla, en
+   proporción del ancho de la casilla. La casilla se calcula con los dos puntos
+   y el paso medidos en pantalla, y medir falla por un píxel o dos: sin esta
+   holgura, una cifra un píxel corrida ya no se parecía a su plantilla. */
+const TCP_HOLGURA = 0.18;
+
+/* Al enseñar a mano, una cifra que se leería con menos parecido que esto -o
+   que se leería como otra- SUSTITUYE a lo que ya sabía, en vez de mezclarse con
+   ello. Una plantilla mala -aprendida con el reparto de antes, o en otro sitio-
+   no se arreglaba nunca: cada vez que se le volvía a enseñar la cifra se
+   mezclaba un 15 % y seguía siendo mala. */
+const TCP_RENUEVA = 0.8;
+
+/* Sin enganchar en este tiempo, en milisegundos, se dice por qué. Antes no se
+   decía nada y el síntoma era el que llegó de sala: «no lo reconoce». */
+const TCP_AVISO_MS = 6000;
+
+/* La forma de lo guardado. Lo de antes se guardó con otro reparto de las
+   casillas, y sus plantillas no valen con el nuevo: se olvidan al cargar. */
+const TCP_GUARDADO_V = 2;
+
+/* El lado mayor, en píxeles, al que se reduce la foto del recuadro antes de
+   leerla. Un contador ajustado de 480 de ancho tiene cifras de más de 40 de
+   alto: de sobra, que se comparan a 12 x 18. */
+const TCP_FOTO_MAX = 480;
+
 const TCP = {
   on: false,            // ¿esta siguiendo a Pro Tools?
   video: null,          // el <video> con la ventana compartida
@@ -75,6 +103,8 @@ const TCP = {
   _hist: [], _dudas: [],
   aprendiendo: null,    // la cuenta de las cifras con Pro Tools rodando
   _aprTimer: 0,
+  _desde: 0,            // performance.now() de cuando se arrancó a seguir
+  _avisado: false,      // ¿ya se dijo por qué no engancha?
   _cv: null, _g: null
 };
 
@@ -208,14 +238,23 @@ function tcpFoto(){
   const W = v.videoWidth, H = v.videoHeight;
   const x = Math.max(0, Math.min(W - 2, Math.round(R.x * W)));
   const y = Math.max(0, Math.min(H - 2, Math.round(R.y * H)));
-  const w = Math.max(8, Math.min(W - x, Math.round(R.w * W)));
-  const h = Math.max(6, Math.min(H - y, Math.round(R.h * H)));
+  const sw = Math.max(8, Math.min(W - x, Math.round(R.w * W)));
+  const sh = Math.max(6, Math.min(H - y, Math.round(R.h * H)));
+  /* Un contador grande -el Big Counter en una pantalla grande- se lee igual de
+     bien reducido, y a tamaño real costaba 60 ms cada lectura, medido: el hilo
+     de la página casi entero, quince veces por segundo. */
+  const k = Math.min(1, TCP_FOTO_MAX / Math.max(sw, sh));
+  const w = Math.max(8, Math.round(sw * k)), h = Math.max(6, Math.round(sh * k));
   if(!TCP._cv){
     TCP._cv = document.createElement('canvas');
     TCP._g = TCP._cv.getContext('2d', { willReadFrequently: true });
   }
   if(TCP._cv.width !== w || TCP._cv.height !== h){ TCP._cv.width = w; TCP._cv.height = h; }
-  try{ TCP._g.drawImage(v, x, y, w, h, 0, 0, w, h); }catch(e){ return null; }
+  try{
+    TCP._g.imageSmoothingEnabled = true;
+    TCP._g.imageSmoothingQuality = 'high';
+    TCP._g.drawImage(v, x, y, sw, sh, 0, 0, w, h);
+  }catch(e){ return null; }
   let d;
   try{ d = TCP._g.getImageData(0, 0, w, h).data; }catch(e){ return null; }
   const g = new Float32Array(w * h);
@@ -243,17 +282,200 @@ function tcpFoto(){
  *
  * Se piden dos pixeles y no uno para que un pixel suelto de ruido no cuente.
  */
-function tcpGrupos(f){
+function tcpGrupos(f){ return tcpGruposEn(f, 0, f.h - 1); }
+
+/** Lo mismo, mirando solo unas filas: las de la franja de las cifras. */
+function tcpGruposEn(f, y0, y1){
   const gr = [];
   let a = -1;
   for(let x = 0; x <= f.w; x++){
     let n = 0;
-    if(x < f.w) for(let y = 0; y < f.h; y++) if(f.g[y * f.w + x] > 0.5){ if(++n >= 2) break; }
+    if(x < f.w) for(let y = y0; y <= y1; y++) if(f.g[y * f.w + x] > 0.5){ if(++n >= 2) break; }
     const hay = n >= 2;
     if(hay && a < 0) a = x;
     if(!hay && a >= 0){ gr.push({ a: a, b: x - 1 }); a = -1; }
   }
   return gr;
+}
+
+/**
+ * Las franjas de filas con tinta, de la más alta a la más baja. En un recuadro
+ * cogido de más hay varias -la etiqueta, el contador, el subcontador- y el
+ * contador es la más alta.
+ *
+ * Una fila cuenta si tiene tinta de verdad, no un borde: la raya vertical del
+ * marco pinta un par de píxeles en TODAS las filas y juntaría la etiqueta y las
+ * cifras en una sola franja.
+ */
+function tcpFranjas(f){
+  const cuenta = new Int32Array(f.h);
+  let mx = 0;
+  for(let y = 0; y < f.h; y++){
+    let n = 0;
+    for(let x = 0; x < f.w; x++) if(f.g[y * f.w + x] > 0.5) n++;
+    cuenta[y] = n; if(n > mx) mx = n;
+  }
+  if(!mx) return [];
+  const umbral = Math.max(2, mx * 0.12);
+  const fr = [];
+  for(let y = 0; y < f.h; y++){
+    if(cuenta[y] < umbral) continue;
+    const u = fr[fr.length - 1];
+    if(u && y - u.b <= 1) u.b = y; else fr.push({ a: y, b: y });
+  }
+  return fr.filter(r => r.b - r.a + 1 >= 5).sort((p, q) => (q.b - q.a) - (p.b - p.a));
+}
+
+/**
+ * Las columnas con forma de dos puntos, en tramos.
+ *
+ * Unos dos puntos se reconocen por su FORMA, columna a columna, y no por ser
+ * un trozo de tinta suelto. Contar trozos era el fallo de «no lo reconoce»:
+ * medido con texto pintado con fuentes de verdad, 56 de 105 contadores. Las
+ * cifras de las letras normales se tocan o se parten -un 1 con su banderita,
+ * dos cifras pegadas en letra pequeña- y entonces no salen once trozos, y sin
+ * once trozos no había reparto.
+ *
+ * Una columna de dos puntos tiene exactamente dos manchas de tinta, sin nada
+ * en la parte de arriba de las cifras, con hueco entre ellas y la de abajo
+ * pegada a la base. Ninguna cifra tiene una columna así: todas pintan arriba,
+ * menos el palo de un 4, que no llega a la base.
+ *
+ * `relativo` mide la tinta contra lo más claro de la columna y no contra un
+ * umbral fijo: con la imagen algo borrosa, unos dos puntos pequeños no llegan
+ * a medio gris y se perdían. Va de segundo intento porque con la imagen nítida
+ * el fijo acierta más.
+ */
+function tcpDosPuntos(f, y0, y1, relativo){
+  const H = y1 - y0 + 1;
+  const arriba = Math.max(1, Math.floor(H * 0.22));
+  const hueco = Math.max(1, Math.floor(H * 0.12));
+  const tramos = [];
+  let a = -1;
+  for(let x = 0; x <= f.w; x++){
+    let es = false;
+    if(x < f.w){
+      let u = 0.45;
+      if(relativo){
+        let mx = 0;
+        for(let y = y0; y <= y1; y++){ const v = f.g[y * f.w + x]; if(v > mx) mx = v; }
+        u = Math.max(0.3, mx * 0.5);
+      }
+      const gr = [];
+      let g0 = -1;
+      for(let i = 0; i <= H; i++){
+        const t = i < H && f.g[(y0 + i) * f.w + x] > u;
+        if(t && g0 < 0) g0 = i;
+        if(!t && g0 >= 0){ gr.push([g0, i - 1]); g0 = -1; }
+      }
+      es = gr.length === 2 && gr[0][0] >= arriba
+        && gr[1][0] - gr[0][1] - 1 >= hueco
+        && gr[1][1] >= H * 0.65
+        && gr[0][1] - gr[0][0] + 1 <= H * 0.45 && gr[1][1] - gr[1][0] + 1 <= H * 0.45;
+    }
+    if(es && a < 0) a = x;
+    if(!es && a >= 0){
+      if(x - a <= H * 0.45) tramos.push({ a: a, b: x - 1, c: (a + x - 1) / 2 });
+      a = -1;
+    }
+  }
+  return tramos;
+}
+
+/**
+ * Los tres dos puntos del contador, de izquierda a derecha, o null.
+ *
+ * De todos los tramos con forma de dos puntos se buscan TRES a la misma
+ * distancia, y a una distancia de timecode: entre uno y otro caben dos cifras,
+ * así que es de algo más de una a algo más de tres veces el alto. Se prefieren
+ * los que van sueltos -su tramo es un trozo de tinta entero-, que un trozo de
+ * cifra con forma de dos puntos va pegado a su cifra: tres sueltos le ganan
+ * siempre a cualquier trío con uno pegado. Los trozos se miran solo en las
+ * filas de las cifras: con una etiqueta encima, en la foto entera todo sería
+ * un trozo y ningún dos puntos iría suelto.
+ */
+function tcpSeparadores(f, y0, y1, gr){
+  const H = y1 - y0 + 1;
+  for(const relativo of [false, true]){
+    const ts = tcpDosPuntos(f, y0, y1, relativo);
+    ts.forEach(t => {
+      const g = gr.find(g => g.a <= t.b && g.b >= t.a);
+      t.suelto = !!(g && g.a >= t.a - 1 && g.b <= t.b + 1);
+    });
+    const cand = ts;
+    if(cand.length > 60) continue;              // eso es un texto entero, no un contador
+    let mejor = null;
+    for(let i = 0; i < cand.length; i++) for(let j = i + 1; j < cand.length; j++) for(let k = j + 1; k < cand.length; k++){
+      const d1 = cand[j].c - cand[i].c, d2 = cand[k].c - cand[j].c;
+      if(d1 <= 0 || d2 <= 0) continue;
+      const err = Math.abs(d1 - d2) / Math.max(d1, d2);
+      if(err > 0.12) continue;
+      const D = (d1 + d2) / 2;
+      if(D < H * 1.1 || D > H * 3.2) continue;
+      const t = [cand[i], cand[j], cand[k]];
+      const nota = t.filter(x => x.suelto).length * 10 - err * 10 + D / H * 0.01;
+      if(!mejor || nota > mejor.nota) mejor = { nota: nota, t: t };
+    }
+    if(mejor) return mejor.t;
+  }
+  return null;
+}
+
+/**
+ * Lo que ocupa una cifra, de una a la siguiente, en píxeles.
+ *
+ * Hace falta y no se puede suponer. Entre dos dos puntos van dos cifras y un
+ * separador, y cuánto de eso es separador depende de la letra: en una de ancho
+ * fijo el separador ocupa lo que una cifra, y en una normal la mitad. Partiendo
+ * a medias, en una de ancho fijo la primera cifra de cada pareja quedaba pegada
+ * a un lado de su casilla y la segunda al otro, y no se parecían: 0 de 21
+ * contadores leídos con Courier.
+ *
+ * Se mide con la tinta de las dos parejas de dentro, que tienen dos puntos a
+ * cada lado y no se les puede colar nada: la pareja entera mide dos cifras.
+ * Se queda dentro de lo que puede ser -de ancho fijo a letra normal- por si
+ * la pareja es de dos unos, que pintan poco.
+ */
+function tcpPasoCifra(f, y0, y1, p, D){
+  let tira = 0;
+  for(const [a, b] of [[p[0], p[1]], [p[1], p[2]]]){
+    let L = -1, R = -1;
+    for(let x = a.b + 1; x < b.a; x++){
+      let n = 0;
+      for(let y = y0; y <= y1; y++) if(f.g[y * f.w + x] > 0.5){ if(++n >= 2) break; }
+      if(n >= 2){ if(L < 0) L = x; R = x; }
+    }
+    if(L >= 0) tira = Math.max(tira, R - L + 1);
+  }
+  return Math.min(D / 2.3, Math.max(D / 3.05, tira / 2 || D / 2.7));
+}
+
+/**
+ * Las ocho casillas, colgadas de los tres dos puntos.
+ *
+ * Cada pareja de cifras va centrada entre dos dos puntos -las de las horas y
+ * los fotogramas, donde irían los dos puntos de fuera-, y cada cifra, medio
+ * paso a un lado del centro de su pareja. La casilla es algo más estrecha que
+ * el paso: más ancha se come un trozo de la cifra de al lado, y esa era la
+ * mitad de los fallos con letra de ancho fijo.
+ */
+function tcpLayoutPuntos(f){
+  for(const fr of tcpFranjas(f)){
+    const y0 = fr.a, y1 = fr.b, H = y1 - y0 + 1;
+    const p = tcpSeparadores(f, y0, y1, tcpGruposEn(f, y0, y1));
+    if(!p) continue;
+    const D = (p[2].c - p[0].c) / 2;
+    const P = tcpPasoCifra(f, y0, y1, p, D);
+    const w = P * 0.95;
+    const cs = [];
+    for(const m of [p[0].c - D / 2, (p[0].c + p[1].c) / 2, (p[1].c + p[2].c) / 2, p[2].c + D / 2])
+      for(const lado of [-1, 1]){
+        const c = m + lado * P / 2;
+        cs.push({ x: (c - w / 2) / f.w, w: w / f.w, y: y0 / f.h, h: H / f.h });
+      }
+    return cs;
+  }
+  return null;
 }
 
 /** La franja de filas que tiene tinta, en proporciones. */
@@ -284,10 +506,15 @@ function tcpFilas(f){
  * una sola vez, con el usuario mirando y diciendo si esta bien, deja de ser un
  * problema de cada fotograma.
  *
- * Se admiten once grupos (ocho cifras y tres separadores) u ocho (si los
- * separadores son tan finos que no pintan).
+ * Primero por los dos puntos (tcpLayoutPuntos), que vale con cualquier letra.
+ * Si no se ven, por trozos: once (ocho cifras y tres separadores que no tienen
+ * forma de dos puntos) u ocho (si los separadores son tan finos que no pintan).
  */
 function tcpLayout(f){
+  return tcpLayoutPuntos(f) || tcpLayoutTrozos(f);
+}
+
+function tcpLayoutTrozos(f){
   const gr = tcpGrupos(f);
   let ds = null, k = null;
   if(gr.length === 11){
@@ -374,29 +601,64 @@ function tcpParecido(a, b){
   return den ? num / den : 0;
 }
 
-/** Que cifra es esta casilla, y con cuanta ventaja sobre la segunda. */
-function tcpCasar(cel){
-  let m1 = -2, m2 = -2, d = '';
-  for(const k in TCP.plantillas){
+/**
+ * La casilla sacada un poco corrida hacia cada lado: hasta TCP_HOLGURA de su
+ * ancho en horizontal -un píxel como poco- y un píxel en vertical.
+ */
+function tcpCorridas(f, c){
+  const R = Math.max(1, Math.round(c.w * f.w * TCP_HOLGURA));
+  const out = [];
+  for(let dx = -R; dx <= R; dx++) for(let dy = -1; dy <= 1; dy++)
+    out.push(tcpCelda(f, { x: c.x + dx / f.w, y: c.y + dy / f.h, w: c.w, h: c.h }));
+  return out;
+}
+
+/**
+ * Que cifra hay en esta casilla, y con cuanta ventaja sobre la segunda.
+ *
+ * La casilla no se compara quieta: cada plantilla se prueba contra la casilla
+ * corrida a cada lado y se queda con su mejor parecido. La plantilla de un 0
+ * se aprendió en su casilla, y el 0 que se lee puede caer en otra, con la
+ * cifra un píxel más a un lado. `cel` es la casilla tal y como casó mejor.
+ */
+function tcpCasar(f, c){
+  const mejor = {};
+  for(const cel of tcpCorridas(f, c)) for(const k in TCP.plantillas){
     const s = tcpParecido(cel, TCP.plantillas[k]);
+    if(!(k in mejor) || s > mejor[k].s) mejor[k] = { s: s, cel: cel };
+  }
+  let m1 = -2, m2 = -2, d = '';
+  for(const k in mejor){
+    const s = mejor[k].s;
     if(s > m1){ m2 = m1; m1 = s; d = k; }
     else if(s > m2) m2 = s;
   }
-  return { d: d, s: m1, margen: m1 - m2 };
+  return { d: d, s: m1, margen: m1 - m2, cel: d ? mejor[d].cel : null };
 }
 
-/** Una lectura del contador. Devuelve null si no hay imagen. */
+/** La casilla corrida donde mejor casa con esta plantilla, y cuánto. */
+function tcpAlinear(f, c, pl){
+  let s = -2, cel = null;
+  for(const x of tcpCorridas(f, c)){
+    const p = tcpParecido(x, pl);
+    if(p > s){ s = p; cel = x; }
+  }
+  return { s: s, cel: cel };
+}
+
+/** Una lectura del contador. Devuelve null si no hay imagen, y `celdas: 0`
+    si en el recuadro no se encuentra el contador. */
 function tcpLeerUna(){
   const f = tcpFoto();
   if(!f) return null;
   let cs = TCP.celdas;
   if(!cs){
     cs = tcpLayout(f);
-    if(!cs) return { celdas: tcpGrupos(f).length };
+    if(!cs) return { celdas: 0 };
   }
   let txt = '', conf = 1;
   for(let i = 0; i < cs.length; i++){
-    const m = tcpCasar(tcpCelda(f, cs[i]));
+    const m = tcpCasar(f, cs[i]);
     if(!m.d) return { celdas: cs.length };
     txt += m.d;
     /* Una cifra que gana por los pelos vale la mitad: casi siempre es un 8 que
@@ -416,7 +678,7 @@ function tcpEnsenar(txt){
   const L = TCP.celdas || tcpLayout(f);
   if(!L) return { ok: false, motivo: 'No distingo ocho cifras · vuelve a marcar el recuadro más ajustado', faltan: tcpFaltan() };
   TCP.celdas = L;
-  tcpAprender(f, t);
+  tcpAprender(f, t, true);
   tcpGuardar();
   return { ok: true, faltan: tcpFaltan() };
 }
@@ -424,15 +686,27 @@ function tcpEnsenar(txt){
 /**
  * Mete estas ocho cifras en las plantillas. Si ya conocia una, no la sustituye:
  * la mezcla. Asi una captura borrosa suelta no estropea lo aprendido, y a la
- * vez la plantilla se va adaptando si cambia el tamaño de la ventana.
+ * vez la plantilla se va adaptando si cambia el tamaño de la ventana. Se mezcla
+ * con la casilla corrida donde mejor casa, no quieta: mezclando una cifra un
+ * píxel corrida, la plantilla se iba emborronando.
+ *
+ * `aMano` es que lo ha escrito alguien mirando el contador, así que se sabe
+ * qué cifra hay en cada casilla. Si con lo aprendido esa casilla se leería
+ * mal, o por los pelos, la plantilla de esa cifra se tira y se queda con lo
+ * de ahora: era mala, y mezclándola un 15 % no se arreglaba nunca.
  */
-function tcpAprender(f, t){
+function tcpAprender(f, t, aMano){
   const L = TCP.celdas;
   if(!L) return;
   for(let i = 0; i < 8 && i < L.length; i++){
-    const c = tcpCelda(f, L[i]), k = t[i], v = TCP.plantillas[k];
-    if(!v) TCP.plantillas[k] = c;
-    else for(let j = 0; j < c.length; j++) v[j] = v[j] * 0.85 + c[j] * 0.15;
+    const k = t[i], v = TCP.plantillas[k];
+    if(!v){ TCP.plantillas[k] = tcpCelda(f, L[i]); continue; }
+    if(aMano){
+      const m = tcpCasar(f, L[i]);
+      if(m.d !== k || m.s < TCP_RENUEVA){ TCP.plantillas[k] = tcpCelda(f, L[i]); continue; }
+    }
+    const a = tcpAlinear(f, L[i], v);
+    for(let j = 0; j < a.cel.length; j++) v[j] = v[j] * 0.85 + a.cel[j] * 0.15;
   }
 }
 
@@ -568,9 +842,10 @@ function tcpAprenderVuelta(ahora){
  * dejaba el contador sin leer: «veo 13 trozos y tienen que ser 8». Ahora se
  * busca DENTRO de lo marcado.
  *
- * Primero la franja de texto más alta, que en el contador son las cifras. Y en
- * ella, once trozos con forma de timecode: dos cifras, dos puntos, dos cifras…
- * Los dos puntos se reconocen por las FILAS con tinta, no por su ancho ni por
+ * Se busca por los dos puntos (tcpRecortar, con tcpLayoutPuntos), y solo si no
+ * se ven, como antes: la franja de texto más alta y en ella once trozos con
+ * forma de timecode, dos cifras, dos puntos, dos cifras…
+ * Ahí los dos puntos se reconocen por las FILAS con tinta, no por su ancho ni por
  * su alto. Un 1 puede ser más estrecho que unos dos puntos, y unos dos puntos
  * de verdad llegan de arriba abajo casi lo que una cifra —medido con Consolas:
  * el 77 %—. Pero una cifra tiene tinta en casi todas sus filas, y unos dos
@@ -624,29 +899,26 @@ function tcpRecortarFranja(f, y0, y1){
 /**
  * El recuadro de las cifras dentro de una foto de lo marcado, en proporciones
  * de esa foto, o nulo si ahí no hay un timecode.
+ *
+ * Primero por los dos puntos, con las mismas casillas que se usarán para leer:
+ * el recuadro va de la primera a la última, con un margen de un cuarto de
+ * cifra a los lados -más que lo que se deja bailar a una cifra al leerla, y
+ * menos que lo que suele haber hasta la etiqueta- y de algo más de un octavo
+ * del alto arriba y abajo. Si no
+ * se ven dos puntos, por trozos, como antes.
  */
 function tcpRecortar(f){
   if(!f || !f.w || !f.h) return null;
-  const cuenta = new Int32Array(f.h);
-  let mx = 0;
-  for(let y = 0; y < f.h; y++){
-    let n = 0;
-    for(let x = 0; x < f.w; x++) if(f.g[y * f.w + x] > 0.5) n++;
-    cuenta[y] = n; if(n > mx) mx = n;
+  const L = tcpLayoutPuntos(f);
+  if(L){
+    const a = L[0].x * f.w, b = (L[7].x + L[7].w) * f.w, cw = L[0].w * f.w;
+    const ya = L[0].y * f.h, alto = L[0].h * f.h;
+    const mx = Math.max(1, cw * 0.25), my = Math.max(1, alto * 0.15);
+    const x0 = Math.max(0, Math.floor(a - mx)), x1 = Math.min(f.w, Math.ceil(b + mx));
+    const y0 = Math.max(0, Math.floor(ya - my)), y1 = Math.min(f.h, Math.ceil(ya + alto + my));
+    return { x: x0 / f.w, y: y0 / f.h, w: (x1 - x0) / f.w, h: (y1 - y0) / f.h };
   }
-  if(!mx) return null;
-  /* Una fila cuenta si tiene tinta de verdad, no un borde: la raya vertical
-     del marco pinta un par de píxeles en TODAS las filas y juntaría la etiqueta
-     y las cifras en una sola franja. */
-  const umbral = Math.max(2, mx * 0.12);
-  const franjas = [];
-  for(let y = 0; y < f.h; y++){
-    if(cuenta[y] < umbral) continue;
-    const u = franjas[franjas.length - 1];
-    if(u && y - u.b <= 2) u.b = y; else franjas.push({ a: y, b: y });
-  }
-  franjas.sort((p, q) => (q.b - q.a) - (p.b - p.a));
-  for(const r of franjas){
+  for(const r of tcpFranjas(f)){
     const x = tcpRecortarFranja(f, r.a, r.b);
     if(x) return x;
   }
@@ -668,6 +940,10 @@ function tcpMirar(){
   const ahora = (typeof performance !== 'undefined' ? performance.now() : Date.now());
   const r = tcpLeerUna();
   TCP._leidas++;
+  if(TCP.tc == null && !TCP._avisado && TCP._desde && ahora - TCP._desde > TCP_AVISO_MS){
+    TCP._avisado = true;
+    try{ castAviso('⚠️ ' + tcpPorQueNoLee()); }catch(e){ /* sin avisos: el panel lo dice igual */ }
+  }
   if(!r || r.seg == null || r.conf < 0.55){ TCP._malas++; return; }
 
   const p = tcpAhora(TCP, ahora);
@@ -701,27 +977,58 @@ function tcpMirar(){
   }
 }
 
+/**
+ * Por qué no se engancha, dicho para quien está en la sala. Son dos cosas muy
+ * distintas y se arreglan distinto: que el contador no esté donde se marcó
+ * -la ventana se ha movido o está tapada- o que esté y no se entiendan las
+ * cifras.
+ */
+function tcpPorQueNoLee(){
+  let f = null;
+  try{ f = tcpFoto(); }catch(e){ f = null; }
+  if(!f) return 'No llega imagen de la pantalla compartida · vuelve a compartirla';
+  if(!tcpLayout(f))
+    return 'No encuentro el contador de Pro Tools en el recuadro · ¿se ve en pantalla? Si has movido la ventana, vuelve a marcarlo';
+  return 'Veo el contador pero no entiendo sus cifras · con Pro Tools parado, vuelve a escribir lo que pone';
+}
+
 function tcpArrancar(){
   tcpParar(true);
   /* Seguir y aprender a la vez no: las dos cosas leen la misma casilla con
      criterios distintos. Si se arranca, lo aprendido hasta ahora se queda. */
   try{ if(typeof tcpAprenderParar === 'function') tcpAprenderParar(); }catch(e){ /* no estaba aprendiendo */ }
+  let ult = -1e9;
   const paso = () => {
     if(!TCP.on) return;
+    /* Si una vuelta tarda más que el latido, los latidos se amontonan: los
+       que llegan pegados a la anterior se saltan en vez de hacer cola. */
+    const t = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    if(t - ult < 45) return;
+    ult = t;
     try{ tcpMirar(); }catch(e){ /* una lectura mala no puede tirar el bucle */ }
     try{ tcpPintarEstado(); }catch(e){ /* el panel no esta abierto */ }
     try{ if(typeof studioTick === 'function') studioTick(false); }catch(e){ /* sin libreto */ }
-    TCP._timer = setTimeout(paso, 66);
   };
   TCP.on = true;
+  TCP._desde = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  TCP._avisado = false;
   /* Leer Pro Tools ES el seguimiento: no tiene sentido estar leyendo la
      pantalla con el libreto suelto. */
   try{ if(typeof stSeguirPoner === 'function') stSeguirPoner(true); }catch(e){ /* sin libreto */ }
+  /* El latido, del mismo sitio que el del aprendizaje (tcpLatido, PT-11), y
+     no de un temporizador de la página. Con Dubbipt tapado por Pro Tools -lo
+     normal en la sala- el navegador frena los temporizadores de la página a
+     uno por segundo, y para enganchar hacen falta tres lecturas en segundo y
+     medio: con uno por segundo no enganchaba NUNCA. Se vio probándolo, con el
+     aprendizaje ya hecho y cada lectura bien leída. */
+  TCP._timer = (typeof tcpLatido === 'function')
+    ? tcpLatido(66, paso)
+    : ((id) => ({ parar(){ clearInterval(id); } }))(setInterval(paso, 66));
   paso();
 }
 
 function tcpParar(soloElBucle){
-  if(TCP._timer){ clearTimeout(TCP._timer); TCP._timer = 0; }
+  if(TCP._timer){ try{ TCP._timer.parar(); }catch(e){ /* ya estaba parado */ } TCP._timer = 0; }
   if(!soloElBucle){
     TCP.on = false;
     TCP.tc = null;
@@ -833,6 +1140,7 @@ function tcpGuardar(){
     const pl = {};
     for(const k in TCP.plantillas) pl[k] = Array.from(TCP.plantillas[k]);
     localStorage.setItem('ddl_tcp', JSON.stringify({
+      v: TCP_GUARDADO_V,
       rect: TCP.rect, celdas: TCP.celdas, plantillas: pl, fps: TCP.fps, lat: TCP.lat
     }));
   }catch(e){ /* sin sitio donde guardar: funciona igual, pero no se recuerda */ }
@@ -844,14 +1152,33 @@ function tcpCargar(){
     if(!s) return;
     const o = JSON.parse(s);
     if(o.rect) TCP.rect = o.rect;
-    if(o.celdas) TCP.celdas = o.celdas;
     if(o.fps) TCP.fps = +o.fps || 25;
     if(o.lat != null) TCP.lat = +o.lat || 0;
+    /* Las casillas y las cifras de antes se sacaron con el reparto por trozos,
+       que es justo el que no reconocía el contador: con ellas se seguiría sin
+       leer. El recuadro y los ajustes sí valen. */
+    if(o.v !== TCP_GUARDADO_V) return;
+    if(o.celdas) TCP.celdas = o.celdas;
     if(o.plantillas) for(const k in o.plantillas)
       TCP.plantillas[k] = Float32Array.from(o.plantillas[k]);
   }catch(e){ /* lo guardado no vale: se empieza de cero */ }
 }
 try{ tcpCargar(); }catch(e){ /* en las pruebas no hay localStorage */ }
+
+/**
+ * Empezar de cero: olvida el recuadro, las casillas y las cifras aprendidas, y
+ * deja de seguir. Los fotogramas y el ajuste fino se quedan, que son de la sala
+ * y no del contador. Hacía falta: una cifra aprendida mal no había manera de
+ * quitarla, y cada vez que se le volvía a enseñar se mezclaba con la mala.
+ */
+function tcpOlvidar(){
+  try{ if(typeof tcpAprenderParar === 'function') tcpAprenderParar(); }catch(e){ /* no estaba aprendiendo */ }
+  tcpParar();
+  TCP.rect = null;
+  TCP.celdas = null;
+  TCP.plantillas = {};
+  tcpGuardar();
+}
 
 /* ── El panel ──────────────────────────────────────────────────────────── */
 
@@ -1011,7 +1338,7 @@ function tcpVistaEnMarcha(ov){
       const r = tcpLeerUna();
       if(tcpFaltan().length === 10) txt = 'todavía no sabe leerlo: enséñale las cifras';
       else if(r && r.seg != null && r.conf >= 0.55){ txt = 'lee ' + tcpTexto(r.seg, TCP.fps); bien = true; }
-      else if(r && r.celdas && r.celdas !== 8) txt = 'en el recuadro ve ' + r.celdas + ' trozos: vuelve a marcarlo';
+      else if(r && !r.celdas) txt = 'no encuentra el contador en el recuadro: vuelve a marcarlo';
       else txt = tcpFaltan().length ? ('no lo entiende todavía · le faltan ' + tcpFaltan().join(', ')) : 'no lo entiende ahora mismo';
     }catch(e){ txt = 'no lo entiende ahora mismo'; }
     lee.textContent = txt;
@@ -1095,6 +1422,14 @@ function tcpPanel(){
     +   '<label class="sala-c">Ajuste fino <input id="tcpLat" type="number" step="0.02" min="-2" max="2" '
     +     'value="' + TCP.lat + '"> s</label>'
     + '</div>'
+    /* Para cuando lo aprendido está mal y no hay manera de que lea: antes no
+       había forma de quitar una cifra mal aprendida. */
+    + ((TCP.rect || faltan.length < 10)
+        ? '<div class="io-rej" style="margin:8px 0 4px">'
+          + '<button class="io-b" id="tcpCero">↺ Empezar de cero</button>'
+          + '<span class="meta-nota" style="margin:0">Olvida el recuadro y las cifras aprendidas.</span>'
+          + '</div>'
+        : '')
     /* Arrancar es LA accion de este panel, asi que va la ultima y va destacada.
        Estaba al reves —«Cerrar» ancho y en verde, y arrancar en un boton
        pequeño de mas arriba—: se vio en pantalla y lo que pedia el ojo era
@@ -1147,6 +1482,25 @@ function tcpPanel(){
   ov.querySelector('#tcpLat').onchange = (e) => {
     const v = +e.target.value; TCP.lat = isFinite(v) ? Math.max(-2, Math.min(2, v)) : 0; tcpGuardar();
   };
+  const cero = ov.querySelector('#tcpCero');
+  if(cero) cero.onclick = async () => {
+    const pregunta = '¿Empezar de cero con el contador?';
+    const detalle = 'Se olvidan el recuadro y las cifras aprendidas. Luego hay que marcar el contador y escribir lo que pone.';
+    /* El panel se quita antes de preguntar: va por encima de la ventana de
+       confirmar y la taparía. */
+    cerrar();
+    let ok = false;
+    try{
+      ok = (typeof DDL_UI !== 'undefined' && DDL_UI.confirmModal)
+        ? await DDL_UI.confirmModal({ title: pregunta, body: detalle, confirmLabel: 'Empezar de cero', danger: true })
+        : confirm(pregunta + '\n\n' + detalle);
+    }catch(e){ ok = false; }
+    if(!ok){ tcpPanel(); return; }
+    tcpOlvidar();
+    castAviso('↺ Olvidado · marca el contador otra vez');
+    if(TCP.video) tcpMarcarRect();
+    else tcpPanel();
+  };
 
   const on = ov.querySelector('#tcpOn');
   if(on) on.onclick = () => {
@@ -1178,8 +1532,8 @@ function tcpMarcarRect(){
     + 'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px';
   ov.innerHTML = '<div style="color:#e7ebf3;font-family:Inter,sans-serif;font-size:14px;text-align:center">'
     + 'Arrastra un recuadro sobre el <b>contador grande de Pro Tools</b>.<br>'
-    + '<span style="color:#8892a6;font-size:12.5px">Solo las cifras: sin la etiqueta ni los bordes.</span></div>'
-    + '<div id="tcpLienzo" style="position:relative;max-width:94vw;max-height:66vh"></div>'
+    + '<span style="color:#8892a6;font-size:12.5px">Coge el contador entero: si coges de más, se ajusta solo a las cifras.</span></div>'
+    + '<div id="tcpLienzo" style="position:relative;max-width:94vw;max-height:58vh"></div>'
     /* La lupa. Compartiendo la pantalla entera el contador queda diminuto sobre
        el lienzo y no hay manera de saber si se ha cogido bien; aqui se ve
        aumentado y con la cuenta de cifras, que es el dato que decide. */
@@ -1197,7 +1551,9 @@ function tcpMarcarRect(){
   const v = TCP.video;
   const cv = document.createElement('canvas');
   cv.width = v.videoWidth || 1280; cv.height = v.videoHeight || 720;
-  cv.style.cssText = 'display:block;max-width:94vw;max-height:76vh;width:auto;height:auto;cursor:crosshair';
+  /* Del mismo alto que su caja: con 76 el lienzo se salía de ella en una
+     pantalla de portátil y tapaba la lupa, que es lo que dice si está bien. */
+  cv.style.cssText = 'display:block;max-width:94vw;max-height:58vh;width:auto;height:auto;cursor:crosshair';
   caja.appendChild(cv);
   const g = cv.getContext('2d');
   const marco = document.createElement('div');
@@ -1249,8 +1605,33 @@ function tcpMarcarRect(){
     const caja2 = ov.querySelector('#tcpLupaCaja');
     const lc = ov.querySelector('#tcpLupa');
     const cuenta = ov.querySelector('#tcpCuenta');
-    const sx = Math.round(sel.x * cv.width), sy = Math.round(sel.y * cv.height);
-    const sw = Math.max(1, Math.round(sel.w * cv.width)), sh = Math.max(1, Math.round(sel.h * cv.height));
+    /* Se mide sobre el recuadro de verdad, con el mismo codigo que leera
+       despues: no vale enseñar una cosa y medir otra. */
+    const antes = TCP.rect;
+    const mide = (r) => {
+      TCP.rect = r;
+      try{ const f = tcpFoto(); return { L: f ? tcpLayout(f) : null, f: f }; }
+      catch(e){ return { L: null, f: null }; /* sin imagen todavia: no lo ve, y lo dice */ }
+    };
+    let m = mide(sel);
+    ajustada = null;
+    /* Se busca el contador DENTRO de lo marcado y se ajusta el recuadro a él:
+       coger de más -la etiqueta, el borde- era el fallo de siempre, y aunque
+       se lea igual, lo que sobra en el recuadro solo puede estorbar. */
+    if(m.f){
+      const r = tcpRecortar(m.f);
+      if(r){
+        const s2 = tcpDentroDe(sel, r);
+        const m2 = mide(s2);
+        if(m2.L){ ajustada = s2; m = m2; ponerMarco(s2); }
+      }
+    }
+    TCP.rect = antes;
+    /* Lo que se enseña aumentado es lo que se va a guardar: el recuadro ya
+       ajustado, si se ajustó. */
+    const q = ajustada || sel;
+    const sx = Math.round(q.x * cv.width), sy = Math.round(q.y * cv.height);
+    const sw = Math.max(1, Math.round(q.w * cv.width)), sh = Math.max(1, Math.round(q.h * cv.height));
     const k = Math.max(1, Math.min(6, Math.floor(620 / sw)));
     lc.width = sw * k; lc.height = sh * k;
     const lg = lc.getContext('2d');
@@ -1258,34 +1639,10 @@ function tcpMarcarRect(){
     try{ lg.drawImage(cv, sx, sy, sw, sh, 0, 0, lc.width, lc.height); }
     catch(e){ /* el recuadro se ha salido del lienzo: no se enseña nada */ }
     caja2.style.display = 'flex';
-    /* Se mide sobre el recuadro de verdad, con el mismo codigo que leera
-       despues: no vale enseñar una cosa y medir otra. */
-    const antes = TCP.rect;
-    const trozos = (r) => {
-      TCP.rect = r;
-      try{ const f = tcpFoto(); return { n: f ? tcpGrupos(f).length : 0, f: f }; }
-      catch(e){ return { n: 0, f: null }; /* sin imagen todavia: cero, y lo dice */ }
-    };
-    let m = trozos(sel);
-    ajustada = null;
-    /* Si no salen las ocho, se busca el contador DENTRO de lo marcado: coger
-       de más —la etiqueta, el borde— era el fallo de siempre. */
-    if(m.n !== 11 && m.n !== 8 && m.f){
-      const r = tcpRecortar(m.f);
-      if(r){
-        const s2 = tcpDentroDe(sel, r);
-        const m2 = trozos(s2);
-        if(m2.n === 11 || m2.n === 8){ ajustada = s2; m = m2; ponerMarco(s2); }
-      }
-    }
-    TCP.rect = antes;
-    const n = m.n;
-    const bien = (n === 11 || n === 8);
-    cuenta.innerHTML = bien
+    cuenta.innerHTML = m.L
       ? '<b style="color:#4ADE80">✓ veo las ocho cifras' + (ajustada ? ' · he ajustado el recuadro a ellas' : '') + '</b>'
-      : '<b style="color:#F59E0B">Aquí veo ' + n + ' trozos y tienen que ser 8 cifras'
-        + (n > 11 ? ' — coge el contador, sin otras cosas escritas al lado' : '')
-        + (n < 8 ? ' — coge el contador entero, de la primera cifra a la última' : '') + '</b>';
+      : '<b style="color:#F59E0B">Aquí no encuentro un contador con sus ocho cifras y sus dos puntos'
+        + ' — coge el contador entero, de la primera cifra a la última</b>';
   };
   cv.addEventListener('pointerup', () => { a = null; lupa(); });
 
@@ -1303,11 +1660,10 @@ function tcpMarcarRect(){
     catch(e){ /* se sacarán al enseñarle las cifras */ }
     tcpGuardar();
     fin();
-    const r = tcpLeerUna();
-    const ocho = !!(r && r.celdas === 8);
+    const ocho = !!TCP.celdas;
     castAviso(ocho
       ? '⬚ Recuadro guardado · veo 8 cifras'
-      : ('⚠️ En el recuadro veo ' + ((r && r.celdas) || 0) + ' cifras y tienen que ser 8'));
+      : '⚠️ Recuadro guardado, pero ahí no encuentro las ocho cifras del contador');
     /* Lo siguiente, sin más clics: si ya conocía las cifras, a seguir. */
     if(ocho && tcpQueFalta() === 'listo') tcpEmpezarASeguir();
     else tcpPanel();

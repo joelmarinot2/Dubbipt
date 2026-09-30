@@ -23,6 +23,9 @@ exports.nombre = 'El libreto sigue al contador de Pro Tools, no al vídeo';
 let ahora = 1000;
 const perf = { now: () => ahora };
 
+const avisos = [];
+const latidos = [];
+
 const guardado = {};
 const almacen = {
   getItem: (k) => (k in guardado ? guardado[k] : null),
@@ -32,7 +35,17 @@ const almacen = {
 
 /* Un navegador de mentira: lo justo para probar el camino de compartir. */
 let videoQueSale = () => ({ play: async () => {}, videoWidth: 0, videoHeight: 0 });
-const doc = { createElement: (q) => (q === 'video' ? videoQueSale() : {}) };
+/* Y un lienzo de mentira que apunta lo que se le dibuja y con qué tamaño. */
+const trazos = [];
+const lienzoDeMentira = () => {
+  const c = { width: 0, height: 0 };
+  c.getContext = () => ({
+    drawImage: (...a) => { trazos.push(a); },
+    getImageData: (x, y, w, h) => ({ data: new Uint8ClampedArray(w * h * 4) })
+  });
+  return c;
+};
+const doc = { createElement: (q) => (q === 'video' ? videoQueSale() : q === 'canvas' ? lienzoDeMentira() : {}) };
 let restriccionesPedidas = null;
 const nav = { mediaDevices: { getDisplayMedia: null } };
 const pista = () => ({ addEventListener: () => {}, stop: () => {} });
@@ -49,8 +62,16 @@ const M = montar(
    'ponLeer: (f) => { tcpLeerUna = f; }',
    'tcpAprendizajeNuevo', 'tcpAprendizajePaso', 'tcpAprendizajeGuardar', 'tcpAprenderVuelta',
    'TCP_IGUAL', 'TCP_GEMELA', 'TCP_APRENDER_S',
-   'tcpRecortar', 'tcpDentroDe', 'tcpQueFalta', 'tcpFoto: () => tcpFoto'],
-  { performance: perf, localStorage: almacen, document: doc, navigator: nav }
+   'tcpRecortar', 'tcpDentroDe', 'tcpQueFalta', 'tcpFoto: () => tcpFoto',
+   'tcpFranjas', 'tcpDosPuntos', 'tcpSeparadores', 'tcpGruposEn', 'tcpPasoCifra',
+   'tcpLayoutPuntos', 'tcpLayoutTrozos', 'tcpCorridas', 'tcpAlinear',
+   'tcpCargar', 'tcpOlvidar', 'tcpPorQueNoLee', 'tcpArrancar', 'tcpFotoDeVerdad: tcpFoto', 'TCP_FOTO_MAX',
+   'TCP_HOLGURA', 'TCP_RENUEVA', 'TCP_AVISO_MS', 'TCP_GUARDADO_V'],
+  { performance: perf, localStorage: almacen, document: doc, navigator: nav,
+    castAviso: (t) => { avisos.push(String(t)); },
+    /* El latido del trabajador de la aplicación, de mentira: se apunta a qué
+       ritmo se pide y se le da a mano. */
+    tcpLatido: (ms, fn) => { const L = { ms: ms, fn: fn, parado: false }; latidos.push(L); return { parar(){ L.parado = true; } }; } }
 );
 const TCP = M.TCP;
 
@@ -81,35 +102,65 @@ function pintaCifra(d, w, h, gro){
  * Una pantalla de mentira con un timecode escrito: ocho cifras y tres dos
  * puntos, con sus huecos y su margen, igual que el contador grande.
  * `opt.sinPuntos` la hace sin separadores, para probar ese caso.
+ *
+ * Y lo que tiene la letra de verdad y rompía el reparto por trozos:
+ *   · `aire`: hueco de más a cada lado de los dos puntos, como en una letra de
+ *     ancho fijo, donde unos dos puntos ocupan lo que una cifra;
+ *   · `pegadas`: las dos cifras de cada pareja tocándose, como en letra pequeña;
+ *   · `delante`: algo escrito a la izquierda en la misma franja, como la
+ *     etiqueta «Main» del contador;
+ *   · `baile`: cada cifra corrida unos píxeles de su sitio;
+ *   · `tenue`: los dos puntos en gris, como salen pequeños y algo borrosos;
+ *   · `corre3`: el tercer dos puntos corrido esos píxeles de su sitio.
+ * Devuelve además `cifras`: dónde cae el centro del sitio de cada cifra.
  */
 function pantalla(txt, opt){
   const o = opt || {};
   const t8 = String(txt).replace(/[^0-9]/g, '');
   const cw = o.cw || 18, ch = o.ch || 28, hueco = o.hueco || 7;
   const sw = o.sw || 5, pad = o.pad || 6, gro = o.gro || 3;
+  const aire = o.aire || 0;
   const items = [];
+  if(o.delante) for(let k = 0; k < 3; k++) items.push({ tipo: 'x', w: 7 });
   for(let i = 0; i < 8; i++){
-    items.push({ tipo: 'd', d: t8[i], w: cw });
+    items.push({ tipo: 'd', d: t8[i], w: cw, i: i });
     if(!o.sinPuntos && (i === 1 || i === 3 || i === 5)) items.push({ tipo: 's', w: sw });
   }
+  const espacio = (i) => {
+    if(!i) return 0;
+    const a = items[i - 1], b = items[i];
+    if(a.tipo === 's' || b.tipo === 's') return hueco + aire;
+    if(o.pegadas && a.tipo === 'd' && b.tipo === 'd' && (a.i & 1) === 0) return 0;
+    return hueco;
+  };
   let W = pad * 2, H = ch + pad * 2;
-  items.forEach((it, i) => { W += it.w + (i ? hueco : 0); });
+  items.forEach((it, i) => { W += it.w + espacio(i); });
   const g = new Float32Array(W * H);
+  const cifras = [];
   let x = pad;
   items.forEach((it, i) => {
-    if(i) x += hueco;
+    x += espacio(i);
     if(it.tipo === 'd'){
+      cifras.push(x + it.w / 2);
+      const dx = o.baile ? (o.baile[it.i] || 0) : 0;
       const c = pintaCifra(it.d, it.w, ch, gro);
-      for(let yy = 0; yy < ch; yy++) for(let xx = 0; xx < it.w; xx++)
-        if(c[yy * it.w + xx]) g[(yy + pad) * W + (x + xx)] = 1;
-    }else{
+      for(let yy = 0; yy < ch; yy++) for(let xx = 0; xx < it.w; xx++){
+        const X = x + xx + dx;
+        if(c[yy * it.w + xx] && X >= 0 && X < W) g[(yy + pad) * W + X] = 1;
+      }
+    }else if(it.tipo === 's'){
+      const sx = x + ((o.corre3 && it === items.filter(q => q.tipo === 's')[2]) ? o.corre3 : 0);
       for(const cy of [Math.round(ch * 0.33), Math.round(ch * 0.7)])
         for(let yy = 0; yy < gro; yy++) for(let xx = 0; xx < it.w; xx++)
-          g[(cy + yy + pad) * W + (x + xx)] = 1;
+          g[(cy + yy + pad) * W + (sx + xx)] = o.tenue || 1;
+    }else{
+      /* Una letra de mentira: de arriba abajo, con un trazo en medio. */
+      for(let yy = Math.round(ch * 0.3); yy < ch; yy++) for(let xx = 0; xx < it.w; xx++)
+        if(xx < 2 || xx >= it.w - 2 || yy === Math.round(ch * 0.6)) g[(yy + pad) * W + (x + xx)] = 1;
     }
     x += it.w;
   });
-  return { g: g, w: W, h: H };
+  return { g: g, w: W, h: H, cifras: cifras };
 }
 
 exports.pruebas = async function(t){
@@ -184,6 +235,18 @@ t.seccion('4 · trocear el contador');
      ocho trozos, y entonces NO se inventa un reparto: dice que no. */
   const f9 = pantalla('011823', { sinPuntos: true });
   t.eq('con seis cifras se planta', M.tcpLayout(f9), null);
+}
+
+/* ── 4b · sin contador en el recuadro ──────────────────────────────────── */
+t.seccion('4b · sin contador en el recuadro');
+{
+  const antes = { c: TCP.celdas, r: TCP.rect };
+  TCP.celdas = null; TCP.rect = { x: 0, y: 0, w: 1, h: 1 };
+  M.ponFoto(() => pantalla('011823', { sinPuntos: true }));
+  const l = M.tcpLeerUna();
+  t.ok('leer donde no hay contador dice que no hay casillas, y no lee nada', !!l && l.celdas === 0 && !l.txt,
+       JSON.stringify(l));
+  TCP.celdas = antes.c; TCP.rect = antes.r;
 }
 
 /* ── 5 · reconocer las cifras ──────────────────────────────────────────── */
@@ -677,5 +740,366 @@ t.seccion('16 · lo que falta para seguir, y los días siguientes');
   t.ok('el aprendizaje late desde un trabajador', /TCP\._aprTimer = tcpLatido\(66, vuelta\);/.test(src)
        && /function tcpLatido\(ms, fn\)\{[\s\S]{0,500}?w = new Worker\(url\);/.test(src),
        'con un temporizador de la página, la ventana tapada deja la cuenta a una foto por segundo');
+
+  /* La lupa y el aviso al aceptar el recuadro decían «veo 13 trozos»: contaban
+     trozos, que es justo lo que fallaba. Ahora dicen si encuentran el contador,
+     con el mismo reparto que leerá después. */
+  t.ok('la lupa mira si encuentra el contador, no cuántos trozos hay',
+       src.indexOf("return { L: f ? tcpLayout(f) : null, f: f };") > 0 && src.indexOf('tcpGrupos(f).length') < 0);
+  t.ok('y al aceptar, lo que cuenta es que salgan las casillas', /const ocho = !!TCP\.celdas;/.test(src));
+  t.ok('hay un botón de empezar de cero', /id="tcpCero"/.test(src));
+  t.ok('que pregunta antes y solo entonces olvida',
+       /if\(!ok\)\{ tcpPanel\(\); return; \}\n\s*tcpOlvidar\(\);/.test(src));
+  t.ok('con el panel quitado antes, que taparía la pregunta', /cerrar\(\);\n\s*let ok = false;/.test(src));
+  t.ok('la lupa enseña aumentado lo que se va a guardar: lo ajustado, si se ajustó',
+       /const q = ajustada \|\| sel;/.test(src));
+  t.ok('al arrancar se pone en marcha el reloj del aviso',
+       /function tcpArrancar\(\)\{[\s\S]{0,1500}?TCP\._desde = [^;]+;\n\s*TCP\._avisado = false;/.test(src));
+}
+
+/* ── 17 · los dos puntos se reconocen por su forma ─────────────────────── */
+t.seccion('17 · los dos puntos se reconocen por su forma');
+{
+  /* Esto es lo que arregla «no lo reconoce». El reparto por trozos necesitaba
+     once trozos exactos, y con letra de verdad las cifras se parten o se
+     pegan: medido con texto pintado con fuentes de verdad, leía 56 de 105
+     contadores. Los dos puntos se buscan columna a columna por su forma. */
+  const dondePuntos = (f, o) => {
+    o = o || {};
+    const cw = o.cw || 18, hueco = o.hueco || 7, sw = o.sw || 5, aire = o.aire || 0;
+    return [1, 3, 5].map(i => f.cifras[i] + cw / 2 + hueco + aire + (sw - 1) / 2);
+  };
+  const f = pantalla('01:18:23:04');
+  const fr = M.tcpFranjas(f)[0];
+  t.ok('la franja más alta es la de las cifras', !!fr && fr.a === 6 && fr.b === 33, JSON.stringify(fr));
+  const p = M.tcpSeparadores(f, fr.a, fr.b, M.tcpGruposEn(f, fr.a, fr.b));
+  const esperado = dondePuntos(f);
+  t.ok('encuentra los tres dos puntos, cada uno en su sitio',
+       !!p && p.length === 3 && p.every((q, k) => Math.abs(q.c - esperado[k]) <= 0.5),
+       p ? p.map(q => q.c).join(' ') + ' / ' + esperado.join(' ') : 'ninguno');
+
+  for(const s of ['01234567', '89898989', '44444444', '11111111', '77777777']){
+    const g = pantalla(s, { sinPuntos: true });
+    const q = M.tcpFranjas(g)[0];
+    const n = M.tcpDosPuntos(g, q.a, q.b, false).length + M.tcpDosPuntos(g, q.a, q.b, true).length;
+    t.eq('ninguna cifra tiene columnas con forma de dos puntos: ' + s, n, 0);
+  }
+  t.eq('sin dos puntos no se inventa ninguno',
+       M.tcpSeparadores(pantalla('01182304', { sinPuntos: true }), 6, 33,
+                        M.tcpGruposEn(pantalla('01182304', { sinPuntos: true }), 6, 33)), null);
+
+  const u = pantalla('11:11:11:11');
+  t.ok('con todo unos, también', !!M.tcpSeparadores(u, 6, 33, M.tcpGruposEn(u, 6, 33)));
+
+  /* Pequeños y algo borrosos, los dos puntos no llegan a medio gris. */
+  const te = pantalla('01:18:23:04', { tenue: 0.4 });
+  t.eq('unos dos puntos tenues no pasan el umbral fijo', M.tcpDosPuntos(te, 6, 33, false).length, 0);
+  t.ok('pero se encuentran mirándolos contra su columna',
+       !!M.tcpSeparadores(te, 6, 33, M.tcpGruposEn(te, 6, 33)));
+  t.eq('y con ellos, las ocho casillas', (M.tcpLayout(te) || []).length, 8);
+
+  /* Una columna de dos puntos, y cada cosa que se le parece sin serlo. Se
+     dibujan columnas sueltas en una franja de 28 filas: `manchas` son los
+     tramos de filas con tinta, contados desde arriba de la franja. */
+  const columna = (manchas) => {
+    const W = 20, H = 40, g = new Float32Array(W * H);
+    for(const [a, b] of manchas) for(let y = a; y <= b; y++) for(let x = 8; x < 12; x++) g[(6 + y) * W + x] = 1;
+    return M.tcpDosPuntos({ g: g, w: W, h: H }, 6, 33, false).length;
+  };
+  t.eq('unos dos puntos de verdad: dos manchas, la de abajo en la base', columna([[12, 15], [24, 27]]), 1);
+  t.eq('dos manchas casi pegadas no son dos puntos', columna([[10, 16], [18, 27]]), 0);
+  t.eq('un «=» no son dos puntos: la de abajo no llega a la base', columna([[8, 10], [14, 16]]), 0);
+  t.eq('una mancha alta no es un punto', columna([[7, 9], [13, 27]]), 0);
+  t.eq('ni arriba', columna([[6, 19], [23, 27]]), 0);
+  t.eq('con tinta en lo alto de las cifras no son dos puntos', columna([[2, 5], [24, 27]]), 0);
+
+  /* Tres a la misma distancia, y a distancia de timecode. */
+  const sep = (f) => { const q = M.tcpFranjas(f)[0]; return M.tcpSeparadores(f, q.a, q.b, M.tcpGruposEn(f, q.a, q.b)); };
+  const holgado = { ch: 40, hueco: 16 };
+  t.ok('con sitio de sobra entre cifras, también', !!sep(pantalla('01:18:23:04', holgado)));
+  t.eq('con el tercero fuera de su sitio no se inventa el reparto',
+       sep(pantalla('01:18:23:04', Object.assign({ corre3: 14 }, holgado))), null);
+  t.ok('pero un par de píxeles de más sí se perdonan', !!sep(pantalla('01:18:23:04', Object.assign({ corre3: 3 }, holgado))));
+  const solos = (xs) => {
+    const W = Math.max.apply(null, xs) + 20, H = 40, g = new Float32Array(W * H);
+    for(const x0 of xs) for(const [a, b] of [[12, 14], [24, 26]])
+      for(let y = a; y <= b; y++) for(let x = x0; x < x0 + 4; x++) g[(6 + y) * W + x] = 1;
+    const f = { g: g, w: W, h: H };
+    return M.tcpSeparadores(f, 6, 33, M.tcpGruposEn(f, 6, 33));
+  };
+  t.ok('tres dos puntos a distancia de timecode, sí', !!solos([10, 70, 130]));
+  t.eq('tres pegados, como en «:::», no', solos([10, 20, 30]), null);
+  t.eq('ni tres separados de más, que entre ellos caben más de dos cifras', solos([10, 110, 210]), null);
+}
+
+/* ── 18 · letra de ancho fijo, cifras pegadas y etiqueta al lado ───────── */
+t.seccion('18 · letra de ancho fijo, cifras pegadas y etiqueta al lado');
+{
+  /* Cada casilla tiene que caer centrada en su cifra, y no vale partir a
+     medias entre dos puntos: en letra de ancho fijo los dos puntos ocupan lo
+     que una cifra, y partiendo a medias cada primera cifra de pareja quedaba
+     pegada a un lado de su casilla y la segunda al otro: 0 de 21 con Courier. */
+  const centradas = (f, L) => !!L && L.length === 8
+    && L.every((c, i) => Math.abs((c.x + c.w / 2) * f.w - f.cifras[i]) <= 25 * 0.12);
+  const lejos = (f, L) => L ? L.map((c, i) => ((c.x + c.w / 2) * f.w - f.cifras[i]).toFixed(1)).join(' ') : 'sin casillas';
+  const casos = [
+    ['como siempre', {}],
+    ['letra de ancho fijo', { aire: 7 }],
+    ['las cifras de cada pareja pegadas', { pegadas: true }],
+    ['con la etiqueta al lado, en la misma franja', { delante: true }]
+  ];
+  for(const [nom, o] of casos){
+    const f = pantalla('01:23:45:67', o);
+    const L = M.tcpLayout(f);
+    t.ok(nom + ': las ocho casillas centradas en sus cifras', centradas(f, L), lejos(f, L));
+
+    TCP.celdas = null; TCP.plantillas = {}; TCP.rect = { x: 0, y: 0, w: 1, h: 1 };
+    let cual = f;
+    M.ponFoto(() => cual);
+    M.tcpEnsenar('01:23:45:67');
+    cual = pantalla('89:01:23:45', o);
+    M.tcpEnsenar('89:01:23:45');
+    cual = pantalla('12:34:56:78', o);
+    const l = M.tcpLeerUna();
+    t.eq(nom + ': y lee lo que pone', l && l.txt, '12345678');
+  }
+  t.eq('pegadas, por trozos no salía el reparto', M.tcpLayoutTrozos(pantalla('01:23:45:67', { pegadas: true })), null);
+  t.eq('con la etiqueta al lado, tampoco', M.tcpLayoutTrozos(pantalla('01:23:45:67', { delante: true })), null);
+
+  const fe = pantalla('01:18:23:04', { delante: true });
+  const r = M.tcpRecortar(fe);
+  const finEtiqueta = 6 + 3 * 7 + 2 * 7 - 1;         // su última columna: margen, tres letras y dos huecos
+  t.ok('el recuadro se ajusta al contador y deja fuera la etiqueta', !!r && r.x * fe.w > finEtiqueta,
+       r ? ('empieza en ' + (r.x * fe.w).toFixed(1)) : 'no lo encontró');
+  t.ok('sin cortar la primera cifra', !!r && r.x * fe.w < fe.cifras[0] - 9);
+  t.ok('ni la última', !!r && (r.x + r.w) * fe.w > fe.cifras[7] + 9);
+  const fp = pantalla('01:18:23:04', { pegadas: true, delante: true });
+  const rp = M.tcpRecortar(fp);
+  t.ok('con las cifras pegadas, el recuadro se encuentra igual, que por trozos no salía',
+       !!rp && rp.x * fp.w > finEtiqueta && rp.x * fp.w < fp.cifras[0] - 9, rp ? String(rp.x * fp.w) : 'no lo encontró');
+
+  /* Unos dos puntos con algo escrito ENCIMA -una etiqueta sobre el contador-
+     siguen yendo sueltos: los trozos se miran solo en las filas de las cifras.
+     Si se mirasen en la foto entera, la etiqueta los juntaría en un trozo y
+     cualquier otra cosa con forma de dos puntos les ganaría. Aquí, esa otra
+     cosa son tres más a la derecha, más juntos. */
+  {
+    const W = 340, H = 40, g = new Float32Array(W * H);
+    for(let y = 0; y < 4; y++) for(let x = 0; x < 200; x++) g[y * W + x] = 1;            // la etiqueta de encima
+    for(const x0 of [10, 70, 130, 230, 270, 310]) for(const [a, b] of [[12, 14], [24, 26]])
+      for(let y = a; y <= b; y++) for(let x = x0; x < x0 + 4; x++) g[(6 + y) * W + x] = 1;
+    const f = { g: g, w: W, h: H };
+    const q = M.tcpSeparadores(f, 6, 33, M.tcpGruposEn(f, 6, 33));
+    t.eq('con una etiqueta encima, los dos puntos del contador siguen contando como sueltos',
+         q ? q.map(x => x.a).join(' ') : 'ninguno', '10 70 130');
+  }
+  {
+    /* Y tres sueltos le ganan a tres pegados a otra cosa, aunque los pegados
+       estén más separados y a igual distancia. */
+    const W = 340, H = 40, g = new Float32Array(W * H);
+    for(const x0 of [10, 50, 90, 150, 210, 270]) for(const [a, b] of [[12, 14], [24, 26]])
+      for(let y = a; y <= b; y++) for(let x = x0; x < x0 + 4; x++) g[(6 + y) * W + x] = 1;
+    for(const x0 of [150, 210, 270]) for(let y = 6; y <= 33; y++) g[y * W + x0 + 4] = g[y * W + x0 + 5] = 1;
+    const f = { g: g, w: W, h: H };
+    const q = M.tcpSeparadores(f, 6, 33, M.tcpGruposEn(f, 6, 33));
+    t.eq('tres sueltos ganan a tres pegados', q ? q.map(x => x.a).join(' ') : 'ninguno', '10 50 90');
+  }
+}
+
+/* ── 19 · una cifra corrida se reconoce igual ──────────────────────────── */
+t.seccion('19 · una cifra corrida se reconoce igual');
+{
+  /* La plantilla de un 0 se aprendió en su casilla, y el 0 que se lee puede
+     estar en otra con la cifra un píxel o dos más a un lado: medir los dos
+     puntos y el paso falla por eso. Por eso se prueba corrida. */
+  TCP.celdas = null; TCP.plantillas = {}; TCP.rect = { x: 0, y: 0, w: 1, h: 1 };
+  let cual = pantalla('01:23:45:67');
+  M.ponFoto(() => cual);
+  M.tcpEnsenar('01:23:45:67');
+  cual = pantalla('89:01:23:45');
+  M.tcpEnsenar('89:01:23:45');
+  cual = pantalla('12:34:56:78', { baile: [3, -3, 2, -2, 3, -3, 1, -1] });
+  const l = M.tcpLeerUna();
+  t.eq('con cada cifra corrida hasta tres píxeles, lee lo que pone', l && l.txt, '12345678');
+  t.ok('y con confianza', !!l && l.conf > 0.8, l ? String(l.conf) : 'no leyó');
+  const c = TCP.celdas[0];
+  const R = Math.max(1, Math.round(c.w * cual.w * M.TCP_HOLGURA));
+  t.eq('se prueba corrida hasta la holgura, a cada lado, y un píxel arriba y abajo',
+       M.tcpCorridas(cual, c).length, (2 * R + 1) * 3);
+  t.ok('la holgura es menos de un cuarto de cifra: no llega a la de al lado',
+       M.TCP_HOLGURA > 0.1 && M.TCP_HOLGURA < 0.25);
+  const m = M.tcpCasar(cual, TCP.celdas[0]);
+  t.ok('y dice cómo casó mejor, para aprender de ahí', !!m.cel && m.cel.length === 12 * 18);
+}
+
+/* ── 20 · enseñar a mano arregla una cifra mal aprendida ───────────────── */
+t.seccion('20 · enseñar a mano arregla una cifra mal aprendida');
+{
+  TCP.celdas = null; TCP.plantillas = {}; TCP.rect = { x: 0, y: 0, w: 1, h: 1 };
+  let cual = pantalla('01:23:45:67');
+  M.ponFoto(() => cual);
+  M.tcpEnsenar('01:23:45:67');
+  cual = pantalla('89:01:23:45');
+  M.tcpEnsenar('89:01:23:45');
+  const bueno2 = Float32Array.from(TCP.plantillas['2']);
+  /* El 1 aprendido con el dibujo de un 8, como pasaba con el reparto de antes.
+     Y se le enseña con un contador que solo trae UN 1, que es lo normal: con
+     ocho unos, mezclar un 15 % ocho veces ya lo arreglaba. */
+  const malo = () => { TCP.plantillas['1'] = Float32Array.from(TCP.plantillas['8']); };
+  const unos = pantalla('11:11:11:11');
+  const leeUnos = () => { const c = cual; cual = unos; const x = (M.tcpLeerUna() || {}).txt; cual = c; return x; };
+  malo();
+  t.ok('con el 1 mal aprendido no lee los unos', leeUnos() !== '11111111');
+  cual = pantalla('01:20:00:00');
+  M.tcpAprender(cual, '01200000');
+  t.ok('mezclándolo, como se hacía, no se arregla: sigue sin leer los unos', leeUnos() !== '11111111', leeUnos());
+  malo();
+  const verdad = M.tcpCelda(cual, TCP.celdas[1]);
+  const r = M.tcpEnsenar('01:20:00:00');
+  t.ok('escribirlo a mano sí lo arregla: se queda con lo de ahora', r.ok && M.tcpParecido(TCP.plantillas['1'], verdad) > 0.999,
+       M.tcpParecido(TCP.plantillas['1'], verdad).toFixed(3));
+  t.eq('y ya lee los unos', leeUnos(), '11111111');
+  /* Y una que se leería bien, pero por los pelos: medio 2 y medio 7. */
+  TCP.plantillas['2'] = Float32Array.from(TCP.plantillas['2'], (v, i) => v * 0.5 + TCP.plantillas['7'][i] * 0.5);
+  cual = pantalla('01:20:00:00');
+  const de2 = M.tcpCasar(cual, TCP.celdas[2]);
+  t.ok('una cifra que se leería bien pero por los pelos', de2.d === '2' && de2.s < M.TCP_RENUEVA,
+       de2.d + ' ' + de2.s.toFixed(3));
+  M.tcpEnsenar('01:20:00:00');
+  t.ok('también se cambia al enseñarla a mano', M.tcpParecido(TCP.plantillas['2'], M.tcpCelda(cual, TCP.celdas[2])) > 0.999,
+       M.tcpParecido(TCP.plantillas['2'], M.tcpCelda(cual, TCP.celdas[2])).toFixed(4));
+  cual = pantalla('22:22:22:22', { baile: [1, 1, 1, 1, 1, 1, 1, 1] });
+  M.tcpEnsenar('22:22:22:22');
+  t.ok('una cifra que ya sabía bien no se tira al enseñarla: se mezcla',
+       M.tcpParecido(TCP.plantillas['2'], bueno2) > 0.97,
+       M.tcpParecido(TCP.plantillas['2'], bueno2).toFixed(3));
+}
+
+/* ── 21 · lo guardado de antes, y empezar de cero ──────────────────────── */
+t.seccion('21 · lo guardado de antes, y empezar de cero');
+{
+  TCP.rect = { x: 0.1, y: 0.2, w: 0.3, h: 0.05 };
+  M.tcpGuardar();
+  t.eq('lo guardado lleva su versión', JSON.parse(almacen.getItem('ddl_tcp')).v, M.TCP_GUARDADO_V);
+
+  /* Lo guardado con la versión de antes: sus casillas y sus cifras se sacaron
+     con el reparto que no reconocía el contador. */
+  const pl = {}; for(let i = 0; i < 10; i++) pl[String(i)] = Array.from({ length: 216 }, () => i / 10);
+  almacen.setItem('ddl_tcp', JSON.stringify({ rect: { x: 0.4, y: 0.5, w: 0.2, h: 0.04 },
+    celdas: [{ x: 0, y: 0, w: 0.1, h: 1 }], plantillas: pl, fps: 24, lat: 0.12 }));
+  TCP.rect = null; TCP.celdas = null; TCP.plantillas = {}; TCP.fps = 25; TCP.lat = 0;
+  M.tcpCargar();
+  t.eq('de lo de antes se queda el recuadro', TCP.rect && TCP.rect.x, 0.4);
+  t.eq('y los ajustes', TCP.fps + ' ' + TCP.lat, '24 0.12');
+  t.eq('pero no las casillas', TCP.celdas, null);
+  t.eq('ni las cifras', M.tcpFaltan().length, 10);
+
+  almacen.setItem('ddl_tcp', JSON.stringify({ v: M.TCP_GUARDADO_V, rect: { x: 0.4, y: 0.5, w: 0.2, h: 0.04 },
+    celdas: [{ x: 0, y: 0, w: 0.1, h: 1 }], plantillas: pl, fps: 24, lat: 0.12 }));
+  M.tcpCargar();
+  t.ok('lo de ahora se carga entero', !!TCP.celdas && M.tcpFaltan().length === 0);
+
+  TCP.on = true; TCP.tc = 12; TCP.fps = 30; TCP.lat = 0.2;
+  M.tcpOlvidar();
+  t.ok('empezar de cero olvida el recuadro, las casillas y las cifras',
+       TCP.rect === null && TCP.celdas === null && M.tcpFaltan().length === 10);
+  t.eq('y deja de seguir', TCP.on + ' ' + TCP.tc, 'false null');
+  t.eq('pero no los ajustes de la sala', TCP.fps + ' ' + TCP.lat, '30 0.2');
+  const o = JSON.parse(almacen.getItem('ddl_tcp'));
+  t.ok('y lo olvidado se olvida también en lo guardado',
+       o.rect === null && o.celdas === null && Object.keys(o.plantillas).length === 0 && o.fps === 30);
+  t.eq('con lo que al compartir, lo siguiente es marcar el contador',
+       (() => { const v = TCP.video; TCP.video = { videoWidth: 10 }; const q = M.tcpQueFalta(); TCP.video = v; return q; })(), 'marcar');
+}
+
+/* ── 22 · si no engancha, dice por qué ─────────────────────────────────── */
+t.seccion('22 · si no engancha, dice por qué');
+{
+  /* El síntoma que llegó de sala fue «no lo reconoce», sin más: no había
+     manera de saber si no veía el contador o si no entendía las cifras. */
+  const probar = (foto, lectura, enganchado) => {
+    avisos.length = 0;
+    ahora = 50000;
+    TCP.on = true; TCP.tc = enganchado ? 100 : null; TCP.t0 = ahora; TCP.rodando = false;
+    TCP._hist = []; TCP._dudas = []; TCP._leidas = 0; TCP._malas = 0;
+    TCP._desde = ahora; TCP._avisado = false;
+    TCP.rect = { x: 0, y: 0, w: 1, h: 1 };
+    M.ponFoto(foto);
+    M.ponLeer(lectura);
+    const antes = [];
+    for(let ms = 0; ms <= M.TCP_AVISO_MS + 3000; ms += 66){
+      ahora += 66; M.tcpMirar();
+      if(ms < M.TCP_AVISO_MS - 100) antes.push(avisos.length);
+    }
+    return { antes: Math.max.apply(null, antes), avisos: avisos.slice() };
+  };
+  const sinLeer = () => ({ celdas: 8, txt: '', seg: null, conf: 0 });
+  const a = probar(() => pantalla('011823', { sinPuntos: true }), sinLeer, false);
+  t.eq('no avisa enseguida: al principio puede estar la ventana tapada', a.antes, 0);
+  t.eq('pasado el rato, avisa una vez y no machaca', a.avisos.length, 1, a.avisos.join(' | '));
+  t.ok('sin contador en el recuadro, dice que no lo encuentra', /No encuentro el contador/.test(a.avisos[0] || ''),
+       a.avisos[0]);
+  const b = probar(() => pantalla('01:18:23:04'), sinLeer, false);
+  t.ok('con el contador a la vista, dice que no entiende las cifras', /no entiendo sus cifras/.test(b.avisos[0] || ''),
+       b.avisos[0]);
+  const c = probar(() => null, () => null, false);
+  t.ok('sin imagen, dice que no llega', /No llega imagen/.test(c.avisos[0] || ''), c.avisos[0]);
+  const d = probar(() => pantalla('01:18:23:04'), sinLeer, true);
+  t.eq('enganchado, no avisa de nada', d.avisos.length, 0);
+  TCP.on = false; TCP._desde = 0;
+}
+
+/* ── 23 · el seguimiento late aunque Dubbipt esté tapado ───────────────── */
+t.seccion('23 · el seguimiento late aunque Dubbipt esté tapado');
+{
+  /* Con Dubbipt tapado por Pro Tools -lo normal en la sala- el navegador frena
+     los temporizadores de la página a uno por segundo, y para enganchar hacen
+     falta tres lecturas en segundo y medio: con un temporizador no enganchaba
+     nunca. Se vio en el navegador, con las diez cifras aprendidas y cada
+     lectura bien leída. El latido sale del mismo trabajador que el del
+     aprendizaje. */
+  latidos.length = 0;
+  ahora = 90000;
+  TCP.on = false; TCP.tc = null; TCP._leidas = 0; TCP._malas = 0; TCP._hist = []; TCP._dudas = [];
+  M.ponLeer(() => ({ celdas: 8, txt: '', seg: 100, conf: 0.9 }));
+  M.tcpArrancar();
+  t.eq('late con el latido del trabajador, cada 66 ms', latidos.length + ' ' + (latidos[0] || {}).ms, '1 66');
+  t.eq('y lee ya, sin esperar al primer latido', TCP._leidas, 1);
+  ahora += 66; latidos[0].fn();
+  t.eq('cada latido es una lectura', TCP._leidas, 2);
+  latidos[0].fn();
+  t.eq('dos latidos pegados, una sola: si una vuelta tarda, no se hace cola', TCP._leidas, 2);
+  ahora += 66; latidos[0].fn();
+  ahora += 66; latidos[0].fn();
+  t.ok('y con eso engancha', TCP.tc != null);
+  M.tcpArrancar();
+  t.ok('arrancar otra vez para el latido de antes', latidos[0].parado && !latidos[1].parado);
+  M.tcpParar();
+  t.ok('y parar, el suyo', latidos[1].parado);
+  ahora += 66; latidos[1].fn();
+  t.eq('parado, un latido rezagado ya no lee', TCP._leidas, 5);
+}
+
+/* ── 24 · un contador grande se reduce antes de leerlo ─────────────────── */
+t.seccion('24 · un contador grande se reduce antes de leerlo');
+{
+  /* El Big Counter en una pantalla grande, a tamaño real, costaba 60 ms cada
+     lectura, medido: el hilo de la página casi entero, quince veces por
+     segundo. Se reduce al dibujarlo, que es donde no cuesta. */
+  const antes = { v: TCP.video, r: TCP.rect, cv: TCP._cv, g: TCP._g };
+  TCP._cv = null; TCP._g = null;
+  TCP.video = { videoWidth: 3840, videoHeight: 2160 };
+  TCP.rect = { x: 0.1, y: 0.1, w: 0.5, h: 0.1 };            // 1920 x 216 en pantalla
+  trazos.length = 0;
+  const f = M.tcpFotoDeVerdad();
+  t.ok('un contador de 1920 de ancho se lee a ' + M.TCP_FOTO_MAX, !!f && f.w === 480 && f.h === 54,
+       f ? f.w + 'x' + f.h : 'sin foto');
+  const d = trazos[trazos.length - 1] || [];
+  t.ok('reducido al dibujarlo', d[1] === 384 && d[3] === 1920 && d[4] === 216 && d[7] === 480 && d[8] === 54,
+       JSON.stringify(d.slice(1)));
+  TCP.rect = { x: 0.1, y: 0.1, w: 0.05, h: 0.02 };          // 192 x 43
+  const g = M.tcpFotoDeVerdad();
+  t.ok('uno pequeño se queda como está', !!g && g.w === 192 && g.h === 43, g ? g.w + 'x' + g.h : 'sin foto');
+  TCP.video = antes.v; TCP.rect = antes.r; TCP._cv = antes.cv; TCP._g = antes.g;
 }
 };
