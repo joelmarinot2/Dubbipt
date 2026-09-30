@@ -2354,7 +2354,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.11.0-nube';
+const APP_VER_NUM = 'v11.12.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -2699,8 +2699,141 @@ function showStudioPicker(){ showWorkspacePicker(true); }
 function ensureStudio(){ ensureWorkspace(); }
 function applyStudio(){ applyWorkspace(); }
 function updateStudioChip(){ updateWorkspaceChip(); }
-// Al iniciar sesión: preguntar SIEMPRE el rol del dispositivo, ajustar y seguir.
+/* ═══ AL RECARGAR, DONDE SE ESTABA ═════════════════════════════════════
+   Pedido de sala: «quiero que si recargo la página no se ponga desde el
+   inicio, sino donde estaba trabajando». Cada carga era una sesión nueva:
+   la tarea, el dispositivo y Programas, aunque se estuviera a mitad de un
+   libreto. Ahora se distingue RECARGAR de ENTRAR. Dónde se está -tarea,
+   dispositivo, programa, capítulo, libreto abierto y por dónde iba- se guarda
+   en el almacén de la PESTAÑA, que sobrevive a recargar y se pierde al
+   cerrarla: recargar vuelve al sitio sin preguntar nada, y abrir la app otra
+   vez -o en otra pestaña- empieza por la tarea, que es lo que pidió sala para
+   cada sesión (QC-11). Cerrar sesión lo olvida. */
+const DONDE_CLAVE = 'ddl_donde';
+
+/** Dónde se está ahora. Nulo mientras no se ha elegido tarea: hasta entonces
+    no hay sesión que recordar. */
+function dondeAhora(){
+  if(!window._perfilSesion) return null;
+  const d = { v: 1, modo: DDL_MODO, rol: dispValido(DEVROLE) || null,
+              ws: (WORKSPACE && WORKSPACE.id) || null,
+              show: LDB.showId || null, vista: libView };
+  const enCap = !!(currentEp && currentEp.id && document.body.classList.contains('ep-open'));
+  if(enCap){
+    d.ep = currentEp.id;
+    d.show = currentEp.showId || d.show;
+    if(libretoVisible() && typeof pop2 !== 'undefined' && pop2 && pop2.type === 'inline'){
+      d.libreto = (pop2.key == null) ? '__full__' : pop2.key;
+      try{ d.top = Math.round(pop2.els.wrap.scrollTop) || 0; }catch(e){ d.top = 0; }
+    }
+  }
+  return d;
+}
+/** Lo guarda. Mientras se está volviendo al sitio, no: se guardaría el sitio a
+    medio camino, y recargar otra vez llevaría a Programas. */
+function dondeGuardar(){
+  if(window._reanudando || window._dondeOlvidado) return false;
+  try{
+    const d = dondeAhora();
+    if(!d) return false;
+    sessionStorage.setItem(DONDE_CLAVE, JSON.stringify(d));
+    return true;
+  }catch(e){ return false; /* sin almacén no se recuerda: se empezará desde el inicio */ }
+}
+/** Lo guardado en esta pestaña, si vale. */
+function dondeLeer(){
+  try{
+    const d = JSON.parse(sessionStorage.getItem(DONDE_CLAVE) || 'null');
+    return (d && d.v === 1 && modoValido(d.modo)) ? d : null;
+  }catch(e){ return null; /* roto: como si no hubiera nada */ }
+}
+/** Lo olvida, y ya no se vuelve a guardar en esta página: cerrar sesión
+    recarga, y el guardado de al irse lo apuntaría otra vez. */
+function dondeOlvidar(){
+  window._dondeOlvidado = true;
+  try{ sessionStorage.removeItem(DONDE_CLAVE); }catch(e){ /* sin almacén no hay nada que olvidar */ }
+}
+/* Se guarda cada poco y, sobre todo, al irse: recargar dispara las dos. */
+function dondeVigilar(){
+  try{ window.addEventListener('beforeunload', dondeGuardar); }catch(e){ /* sin eventos, solo el reloj */ }
+  try{ window.addEventListener('pagehide', dondeGuardar); }catch(e){ /* sin eventos, solo el reloj */ }
+  try{ setInterval(dondeGuardar, 1500); }catch(e){ /* sin reloj, solo al irse */ }
+}
+try{ dondeVigilar(); }catch(e){ /* sin vigía se empezará desde el inicio */ }
+
+/** Pone el libreto por donde iba en cuanto está pintado, y otra vez un poco
+    después: el capítulo se refresca de la nube al rato y vuelve a pintarse. */
+function dondeScroll(top){
+  let vueltas = 0;
+  const intento = () => {
+    let listo = false;
+    try{
+      const w = pop2 && pop2.els && pop2.els.wrap;
+      if(w && pop2.doc && pop2.doc.querySelector('#lBlocks .blk')){ w.scrollTop = +top || 0; listo = true; }
+    }catch(e){ /* sin libreto todavía */ }
+    if(listo){ setTimeout(() => { try{ pop2.els.wrap.scrollTop = +top || 0; }catch(e){} }, 900); return; }
+    if(++vueltas < 40) setTimeout(intento, 150);
+  };
+  intento();
+}
+
+/**
+ * Vuelve a donde se estaba, con lo guardado `d`, sin preguntar nada.
+ * Grabación sin dispositivo guardado lo pregunta: sin él no se puede grabar.
+ */
+async function dondeReanudar(d){
+  window._reanudando = true;
+  try{
+    ponerModo(null, d.modo);
+    if(perfilUsaDispositivo(d.modo) && dispValido(d.rol)){
+      DEVROLE = d.rol; sync.role = d.rol;
+      try{ applyDeviceRole(); }catch(e){ fallo('applyDeviceRole · index.html:dondeReanudar', e); }
+    }else{
+      await new Promise((r) => perfilDispositivo(d.modo, r));
+    }
+    await ensureWorkspace();
+    if(!(WORKSPACE && WORKSPACE.id)) return false;      // hay que elegir espacio: ahí se queda
+    if(d.show) LDB.showId = d.show;
+    if(d.ep){
+      LDB.browse = false;
+      const k = (d.libreto && d.libreto !== '__full__') ? d.libreto : null;
+      /* El libreto tiene que ABRIRSE ya por donde iba, no abrirse arriba y
+         moverse después: mientras estaba arriba, el refresco de la nube
+         apuntaba «conservar esta posición» y, al repintar, lo devolvía arriba.
+         Se vio probándolo. Se le dice antes, por la misma vía que usa ese
+         refresco para conservarla. */
+      const apuntar = () => { try{ if(typeof pop2 !== 'undefined' && pop2){ pop2._keepTop = +d.top || 0; pop2._keepKey = k; } }catch(e){ /* sin libreto todavía */ } };
+      if(d.libreto) apuntar();                            // QC lo abre él solo al abrir el capítulo
+      const ok = await openEpisode(d.ep);
+      if(!ok) return false;
+      if(d.libreto){
+        const mismo = libretoVisible() && pop2 && ((pop2.key == null) === (k == null)) && (k == null || pop2.key === k);
+        if(!mismo && (k == null || (charIdx && charIdx[k]))){ apuntar(); openLibretoInline(k); }
+        dondeScroll(d.top || 0);
+      }
+    }else if(d.show){
+      libView = (d.vista === 'eps') ? 'eps' : 'shows';
+      LDB.browse = true;
+      await renderLibrary();
+    }
+    if(typeof DDL_UI !== 'undefined' && DDL_UI.toast) DDL_UI.toast('Seguimos donde lo dejaste');
+    return true;
+  }finally{
+    window._reanudando = false;
+  }
+}
+
+// Al entrar: si es una RECARGA, a donde se estaba; si no, la sesión desde el principio.
 function postLogin(){
+  const d = dondeLeer();
+  if(d){
+    dondeReanudar(d).catch((e) => fallo('dondeReanudar · index.html:postLogin', e, 'no se ha podido volver a donde estabas'));
+    return;
+  }
+  empezarSesion();
+}
+/** Una sesión nueva: la tarea primero y el dispositivo solo si es Grabación. */
+function empezarSesion(){
   // Cambio 1: borrar el último episodio guardado para que siempre se aterrice
   // en la pestaña de Programas, sin reabrir automáticamente el libreto.
   try{ localStorage.removeItem('ddl_last_ep'); localStorage.removeItem('ddl_last_key'); localStorage.removeItem('ddl_last_top'); }catch(e){}
@@ -2799,7 +2932,7 @@ function askRoleAtLogin(done){
     if(_logoutTaps>=3){
       _logoutTaps=0;
       if(!confirm('¿Cerrar sesión?')) return;
-      (async()=>{ try{ if(sb) await sb.auth.signOut(); }catch(e){} try{['ddl_last_ep','ddl_last_key','ddl_last_top'].forEach(k=>localStorage.removeItem(k));}catch(e){} location.reload(); })();
+      (async()=>{ try{ if(sb) await sb.auth.signOut(); }catch(e){} try{['ddl_last_ep','ddl_last_key','ddl_last_top'].forEach(k=>localStorage.removeItem(k));}catch(e){} dondeOlvidar(); location.reload(); })();
     }
   });
 }
@@ -3232,6 +3365,8 @@ document.getElementById('btnOut').addEventListener('click', async ()=>{
   try{ if(typeof pop2!=='undefined' && pop2.win && pop2.win!==window && !pop2.win.closed) pop2.win.close(); }catch(e){}
   // al cambiar de usuario: no arrastrar el libreto/capítulo del usuario anterior
   try{ ['ddl_last_ep','ddl_last_key','ddl_last_top'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
+  /* Y dónde se estaba: si no, recargar metería al siguiente en el sitio del anterior. */
+  dondeOlvidar();
   try{ if(typeof idbClearAll==='function') await idbClearAll(); }catch(e){}
   location.reload();
 });
