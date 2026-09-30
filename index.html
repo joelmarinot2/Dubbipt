@@ -995,11 +995,27 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 #topbar .tb-menu button.tb-po.on{ background:#1c2f24; }
 #topbar .tb-po.on b::after{ content:' · ahora'; font-weight:600; font-size:11px; color:#4ADE80; }
 #topbar .tb-menu button.tb-po:focus-visible{ outline:2px solid #4ADE80; outline-offset:-2px; }
+/* El dispositivo: lo mismo, con el dibujo del aparato en vez del punto. Y el
+   aviso «Escritorio Listo» se retira: el botón ya dice qué equipo es. */
+#topbar .tb-disp-ic{ display:grid; place-items:center; color:#4ADE80; }
+#topbar .tb-disp-ic svg, #topbar .tb-do i svg{ display:block; }
+#topbar .tb-do i{ width:auto; height:auto; background:none; border-radius:0; color:#9CA3AF; margin-top:1px; }
+#topbar .tb-do.on i{ color:#4ADE80; }
+#topbar .tb-dev{ display:none; }
 @media(max-width:720px){
   #topbar{ flex-wrap:wrap; gap:10px; }
   #topbar .tb-loc{ display:none; }
   #topbar .tb-right{ gap:9px; }
-  #topbar .tb-perfil-menu{ width:min(300px, calc(100vw - 32px)); }
+  /* Los menús cuelgan de la fila de la derecha, no de su botón: colgados del
+     botón, el del dispositivo -en medio de la fila- se salía de la pantalla. */
+  #topbar .tb-perfil-w{ position:static; }
+  #topbar .tb-perfil-menu{ left:auto; right:0; width:min(300px, calc(100vw - 32px)); }
+  /* Con los dos botones la fila de la derecha no cabía en el móvil y la página
+     se ensanchaba: el del dispositivo se queda con su dibujo. Su nombre sigue
+     en el menú y en la etiqueta que se lee en voz alta. */
+  #topbar #tbDispEt{ display:none; }
+  #topbar .tb-disp{ padding:0 10px; gap:6px; }
+  #topbar .tb-right{ flex-wrap:wrap; justify-content:flex-end; }
 }
 /* ===== Módulo 8 · Perfil de la cuenta ===== */
 #acctOv{ position:fixed; inset:0; z-index:11800; background:rgba(8,9,11,.7); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
@@ -1891,6 +1907,12 @@ body.modo-casting #btnExport{ display:none !important; }
           ><i aria-hidden="true"></i><span id="tbPerfilEt">Grabación</span><svg aria-hidden="true" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 4l4 4 4-4"/></svg></button>
         <div class="tb-menu tb-perfil-menu" id="tbPerfilMenu" role="menu" aria-label="Perfil de trabajo"></div>
       </div>
+      <div class="tb-perfil-w">
+        <button class="tb-perfil tb-disp" id="tbDisp" type="button" onclick="dispNavAbrir(event)" data-disp=""
+          aria-haspopup="menu" aria-expanded="false" aria-controls="tbDispMenu" title="Cambiar de dispositivo: escritorio o tablet"
+          ><span class="tb-disp-ic" id="tbDispIc" aria-hidden="true"></span><span id="tbDispEt">Dispositivo</span><svg aria-hidden="true" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 4l4 4 4-4"/></svg></button>
+        <div class="tb-menu tb-perfil-menu" id="tbDispMenu" role="menu" aria-label="Este dispositivo"></div>
+      </div>
       <span class="tb-loc" id="tbLoc" style="display:none">
         <span id="tbLocShow"></span><span class="sep">/</span><b id="tbLocEp"></b>
       </span>
@@ -2332,7 +2354,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.10.0-nube';
+const APP_VER_NUM = 'v11.11.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -2682,17 +2704,20 @@ function postLogin(){
   // Cambio 1: borrar el último episodio guardado para que siempre se aterrice
   // en la pestaña de Programas, sin reabrir automáticamente el libreto.
   try{ localStorage.removeItem('ddl_last_ep'); localStorage.removeItem('ddl_last_key'); localStorage.removeItem('ddl_last_top'); }catch(e){}
-  askRoleAtLogin(()=> perfilAlEntrar(()=> ensureWorkspace()));
+  /* Primero la tarea; el dispositivo, solo si es Grabación (perfilDispositivo). */
+  perfilAlEntrar(()=> perfilDispositivo(DDL_MODO, ()=> ensureWorkspace()));
 }
 
 /**
- * El perfil de trabajo, en la pantalla inicial: justo después de elegir el
- * dispositivo y antes de ver los programas.
+ * El perfil de trabajo, lo PRIMERO de la pantalla inicial, antes que el
+ * dispositivo y antes de ver los programas. Iba después del dispositivo; se
+ * cambió porque solo Grabación lo necesita: QC y Casting se hacen en un equipo
+ * solo, y preguntarles por la tablet era preguntar por nada.
  *
  * Pedido de sala. El perfil se preguntaba al abrir cada capítulo, y quien viene
  * a hacer QC viene a hacer QC toda la sesión: se pregunta UNA vez, al entrar, y
  * cada capítulo se abre ya con las herramientas de ese trabajo. Se sigue
- * pudiendo cambiar desde el botón del perfil, en la barra del libreto.
+ * pudiendo cambiar desde el botón del perfil, en la barra de arriba.
  *
  * Aquí hay que elegir: pulsar fuera no vale. Un toque de más al entrar dejaba a
  * quien venía a revisar en «Grabación» sin haberlo pedido.
@@ -2788,6 +2813,10 @@ function applyDeviceRole(){
   try{ if(typeof pop2!=='undefined' && pop2.doc){ pop2.doc.body.classList.toggle('is-tablet', DEVROLE==='tablet' || DEVROLE==='talent');
         pop2.doc.body.classList.toggle('is-talent', DEVROLE==='talent'); renderLibretoBlocks(); renderLibretoChips(); } }catch(e){}
   try{ updateTalentGate(); }catch(e){}
+  /* Los dos botones de la barra de arriba dicen lo que hay ahora; y el del
+     perfil se esconde en la tablet del actor. */
+  try{ dispNavPintar(); }catch(e){ fallo('dispNavPintar · index.html:applyDeviceRole', e); }
+  try{ perfilNavPintar(); }catch(e){ fallo('perfilNavPintar · index.html:applyDeviceRole', e); }
 }
 /* ===== Módulo 0 · relleno dinámico de la barra superior ===== */
 function refreshTopbar(){
@@ -8353,6 +8382,7 @@ function ponerModo(epId, m){
   const bm = document.getElementById('btnModo');
   if(bm){ bm.style.display = ''; bm.textContent = DDL_MODO_ET[m] || m; }
   try{ perfilNavPintar(); }catch(e){ fallo('perfilNavPintar · index.html:ponerModo', e); }
+  try{ dispNavPintar(); }catch(e){ fallo('dispNavPintar · index.html:ponerModo', e); }
   if(m === 'casting') castCargarCatalogo();
 }
 
@@ -10303,6 +10333,9 @@ function perfilCambiarA(m){
   const ep = (typeof currentEp !== 'undefined' && currentEp && currentEp.id) ? currentEp.id : null;
   ponerModo(ep, m);
   if(typeof DDL_UI !== 'undefined' && DDL_UI.toast) DDL_UI.toast('Perfil: ' + (DDL_MODO_ET[m] || m));
+  /* Pasar a Grabación pregunta el dispositivo si no lo hay; pasar a QC o a
+     Casting lo suelta: ahí se trabaja en un equipo solo. */
+  try{ perfilDispositivo(m); }catch(e){ fallo('perfilDispositivo · index.html:perfilCambiarA', e); }
   /* Pasar a QC con un capítulo delante lleva a su libreto, como abrirlo. */
   if(ep && document.body.classList.contains('ep-open')){
     try{ libretoDirecto(); }catch(e){ fallo('libretoDirecto · index.html:perfilCambiarA', e); }
@@ -10348,6 +10381,7 @@ function perfilNavAbrir(e){
   if(e) e.stopPropagation();
   if(perfilNavAbierto()){ perfilNavCerrar(); return; }
   try{ closeUserMenu(); }catch(x){ /* sin menú de cuenta no hay nada que cerrar */ }
+  try{ dispNavCerrar(); }catch(x){ /* sin menú de dispositivo no hay nada que cerrar */ }
   perfilNavPintar();
   const m = document.getElementById('tbPerfilMenu'), b = document.getElementById('tbPerfil');
   if(!m) return;
@@ -10364,6 +10398,166 @@ document.addEventListener('keydown', (e)=>{
   if(e.key === 'Escape'){ e.preventDefault(); perfilNavCerrar(true); return; }
   if(e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
   const ops = Array.prototype.slice.call(document.querySelectorAll('#tbPerfilMenu .tb-po'));
+  if(!ops.length) return;
+  e.preventDefault();
+  const i = ops.indexOf(document.activeElement);
+  const n = (i < 0) ? 0 : (i + (e.key === 'ArrowDown' ? 1 : ops.length - 1)) % ops.length;
+  try{ ops[n].focus(); }catch(x){ /* sin foco no se mueve */ }
+});
+
+/* ═══ EL DISPOSITIVO EN LA BARRA DE ARRIBA ═══════════════════════════════
+   Pedido de sala: «quiero un botón de cambiar de dispositivo también», junto
+   al del perfil. El dispositivo -escritorio, tablet del director o tablet del
+   actor- se elige al entrar; arriba solo se VEÍA («Escritorio Listo») y
+   cambiarlo pedía pasar por el menú de Sincronizar, con una ventana vieja que
+   ni siquiera ofrecía la tablet del actor. Ahora es un botón con su menú, como
+   el del perfil, y cambiar reconecta la sincronía con el papel nuevo. */
+
+const DDL_DISPOSITIVOS = ['pc', 'tablet', 'talent'];
+const DDL_DISP_ET = { pc: 'Escritorio', tablet: 'Tablet · Director', talent: 'Tablet · Actor' };
+const DDL_DISP_DICE = {
+  pc: 'Muestra el libreto para lectura durante la grabación.',
+  tablet: 'Control total del desglose y todas las herramientas.',
+  talent: 'Solo el pincel; el director controla el desplazamiento.'
+};
+const DDL_DISP_ICONO = {
+  pc: '<svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="19" height="13" rx="2"/><path d="M8 20.5h8M12 16.5v4"/></svg>',
+  tablet: '<svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2.5" width="14" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>'
+};
+DDL_DISP_ICONO.talent = DDL_DISP_ICONO.tablet;
+function dispValido(r){ return DDL_DISPOSITIVOS.indexOf(String(r || '')) >= 0 ? String(r) : ''; }
+
+/** Pasa este equipo al papel `r`. Devuelve si cambió. La sincronía, si estaba
+    en marcha, se corta y se vuelve a abrir con el papel nuevo: el otro equipo
+    tiene que enterarse de quién es cada uno. */
+function dispCambiarA(r){
+  r = dispValido(r);
+  dispNavCerrar();
+  if(!r || r === DEVROLE) return false;
+  try{ localStorage.setItem('ddl_role', r); }catch(e){ /* sin almacén se usa, pero no se recuerda */ }
+  DEVROLE = r;
+  try{ applyDeviceRole(); }catch(e){ fallo('applyDeviceRole · index.html:dispCambiarA', e); }
+  dispResincronizar();
+  if(typeof DDL_UI !== 'undefined' && DDL_UI.toast) DDL_UI.toast('Este dispositivo: ' + DDL_DISP_ET[r]);
+  return true;
+}
+
+/* ── Solo Grabación lleva dispositivo ──────────────────────────────────────
+   Pedido de sala: «el modo de casting y QC no tiene que tener dispositivos:
+   ellos no necesitan más de un dispositivo. Pregunta al principio de cada
+   sesión primero qué tarea va a realizar, y si elige Grabación, sí despliega
+   el formato de elegir dispositivo; para QC y Casting no es necesario, pueden
+   manejarlos desde cualquier dispositivo». La tablet y el escritorio son un
+   par para GRABAR: uno lleva el libreto y el otro lo gobierna. Quien revisa o
+   reparte trabaja en un solo equipo, sea cual sea, y sin sincronía. */
+const PERFIL_CON_DISPOSITIVO = ['grabacion'];
+function perfilUsaDispositivo(m){ return PERFIL_CON_DISPOSITIVO.indexOf(m) >= 0; }
+
+/** Este equipo deja de tener papel: sin sincronía, sin trackpad y con la
+    vista de un equipo solo. Es lo que toca en QC y en Casting. */
+function dispSoltar(){
+  if(sync.isOn || sync.channel || sync._connecting){
+    try{ syncDisconnect(); }catch(e){ fallo('syncDisconnect · index.html:dispSoltar', e); }
+  }
+  if(typeof TP !== 'undefined' && TP.on){
+    const tp = document.getElementById('trackpad');
+    if(tp) tp.style.display = 'none';
+    TP.on = false;
+    try{ document.documentElement.style.overflow = ''; }catch(e){ /* sin raíz no hay nada que devolver */ }
+  }
+  DEVROLE = null; sync.role = null;
+  try{ applyDeviceRole(); }catch(e){ fallo('applyDeviceRole · index.html:dispSoltar', e); }
+}
+
+/**
+ * Pone el dispositivo de acuerdo con la tarea `m`, y luego sigue (`hecho`).
+ * Grabación sin dispositivo lo pregunta, con la pantalla de siempre; QC y
+ * Casting con dispositivo lo sueltan. Si ya está como debe, no hace nada.
+ */
+function perfilDispositivo(m, hecho){
+  const seguir = () => { if(typeof hecho === 'function') hecho(); };
+  if(perfilUsaDispositivo(m)){
+    if(dispValido(DEVROLE)){ seguir(); return 'ya'; }
+    askRoleAtLogin(() => {
+      try{ dispResincronizar(); }catch(e){ fallo('dispResincronizar · index.html:perfilDispositivo', e); }
+      seguir();
+    });
+    return 'preguntar';
+  }
+  if(DEVROLE) dispSoltar();
+  seguir();
+  return 'sin';
+}
+
+/** La sincronía, con el papel que tiene ahora este equipo: si estaba en
+    marcha se corta y se vuelve a abrir. También al elegirlo en la pantalla
+    de espera del actor, que antes cambiaba el papel sin avisar al otro
+    equipo. Se corta ANTES de poner el papel: cortar lo borra. */
+function dispResincronizar(){
+  const r = dispValido(DEVROLE);
+  if(!r) return false;
+  if(sync.isOn || sync.channel || sync._connecting){
+    try{ syncDisconnect(); }catch(e){ fallo('syncDisconnect · index.html:dispResincronizar', e); }
+  }
+  sync.role = r;
+  try{ autoSync(); }catch(e){ fallo('autoSync · index.html:dispResincronizar', e, 'la sincronía no se ha vuelto a conectar'); }
+  return true;
+}
+
+/** El botón y su menú, con el dispositivo que es ahora. */
+function dispNavPintar(){
+  const b = document.getElementById('tbDisp');
+  if(!b) return;
+  /* Solo en Grabación: en QC y en Casting no hay dispositivo que elegir. */
+  const w = b.parentNode;
+  if(w && w.style) w.style.display = perfilUsaDispositivo(DDL_MODO) ? '' : 'none';
+  const r = dispValido(DEVROLE);
+  const et = r ? DDL_DISP_ET[r] : 'Dispositivo';
+  b.dataset.disp = r;
+  const t = document.getElementById('tbDispEt');
+  if(t) t.textContent = et;
+  const ic = document.getElementById('tbDispIc');
+  if(ic) ic.innerHTML = DDL_DISP_ICONO[r || 'pc'];
+  b.setAttribute('aria-label', (r ? ('Este dispositivo: ' + et) : 'Sin dispositivo elegido') + '. Cambiar de dispositivo');
+  const menu = document.getElementById('tbDispMenu');
+  if(!menu) return;
+  const limpio = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  menu.innerHTML = '<div class="mh">Este dispositivo es…</div>'
+    + DDL_DISPOSITIVOS.map(d => '<button type="button" role="menuitemradio" data-d="' + d + '"'
+        + ' aria-checked="' + (d === r) + '" class="tb-po tb-do' + (d === r ? ' on' : '') + '">'
+        + '<i aria-hidden="true">' + DDL_DISP_ICONO[d] + '</i><span><b>' + limpio(DDL_DISP_ET[d]) + '</b>'
+        + '<small>' + limpio(DDL_DISP_DICE[d]) + '</small></span></button>').join('');
+  menu.querySelectorAll('.tb-do').forEach(o => o.onclick = (e) => { e.stopPropagation(); dispCambiarA(o.dataset.d); });
+}
+
+function dispNavAbierto(){
+  const m = document.getElementById('tbDispMenu');
+  return !!(m && m.classList.contains('open'));
+}
+function dispNavCerrar(foco){
+  const m = document.getElementById('tbDispMenu'), b = document.getElementById('tbDisp');
+  if(m) m.classList.remove('open');
+  if(b){ b.setAttribute('aria-expanded', 'false'); if(foco) try{ b.focus(); }catch(e){ /* sin foco no pasa nada */ } }
+}
+function dispNavAbrir(e){
+  if(e) e.stopPropagation();
+  if(dispNavAbierto()){ dispNavCerrar(); return; }
+  try{ closeUserMenu(); }catch(x){ /* sin menú de cuenta no hay nada que cerrar */ }
+  try{ perfilNavCerrar(); }catch(x){ /* sin menú de perfil no hay nada que cerrar */ }
+  dispNavPintar();
+  const m = document.getElementById('tbDispMenu'), b = document.getElementById('tbDisp');
+  if(!m) return;
+  m.classList.add('open');
+  if(b) b.setAttribute('aria-expanded', 'true');
+  const on = m.querySelector('.tb-do.on') || m.querySelector('.tb-do');
+  if(on) try{ on.focus(); }catch(x){ /* sin foco se elige igual con el ratón */ }
+}
+document.addEventListener('click', ()=>{ if(dispNavAbierto()) dispNavCerrar(); });
+document.addEventListener('keydown', (e)=>{
+  if(!dispNavAbierto()) return;
+  if(e.key === 'Escape'){ e.preventDefault(); dispNavCerrar(true); return; }
+  if(e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const ops = Array.prototype.slice.call(document.querySelectorAll('#tbDispMenu .tb-do'));
   if(!ops.length) return;
   e.preventDefault();
   const i = ops.indexOf(document.activeElement);
@@ -10408,10 +10602,14 @@ function libretoDirecto(){
  * entrar. Solo se pregunta aquí si no hay sesión que lo diga ni nada guardado.
  */
 async function modoAlAbrir(epId, nombre){
+  /* Y el dispositivo de acuerdo con el perfil: casi siempre ya lo está -el de
+     la sesión se ajustó al entrar- y no hace nada. */
+  const ajustar = (m) => { try{ perfilDispositivo(m); }catch(e){ fallo('perfilDispositivo · index.html:modoAlAbrir', e); } };
   const toca = modoQueToca(window._perfilSesion, modoDe(epId));
-  if(toca){ ponerModo(epId, toca); return toca; }
+  if(toca){ ponerModo(epId, toca); ajustar(toca); return toca; }
   const m = await preguntarModo(nombre, modoUltimo());
   ponerModo(epId, m);
+  ajustar(m);
   return m;
 }
 
@@ -12801,9 +12999,15 @@ body.light .blk .tx .wd.know{ color:#2a2540 !important; background:#FDE68A !impo
    .blk.blk no es un descuido: con el tema claro, la regla de la caja abierta
    pesaba mas y le ponia el azul de resaltar. Se vio mirandolo. */
 html[data-perfil="qc"] body #lBlocks .blk.blk:not(.narr){
-  border:2px solid var(--pc,#5FC85A) !important;
+  border:1px solid color-mix(in srgb, var(--pc,#5FC85A) 38%, transparent) !important;
   border-radius:12px !important;
-  margin:7px auto !important;
+  margin:6px auto !important;
+}
+/* Sutil: pedido de sala, «que no resalten tanto». A 2 px y a color entero
+   cada caja gritaba. La del personaje resaltado lo lleva algo mas marcado,
+   para que se siga viendo cual es. */
+html[data-perfil="qc"] body #lBlocks .blk.blk.mine:not(.narr){
+  border-color:color-mix(in srgb, var(--pc,#5FC85A) 70%, transparent) !important;
 }
 `;
 /* El cajón de ocupación DENTRO del libreto. Va aparte de LIB_CSS porque solo
@@ -17208,7 +17412,9 @@ function updateTalentGate(){
   try{
     document.body.classList.toggle('talent-wait', waiting);
     const btn = document.getElementById('tgRole');
-    if(btn && !btn._wired){ btn._wired = true; btn.onclick = ()=>{ try{ askRoleAtLogin(()=>{}); }catch(e){ try{ pickRole(); }catch(_){} } }; }
+    if(btn && !btn._wired){ btn._wired = true; btn.onclick = ()=>{
+      try{ askRoleAtLogin(()=>{ try{ dispResincronizar(); }catch(e){ fallo('dispResincronizar · index.html:updateTalentGate', e); } }); }
+      catch(e){ try{ pickRole(); }catch(_){} } }; }
     if(waiting){
       const w = document.getElementById('tgWho');
       if(w) w.textContent = (typeof WORKSPACE!=='undefined' && WORKSPACE && WORKSPACE.name)

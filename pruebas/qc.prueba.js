@@ -466,8 +466,9 @@ exports.pruebas = async function(t){
   t.eq('un perfil que no existe no cuenta como sesión', MO.modoQueToca('loquesea', 'qc'), 'qc');
   t.eq('ni como guardado', MO.modoQueToca(undefined, 'loquesea'), '');
 
-  t.ok('se pregunta justo después del dispositivo, y antes de los programas',
-       /askRoleAtLogin\(\(\)=> perfilAlEntrar\(\(\)=> ensureWorkspace\(\)\)\);/.test(TODO));
+  t.ok('se pregunta lo primero, antes que el dispositivo y antes de los programas',
+       /perfilAlEntrar\(\(\)=> perfilDispositivo\(DDL_MODO, \(\)=> ensureWorkspace\(\)\)\);/.test(TODO),
+       'solo Grabación necesita dispositivo: preguntarlo antes era preguntárselo también a QC y a Casting');
   t.ok('al entrar hay que elegir: pulsar fuera no vale',
        /obligatorio: true/.test(TODO)
        && /if\(e\.target === cap && !tx\.obligatorio\) elegir\(alSalir\)/.test(TODO),
@@ -492,7 +493,7 @@ exports.pruebas = async function(t){
      tiene lo justo: el botón, su etiqueta y su menú. */
   {
     const R_MODOS = ['/* Los perfiles que hay, y lo que cada uno saca', 'function ponerModo(epId, m){'];
-    const R_NAV = ['/** Cambia de modo sobre la marcha.', '/* ═══ QC ENTRA DIRECTO AL LIBRETO'];
+    const R_NAV = ['/** Cambia de modo sobre la marcha.', '/* ═══ EL DISPOSITIVO EN LA BARRA DE ARRIBA'];
     const clases = () => { const s = new Set(); return { add: c => s.add(c), remove: c => s.delete(c),
       contains: c => s.has(c), toggle: (c, v) => { if(v === undefined ? !s.has(c) : v) s.add(c); else s.delete(c); } }; };
     const doc = { foco: null, oyentes: {}, els: {},
@@ -519,6 +520,7 @@ exports.pruebas = async function(t){
           DDL_UI: { toast: (m) => X.avisos.push(m) }, fallo: () => {},
           libretoDirecto: () => { X.directos++; return true; },
           isTalent: () => !!o.actor, closeUserMenu: () => {},
+          perfilDispositivo: (m) => { X.dispositivo = m; },
           preguntarModo: async (n, s, tx) => { X.preguntas.push([n, s, tx]); return o.responde; } });
       return X;
     };
@@ -528,6 +530,7 @@ exports.pruebas = async function(t){
          'true|[["ep1","qc"]]');
     t.eq('y lo dice', A.avisos.join(), 'Perfil: QC');
     t.eq('pasar a QC con el capítulo delante lleva a su libreto', A.directos, 1);
+    t.eq('y pone el dispositivo de acuerdo con la tarea nueva', A.dispositivo, 'qc');
     const B = monta({ modo: 'qc' });
     t.eq('elegir el que ya está no hace nada', B.M.perfilCambiarA('qc') + '|' + B.cambios.length + '|' + B.avisos.length, 'false|0|0');
     t.eq('ni lo que no es un perfil', monta().M.perfilCambiarA('sordo'), false);
@@ -586,6 +589,155 @@ exports.pruebas = async function(t){
          'decía «Grabación» también en QC');
   }
 
+  t.seccion('12i2b · el dispositivo, en la barra de arriba');
+  /* Pedido de sala: «quiero un botón de cambiar de dispositivo también». */
+  {
+    const R_DISP = ['/* ═══ EL DISPOSITIVO EN LA BARRA DE ARRIBA', '/* ═══ QC ENTRA DIRECTO AL LIBRETO'];
+    const clases = () => { const s = new Set(); return { add: c => s.add(c), remove: c => s.delete(c),
+      contains: c => s.has(c), toggle: (c, v) => { if(v === undefined ? !s.has(c) : v) s.add(c); else s.delete(c); } }; };
+    const doc = { foco: null, oyentes: {}, els: {},
+      getElementById(id){ return this.els[id] || null; },
+      addEventListener(ev, f){ (this.oyentes[ev] = this.oyentes[ev] || []).push(f); },
+      querySelectorAll(){ return []; } };
+    const el = (id) => ({ id: id, dataset: {}, attrs: {}, style: {}, textContent: '', innerHTML: '', classList: clases(),
+      setAttribute(k, v){ this.attrs[k] = String(v); }, getAttribute(k){ return this.attrs[k]; },
+      querySelector(){ return null; }, querySelectorAll(){ return []; }, focus(){ doc.foco = this.id; } });
+    ['tbDisp', 'tbDispEt', 'tbDispIc', 'tbDispMenu'].forEach(id => { doc.els[id] = el(id); });
+    const ultimo = (ev) => doc.oyentes[ev][doc.oyentes[ev].length - 1];
+    const monta = (o) => {
+      o = o || {};
+      const X = { diario: [], avisos: [], guardado: {}, sync: Object.assign({ isOn: false, channel: null, role: null }, o.sync || {}) };
+      X.M = montar([R_DISP],
+        ['dispCambiarA', 'dispResincronizar', 'dispNavPintar', 'dispNavAbrir', 'dispNavAbierto', 'rol: () => DEVROLE',
+         'perfilDispositivo', 'perfilUsaDispositivo', 'dispSoltar', 'ponRol: (r) => { DEVROLE = r; }'],
+        { document: doc, DEVROLE: ('rol' in o) ? o.rol : 'pc', sync: X.sync, DDL_MODO: o.modo || 'grabacion',
+          TP: X.tp = o.tp || { on: false },
+          /* Como el de verdad: deja puesto el papel elegido y luego sigue. */
+          askRoleAtLogin: (cb) => { X.diario.push('preguntar dispositivo'); X.alElegir = (r) => { X.M.ponRol(r); cb(); }; },
+          localStorage: { setItem: (k, v) => { X.guardado[k] = v; }, getItem: () => null },
+          syncDisconnect: () => { X.diario.push('cortar'); X.sync.isOn = false; X.sync.channel = null; X.sync.role = null; },
+          applyDeviceRole: () => X.diario.push('aplicar'), autoSync: () => X.diario.push('conectar'),
+          DDL_UI: { toast: (m) => X.avisos.push(m) }, fallo: () => {},
+          closeUserMenu: () => {}, perfilNavCerrar: () => X.diario.push('cerrar perfil') });
+      return X;
+    };
+    const A = monta({ rol: 'pc', sync: { isOn: true, channel: {}, role: 'pc' } });
+    t.eq('elegir otro dispositivo lo pone', A.M.dispCambiarA('tablet') + '|' + A.M.rol(), 'true|tablet');
+    t.eq('cortando la sincronía y volviéndola a abrir con el papel nuevo', A.diario.join(','), 'aplicar,cortar,conectar',
+         'el otro equipo tiene que enterarse de quién es cada uno');
+    t.eq('y el papel de la sincronía es el nuevo', A.sync.role, 'tablet',
+         'cortar la sincronía borra el papel: ponerlo antes de cortar lo dejaba vacío');
+    t.eq('se recuerda', A.guardado.ddl_role, 'tablet');
+    t.eq('y se dice', A.avisos.join(), 'Este dispositivo: Tablet · Director');
+    const B = monta({ rol: 'pc' });
+    B.M.dispCambiarA('talent');
+    t.eq('sin sincronía en marcha no hay nada que cortar', B.diario.join(','), 'aplicar,conectar');
+    const R = monta({ rol: 'tablet', sync: { isOn: true, channel: {}, role: 'talent' } });
+    t.eq('elegido en la pantalla de espera del actor, también se reabre la sincronía',
+         R.M.dispResincronizar() + '|' + R.diario.join(',') + '|' + R.sync.role, 'true|cortar,conectar|tablet',
+         'antes cambiaba el papel sin avisar al otro equipo');
+    t.ok('y es lo que hace ese botón al elegir',
+         /askRoleAtLogin\(\(\)=>\{ try\{ dispResincronizar\(\); \}/.test(TODO));
+    t.eq('sin papel no hay nada que sincronizar', monta({ rol: null }).M.dispResincronizar(), false);
+    const C = monta({ rol: 'tablet' });
+    t.eq('elegir el que ya es no hace nada', C.M.dispCambiarA('tablet') + '|' + C.diario.length + '|' + C.avisos.length, 'false|0|0');
+    t.eq('ni lo que no es un dispositivo', monta().M.dispCambiarA('nevera'), false);
+
+    const P = monta({ rol: 'talent' });
+    P.M.dispNavPintar();
+    t.eq('el botón dice qué equipo es', doc.els.tbDispEt.textContent + '|' + doc.els.tbDisp.dataset.disp, 'Tablet · Actor|talent');
+    t.eq('también a quien no ve la pantalla', doc.els.tbDisp.attrs['aria-label'], 'Este dispositivo: Tablet · Actor. Cambiar de dispositivo');
+    t.ok('con su dibujo', /<svg/.test(doc.els.tbDispIc.innerHTML));
+    const menu = doc.els.tbDispMenu.innerHTML;
+    t.eq('el menú trae los tres, también la tablet del actor', (menu.match(/role="menuitemradio"/g) || []).length, 3,
+         'la ventana vieja de Sincronizar solo ofrecía tablet y escritorio');
+    t.ok('marcado solo el que es', (menu.match(/aria-checked="true"/g) || []).length === 1 && /data-d="talent" aria-checked="true"/.test(menu));
+    monta({ rol: null }).M.dispNavPintar();
+    t.eq('sin elegir, lo dice', doc.els.tbDispEt.textContent + '|' + doc.els.tbDisp.attrs['aria-label'],
+         'Dispositivo|Sin dispositivo elegido. Cambiar de dispositivo');
+
+    const H = monta();
+    const ev = { stopPropagation: () => {} };
+    H.M.dispNavAbrir(ev);
+    t.ok('pulsarlo abre el menú', H.M.dispNavAbierto() && doc.els.tbDisp.attrs['aria-expanded'] === 'true');
+    t.ok('y cierra el del perfil, que no se pisen', H.diario.includes('cerrar perfil'));
+    H.M.dispNavAbrir(ev);
+    t.ok('pulsarlo otra vez lo cierra', !H.M.dispNavAbierto());
+    H.M.dispNavAbrir(ev);
+    ultimo('click')();
+    t.ok('pulsar fuera lo cierra', !H.M.dispNavAbierto());
+    H.M.dispNavAbrir(ev);
+    doc.foco = null;
+    ultimo('keydown')({ key: 'Escape', preventDefault: () => {} });
+    t.ok('Escape lo cierra y devuelve el foco al botón', !H.M.dispNavAbierto() && doc.foco === 'tbDisp');
+
+    t.seccion('12i2c · solo Grabación lleva dispositivo');
+    /* Pedido de sala: «QC y Casting no tienen que tener dispositivos: pregunta
+       al principio de cada sesión qué tarea va a realizar, y si elige
+       Grabación, sí despliega el formato de elegir dispositivo». */
+    doc.els.envoltorioDisp = el('envoltorioDisp');
+    doc.els.tbDisp.parentNode = doc.els.envoltorioDisp;
+    t.ok('Grabación lleva dispositivo; QC y Casting no',
+         monta().M.perfilUsaDispositivo('grabacion') && !monta().M.perfilUsaDispositivo('qc') && !monta().M.perfilUsaDispositivo('casting'));
+    {
+      let seguido = 0;
+      const G = monta({ rol: null, modo: 'grabacion' });
+      t.eq('elegir Grabación sin dispositivo lo pregunta', G.M.perfilDispositivo('grabacion', () => seguido++), 'preguntar');
+      t.eq('con la pantalla de siempre, y sin seguir todavía', G.diario.join(',') + '|' + seguido, 'preguntar dispositivo|0');
+      G.alElegir('tablet');
+      t.eq('al elegirlo, sincroniza con su papel y sigue', G.diario.includes('conectar') + '|' + seguido, 'true|1');
+    }
+    {
+      let seguido = 0;
+      const G = monta({ rol: 'tablet', modo: 'grabacion' });
+      t.eq('Grabación con dispositivo ya elegido no vuelve a preguntar', G.M.perfilDispositivo('grabacion', () => seguido++) + '|' + seguido, 'ya|1');
+    }
+    {
+      let seguido = 0;
+      const tp = { on: true };
+      const Q = monta({ rol: 'tablet', modo: 'qc', tp: tp, sync: { isOn: true, channel: {}, role: 'tablet' } });
+      t.eq('QC suelta el dispositivo', Q.M.perfilDispositivo('qc', () => seguido++) + '|' + Q.M.rol() + '|' + seguido, 'sin|null|1');
+      t.ok('sin sincronía, que en un equipo solo no hace falta', Q.diario.includes('cortar') && Q.sync.role === null);
+      t.eq('ni trackpad', tp.on, false);
+      t.ok('y con la vista de un equipo solo', Q.diario.includes('aplicar'));
+      t.ok('sin preguntar nada', !Q.diario.includes('preguntar dispositivo'));
+    }
+    {
+      const C = monta({ rol: null, modo: 'casting' });
+      t.eq('Casting sin dispositivo se queda así, sin tocar nada', C.M.perfilDispositivo('casting') + '|' + C.diario.length, 'sin|0');
+    }
+    monta({ rol: 'pc', modo: 'qc' }).M.dispNavPintar();
+    t.eq('en QC el botón del dispositivo no sale', doc.els.envoltorioDisp.style.display, 'none');
+    monta({ rol: null, modo: 'casting' }).M.dispNavPintar();
+    t.eq('ni en Casting', doc.els.envoltorioDisp.style.display, 'none');
+    monta({ rol: 'pc', modo: 'grabacion' }).M.dispNavPintar();
+    t.eq('en Grabación, sí', doc.els.envoltorioDisp.style.display, '');
+    t.ok('cambiar de perfil lo repinta', /try\{ dispNavPintar\(\); \}catch\(e\)\{ fallo\('dispNavPintar · index\.html:ponerModo'/.test(TODO));
+    t.ok('y abrir un capítulo pone el dispositivo de acuerdo con su perfil',
+         /const ajustar = \(m\) => \{ try\{ perfilDispositivo\(m\); \}/.test(TODO)
+         && /if\(toca\)\{ ponerModo\(epId, toca\); ajustar\(toca\); return toca; \}/.test(TODO));
+
+    const PAGINA = require('fs').readFileSync(require('./ayuda').INDEX, 'utf8').replace(/\r\n/g, '\n');
+    const barra = PAGINA.slice(PAGINA.indexOf('<div id="topbar">'), PAGINA.indexOf('<div class="epline" id="epLine"'));
+    t.ok('va en la barra de arriba, junto al del perfil', barra.indexOf('id="tbDisp"') > barra.indexOf('id="tbPerfil"')
+         && barra.indexOf('id="tbPerfil"') > 0);
+    t.ok('abrir el del perfil cierra el del dispositivo', /try\{ dispNavCerrar\(\); \}catch\(x\)/.test(TODO));
+    t.ok('los dos se repintan cada vez que cambia el dispositivo',
+         /try\{ dispNavPintar\(\); \}catch\(e\)\{ fallo\('dispNavPintar · index\.html:applyDeviceRole'/.test(TODO)
+         && /try\{ perfilNavPintar\(\); \}catch\(e\)\{ fallo\('perfilNavPintar · index\.html:applyDeviceRole'/.test(TODO),
+         'el del perfil se esconde en la tablet del actor');
+    t.ok('el aviso «Escritorio Listo» se retira: el botón ya lo dice', /#topbar \.tb-dev\{ display:none; \}/.test(PAGINA));
+    /* En el móvil, con los dos botones, la fila no cabía y la página se
+       ensanchaba; y el menú del dispositivo, colgado de su botón, se salía por
+       la derecha. Se vio en el navegador a 375 px. */
+    const movil = PAGINA.slice(PAGINA.indexOf('@media(max-width:720px){\n  #topbar{ flex-wrap:wrap; gap:10px; }'));
+    const movil1 = movil.slice(0, movil.indexOf('\n}') + 2);
+    t.ok('en el móvil el dispositivo se queda con su dibujo', /#topbar #tbDispEt\{ display:none; \}/.test(movil1), movil1.slice(0, 200));
+    t.ok('los menús cuelgan de la fila, no del botón', /#topbar \.tb-perfil-w\{ position:static; \}/.test(movil1)
+         && /#topbar \.tb-perfil-menu\{ left:auto; right:0; width:min\(300px, calc\(100vw - 32px\)\); \}/.test(movil1));
+    t.ok('y la fila puede partirse en dos', /#topbar \.tb-right\{ flex-wrap:wrap; justify-content:flex-end; \}/.test(movil1));
+  }
+
   t.seccion('12i3 · QC entra directo al libreto, y cada caja con el color de su personaje');
   /* Pedido de sala: «no quiero ver las tarjetas de personajes, quiero ingresar
      de una vez al libreto» -en QC-, «y que cada caja de personaje tenga un
@@ -624,7 +776,10 @@ exports.pruebas = async function(t){
     t.eq('el libreto sabe en qué perfil está, aunque no tenga barra', attrs['data-perfil'], 'qc',
          'en la raíz y no en el body: cambiar el tema reescribe las clases del body');
     t.ok('y en QC cada caja lleva el reborde del color de su personaje',
-         /html\[data-perfil="qc"\] body #lBlocks \.blk\.blk:not\(\.narr\)\{\s*border:2px solid var\(--pc,#5FC85A\) !important;/.test(TODO));
+         /html\[data-perfil="qc"\] body #lBlocks \.blk\.blk:not\(\.narr\)\{\s*border:1px solid color-mix\(in srgb, var\(--pc,#5FC85A\) 38%, transparent\) !important;/.test(TODO),
+         'sutil, pedido de sala: a 2 px y a color entero cada caja gritaba');
+    t.ok('la del personaje resaltado, algo más marcada',
+         /html\[data-perfil="qc"\] body #lBlocks \.blk\.blk\.mine:not\(\.narr\)\{\s*border-color:color-mix\(in srgb, var\(--pc,#5FC85A\) 70%, transparent\) !important;/.test(TODO));
     t.ok('y pesa más que el resaltado del tema claro, que le ponía su azul',
          /body\.light #lBlocks \.blk\.mine:not\(\.rec\)\{/.test(TODO),
          'si esa regla cambia, hay que volver a mirar el reborde con el tema claro');
