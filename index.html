@@ -972,10 +972,34 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 #topbar .tb-menu .mdiv{ height:1px; background:#23262b; margin:6px 8px; }
 #topbar .tb-menu button.danger{ color:#F87171; }
 #topbar .tb-menu button.danger:hover{ background:rgba(248,113,113,.10); }
+/* El perfil de trabajo, siempre a la vista: el punto con su color -el mismo
+   que en la barra del libreto-, el nombre, y un menú para cambiarlo. */
+#topbar .tb-perfil-w{ position:relative; }
+#topbar .tb-perfil{ display:flex; align-items:center; gap:8px; height:38px; padding:0 12px;
+  background:#0f1512; color:#f2f3f5; border:1px solid #23312a; border-radius:10px; cursor:pointer;
+  font-family:'Inter',sans-serif; font-weight:700; font-size:13px; white-space:nowrap; transition:border-color .12s; }
+#topbar .tb-perfil:hover, #topbar .tb-perfil[aria-expanded="true"]{ border-color:#4ADE80; }
+#topbar .tb-perfil:focus-visible{ outline:2px solid #4ADE80; outline-offset:2px; }
+#topbar .tb-perfil svg{ color:#9CA3AF; }
+#topbar .tb-perfil i, #topbar .tb-po i{ width:8px; height:8px; border-radius:50%; flex:none; background:#6b7280; }
+#topbar .tb-perfil[data-modo="grabacion"] i, #topbar .tb-po[data-m="grabacion"] i{ background:#F87171; }
+#topbar .tb-perfil[data-modo="qc"] i, #topbar .tb-po[data-m="qc"] i{ background:#4ADE80; }
+#topbar .tb-perfil[data-modo="casting"] i, #topbar .tb-po[data-m="casting"] i{ background:#60A5FA; }
+/* El menú sale hacia la derecha del botón: hacia la izquierda se salía de la
+   pantalla en el móvil, donde el botón queda a la izquierda de su fila. */
+#topbar .tb-perfil-menu{ left:0; right:auto; width:300px; max-width:calc(100vw - 32px); }
+#topbar .tb-menu button.tb-po{ display:flex; align-items:flex-start; gap:10px; }
+#topbar .tb-po i{ margin-top:6px; }
+#topbar .tb-po span{ display:flex; flex-direction:column; gap:3px; }
+#topbar .tb-po small{ font-weight:500; font-size:12px; color:#9CA3AF; line-height:1.4; }
+#topbar .tb-menu button.tb-po.on{ background:#1c2f24; }
+#topbar .tb-po.on b::after{ content:' · ahora'; font-weight:600; font-size:11px; color:#4ADE80; }
+#topbar .tb-menu button.tb-po:focus-visible{ outline:2px solid #4ADE80; outline-offset:-2px; }
 @media(max-width:720px){
   #topbar{ flex-wrap:wrap; gap:10px; }
   #topbar .tb-loc{ display:none; }
   #topbar .tb-right{ gap:9px; }
+  #topbar .tb-perfil-menu{ width:min(300px, calc(100vw - 32px)); }
 }
 /* ===== Módulo 8 · Perfil de la cuenta ===== */
 #acctOv{ position:fixed; inset:0; z-index:11800; background:rgba(8,9,11,.7); backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
@@ -1648,6 +1672,8 @@ body:not(.modo-casting) .gestbtn{ display:none; }
   content:'la última vez'; font-size:9.5px; letter-spacing:.7px; text-transform:uppercase;
   color:#22C55E; font-weight:700;
 }
+/* Cambiando a mitad de trabajo, el marcado es el que está puesto ahora. */
+.modo-op.ultimo.actual::after{ content:'ahora'; }
 .modo-op{
   flex:1; display:flex; flex-direction:column; align-items:center; gap:8px;
   background:#1c1f28; color:inherit; border:1px solid #2b3040; border-radius:13px;
@@ -1859,6 +1885,12 @@ body.modo-casting #btnExport{ display:none !important; }
       <button class="tb-tab" id="tabPrograms" onclick="goPrograms()" title="Ir a Programas">Programas</button>
     </div>
     <div class="tb-right">
+      <div class="tb-perfil-w">
+        <button class="tb-perfil" id="tbPerfil" type="button" onclick="perfilNavAbrir(event)" data-modo="grabacion"
+          aria-haspopup="menu" aria-expanded="false" aria-controls="tbPerfilMenu" title="Cambiar de perfil: Grabación, QC o Casting"
+          ><i aria-hidden="true"></i><span id="tbPerfilEt">Grabación</span><svg aria-hidden="true" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 4l4 4 4-4"/></svg></button>
+        <div class="tb-menu tb-perfil-menu" id="tbPerfilMenu" role="menu" aria-label="Perfil de trabajo"></div>
+      </div>
       <span class="tb-loc" id="tbLoc" style="display:none">
         <span id="tbLocShow"></span><span class="sep">/</span><b id="tbLocEp"></b>
       </span>
@@ -1945,7 +1977,7 @@ body.modo-casting #btnExport{ display:none !important; }
         </div>
       </div>
       <div class="ac-div" aria-hidden="true"></div>
-      <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar entre grabación y casting">Modo</button>
+      <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar de perfil: Grabación, QC o Casting">Modo</button>
       <button class="btnv sm" id="btnGestos" style="display:none" onclick="gestPanel()" title="Personajes que en este capitulo solo hacen gestos, sin una sola palabra">🎭 Solo gestos</button>
       <button class="btnv sm" id="btnBaseTal" style="display:none" onclick="talPanel()" title="La lista de actores de la empresa: solo se puede repartir a quien este aqui">🎭 Base de talentos</button>
       <button class="btnv sm" id="btnMeta" style="display:none" onclick="castMetaPanel()" title="Fecha, género, tiempo, director, técnico y estudio del programa">Cabecera</button>
@@ -2300,7 +2332,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.9.2-nube';
+const APP_VER_NUM = 'v11.10.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -2673,7 +2705,7 @@ function perfilAlEntrar(done){
       titulo: 'Dubbipt',
       sub: '¿Qué vas a hacer?',
       pie: 'Cada capítulo se abrirá con las herramientas de ese trabajo. '
-         + 'Se puede cambiar luego desde el botón del perfil, en la barra del libreto.',
+         + 'Se puede cambiar luego desde el botón del perfil, en la barra de arriba.',
       obligatorio: true
     });
   }catch(e){ fallo('preguntarModo · index.html:perfilAlEntrar', e); seguir(); return; }
@@ -3965,9 +3997,14 @@ const PERFIL_PISTA = {
 function perfilPintar(){
   const d = (typeof pop2 !== 'undefined' && pop2) ? pop2.doc : null;
   if(!d) return;
+  const m = (typeof DDL_MODO !== 'undefined' && DDL_MODO) || 'grabacion';
+  /* El perfil, también en la raíz del libreto: de ahí cuelga el estilo que es
+     de un solo perfil -el reborde de color de las cajas en QC-. En la raíz y
+     no en el body porque cambiar el tema reescribe las clases del body. */
+  try{ if(d.documentElement) d.documentElement.setAttribute('data-perfil', m); }
+  catch(e){ /* sin raíz no hay estilo que colgar */ }
   const barra = d.getElementById('lPerfil');
   if(!barra) return;
-  const m = (typeof DDL_MODO !== 'undefined' && DDL_MODO) || 'grabacion';
   const lista = PERFIL_HERRAMIENTAS[m] || [];
   const esc_ = (typeof esc === 'function') ? esc : (s)=> String(s == null ? '' : s);
   const n = (typeof qcPendientes === 'function') ? qcPendientes() : 0;
@@ -8226,6 +8263,14 @@ let DDL_MODO = 'grabacion';
 /* Los perfiles que hay, y lo que cada uno saca a la barra del libreto. */
 const DDL_MODOS = ['grabacion', 'qc', 'casting'];
 const DDL_MODO_ET = { grabacion:'Grabación', qc:'QC', casting:'Casting' };
+/* Lo que es cada uno, dicho igual en el selector de la entrada y en el menú
+   del perfil de la barra de arriba. */
+const DDL_MODO_DICE = {
+  grabacion: 'El libreto, el marcado y la sincronía entre equipos.',
+  qc: 'Revisar el capítulo: analizar los cambios entre el audio y el libreto, apuntar '
+    + 'correcciones y entregar el informe.',
+  casting: 'Repartir los talentos entre los personajes y descargar el desglose relleno.'
+};
 function modoValido(m){ return DDL_MODOS.indexOf(String(m || '')) >= 0 ? String(m) : ''; }
 
 function modoDe(epId){
@@ -8304,8 +8349,10 @@ function ponerModo(epId, m){
       try{ await castHeredar(null); }catch(e){ fallo('castHeredar · index.html:6141', e); }
     })();
   }
+  /* Decía «Grabación» también en QC: solo conocía dos perfiles. */
   const bm = document.getElementById('btnModo');
-  if(bm){ bm.style.display = ''; bm.textContent = (m === 'casting') ? 'Casting' : 'Grabación'; }
+  if(bm){ bm.style.display = ''; bm.textContent = DDL_MODO_ET[m] || m; }
+  try{ perfilNavPintar(); }catch(e){ fallo('perfilNavPintar · index.html:ponerModo', e); }
   if(m === 'casting') castCargarCatalogo();
 }
 
@@ -8322,35 +8369,32 @@ function preguntarModo(nombreEp, sugerido, textos){
     +   '<div class="modo-tit">' + limpio(tx.titulo || nombreEp || 'Capítulo') + '</div>'
     +   '<div class="modo-sub">' + limpio(tx.sub || '¿Qué vas a hacer con este capítulo?') + '</div>'
     +   '<div class="modo-ops">'
-    +     '<button class="modo-op" data-m="grabacion">'
-    +       '<b>Grabación</b>'
-    +       '<small>El libreto, el marcado y la sincronía entre equipos.</small></button>'
-    +     '<button class="modo-op" data-m="qc">'
-    +       '<b>QC</b>'
-    +       '<small>Revisar el capítulo: analizar los cambios entre el audio y el libreto, apuntar '
-    +       'correcciones y entregar el informe.</small></button>'
-    +     '<button class="modo-op" data-m="casting">'
-    +       '<b>Casting</b>'
-    +       '<small>Repartir los talentos entre los personajes y descargar el desglose relleno.</small></button>'
+    +     DDL_MODOS.map(m => '<button class="modo-op" data-m="' + m + '">'
+    +       '<b>' + limpio(DDL_MODO_ET[m]) + '</b>'
+    +       '<small>' + limpio(DDL_MODO_DICE[m]) + '</small></button>').join('')
     +   '</div>'
     +   '<div class="modo-pie">' + limpio(tx.pie || ('Se puede cambiar luego desde el botón del perfil, '
-    +     'en la barra del libreto.')) + '</div>'
+    +     'en la barra de arriba.')) + '</div>'
     + '</div>';
     document.body.appendChild(cap);
     const elegir = (m) => { cap.remove(); resolve(m); };
+    /* Lo que se elige al salir sin elegir -pulsando fuera o con Escape-: por
+       defecto Grabación, como siempre al abrir un capítulo. Quien CAMBIA de
+       perfil a mitad de trabajo pasa el que tiene: salir no lo cambia. */
+    const alSalir = ('alSalir' in tx) ? tx.alSalir : 'grabacion';
     cap.querySelectorAll('.modo-op').forEach(b => b.onclick = () => elegir(b.dataset.m));
     /* El de la última vez queda marcado: se ve de un golpe cuál elegiste antes
        sin que deje de preguntar. */
     if(marca){
       const b = cap.querySelector('.modo-op[data-m="' + marca + '"]');
-      if(b){ b.classList.add('ultimo'); b.focus(); }
+      if(b){ b.classList.add('ultimo'); if(tx.marcaActual) b.classList.add('actual'); b.focus(); }
     }
     /* Al entrar hay que ELEGIR: pulsar fuera o Escape no vale. Con el selector
        de un capítulo sí se puede salir así, y cae en Grabación como siempre. */
-    cap.addEventListener('click', (e) => { if(e.target === cap && !tx.obligatorio) elegir('grabacion'); });
+    cap.addEventListener('click', (e) => { if(e.target === cap && !tx.obligatorio) elegir(alSalir); });
     document.addEventListener('keydown', function esc(e){
       if(e.key !== 'Escape' || tx.obligatorio) return;
-      document.removeEventListener('keydown', esc); elegir('grabacion');
+      document.removeEventListener('keydown', esc); elegir(alSalir);
     });
     /* Solo si no se ha marcado ya el de la última vez: si no, el foco se lo
        llevaría el primero y la marca no serviría de nada. */
@@ -10233,13 +10277,125 @@ async function castPintarBotonFormato(nombre){
                   : 'Sube el Excel de la empresa que se rellenará con el casting';
 }
 
-/** Cambia de modo sobre la marcha. El modal lo promete, así que existe. */
+/** Cambia de modo sobre la marcha. El modal lo promete, así que existe.
+    Salir sin elegir deja el que había: antes caía en Grabación, y quien abría
+    el selector desde QC y pulsaba fuera se encontraba grabando. */
 async function cambiarModo(){
   if(!currentEp || !currentEp.id) return;
-  const m = await preguntarModo(currentEp.name);
-  ponerModo(currentEp.id, m);
-  if(typeof DDL_UI !== 'undefined' && DDL_UI.toast)
-    DDL_UI.toast('Perfil: ' + (DDL_MODO_ET[m] || m));
+  const m = await preguntarModo(currentEp.name, DDL_MODO, { alSalir: '', marcaActual: true });
+  perfilCambiarA(m);
+}
+
+/* ═══ EL PERFIL EN LA BARRA DE ARRIBA ════════════════════════════════════
+   Pedido de sala: «agrega un botón para cambiar entre modos en la barra de
+   navegación». El perfil solo se podía cambiar desde DENTRO del libreto -el
+   botón de su barra- o desde la pantalla de un capítulo: en Programas o en la
+   lista de capítulos no había manera, y no se veía cuál estaba puesto. Ahora
+   va arriba, siempre a la vista, diciendo cuál es; se pulsa y se elige.
+   Cerrar el menú sin elegir no cambia nada. */
+
+/** Cambia al perfil `m`: el del capítulo abierto si lo hay, y el de la sesión
+    siempre, que es con el que se abrirán los siguientes. Devuelve si cambió. */
+function perfilCambiarA(m){
+  m = modoValido(m);
+  perfilNavCerrar();
+  if(!m || m === DDL_MODO) return false;
+  const ep = (typeof currentEp !== 'undefined' && currentEp && currentEp.id) ? currentEp.id : null;
+  ponerModo(ep, m);
+  if(typeof DDL_UI !== 'undefined' && DDL_UI.toast) DDL_UI.toast('Perfil: ' + (DDL_MODO_ET[m] || m));
+  /* Pasar a QC con un capítulo delante lleva a su libreto, como abrirlo. */
+  if(ep && document.body.classList.contains('ep-open')){
+    try{ libretoDirecto(); }catch(e){ fallo('libretoDirecto · index.html:perfilCambiarA', e); }
+  }
+  return true;
+}
+
+/** El botón y su menú, con el perfil que hay ahora. */
+function perfilNavPintar(){
+  const b = document.getElementById('tbPerfil');
+  if(!b) return;
+  /* En la tablet del actor no hay perfiles que valgan: solo el pincel. */
+  const actor = (typeof isTalent === 'function') && isTalent();
+  const w = b.parentNode;
+  if(w && w.style) w.style.display = actor ? 'none' : '';
+  const et = DDL_MODO_ET[DDL_MODO] || DDL_MODO;
+  b.dataset.modo = DDL_MODO;
+  const t = document.getElementById('tbPerfilEt');
+  if(t) t.textContent = et;
+  b.setAttribute('aria-label', 'Perfil: ' + et + '. Cambiar de perfil');
+  const menu = document.getElementById('tbPerfilMenu');
+  if(!menu) return;
+  const limpio = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  menu.innerHTML = '<div class="mh">Perfil de trabajo</div>'
+    + DDL_MODOS.map(m => '<button type="button" role="menuitemradio" data-m="' + m + '"'
+        + ' aria-checked="' + (m === DDL_MODO) + '" class="tb-po' + (m === DDL_MODO ? ' on' : '') + '">'
+        + '<i aria-hidden="true"></i><span><b>' + limpio(DDL_MODO_ET[m]) + '</b>'
+        + '<small>' + limpio(DDL_MODO_DICE[m]) + '</small></span></button>').join('');
+  menu.querySelectorAll('.tb-po').forEach(o => o.onclick = (e) => { e.stopPropagation(); perfilCambiarA(o.dataset.m); });
+}
+
+function perfilNavAbierto(){
+  const m = document.getElementById('tbPerfilMenu');
+  return !!(m && m.classList.contains('open'));
+}
+function perfilNavCerrar(foco){
+  const m = document.getElementById('tbPerfilMenu'), b = document.getElementById('tbPerfil');
+  if(m) m.classList.remove('open');
+  if(b){ b.setAttribute('aria-expanded', 'false'); if(foco) try{ b.focus(); }catch(e){ /* sin foco no pasa nada */ } }
+}
+/** Abre o cierra el menú. Abierto, el foco va al perfil puesto. */
+function perfilNavAbrir(e){
+  if(e) e.stopPropagation();
+  if(perfilNavAbierto()){ perfilNavCerrar(); return; }
+  try{ closeUserMenu(); }catch(x){ /* sin menú de cuenta no hay nada que cerrar */ }
+  perfilNavPintar();
+  const m = document.getElementById('tbPerfilMenu'), b = document.getElementById('tbPerfil');
+  if(!m) return;
+  m.classList.add('open');
+  if(b) b.setAttribute('aria-expanded', 'true');
+  const on = m.querySelector('.tb-po.on') || m.querySelector('.tb-po');
+  if(on) try{ on.focus(); }catch(x){ /* sin foco se elige igual con el ratón */ }
+}
+/* Pulsar fuera lo cierra, sin cambiar nada. Escape también, y devuelve el
+   foco al botón; con las flechas se va de un perfil a otro. */
+document.addEventListener('click', ()=>{ if(perfilNavAbierto()) perfilNavCerrar(); });
+document.addEventListener('keydown', (e)=>{
+  if(!perfilNavAbierto()) return;
+  if(e.key === 'Escape'){ e.preventDefault(); perfilNavCerrar(true); return; }
+  if(e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const ops = Array.prototype.slice.call(document.querySelectorAll('#tbPerfilMenu .tb-po'));
+  if(!ops.length) return;
+  e.preventDefault();
+  const i = ops.indexOf(document.activeElement);
+  const n = (i < 0) ? 0 : (i + (e.key === 'ArrowDown' ? 1 : ops.length - 1)) % ops.length;
+  try{ ops[n].focus(); }catch(x){ /* sin foco no se mueve */ }
+});
+
+/* ═══ QC ENTRA DIRECTO AL LIBRETO ═════════════════════════════════════════
+   Pedido de sala: «no quiero ver las tarjetas de personajes, quiero ingresar
+   de una vez al libreto» -en QC, no en Casting: la primera versión lo puso en
+   Casting y se corrigió al momento-. En QC el capítulo se abre ya en el
+   libreto completo, que es donde están todas sus herramientas, y cada caja
+   lleva un reborde del color de su personaje (LIB_OVERRIDE). Las tarjetas no
+   desaparecen: siguen a un «← Atrás». */
+
+/* Los perfiles que entran directo al libreto al abrir un capítulo. */
+const PERFIL_DIRECTO = ['qc'];
+
+/** Si el libreto está a la vista. */
+function libretoVisible(){
+  const h = document.getElementById('libInline');
+  return !!(h && h.style.display && h.style.display !== 'none');
+}
+
+/** En QC, abre el libreto completo del capítulo. Devuelve si lo abrió: en
+    otro perfil, sin libreto cargado o con él ya abierto, no hace nada. */
+function libretoDirecto(){
+  if(PERFIL_DIRECTO.indexOf(DDL_MODO) < 0) return false;
+  if(!Array.isArray(script) || !script.length) return false;
+  if(libretoVisible()) return false;
+  openLibretoInline(null);
+  return true;
 }
 
 /**
@@ -11375,6 +11531,7 @@ async function openEpisodeFromJson(ep){
     libMsg('📂 '+(ep.name||'Capítulo')+' abierto');
     renderLibrary();
     _epOpen(true);
+    try{ libretoDirecto(); }catch(e){ fallo('libretoDirecto · index.html:openEpisodeFromJson', e); }
     (async ()=>{ try{ await cloudLoadProgress(); loadProgress(); rebuild();
       if(typeof loadCloudMarks==='function') await loadCloudMarks();
       if(typeof pop2!=='undefined' && pop2.doc){ refreshOpenLibretoForEpisode(); } }catch(e){ fallo('cloudLoadProgress · index.html:8929', e); } })();
@@ -11425,7 +11582,12 @@ async function openEpisode(id){
     renderLibrary();
     _epOpen(true);
     // ¿a grabar o a repartir casting? Se pregunta una vez por capítulo.
-    try{ modoAlAbrir(currentEp.id, currentEp.name); }catch(e){ console.warn('modo', e); }
+    // Y en QC se entra de una vez al libreto, sin pasar por las tarjetas.
+    try{
+      Promise.resolve(modoAlAbrir(currentEp.id, currentEp.name))
+        .then(()=>{ try{ libretoDirecto(); }catch(e){ fallo('libretoDirecto · index.html:openEpisode', e); } })
+        .catch(e=> console.warn('modo', e));
+    }catch(e){ console.warn('modo', e); }
   };
   const bg = ()=>{ return (async ()=>{ try{
       // SIEMPRE al abrir: si los archivos cambiaron en la nube, actualizar solo
@@ -11592,7 +11754,9 @@ async function openEpisodeLegacy(ep){
     libMsg('📂 '+ep.name+' abierto · progreso del estudio');
   }catch(err){ console.error(err); libMsg('Error al abrir el capítulo'); renderLibrary(); return false; }
   renderLibrary();
-  return !!(script && script.length && window._dataEpId===id);
+  const listo = !!(script && script.length && window._dataEpId===id);
+  if(listo){ try{ libretoDirecto(); }catch(e){ fallo('libretoDirecto · index.html:openEpisodeLegacy', e); } }
+  return listo;
 }
 
 
@@ -12630,6 +12794,17 @@ body.light .blk .tx .wd.know{ color:#2a2540 !important; background:#FDE68A !impo
 /* El acento y la pronunciacion mandan sobre el karaoke: son marcas de trabajo
    del actor y no se pueden perder de vista porque pase el encendido por encima. */
 .blk .tx .wd.acc.kdone, .blk .tx .wd.prn.kdone, .blk .tx .wd.pr.kdone{ opacity:.62 !important; }
+/* QC: cada caja lleva un reborde del color de su personaje, que cada caja
+   trae puesto en --pc. Pedido de sala: de un vistazo se ve de quien es cada
+   parlamento. Las acotaciones no son de nadie y se quedan sin reborde. La
+   caja del personaje abierto conserva su relleno; el borde es el suyo. El
+   .blk.blk no es un descuido: con el tema claro, la regla de la caja abierta
+   pesaba mas y le ponia el azul de resaltar. Se vio mirandolo. */
+html[data-perfil="qc"] body #lBlocks .blk.blk:not(.narr){
+  border:2px solid var(--pc,#5FC85A) !important;
+  border-radius:12px !important;
+  margin:7px auto !important;
+}
 `;
 /* El cajón de ocupación DENTRO del libreto. Va aparte de LIB_CSS porque solo
    se inyecta en modo casting: en grabación no se mete ni una regla. */

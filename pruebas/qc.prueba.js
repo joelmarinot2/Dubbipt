@@ -470,8 +470,13 @@ exports.pruebas = async function(t){
        /askRoleAtLogin\(\(\)=> perfilAlEntrar\(\(\)=> ensureWorkspace\(\)\)\);/.test(TODO));
   t.ok('al entrar hay que elegir: pulsar fuera no vale',
        /obligatorio: true/.test(TODO)
-       && /if\(e\.target === cap && !tx\.obligatorio\) elegir\('grabacion'\)/.test(TODO),
+       && /if\(e\.target === cap && !tx\.obligatorio\) elegir\(alSalir\)/.test(TODO),
        'un toque de más al entrar dejaba a quien venía a revisar en Grabación sin haberlo pedido');
+  t.ok('al abrir un capítulo, salir sin elegir sigue siendo Grabación',
+       /const alSalir = \('alSalir' in tx\) \? tx\.alSalir : 'grabacion';/.test(TODO));
+  t.ok('pero cambiar de perfil y salir sin elegir deja el que había',
+       /preguntarModo\(currentEp\.name, DDL_MODO, \{ alSalir: '', marcaActual: true \}\)/.test(TODO),
+       'antes caía en Grabación: quien abría el selector desde QC y pulsaba fuera se encontraba grabando');
   t.ok('ni Escape', /if\(e\.key !== 'Escape' \|\| tx\.obligatorio\) return;/.test(TODO));
   t.ok('lo elegido queda como perfil de la sesión', /window\._perfilSesion = m;/.test(TODO),
        'también cuando se cambia desde la barra del libreto: el siguiente capítulo lo hereda');
@@ -480,6 +485,152 @@ exports.pruebas = async function(t){
   t.ok('pase lo que pase con el selector, se sigue a los programas',
        /\.catch\(\(e\)=>\{ fallo\('perfilAlEntrar · index\.html', e\); \}\)\s*\.then\(seguir\);/.test(TODO),
        'un fallo al pintar el selector no puede dejar a nadie en una pantalla vacía');
+
+  t.seccion('12i2 · el perfil, en la barra de arriba');
+  /* Pedido de sala: «agrega un botón para cambiar entre modos en la barra de
+     navegación». Se corre el código de verdad con un documento de mentira que
+     tiene lo justo: el botón, su etiqueta y su menú. */
+  {
+    const R_MODOS = ['/* Los perfiles que hay, y lo que cada uno saca', 'function ponerModo(epId, m){'];
+    const R_NAV = ['/** Cambia de modo sobre la marcha.', '/* ═══ QC ENTRA DIRECTO AL LIBRETO'];
+    const clases = () => { const s = new Set(); return { add: c => s.add(c), remove: c => s.delete(c),
+      contains: c => s.has(c), toggle: (c, v) => { if(v === undefined ? !s.has(c) : v) s.add(c); else s.delete(c); } }; };
+    const doc = { foco: null, oyentes: {}, els: {},
+      getElementById(id){ return this.els[id] || null; },
+      addEventListener(ev, f){ (this.oyentes[ev] = this.oyentes[ev] || []).push(f); },
+      querySelectorAll(){ return []; } };
+    const el = (id) => ({ id: id, dataset: {}, attrs: {}, style: {}, textContent: '', innerHTML: '', classList: clases(),
+      setAttribute(k, v){ this.attrs[k] = String(v); }, getAttribute(k){ return this.attrs[k]; },
+      querySelector(){ return null; }, querySelectorAll(){ return []; }, focus(){ doc.foco = this.id; } });
+    doc.body = el('body');
+    ['tbPerfil', 'tbPerfilEt', 'tbPerfilMenu', 'envoltorio'].forEach(id => { doc.els[id] = el(id); });
+    doc.els.tbPerfil.parentNode = doc.els.envoltorio;
+    const ultimo = (ev) => doc.oyentes[ev][doc.oyentes[ev].length - 1];
+    const monta = (o) => {
+      o = o || {};
+      const X = { cambios: [], avisos: [], directos: 0, preguntas: [] };
+      X.M = montar([R_MODOS, R_NAV],
+        ['cambiarModo', 'perfilCambiarA', 'perfilNavPintar', 'perfilNavAbrir', 'perfilNavAbierto'],
+        { document: doc, window: {}, console: { warn: () => {}, log: () => {} },
+          localStorage: { getItem: () => null, setItem: () => {} },
+          DDL_MODO: o.modo || 'grabacion',
+          currentEp: ('ep' in o) ? o.ep : { id: 'ep1', name: 'Capítulo 1' },
+          ponerModo: (ep, m) => X.cambios.push([ep, m]),
+          DDL_UI: { toast: (m) => X.avisos.push(m) }, fallo: () => {},
+          libretoDirecto: () => { X.directos++; return true; },
+          isTalent: () => !!o.actor, closeUserMenu: () => {},
+          preguntarModo: async (n, s, tx) => { X.preguntas.push([n, s, tx]); return o.responde; } });
+      return X;
+    };
+    doc.body.classList.add('ep-open');
+    const A = monta({ modo: 'grabacion' });
+    t.eq('elegir otro perfil lo pone, en el capítulo abierto', A.M.perfilCambiarA('qc') + '|' + JSON.stringify(A.cambios),
+         'true|[["ep1","qc"]]');
+    t.eq('y lo dice', A.avisos.join(), 'Perfil: QC');
+    t.eq('pasar a QC con el capítulo delante lleva a su libreto', A.directos, 1);
+    const B = monta({ modo: 'qc' });
+    t.eq('elegir el que ya está no hace nada', B.M.perfilCambiarA('qc') + '|' + B.cambios.length + '|' + B.avisos.length, 'false|0|0');
+    t.eq('ni lo que no es un perfil', monta().M.perfilCambiarA('sordo'), false);
+    const C = monta({ ep: null });
+    C.M.perfilCambiarA('casting');
+    t.eq('sin capítulo abierto se cambia el de la sesión', JSON.stringify(C.cambios), '[[null,"casting"]]',
+         'en Programas o en la lista de capítulos no había manera de cambiarlo');
+    doc.body.classList.remove('ep-open');
+    const D = monta();
+    D.M.perfilCambiarA('qc');
+    t.eq('con el capítulo cargado pero sin estar en él, no se abre ningún libreto', D.directos, 0);
+
+    const E = monta({ modo: 'qc', responde: '' });
+    await E.M.cambiarModo();
+    t.eq('cambiar desde el libreto y salir sin elegir no cambia nada', E.cambios.length, 0,
+         'antes caía en Grabación');
+    t.eq('marcando el que está puesto', JSON.stringify(E.preguntas[0].slice(1)), '["qc",{"alSalir":"","marcaActual":true}]');
+    const F = monta({ modo: 'qc', responde: 'casting' });
+    await F.M.cambiarModo();
+    t.eq('y eligiendo, cambia', JSON.stringify(F.cambios), '[["ep1","casting"]]');
+
+    const G = monta({ modo: 'qc' });
+    G.M.perfilNavPintar();
+    t.eq('el botón dice el perfil puesto', doc.els.tbPerfilEt.textContent + '|' + doc.els.tbPerfil.dataset.modo, 'QC|qc');
+    t.eq('también a quien no ve la pantalla', doc.els.tbPerfil.attrs['aria-label'], 'Perfil: QC. Cambiar de perfil');
+    const menu = doc.els.tbPerfilMenu.innerHTML;
+    t.eq('el menú trae los tres', (menu.match(/role="menuitemradio"/g) || []).length, 3);
+    t.ok('marcado solo el puesto', (menu.match(/aria-checked="true"/g) || []).length === 1
+         && /data-m="qc" aria-checked="true"/.test(menu), menu.slice(0, 300));
+    t.eq('se ve', doc.els.envoltorio.style.display, '');
+    monta({ actor: true }).M.perfilNavPintar();
+    t.eq('en la tablet del actor no sale', doc.els.envoltorio.style.display, 'none');
+
+    const H = monta({ modo: 'qc' });
+    const ev = { stopPropagation: () => {} };
+    H.M.perfilNavAbrir(ev);
+    t.ok('pulsarlo abre el menú', H.M.perfilNavAbierto() && doc.els.tbPerfil.attrs['aria-expanded'] === 'true');
+    H.M.perfilNavAbrir(ev);
+    t.ok('pulsarlo otra vez lo cierra', !H.M.perfilNavAbierto() && doc.els.tbPerfil.attrs['aria-expanded'] === 'false');
+    H.M.perfilNavAbrir(ev);
+    ultimo('click')();
+    t.ok('pulsar fuera lo cierra', !H.M.perfilNavAbierto());
+    H.M.perfilNavAbrir(ev);
+    doc.foco = null;
+    ultimo('keydown')({ key: 'Escape', preventDefault: () => {} });
+    t.ok('Escape lo cierra y devuelve el foco al botón', !H.M.perfilNavAbierto() && doc.foco === 'tbPerfil');
+    t.eq('y nada de eso cambia el perfil', H.cambios.length, 0);
+
+    const PAGINA = require('fs').readFileSync(require('./ayuda').INDEX, 'utf8').replace(/\r\n/g, '\n');
+    const barra = PAGINA.slice(PAGINA.indexOf('<div id="topbar">'), PAGINA.indexOf('<div class="epline" id="epLine"'));
+    t.ok('el botón va en la barra de arriba, a la derecha', barra.indexOf('<div class="tb-right">') >= 0
+         && barra.indexOf('id="tbPerfil"') > barra.indexOf('<div class="tb-right">'));
+    t.ok('y se repinta cada vez que cambia el perfil', /try\{ perfilNavPintar\(\); \}catch\(e\)\{ fallo\('perfilNavPintar · index\.html:ponerModo'/.test(TODO));
+    t.ok('el botón de la pantalla del capítulo dice los tres perfiles',
+         /if\(bm\)\{ bm\.style\.display = ''; bm\.textContent = DDL_MODO_ET\[m\] \|\| m; \}/.test(TODO),
+         'decía «Grabación» también en QC');
+  }
+
+  t.seccion('12i3 · QC entra directo al libreto, y cada caja con el color de su personaje');
+  /* Pedido de sala: «no quiero ver las tarjetas de personajes, quiero ingresar
+     de una vez al libreto» -en QC-, «y que cada caja de personaje tenga un
+     reborde del color del personaje». */
+  {
+    const R_DIRECTO = ['/* ═══ QC ENTRA DIRECTO AL LIBRETO', '/**\n * Se llama al terminar de abrir un capítulo.'];
+    const libro = (o) => {
+      o = o || {};
+      const abiertos = [];
+      const host = ('host' in o) ? o.host : { style: { display: 'none' } };
+      const M = montar([R_DIRECTO], ['libretoDirecto', 'PERFIL_DIRECTO'],
+        { DDL_MODO: o.modo || 'qc', script: ('script' in o) ? o.script : [{ key: 'A' }],
+          document: { getElementById: (id) => (id === 'libInline' ? host : null) },
+          openLibretoInline: (k) => abiertos.push(k) });
+      return { M: M, abiertos: abiertos };
+    };
+    const Q = libro();
+    t.eq('en QC se abre el libreto completo', Q.M.libretoDirecto() + '|' + JSON.stringify(Q.abiertos), 'true|[null]');
+    t.eq('también la primera vez, sin libreto creado todavía', libro({ host: null }).M.libretoDirecto(), true);
+    t.eq('con el libreto ya a la vista no se vuelve a abrir', libro({ host: { style: { display: 'block' } } }).M.libretoDirecto(), false);
+    t.eq('en Grabación no', libro({ modo: 'grabacion' }).M.libretoDirecto(), false);
+    t.eq('ni en Casting: el pedido era para QC', libro({ modo: 'casting' }).M.libretoDirecto(), false);
+    t.eq('sin libreto cargado, nada', libro({ script: [] }).M.libretoDirecto(), false);
+    t.ok('al abrir un capítulo, en cuanto se sabe el perfil',
+         /Promise\.resolve\(modoAlAbrir\(currentEp\.id, currentEp\.name\)\)\s*\.then\(\(\)=>\{ try\{ libretoDirecto\(\);/.test(TODO));
+    t.ok('también por los otros dos caminos de abrir',
+         /fallo\('libretoDirecto · index\.html:openEpisodeFromJson'/.test(TODO)
+         && /fallo\('libretoDirecto · index\.html:openEpisodeLegacy'/.test(TODO));
+
+    /* El reborde cuelga del perfil puesto en la raíz del libreto. */
+    const attrs = {};
+    const P = montar([['function perfilPintar(){', '/** ¿Lleva vídeo este perfil? */']], ['perfilPintar'],
+      { pop2: { doc: { documentElement: { setAttribute: (k, v) => { attrs[k] = v; } }, getElementById: () => null } },
+        DDL_MODO: 'qc' });
+    P.perfilPintar();
+    t.eq('el libreto sabe en qué perfil está, aunque no tenga barra', attrs['data-perfil'], 'qc',
+         'en la raíz y no en el body: cambiar el tema reescribe las clases del body');
+    t.ok('y en QC cada caja lleva el reborde del color de su personaje',
+         /html\[data-perfil="qc"\] body #lBlocks \.blk\.blk:not\(\.narr\)\{\s*border:2px solid var\(--pc,#5FC85A\) !important;/.test(TODO));
+    t.ok('y pesa más que el resaltado del tema claro, que le ponía su azul',
+         /body\.light #lBlocks \.blk\.mine:not\(\.rec\)\{/.test(TODO),
+         'si esa regla cambia, hay que volver a mirar el reborde con el tema claro');
+    t.ok('el color es el de cada caja: cada una trae el de su personaje',
+         /data-pg="'\+b\.page\+'" style="--pc:'\+bcolor\+'"/.test(TODO));
+  }
 
   t.seccion('12j · QC no lleva vídeo');
   /* Pedido de sala: «quita la opcion de video en QC y todas las herramientas
