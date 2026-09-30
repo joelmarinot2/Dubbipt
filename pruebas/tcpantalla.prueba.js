@@ -67,7 +67,8 @@ const M = montar(
    'tcpLayoutPuntos', 'tcpLayoutTrozos', 'tcpCorridas', 'tcpAlinear',
    'tcpCargar', 'tcpOlvidar', 'tcpPorQueNoLee', 'tcpArrancar', 'tcpFotoDeVerdad: tcpFoto', 'TCP_FOTO_MAX',
    'TCP_HOLGURA', 'TCP_RENUEVA', 'TCP_AVISO_MS', 'TCP_GUARDADO_V',
-   'TCP_SUAVE', 'TCP_PERIODO_MS', 'tcpRetardo'],
+   'TCP_SUAVE', 'TCP_PERIODO_MS', 'tcpRetardo',
+   'TCP_QUIETAS', 'TCP_RITMO_MAX', 'TCP_RUEDA', 'tcpQuieto', 'tcpApuntar', 'tcpDiagnosticoTexto', 'verDiario: () => TCP._diario'],
   { performance: perf, localStorage: almacen, document: doc, navigator: nav,
     castAviso: (t) => { avisos.push(String(t)); },
     /* El latido del trabajador de la aplicación, de mentira: se apunta a qué
@@ -196,8 +197,14 @@ const recta = (v, n, desde) => {
 t.ok('tres a tiempo real concuerdan', !!M.tcpRecta(recta(1, 3)));
 t.ok('tres paradas concuerdan', !!M.tcpRecta(recta(0, 3)));
 t.ok('dos no bastan', !M.tcpRecta(recta(1, 2)));
-t.ok('a triple velocidad no es creible', !M.tcpRecta(recta(3, 5)));
-t.ok('hacia atras no es creible', !M.tcpRecta(recta(-1, 5)));
+/* Llegó de sala: «sincroniza cuando se maneja lento, pero a cambios abruptos
+   no». Avanzar rápido, rebobinar y arrastrar el cursor también son Pro Tools:
+   ahora se siguen hasta cuatro veces la velocidad, en los dos sentidos. */
+t.ok('a triple velocidad es avanzar rápido: creíble', !!M.tcpRecta(recta(3, 5)));
+t.ok('hacia atrás a tiempo real es rebobinar: creíble', !!M.tcpRecta(recta(-1, 5)));
+t.cerca('y el ritmo sale de la recta', M.tcpRecta(recta(-1, 5)).v, -1, 0.05);
+t.ok('a diez veces ya no: eso es una cifra mal leída', !M.tcpRecta(recta(10, 5)));
+t.ok('ni a medias: ni parado ni rodando no es un ritmo', !M.tcpRecta(recta(0.2, 5)));
 {
   /* Esto es lo que rompio la primera version: entre lecturas buenas se cuelan
      malas, y mirandolas todas juntas no concordaba ninguna. */
@@ -332,6 +339,79 @@ t.seccion('7 · si saltan en Pro Tools, se engancha alli');
   for(let i = 0; i < 4; i++){ ahora += 66; M.tcpMirar(); }
   t.eq('tras saltar rodando, sabe que rueda', TCP.rodando, true);
   t.cerca('y en el sitio nuevo', M.tcpAhora(TCP, ahora), 900 + (ahora - 20264) / 1000, 0.05);
+}
+
+/* ── 7b · saltos, rebobinar y avanzar rápido ───────────────────────────── */
+t.seccion('7b · saltos, rebobinar y avanzar rápido');
+{
+  /* Llegó de sala: «sí sincroniza cuando se maneja lento, pero a cambios
+     abruptos no». El reloj solo se creía parado o a tiempo real. */
+  const arranque = (tc, rodando) => {
+    ahora = 40000;
+    TCP.on = true; TCP.tc = tc; TCP.t0 = ahora; TCP.rodando = rodando; TCP.ritmo = rodando ? 1 : 0;
+    TCP._hist = []; TCP._dudas = []; TCP._leidas = 0; TCP._malas = 0; TCP._diario = [];
+  };
+  /* Rebobinando a tiempo real: las lecturas van hacia atrás. */
+  arranque(500, true);
+  M.ponLeer(() => ({ celdas: 8, txt: '', seg: 500 - (ahora - 40000) / 1000, conf: 0.9 }));
+  for(let i = 0; i < 12; i++){ ahora += 66; M.tcpMirar(); }
+  t.ok('rebobinando, el reloj va hacia atrás', TCP.rodando && TCP.ritmo < -0.8, 'ritmo ' + TCP.ritmo.toFixed(2));
+  t.cerca('y está donde Pro Tools', M.tcpAhora(TCP, ahora), 500 - (ahora - 40000) / 1000, 0.1);
+  ahora += 200;
+  t.cerca('y entre lecturas sigue yendo hacia atrás, no hacia delante', M.tcpAhora(TCP, ahora), 500 - (ahora - 40000) / 1000, 0.1);
+  /* Avanzando rápido, al triple. */
+  arranque(100, false);
+  M.ponLeer(() => ({ celdas: 8, txt: '', seg: 100 + 3 * (ahora - 40000) / 1000, conf: 0.9 }));
+  for(let i = 0; i < 12; i++){ ahora += 66; M.tcpMirar(); }
+  t.ok('avanzando rápido, el reloj corre al triple', TCP.rodando && TCP.ritmo > 2.5 && TCP.ritmo < 3.5, 'ritmo ' + TCP.ritmo.toFixed(2));
+  t.cerca('y está donde Pro Tools', M.tcpAhora(TCP, ahora), 100 + 3 * (ahora - 40000) / 1000, 0.15);
+  t.ok('con la parte del retardo al mismo ritmo', M.tcpFuente() - M.tcpAhora(TCP, ahora) > 2.5 * M.tcpRetardo(25),
+       'a triple velocidad lo leído tiene el triple de atraso');
+  /* Un salto con Pro Tools PARADO: dos lecturas iguales bastan. */
+  arranque(100, false);
+  M.ponLeer(() => ({ celdas: 8, txt: '', seg: 777, conf: 0.9 }));
+  ahora += 66; M.tcpMirar();
+  t.cerca('con una lectura no se cree el salto', M.tcpAhora(TCP, ahora), 100, 0.002);
+  ahora += 66; M.tcpMirar();
+  t.cerca('con dos iguales, ya', M.tcpAhora(TCP, ahora), 777, 0.002, 'parado, la lectura es exacta: dos iguales no son casualidad');
+  t.eq('y parado', TCP.rodando, false);
+  t.eq('dos iguales bastan', M.TCP_QUIETAS, 2);
+  /* Pero dos iguales VIEJAS no: tienen que ser seguidas y de ahora. */
+  t.eq('dos iguales de hace un segundo no valen', M.tcpQuieto([{ seg: 5, t: 1000 }, { seg: 5, t: 1100 }], 2500), null);
+  t.eq('ni dos distintas', M.tcpQuieto([{ seg: 5, t: 2400 }, { seg: 6, t: 2450 }], 2500), null);
+  t.ok('dos iguales y seguidas, sí, y dicen parado', (function(){ const q = M.tcpQuieto([{ seg: 5, t: 2400 }, { seg: 5, t: 2450 }], 2500); return q && q.v === 0 && q.ult.seg === 5; })());
+  /* Un salto rodando, y se sigue rodando: se recoge en tres lecturas. */
+  arranque(100, true);
+  M.ponLeer(() => ({ celdas: 8, txt: '', seg: 900 + (ahora - 40000) / 1000, conf: 0.9 }));
+  let cuando = -1;
+  for(let i = 0; i < 8; i++){ ahora += 66; M.tcpMirar(); if(cuando < 0 && Math.abs(M.tcpAhora(TCP, ahora) - (900 + (ahora - 40000) / 1000)) < 0.1) cuando = i + 1; }
+  t.ok('un salto rodando se recoge en tres lecturas', cuando > 0 && cuando <= 3, 'en ' + cuando);
+  t.ok('y sigue rodando a tiempo real', TCP.rodando && Math.abs(TCP.ritmo - 1) < 0.2, 'ritmo ' + TCP.ritmo.toFixed(2));
+  /* Y el ritmo más rápido que se cree. */
+  t.eq('hasta cuatro veces la velocidad, en los dos sentidos', M.TCP_RITMO_MAX, 4);
+  t.ok('a diez veces no se mueve: eso es una cifra mal leída', (function(){
+    arranque(100, false);
+    M.ponLeer(() => ({ celdas: 8, txt: '', seg: 100 + 10 * (ahora - 40000) / 1000, conf: 0.9 }));
+    for(let i = 0; i < 12; i++){ ahora += 66; M.tcpMirar(); }
+    return Math.abs(M.tcpAhora(TCP, ahora) - 100) < 0.002 || TCP.rodando === false; })());
+
+  /* El diario: qué se hizo con cada lectura, para la captura de revisar. */
+  arranque(100, true);
+  M.ponLeer(() => ({ celdas: 8, txt: '01000000', seg: 100.05, conf: 0.9 }));
+  ahora += 66; M.tcpMirar();
+  M.ponLeer(() => ({ celdas: 8, txt: '', seg: null, conf: 0 }));
+  ahora += 66; M.tcpMirar();
+  M.ponLeer(() => ({ celdas: 8, txt: '05000000', seg: 5 * 3600, conf: 0.9 }));
+  ahora += 66; M.tcpMirar();
+  const diario = M.verDiario();
+  t.eq('cada lectura queda apuntada con lo que se hizo', diario.map(e => e.que).join(','), 'cuadra,mala,duda');
+  t.eq('con lo leído y el reloj', diario[0].txt + ' ' + diario[0].seg + ' ' + (diario[0].reloj != null), '01000000 100.05 true');
+  const texto = M.tcpDiagnosticoTexto();
+  t.ok('y el texto de la captura lleva el estado y el diario', texto.some(l => /^fps 25/.test(l)) && texto.some(l => /01000000 conf 0.9 seg 100.05 .*cuadra/.test(l)),
+       texto.join(' | ').slice(0, 300));
+  for(let i = 0; i < 200; i++) M.tcpApuntar(ahora + i, { txt: '', conf: 0, seg: null }, 'mala');
+  t.ok('el diario no crece sin tope: se queda con las ultimas', M.verDiario().length <= 80, 'tiene ' + M.verDiario().length);
+  TCP.on = false; TCP._diario = [];
 }
 
 /* ── 8 · con la mitad de las lecturas malas, el libreto no se va ───────── */
@@ -799,6 +879,7 @@ t.seccion('16 · lo que falta para seguir, y los días siguientes');
        src.indexOf("return { L: f ? tcpLayout(f) : null, f: f };") > 0 && src.indexOf('tcpGrupos(f).length') < 0);
   t.ok('y al aceptar, lo que cuenta es que salgan las casillas', /const ocho = !!TCP\.celdas;/.test(src));
   t.ok('hay un botón de empezar de cero', /id="tcpCero"/.test(src));
+  t.ok('y uno de guardar la captura para revisar', /id="tcpCaptura"/.test(src) && /b\.onclick = \(\)=> tcpDiagnosticoBajar\(\);/.test(src));
   t.ok('que pregunta antes y solo entonces olvida',
        /if\(!ok\)\{ tcpPanel\(\); return; \}\n\s*tcpOlvidar\(\);/.test(src));
   t.ok('con el panel quitado antes, que taparía la pregunta', /cerrar\(\);\n\s*let ok = false;/.test(src));

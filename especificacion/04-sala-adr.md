@@ -72,9 +72,9 @@ qué dijo el director.
 | | Regla | |
 |---|---|---|
 | **PT-1** | El botón **Seguir** cuelga del **contador de Pro Tools**, no del vídeo ni del audio que se suban a Dubbipt. Pro Tools es el reloj que manda en la sala; lo de aquí es material de consulta. El vídeo lleva el reloj **solo** si no hay Pro Tools leyendo, y entonces el botón lo dice: pone «Seguir · vídeo» en vez de «Seguir · PT». | ✅ |
-| **PT-2** | El timecode se lee **de la pantalla**: se comparte la ventana de Pro Tools y se marca una vez el recuadro del contador grande. Sin instalar nada, sin cables y **sin MIDI** — se descartó a petición. | ✅ |
+| **PT-2** | El timecode se lee **de la pantalla**: se comparte la ventana de Pro Tools y se marca una vez el recuadro del contador grande. Sin instalar nada, sin cables. El MIDI se descartó al principio pensando en cables y aparatos; ahora es la otra puerta, sin cables (PT-24). | ✅ |
 | **PT-3** | **El reloj no es la lectura.** Se engancha una vez y a partir de ahí cuenta solo con el reloj del navegador. Una lectura solo se acepta si **cuadra** con lo que el reloj ya predecía; la que no cuadra se tira. Esto es lo que hace viable leer una pantalla. | ✅ |
-| **PT-4** | Si **varias** lecturas seguidas no cuadran pero coinciden **entre sí** sobre una misma recta —parado o a tiempo real—, es que han saltado en Pro Tools, y ahí sí se vuelve a enganchar. Se busca el **grupo mayor** que caiga en una recta, no que encajen todas: con la mitad de las lecturas malas, exigir que encajen todas no engancha nunca. | ✅ |
+| **PT-4** | Si **varias** lecturas seguidas no cuadran pero coinciden **entre sí** sobre una misma recta, es que han saltado en Pro Tools, y ahí sí se vuelve a enganchar. Se busca el **grupo mayor** que caiga en una recta, no que encajen todas: con la mitad de las lecturas malas, exigir que encajen todas no engancha nunca. La recta puede ir **a cualquier ritmo creíble**: parado, a tiempo real, rebobinando o avanzando rápido, hasta cuatro veces la velocidad en los dos sentidos; más rápido es una cifra mal leída. Antes solo se creía parado o a tiempo real y el resto se tiraba: llegó de sala «sincroniza cuando se maneja lento, pero a cambios abruptos no», y mientras el técnico rebobinaba o arrastraba el cursor el libreto se quedaba quieto. Y si Pro Tools salta y se queda **parado**, **dos** lecturas iguales y seguidas bastan: parado la lectura es exacta. | ✅ |
 | **PT-5** | El reparto de las ocho cifras se calcula **una vez**, al enseñárselas, y se reutiliza. Calcularlo en cada fotograma era el fallo gordo: una partición mala estropea las ocho cifras a la vez. | ✅ |
 | **PT-6** | Las casillas se cuelgan de una **rejilla** anclada en los dos puntos, no del centro de la tinta de cada cifra. Un **1** solo pinta su palo derecho, así que su centro de tinta cae medio dígito a la derecha: colocando por la tinta, cualquier timecode con un 1 salía torcido. Los dos puntos se encuentran por su forma (PT-16) y el paso de cifra se mide (PT-17). | ✅ |
 | **PT-7** | El recuadro y las cifras aprendidas **se recuerdan** entre sesiones. La ventana compartida no se puede recordar —el navegador no deja—, así que cada sesión hay que volver a compartirla, pero **nada más**. Por eso el botón Seguir abre el panel en vez de encenderse a secas. | ✅ |
@@ -93,6 +93,8 @@ qué dijo el director.
 | **PT-20** | **El seguimiento late desde un trabajador en segundo plano**, como el aprendizaje (PT-11), y no desde un temporizador de la página. Con Dubbipt tapado por Pro Tools —lo normal en la sala— el navegador frena los temporizadores de la página a **uno por segundo**, y para enganchar hacen falta tres lecturas en segundo y medio: **no enganchaba nunca**. Se vio en el navegador, con las diez cifras aprendidas y cada lectura bien leída. Si una vuelta tarda más que el latido, los latidos pegados se saltan en vez de hacer cola. | ✅ |
 | **PT-21** | **Si no engancha, dice por qué**, una vez, a los **seis segundos** de arrancar —antes no, que al principio la ventana puede estar tapada—: que no llega imagen, que en el recuadro **no está el contador** —se ha movido la ventana o está tapada— o que el contador está pero **no entiende sus cifras**. Son tres cosas que se arreglan distinto, y antes no se decía ninguna. | ✅ |
 | **PT-22** | La foto del recuadro se **reduce** a 480 píxeles de lado mayor antes de leerla. El Big Counter en una pantalla grande, a tamaño real, costaba **60 ms** cada lectura: el hilo de la página casi entero, quince veces por segundo. Reducido lee igual. | ✅ |
+| **PT-24** | **El timecode también llega por MIDI (MTC), y es el camino bueno cuando se puede.** Pro Tools genera MIDI Time Code de serie —Setup › Peripherals › Synchronization › *MTC Generator Port*, y *Gen MTC* en el transporte— y Chrome lo recibe con Web MIDI: exacto al fotograma, con los saltos y a la velocidad que sea, sin leer píxeles ni enseñar cifras. En el mismo equipo no hace falta cable: en Mac el IAC viene de fábrica, en Windows loopMIDI (gratis). Los ocho cuartos de trama (F1) se juntan en un timecode —hacia delante sumando los dos fotogramas que tardan en llegar; hacia atrás también se juntan; una pieza perdida no se mezcla con las de la vuelta anterior—, el timecode entero por sysex al localizar deja el reloj parado ahí, y sin cuartos de trama en un cuarto de segundo Pro Tools está parado donde dijo el último. Engancha **el mismo reloj** que la lectura de pantalla: el botón, el libreto y las correcciones de QC no saben de dónde viene. Mientras llega MIDI la pantalla no se lee, no falta nada para seguir, y no se suma el retardo de leer. El puerto se recuerda **por nombre** y los días siguientes se conecta solo, sin pedir nada; sin puerto recordado no se pide ni el permiso. El tipo de fotogramas del MTC pasa al reloj. | ✅ |
+| **PT-25** | **Una captura para revisar.** Cuando en la sala «no sincroniza», desde fuera no se ve nada: el panel tiene «📷 Guardar captura para revisar», una imagen con el recuadro aumentado y sus casillas, las diez cifras aprendidas y el diario de las últimas lecturas —qué se leyó, con qué confianza y qué se hizo con cada una: cuadra, salto, duda, mala—. Se manda y se arregla contra lo real. | ✅ |
 | **PT-23** | **El reloj no tiembla ni va por detrás.** Rodando, cada lectura que cuadra **acerca** el reloj a ella un cuarto del camino, en vez de saltar a ella: una lectura es un fotograma entero —el contador enseña el mismo número durante 40 ms— y saltando el reloj iba a trompicones de hasta un fotograma (medido: 20 ms de desviación y saltos de 100 ms; ahora, 5 ms). Parado, o tras un salto, a la lectura tal cual. Y se suma lo que se **sabe** que va por detrás una lectura: medio fotograma del contador y media imagen de la captura, 37 ms a 25 fotogramas. Con el contador de mentira iba 43 ms por detrás; ahora, a menos de un fotograma. Lo que tarde además la captura de pantalla del equipo sigue siendo del ajuste fino. | ✅ |
 
 | | |
@@ -131,6 +133,22 @@ qué dijo el director.
   adelanto de tres décimas, y el latido del vídeo dado a mano. En la sección
   19, la tablet: lo marcado como del seguimiento va con el deslizar corto —o de
   golpe tapada—, sin el motor de los gestos y sin reenviarse, y mi mano manda.
+- **PT-24**, en `pruebas/mtc.prueba.js`, con un Web MIDI de mentira: los ocho cuartos
+  de trama y sus tipos, hacia atrás, con una pieza perdida y entrando a mitad de
+  vuelta; el timecode entero y lo que no lo es; que engancha el reloj de la
+  lectura de pantalla y le pasa el ritmo —a tiempo real y al doble— y el tipo
+  de fotogramas; que sin cuartos de trama se para donde estaba y no donde estaría;
+  que se recuerda el puerto por nombre y se conecta solo, y sin puerto recordado
+  no se pide el permiso; y que la pantalla se calla mientras llega MIDI. Treinta
+  y dos mutaciones con las de PT-4 y PT-25, todas en rojo: seis nacieron verdes y
+  se cerraron. Y en el navegador, con un puerto de mentira y un Pro Tools de
+  mentira que genera MTC: el libreto sigue a 30 ms del contador, un localizar
+  con Pro Tools parado salta al parlamento 71 al momento, y al parar se queda.
+  Lo que **no** se ha probado es un Pro Tools de verdad generando MTC.
+- **PT-4** (los ritmos) y **PT-25**, en la sección 7b de `pruebas/tcpantalla.prueba.js`:
+  rebobinando el reloj va hacia atrás, al triple corre al triple, un salto parado
+  se recoge con dos lecturas iguales y uno rodando con tres, a diez veces no se
+  mueve, y el diario apunta cada lectura con lo que se hizo, con tope.
 - **PT-23**, en la sección 9b de `pruebas/tcpantalla.prueba.js`: un Pro Tools
   rodando de verdad, leído cada 66 ms con el fotograma truncado y la imagen de
   la captura con hasta 33 ms de edad; el reloj tiene que ir a menos de 10 ms

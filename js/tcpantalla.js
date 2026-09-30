@@ -59,6 +59,24 @@ const TCP_TOL = 0.30;
    digan casualmente lo mismo y ademas encajen en una recta es despreciable. */
 const TCP_SEGUIDAS = 3;
 
+/* Lecturas seguidas IGUALES que bastan para dar por parado el contador en un
+   sitio nuevo. Parado, la lectura es exacta y dos iguales no son casualidad:
+   con tres se tardaba una lectura más en cada salto, y en la sala se salta
+   mucho. Llegó de sala: «sincroniza cuando se maneja lento, pero a cambios
+   abruptos no». */
+const TCP_QUIETAS = 2;
+
+/* El ritmo más rápido que se cree el reloj, en veces la velocidad real. Antes
+   solo se creía parado o a tiempo real, y todo lo demás -avanzar rápido,
+   rebobinar, arrastrar el cursor- se tiraba: mientras el técnico hacía eso el
+   libreto se quedaba quieto. Ahora se sigue a cualquier ritmo hasta cuatro
+   veces, hacia delante o hacia atrás; más rápido que eso ya no se lee bien y
+   no hace falta: nadie lee el libreto a ocho veces. */
+const TCP_RITMO_MAX = 4;
+
+/* Desde qué ritmo se considera que rueda, en valor absoluto. */
+const TCP_RUEDA = 0.3;
+
 /* Cada cuánto se lee el contador, en milisegundos. */
 const TCP_PERIODO_MS = 66;
 
@@ -120,6 +138,7 @@ const TCP = {
   _aprTimer: 0,
   _desde: 0,            // performance.now() de cuando se arrancó a seguir
   _avisado: false,      // ¿ya se dijo por qué no engancha?
+  fuente: 'pantalla',   // de dónde llega el timecode: 'pantalla' (leído) o 'midi' (MTC, mtc.js)
   _cv: null, _g: null
 };
 
@@ -169,14 +188,20 @@ function tcpFaltan(){
 function tcpAhora(T, ahora){
   if(!T || T.tc == null) return null;
   if(!T.rodando) return T.tc;
-  return T.tc + Math.max(0, (ahora - T.t0) / 1000);
+  /* Al ritmo que lleve: a tiempo real casi siempre, pero también rebobinando
+     o avanzando rápido. Sin ritmo apuntado, a tiempo real. */
+  const v = (T.ritmo != null && isFinite(+T.ritmo) && Math.abs(+T.ritmo) >= TCP_RUEDA) ? +T.ritmo : 1;
+  return T.tc + v * Math.max(0, (ahora - T.t0) / 1000);
 }
 
 /** El timecode que ve el resto del programa, con el ajuste fino aplicado. */
 function tcpFuente(){
   if(!TCP.on) return null;
   const s = tcpAhora(TCP, (typeof performance !== 'undefined' ? performance.now() : Date.now()));
-  return s == null ? null : s + (TCP.lat || 0) + (TCP.rodando ? tcpRetardo(TCP.fps) : 0);
+  /* El retardo de leer va al ritmo que lleve: a doble velocidad, lo que se
+     lee tiene el doble de atraso en el tiempo de Pro Tools. */
+  const v = (TCP.rodando && TCP.fuente !== 'midi') ? ((TCP.ritmo != null && isFinite(+TCP.ritmo)) ? +TCP.ritmo : 1) : 0;
+  return s == null ? null : s + (TCP.lat || 0) + v * tcpRetardo(TCP.fps);
 }
 
 /**
@@ -214,7 +239,11 @@ function tcpRecta(ds){
     const dt = (ds[j].t - ds[i].t) / 1000;
     if(dt <= 0.05) continue;                       // demasiado juntas: la recta no dice nada
     const v = (ds[j].seg - ds[i].seg) / dt;
-    if(Math.abs(v) >= 0.15 && Math.abs(v - 1) >= 0.15) continue;
+    /* Parado, a tiempo real, o a cualquier ritmo creíble hasta TCP_RITMO_MAX,
+       hacia delante o hacia atrás: rebobinar y avanzar rápido también son
+       Pro Tools. Lo que va más rápido que eso es una cifra mal leída. */
+    if(Math.abs(v) > TCP_RITMO_MAX) continue;
+    if(Math.abs(v) >= 0.15 && Math.abs(v) < TCP_RUEDA) continue;   // ni parado ni rodando: no es un ritmo
     const dentro = ds.filter(d =>
       Math.abs(d.seg - (ds[i].seg + v * (d.t - ds[i].t) / 1000)) <= TCP_TOL);
     if(dentro.length >= TCP_SEGUIDAS && (!mejor || dentro.length > mejor.n))
@@ -242,7 +271,7 @@ function tcpAnclar(seg, ahora, seguido){
     const dt = (b.t - a.t) / 1000;
     if(dt > 0.3){
       TCP.ritmo = (b.seg - a.seg) / dt;
-      TCP.rodando = TCP.ritmo > 0.5;
+      TCP.rodando = Math.abs(TCP.ritmo) >= TCP_RUEDA;
     }
   }
   /* Rodando y cuadrando, el reloj se ACERCA a la lectura en vez de saltar a
@@ -968,20 +997,35 @@ function tcpDentroDe(R, r){
  * Una vuelta: leer, y decidir si la lectura merece mover el reloj. Todo el
  * criterio de "el reloj manda, la lectura solo corrige" esta aqui.
  */
+/** ¿Está llegando el timecode por MIDI? Entonces la pantalla no se lee. */
+function tcpPorMidi(){
+  return !!(typeof MTC !== 'undefined' && MTC && MTC.on);
+}
+
 function tcpMirar(){
   const ahora = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  /* Por MIDI llega exacto y ya engancha el reloj él solo (mtc.js): leer la
+     pantalla además sería pelearse con él. Solo se vigila que llegue. */
+  if(tcpPorMidi()){
+    if(TCP.tc == null && !TCP._avisado && TCP._desde && ahora - TCP._desde > TCP_AVISO_MS){
+      TCP._avisado = true;
+      try{ castAviso('⚠️ ' + tcpPorQueNoLee()); }catch(e){ /* sin avisos */ }
+    }
+    return;
+  }
   const r = tcpLeerUna();
   TCP._leidas++;
   if(TCP.tc == null && !TCP._avisado && TCP._desde && ahora - TCP._desde > TCP_AVISO_MS){
     TCP._avisado = true;
     try{ castAviso('⚠️ ' + tcpPorQueNoLee()); }catch(e){ /* sin avisos: el panel lo dice igual */ }
   }
-  if(!r || r.seg == null || r.conf < 0.55){ TCP._malas++; return; }
+  if(!r || r.seg == null || r.conf < 0.55){ TCP._malas++; tcpApuntar(ahora, r, 'mala'); return; }
 
   const p = tcpAhora(TCP, ahora);
   if(p != null && Math.abs(r.seg - p) <= TCP_TOL){
     tcpAnclar(r.seg, ahora, true);
     TCP._dudas = [];
+    tcpApuntar(ahora, r, 'cuadra');
     /* Esta lectura cuadra con el reloj, o sea que las ocho cifras son las que
        son: buena ocasion para afinar las plantillas con el contador tal y como
        se ve ahora mismo, tamaño y nitidez incluidos. */
@@ -995,7 +1039,7 @@ function tcpMirar(){
      misma historia. */
   TCP._dudas.push({ seg: r.seg, t: ahora });
   TCP._dudas = TCP._dudas.filter(d => ahora - d.t < 1500);
-  const R = tcpRecta(TCP._dudas);
+  const R = tcpRecta(TCP._dudas) || tcpQuieto(TCP._dudas, ahora);
   if(R){
     /* Se engancha donde dice la RECTA proyectada hasta ahora, no donde dice la
        ultima lectura: la ultima puede ser precisamente una de las malas. */
@@ -1003,9 +1047,122 @@ function tcpMirar(){
     /* El ritmo sale de la recta, y se pone despues de anclar: anclar tras un
        salto tira el historial, y sin historial no sabria si rueda o esta
        parado hasta pasado mas de un segundo. */
-    TCP.rodando = R.v > 0.5;
+    TCP.rodando = Math.abs(R.v) >= TCP_RUEDA;
     TCP.ritmo = R.v;
     TCP._dudas = [];
+    tcpApuntar(ahora, r, 'salto');
+  }else tcpApuntar(ahora, r, 'duda');
+}
+
+/**
+ * ¿Han saltado a un sitio y se han quedado PARADOS ahí? Las últimas lecturas
+ * son iguales, exactas al fotograma, y seguidas. Parado, la lectura es exacta
+ * y con TCP_QUIETAS iguales basta: es lo que hace que un salto con Pro Tools
+ * parado se recoja una lectura antes.
+ */
+function tcpQuieto(ds, ahora){
+  if(!ds || ds.length < TCP_QUIETAS) return null;
+  const ult = ds[ds.length - 1];
+  for(let k = 1; k <= TCP_QUIETAS; k++){
+    const d = ds[ds.length - k];
+    if(!d || d.seg !== ult.seg || ahora - d.t > 400) return null;
+  }
+  return { n: TCP_QUIETAS, v: 0, ult: ult };
+}
+
+/* ── El diario y la captura para revisar ───────────────────────────────── */
+
+/* Las últimas lecturas, con qué se hizo con cada una. Es lo que se puede
+   mandar cuando en la sala «no sincroniza» y desde aquí no se ve nada. */
+const TCP_DIARIO = 80;
+function tcpApuntar(ahora, r, que){
+  try{
+    const d = TCP._diario || (TCP._diario = []);
+    d.push({ t: Math.round(ahora), txt: (r && r.txt) || '', conf: r ? +(+r.conf || 0).toFixed(2) : null,
+             seg: (r && r.seg != null) ? +(+r.seg).toFixed(3) : null, que: que,
+             reloj: (TCP.tc != null) ? +(+tcpAhora(TCP, ahora)).toFixed(3) : null });
+    if(d.length > TCP_DIARIO) d.splice(0, d.length - TCP_DIARIO);
+  }catch(e){ /* el diario no puede tirar la lectura */ }
+}
+
+/** El estado, en texto, para la captura y para quien pregunte. */
+function tcpDiagnosticoTexto(){
+  const l = [];
+  l.push('Dubbipt ' + (typeof APP_VER_NUM !== 'undefined' ? APP_VER_NUM : '') + ' · ' + new Date().toISOString());
+  l.push('fps ' + TCP.fps + ' · ajuste ' + TCP.lat + ' · recuadro ' + JSON.stringify(TCP.rect)
+         + ' · casillas ' + (TCP.celdas ? TCP.celdas.length : 0) + ' · cifras ' + (10 - tcpFaltan().length) + '/10');
+  l.push('estado: ' + ((typeof tcpEstadoTexto === 'function') ? tcpEstadoTexto() : '') + ' · ritmo ' + (+TCP.ritmo || 0).toFixed(2)
+         + ' · leídas ' + TCP._leidas + ' · descartadas ' + TCP._malas);
+  const v = TCP.video;
+  if(v) l.push('vídeo ' + v.videoWidth + 'x' + v.videoHeight);
+  (TCP._diario || []).slice(-40).forEach(e => l.push(
+    e.t + ' ' + (e.txt || '--------') + ' conf ' + (e.conf == null ? '-' : e.conf) + ' seg ' + (e.seg == null ? '-' : e.seg)
+    + ' reloj ' + (e.reloj == null ? '-' : e.reloj) + ' → ' + e.que));
+  return l;
+}
+
+/**
+ * Una imagen con lo que ve y lo que lee, para mandarla: el recuadro
+ * aumentado con las casillas encima, las diez cifras aprendidas y el diario.
+ * Desde la sala «no sincroniza» no dice nada; esto sí.
+ */
+function tcpDiagnostico(){
+  const f = tcpFoto();
+  const k = 4, W = 1000;
+  const cv = document.createElement('canvas');
+  const lineas = tcpDiagnosticoTexto();
+  const altoFoto = f ? Math.min(400, f.h * k) : 40;
+  cv.width = W; cv.height = altoFoto + 20 + 60 + 20 + lineas.length * 14 + 20;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#111'; g.fillRect(0, 0, cv.width, cv.height);
+  let y = 10;
+  if(f){
+    const esc = Math.min(k, (W - 20) / f.w, altoFoto / f.h);
+    const img = g.createImageData(f.w, f.h);
+    for(let i = 0; i < f.g.length; i++){ const c = Math.round(f.g[i] * 255); img.data[i * 4] = c; img.data[i * 4 + 1] = c; img.data[i * 4 + 2] = c; img.data[i * 4 + 3] = 255; }
+    const tmp = document.createElement('canvas'); tmp.width = f.w; tmp.height = f.h; tmp.getContext('2d').putImageData(img, 0, 0);
+    g.imageSmoothingEnabled = false;
+    g.drawImage(tmp, 10, y, f.w * esc, f.h * esc);
+    if(TCP.celdas){
+      g.strokeStyle = '#22C55E'; g.lineWidth = 1;
+      TCP.celdas.forEach(c => g.strokeRect(10 + c.x * f.w * esc, y + c.y * f.h * esc, c.w * f.w * esc, c.h * f.h * esc));
+    }
+    y += f.h * esc + 10;
+  }else{
+    g.fillStyle = '#F87171'; g.font = '13px monospace'; g.fillText('sin imagen del recuadro', 10, y + 14); y += 30;
+  }
+  /* Las diez cifras aprendidas, a tamaño de comparar. */
+  let x = 10;
+  for(let d = 0; d < 10; d++){
+    const pl = TCP.plantillas[String(d)];
+    g.fillStyle = '#ddd'; g.font = '11px monospace'; g.fillText(String(d), x, y + 10);
+    if(pl){
+      const img = g.createImageData(TCP_W, TCP_H);
+      for(let i = 0; i < pl.length; i++){ const c = Math.round(pl[i] * 255); img.data[i * 4] = c; img.data[i * 4 + 1] = c; img.data[i * 4 + 2] = c; img.data[i * 4 + 3] = 255; }
+      const tmp = document.createElement('canvas'); tmp.width = TCP_W; tmp.height = TCP_H; tmp.getContext('2d').putImageData(img, 0, 0);
+      g.drawImage(tmp, x, y + 14, TCP_W * 3, TCP_H * 3);
+    }
+    x += TCP_W * 3 + 14;
+  }
+  y += 14 + TCP_H * 3 + 12;
+  g.fillStyle = '#ddd'; g.font = '11px monospace';
+  lineas.forEach(l => { g.fillText(l.slice(0, 150), 10, y + 11); y += 14; });
+  return cv;
+}
+
+/** Descarga la captura de diagnóstico como imagen. */
+function tcpDiagnosticoBajar(){
+  try{
+    const cv = tcpDiagnostico();
+    const a = document.createElement('a');
+    a.href = cv.toDataURL('image/png');
+    a.download = 'dubbipt-contador-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.png';
+    a.click();                                  // sin colgarlo de body: descarga igual, y no nace ninguna pantalla
+    castAviso('📷 Captura guardada · mándala para revisar la lectura');
+    return true;
+  }catch(e){
+    castAviso('❌ No se pudo guardar la captura' + ((e && e.message) ? ' · ' + e.message : ''));
+    return false;
   }
 }
 
@@ -1016,6 +1173,10 @@ function tcpMirar(){
  * cifras.
  */
 function tcpPorQueNoLee(){
+  if(tcpPorMidi()){
+    return 'Conectado a «' + MTC.puerto + '» por MIDI, pero no llega timecode · en Pro Tools: '
+         + 'Setup › Peripherals › Synchronization › MTC Generator Port, y el botón Gen MTC del transporte';
+  }
   let f = null;
   try{ f = tcpFoto(); }catch(e){ f = null; }
   if(!f) return 'No llega imagen de la pantalla compartida · vuelve a compartirla';
@@ -1082,6 +1243,8 @@ function tcpActivo(){ return !!(TCP.on && TCP.tc != null); }
  * único que queda es compartir, y en cuanto se comparte se arranca.
  */
 function tcpQueFalta(){
+  /* Por MIDI no hace falta nada más: ni compartir, ni recuadro, ni cifras. */
+  if(tcpPorMidi()) return 'listo';
   if(!TCP.video) return 'compartir';
   if(!TCP.rect) return 'marcar';
   if(tcpFaltan().length) return 'ensenar';
@@ -1215,6 +1378,11 @@ function tcpOlvidar(){
 /* ── El panel ──────────────────────────────────────────────────────────── */
 
 function tcpEstadoTexto(){
+  if(tcpPorMidi()){
+    if(!TCP.on) return 'apagado · MIDI conectado';
+    if(TCP.tc == null) return 'esperando el timecode por MIDI…';
+    return tcpTexto(tcpAhora(TCP, performance.now()), TCP.fps) + (TCP.rodando ? ' · rodando' : ' · parado') + ' · por MIDI';
+  }
   if(!TCP.video) return 'sin compartir la ventana de Pro Tools';
   if(!TCP.on) return 'apagado';
   if(TCP.tc == null) return 'esperando a leer el contador…';
@@ -1380,10 +1548,76 @@ function tcpVistaEnMarcha(ov){
   vuelta();
 }
 
+/**
+ * El bloque del MIDI en el panel: el camino bueno cuando se puede. Sin MIDI
+ * en el navegador no se enseña nada más que el porqué; con acceso, la lista
+ * de puertos y el botón de conectar; conectado, cómo va.
+ */
+function tcpPanelMidiHtml(esc2){
+  const hay = (typeof mtcDisponible === 'function') && mtcDisponible();
+  const M = (typeof MTC !== 'undefined') ? MTC : null;
+  const entradas = (M && M.acceso && typeof mtcEntradas === 'function') ? mtcEntradas() : [];
+  const guardado = (typeof mtcPuertoGuardado === 'function') ? mtcPuertoGuardado() : '';
+  const estado = (typeof mtcEstadoTexto === 'function') ? mtcEstadoTexto() : '';
+  let h = '<div class="io-tit">Por MIDI (MTC) <span style="color:#4ADE80;font-weight:400;text-transform:none;letter-spacing:0">· exacto al fotograma, con los saltos y a cualquier velocidad</span></div>';
+  h += '<div class="meta-nota">Pro Tools manda el timecode por MIDI y Dubbipt lo recibe: sin compartir pantalla ni enseñar cifras. '
+    + 'En Pro Tools: <b>Setup › Peripherals › Synchronization</b>, en <b>MTC Generator Port</b> elige el puerto, y enciende <b>Gen MTC</b> en el transporte. '
+    + 'En el mismo equipo no hace falta cable: en <b>Windows</b> instala <b>loopMIDI</b> (gratis) y crea un puerto; en <b>Mac</b> activa el <b>IAC Driver</b> en Configuración Audio MIDI.</div>';
+  if(!hay){
+    h += '<div class="meta-nota" style="color:#F59E0B">Este navegador no sabe de MIDI: hace falta Chrome o Edge.</div>';
+    return h;
+  }
+  h += '<div class="io-rej" style="margin-bottom:8px;align-items:center">';
+  if(!M || !M.acceso){
+    h += '<button class="io-b" id="tcpMidiPedir">🎹 Buscar puertos MIDI</button>';
+  }else{
+    h += '<select id="tcpMidiPuerto" style="flex:1;min-width:160px;background:#11131a;color:#e7ebf3;border:1px solid #2b3040;border-radius:9px;padding:8px 10px;font-size:13px">'
+      + (entradas.length ? '' : '<option value="">(no hay puertos MIDI)</option>')
+      + entradas.map(e => '<option value="' + esc2(e.id) + '"' + ((M.on ? M.puerto === e.nombre : guardado === e.nombre) ? ' selected' : '') + '>' + esc2(e.nombre) + '</option>').join('')
+      + '</select>'
+      + (M.on ? '<button class="io-b" id="tcpMidiSoltar">Desconectar</button>'
+              : '<button class="io-b" id="tcpMidiConectar"' + (entradas.length ? '' : ' disabled') + '>Conectar</button>');
+  }
+  h += '</div>';
+  h += '<div id="tcpMidiEstado" style="font-size:12.5px;color:' + (M && M.vivo ? '#4ADE80' : '#60A5FA') + ';margin-bottom:6px">' + esc2(estado) + '</div>';
+  return h;
+}
+
+/** Los botones del bloque del MIDI. */
+function tcpPanelMidiCablear(ov){
+  const q = (s) => ov.querySelector(s);
+  { const b = q('#tcpMidiPedir');
+    if(b) b.onclick = async () => {
+      try{ await mtcAcceso(); }
+      catch(e){ castAviso('❌ ' + ((e && e.message) || 'No se pudo acceder al MIDI')); return; }
+      /* Con el puerto de otro día enchufado, se conecta solo. */
+      if(typeof mtcEnchufado === 'function' && mtcEnchufado()) castAviso('🎹 Conectado a «' + MTC.puerto + '»');
+      tcpPanel();
+    }; }
+  { const b = q('#tcpMidiConectar');
+    if(b) b.onclick = () => {
+      const sel = q('#tcpMidiPuerto');
+      const r = mtcConectar(sel ? sel.value : '');
+      if(!r.ok){ castAviso('❌ ' + r.motivo); return; }
+      castAviso('🎹 Conectado a «' + MTC.puerto + '» · en Pro Tools, Gen MTC y play');
+      tcpPanel();
+    }; }
+  { const b = q('#tcpMidiSoltar');
+    if(b) b.onclick = () => { mtcDesconectar(); castAviso('MIDI desconectado'); tcpPanel(); }; }
+  /* El estado del MIDI se refresca solo mientras el panel está abierto. */
+  const est = q('#tcpMidiEstado');
+  if(est && typeof mtcEstadoTexto === 'function'){
+    const vuelta = () => {
+      if(!ov.isConnected) return;
+      try{ est.textContent = mtcEstadoTexto(); est.style.color = (typeof MTC !== 'undefined' && MTC.vivo) ? '#4ADE80' : '#60A5FA'; }catch(e){ /* nada */ }
+      setTimeout(vuelta, 500);
+    };
+    setTimeout(vuelta, 500);
+  }
+}
+
 function tcpPanel(){
   const viejo = document.getElementById('tcpOv'); if(viejo) viejo.remove();
-  const ov = document.createElement('div');
-  ov.id = 'tcpOv'; ov.className = 'modo-cap';
   const esc2 = (s) => (typeof esc === 'function') ? esc(String(s)) : String(s);
   const faltan = tcpFaltan();
   const q = tcpQueFalta();
@@ -1395,13 +1629,15 @@ function tcpPanel(){
     + (hecho ? ' <span style="color:#4ADE80">✓</span>' : '') + '</div>';
   const aprendiendo = !!TCP.aprendiendo;
 
-  ov.innerHTML = '<div class="modo-caja" style="max-width:600px;text-align:left">'
+  const html = '<div class="modo-caja" style="max-width:600px;text-align:left">'
     + '<div class="modo-tit">Seguir a Pro Tools</div>'
     + '<div class="modo-sub" style="margin-bottom:8px" id="tcpEstado">' + esc2(tcpEstadoTexto()) + '</div>'
     + '<div class="meta-nota">El libreto sigue al <b>contador de Pro Tools</b>, leyéndolo de una '
     +   '<b>captura de pantalla</b>: no hace falta vídeo, ni instalar nada, ni ningún cable. Hace falta '
     +   '<b>Chrome o Edge</b> y que el contador se vea en pantalla. Lo del recuadro y las cifras se hace '
     +   '<b>una sola vez</b>: los días siguientes basta con compartir.</div>'
+    + tcpPanelMidiHtml(esc2)
+    + '<div class="io-tit" style="margin-top:10px">O leyendo el contador de la pantalla</div>'
     + nPaso('compartir la pantalla', !!TCP.video)
     /* Las DOS rutas, dichas antes de elegir. El Big Counter de Pro Tools es una
        ventana flotante y el selector de Windows solo lista ventanas
@@ -1461,6 +1697,12 @@ function tcpPanel(){
           + '<button class="io-b" id="tcpCero">↺ Empezar de cero</button>'
           + '<span class="meta-nota" style="margin:0">Olvida el recuadro y las cifras aprendidas.</span>'
           + '</div>'
+          /* Para cuando «no sincroniza» y desde fuera no se ve nada: una imagen
+             con lo que ve, lo que lee y las últimas lecturas, para mandarla. */
+          + '<div class="io-rej" style="margin:4px 0 4px">'
+          + '<button class="io-b" id="tcpCaptura">📷 Guardar captura para revisar</button>'
+          + '<span class="meta-nota" style="margin:0">Una imagen con lo que ve y lo que lee. Mándala si no sincroniza.</span>'
+          + '</div>'
         : '')
     /* Arrancar es LA accion de este panel, asi que va la ultima y va destacada.
        Estaba al reves —«Cerrar» ancho y en verde, y arrancar en un boton
@@ -1471,6 +1713,11 @@ function tcpPanel(){
     +   (TCP.on ? '<button class="modo-op dud-b dud-ok" id="tcpOff">⏹ Dejar de seguir a Pro Tools</button>'
               : '<button class="modo-op dud-b dud-ok" id="tcpOn">▶ Seguir a Pro Tools</button>')
     + '</div></div>';
+  /* La pantalla se crea aquí, ya con su HTML hecho: la prueba de las
+     pantallas (EST-N3) busca la creación cerca de donde se cuelga. */
+  const ov = document.createElement('div');
+  ov.id = 'tcpOv'; ov.className = 'modo-cap';
+  ov.innerHTML = html;
   document.body.appendChild(ov);
 
   const cerrar = () => ov.remove();
@@ -1514,6 +1761,7 @@ function tcpPanel(){
   ov.querySelector('#tcpLat').onchange = (e) => {
     const v = +e.target.value; TCP.lat = isFinite(v) ? Math.max(-2, Math.min(2, v)) : 0; tcpGuardar();
   };
+  { const b = ov.querySelector('#tcpCaptura'); if(b) b.onclick = ()=> tcpDiagnosticoBajar(); }
   const cero = ov.querySelector('#tcpCero');
   if(cero) cero.onclick = async () => {
     const pregunta = '¿Empezar de cero con el contador?';
@@ -1536,11 +1784,13 @@ function tcpPanel(){
 
   const on = ov.querySelector('#tcpOn');
   if(on) on.onclick = () => {
-    if(!TCP.video){ castAviso('❌ Primero comparte la pantalla de Pro Tools'); return; }
+    if(tcpPorMidi()){ tcpEmpezarASeguir(); return; }
+    if(!TCP.video){ castAviso('❌ Primero comparte la pantalla de Pro Tools, o conecta el MIDI'); return; }
     if(!TCP.rect){ castAviso('❌ Primero marca el recuadro del contador'); return; }
     if(tcpFaltan().length === 10){ castAviso('❌ Primero enséñale las cifras'); return; }
     tcpEmpezarASeguir();
   };
+  tcpPanelMidiCablear(ov);
   const off = ov.querySelector('#tcpOff');
   if(off) off.onclick = () => { tcpParar(); castAviso('El libreto deja de seguir a Pro Tools'); tcpPanel(); };
 }
