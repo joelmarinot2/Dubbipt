@@ -28,6 +28,7 @@ saltárselas al probar significa probar otra aplicación.
 | **ENT-16** | El guardado automático (`herramientas/guardar.sh`, hook de fin de turno) **nunca commitea en `main`** y **nunca commitea con las pruebas en rojo**. Si el push falla, el commit se queda en local y se dice. | 👁 |
 | **ENT-17** | Las hojas de estilo del libreto viven dentro de **plantillas de JavaScript** (`LIB_CSS`, `LIB_OVERRIDE`, `LIB_OCU_CSS`). Un **acento grave** ahí dentro —aunque sea en un comentario de CSS— cierra la plantilla a media hoja y parte el archivo entero. El error sale en otro sitio, cien líneas más arriba. | ✅ |
 | **ENT-18** | Las **transiciones de CSS no avanzan** si la pestaña no se está pintando, igual que `requestAnimationFrame` (**ENT-N4**). Por eso el estado final se fija también en píxeles desde el código: la animación es adorno, la posición no. Costó media hora de medidas contradictorias en un panel oculto. | 👁 |
+| **ENT-19** | **Lo que el navegador reporta como error y no lo es, no se avisa.** «ResizeObserver loop completed with undelivered notifications» —y «loop limit exceeded»— es el navegador diciendo que dejó una medida para el siguiente fotograma: no rompe nada ni se pierde nada. Llegó de sala como «⚠ ResizeObserver loop… avisa al equipo técnico», que asusta y no es. Ni el avisador general ni la banda roja del libreto lo enseñan (`errorDeRuido`); todo lo demás sigue avisando. Sección 3 de `pruebas/callados.prueba.js`. | ✅ |
 
 ## Nunca
 

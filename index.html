@@ -2230,10 +2230,19 @@ function falloCopiarAPelo(txt, ok){
    Esto es lo que más cubre y lo que menos cuesta: cualquier error que se
    escape llega aquí. Antes se quedaba en la consola, que nadie mira. */
 
+/* Lo que el navegador reporta como error y no lo es. «ResizeObserver loop
+   completed with undelivered notifications» -y su hermano «loop limit
+   exceeded»- es el navegador diciendo que dejó una medida para el siguiente
+   fotograma: no rompe nada ni se pierde nada. Llegó de sala como
+   «⚠ ResizeObserver loop... avisa al equipo técnico», que asusta y no es. */
+function errorDeRuido(ev){
+  const m = String((ev && ev.message) || '');
+  return /^ResizeObserver loop/.test(m);
+}
 try{
   window.addEventListener('error', function(ev){
     try{
-      if(ev && ev.message === 'ResizeObserver loop limit exceeded') return;   // ruido del navegador
+      if(errorDeRuido(ev)) return;   // ruido del navegador, no un fallo
       const d = (ev && ev.filename ? String(ev.filename).split('/').pop() : 'la pagina')
               + (ev && ev.lineno ? (':' + ev.lineno) : '');
       fallo('sin capturar · ' + d, (ev && ev.error) || (ev && ev.message) || ev);
@@ -2354,7 +2363,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.14.0-nube';
+const APP_VER_NUM = 'v11.14.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -14191,6 +14200,7 @@ function buildLibretoDoc(pc){
   try{
     pop2.win.addEventListener('error', ev=>{
       try{
+        if(typeof errorDeRuido === 'function' && errorDeRuido(ev)) return;   // no es un fallo
         let be = d.getElementById('lErr');
         if(!be){
           be = d.createElement('div'); be.id = 'lErr';

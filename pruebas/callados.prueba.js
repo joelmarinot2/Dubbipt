@@ -72,4 +72,21 @@ exports.pruebas = function(t){
   // Si la deuda ha bajado, se dice: el tope deberia bajar con ella.
   if(r.callados < TOPE - 10)
     console.log('    · la deuda ha bajado a ' + r.callados + ': baja el TOPE en pruebas/callados.js');
+
+  t.seccion('3 · lo que el navegador reporta como error y no lo es, no se avisa');
+  /* «ResizeObserver loop completed with undelivered notifications» es el
+     navegador diciendo que dejo una medida para el siguiente fotograma: no
+     rompe nada. Llego de sala como «⚠ ResizeObserver loop... avisa al equipo
+     tecnico», que asusta y no es. */
+  const { montar } = require('./ayuda');
+  const M = montar([['/* Lo que el navegador reporta como error y no lo es.', 'try{\n  window.addEventListener(\'error\'']], ['errorDeRuido'], {});
+  t.ok('el bucle del medidor, con o sin notificaciones por entregar, es ruido',
+       M.errorDeRuido({ message: 'ResizeObserver loop completed with undelivered notifications' })
+       && M.errorDeRuido({ message: 'ResizeObserver loop limit exceeded' }));
+  t.ok('un error de verdad no lo es', !M.errorDeRuido({ message: 'Cannot read properties of null' }) && !M.errorDeRuido(null));
+  const { trozo } = require('./ayuda');
+  const dentro = trozo("pop2.win.addEventListener('error', ev=>{", 'pop2._suppressTx = performance.now() + 700;');
+  t.ok('la banda roja del libreto tambien lo deja pasar', /if\(typeof errorDeRuido === 'function' && errorDeRuido\(ev\)\) return;/.test(dentro));
+  const fuera = trozo("window.addEventListener('error', function(ev){", "fallo('sin capturar");
+  t.ok('y el avisador general', /if\(errorDeRuido\(ev\)\) return;/.test(fuera));
 };
