@@ -59,7 +59,8 @@ function logica(ana){
     ['anaEnergia', 'anaUmbral', 'anaVoces', 'anaPartir', 'anaTramos', 'anaMontar', 'anaTiempo',
      'anaNumero', 'anaSinAcotaciones', 'anaFonetica', 'anaPalabras', 'anaUnir', 'anaJuntar', 'anaCasi', 'anaOidas',
      'anaCasar', 'anaParlamento', 'anaRepartir',
-     'anaTrozos', 'anaEsGrafica', 'anaLigera', 'anaJuntarIx', 'anaDistancia', 'anaHolgura', 'ANA_GRAFICAS'],
+     'anaTrozos', 'anaEsGrafica', 'anaLigera', 'anaJuntarIx', 'anaDistancia', 'anaHolgura', 'ANA_GRAFICAS',
+     'anaNombres', 'anaNombresDe', 'anaCasiNombre'],
     { ANA: ana || REAL.ANA, karNorm: karNormReal(), console: callado });
 }
 
@@ -459,9 +460,11 @@ exports.pruebas = async function(t){
                { tcEff: 40, who: 'JORIS', key: 'JORIS', lines: ['(GRITA)'] },
                { tcEff: null, who: 'JORIS', key: 'JORIS', lines: ['sin tiempo'] }],
       karVentana: (si) => [10 * (si + 1), 10 * (si + 1) + 5], karVid: (t) => t - 5,
+      chars: [{ key: 'JORIS', display: 'Joris' }, { key: 'NARRADORA' }, null],
       anaEsGrafica: L.anaEsGrafica, console: callado });
     const vs = V.anaVentanas();
     t.eq('las gráficas no entran en el análisis', vs.map(v => v.si).join(','), '1,3');
+    t.eq('y las ventanas llevan los nombres del reparto', (vs.nombres || []).join(','), 'Joris,NARRADORA');
     t.eq('y se cuentan, para decirlo', vs.graficas, 2);
     t.eq('cada ventana lleva su timecode del libreto, para saber si son enteros', vs[0].tc, 20);
   }
@@ -482,6 +485,87 @@ exports.pruebas = async function(t){
     t.ok('solo no cuadra y dudoso cuentan como cambio',
          A.anaCuentaComoCambio('mal') && A.anaCuentaComoCambio('dudoso') && !A.anaCuentaComoCambio('leve') && !A.anaCuentaComoCambio('sin') && !A.anaCuentaComoCambio(null));
   }
+
+  t.seccion('6d · gráficas en inglés, nombres propios y lo que se cruza del vecino');
+  /* Con el informe de Akka delante: 143 «cambios» de 576, y buena parte eran
+     esto. */
+  ['GRAPHICS INSERTS', 'GRAPHICS', 'INSERT', 'PRINCIPAL PHOTOGRAPHY', 'PRINCIPAL PH OTOGRAPHY', 'TITLE CARD', 'LOWER THIRD', 'ON SCREEN TEXT', 'Credits']
+    .forEach(g => t.ok('«' + g + '» es una gráfica', L.anaEsGrafica(g)));
+  ['MALE NARRATOR', 'TARA\'S MALE GANG', 'TITLEHOLDER', 'CARTELERO', 'SUPERVISOR', 'INSERTA']
+    .forEach(g => t.ok('«' + g + '» no lo es', !L.anaEsGrafica(g)));
+  /* Los nombres: con mayúscula sin estar al principio, y los del reparto. */
+  const nn = L.anaNombres('¿Soy el padre de Kaveri, Manjaya. Umesh, estás ebrio! Que me dejes entrar, Manjaya (manyeá)! GRAPHICS no.');
+  t.eq('los nombres del texto, como suenan', [...nn].sort().join(','), [una('Kaveri'), una('Manjaya')].sort().join(','),
+       '«Umesh» va al principio de frase y no se puede saber; «GRAPHICS» no tiene minúsculas');
+  t.ok('«Soy» no es un nombre: va al principio', !nn.has(una('Soy')));
+  t.ok('una palabra en mayúsculas enteras en medio de la frase tampoco: «lo dijo el REY»', !L.anaNombres('Lo dijo el REY ayer').has(una('rey')),
+       'las mayúsculas enteras son énfasis o rótulo, no un nombre');
+  const rep = L.anaNombresDe(['Umesh', 'Subbayya Murthy', 'MALE NARRATOR', 'Akka']);
+  t.ok('los del reparto, palabra a palabra', rep.has(una('Umesh')) && rep.has(una('Subbayya')) && rep.has(una('Murthy')) && rep.has(una('Akka')));
+  t.ok('«Manjea» es Manjaya dicho como suena', L.anaCasiNombre(una('Manjaya'), una('Manjea')));
+  t.ok('«Cabel» es Kaveri', L.anaCasiNombre(una('Kaveri'), una('Cabel')));
+  t.ok('«Pernuro» y «Pernúruo» son Pernuru', L.anaCasiNombre(una('Pernuru'), una('Pernuro')) && L.anaCasiNombre(una('Pernuru'), una('Pernúruo')));
+  t.ok('pero no cualquier cosa: «Demki» no es Devaki... por una letra sí', L.anaCasiNombre(una('Devaki'), una('Demki')));
+  t.ok('«Umesh» no es «beche»', !L.anaCasiNombre(una('Umesh'), una('beche')));
+  t.ok('ni un nombre corto con dos letras de diferencia', !L.anaCasiNombre('ana', 'onas'));
+  /* Y en la comparación: el nombre casa entero, marcado como casi. */
+  const N = new Set([una('Manjaya')]);
+  const cn = L.anaCasar(L.anaPalabras('Que me dejes entrar, Manjaya'), L.anaPalabras('que me dejes entrar Manjea'), N);
+  t.eq('un nombre oído como suena no resta parecido', cn.sim, 1);
+  t.eq('ni pesa', cn.pesada + ' ' + cn.dif, '0 0');
+  t.eq('pero se marca como casi, para que se vea', cn.me, 'iiiic');
+  const sn = L.anaCasar(L.anaPalabras('Que me dejes entrar, Manjaya'), L.anaPalabras('que me dejes entrar Manjea'));
+  t.ok('sin saber que es un nombre, como antes: es un cambio', sn.sim < 1);
+  /* Lo que se cruza del vecino. */
+  const tt = (x, ti) => ({ p: una(x), t: ti, txt: x });
+  const Q2 = [tt('la', 10.2), tt('división', 10.5), tt('está', 10.9), tt('prohibida', 11.2), tt('Pon', 11.9),
+              tt('las', 12.3), tt('manos', 12.6), tt('sobre', 12.9), tt('el', 13.1), tt('coco', 13.3)];
+  const W2 = [{ si: 0, texto: 'La división está prohibida.', v0: 10, v1: 12.5 },
+              { si: 1, texto: 'Pon las manos sobre el coco.', v0: 12.5, v1: 15 }];
+  const X2 = L.anaRepartir(W2, Q2, 100, { holgura: 0.3 });
+  t.eq('el «Pon» del siguiente, dicho antes de su timecode, no se le cuelga al anterior', X2.por[0].oido, 'la división está prohibida');
+  t.eq('y cuadra', X2.por[0].sim, 1);
+  t.eq('y el siguiente se lo queda', X2.por[1].oido, 'Pon las manos sobre el coco');
+  const Q3 = [tt('sabe', 20.2), tt('cuántas', 20.5), tt('personas', 20.9), tt('saben', 21.3), tt('hacerlo', 21.6), tt('9', 22.4)];
+  const W3 = [{ si: 0, texto: '¿Sabe cuántas personas saben hacerlo?', v0: 20, v1: 23.2 }, { si: 1, texto: 'Nueve.', v0: 23.2, v1: 25 }];
+  const X3 = L.anaRepartir(W3, Q3, 100, { holgura: 0.3 });
+  t.eq('el «9» de la respuesta tampoco', X3.por[0].oido, 'sabe cuántas personas saben hacerlo');
+  t.eq('y la respuesta lo recibe aunque se dijera antes de su timecode', X3.por[1].oido, '9');
+  /* Pero una palabra que NO está en el vecino sigue siendo de este: lo
+     añadido se tiene que ver. */
+  const Q4 = [tt('la', 10.2), tt('división', 10.5), tt('está', 10.9), tt('prohibida', 11.2), tt('siempre', 11.9), tt('las', 12.6), tt('manos', 12.8)];
+  const X4 = L.anaRepartir(W2, Q4, 100, { holgura: 0.3 });
+  t.eq('una palabra de más que no es del vecino sigue siendo de este', X4.por[0].oido, 'la división está prohibida siempre');
+  /* Y una que está en los dos -«las»- es de este si cae bien dentro. */
+  const Q5 = [tt('la', 10.2), tt('división', 10.5), tt('las', 10.8), tt('está', 11.0), tt('prohibida', 11.3)];
+  const X5 = L.anaRepartir(W2, Q5, 100, { holgura: 0.3 });
+  t.ok('lo que cae en medio es de este aunque el vecino también lo diga', /las/.test(X5.por[0].oido));
+  /* Una palabra del vecino lejos del borde no se suelta: ahí es de este. */
+  const W6 = [{ si: 0, texto: 'La división está prohibida, claro.', v0: 10, v1: 16 }, { si: 1, texto: 'Pon las manos.', v0: 16, v1: 18 }];
+  const Q6 = [tt('la', 10.2), tt('división', 10.6), tt('Pon', 12.9), tt('está', 14.5), tt('prohibida', 15.0), tt('claro', 15.4)];
+  const X6 = L.anaRepartir(W6, Q6, 100, { holgura: 0.3 });
+  t.eq('una palabra del vecino dicha en medio de este es de este, y se ve como añadida', X6.por[0].oido, 'la división Pon está prohibida claro',
+       'solo se suelta lo que está a segundo y medio del borde');
+  const W6b = [{ si: 0, texto: 'La división está prohibida.', v0: 10, v1: 20 }, { si: 1, texto: 'Pon las manos.', v0: 20, v1: 22 }];
+  const Q6b = [tt('la', 10.2), tt('división', 10.6), tt('está', 11.0), tt('prohibida', 11.4), tt('Pon', 12.0)];
+  t.eq('y la última palabra, si está lejos del borde, también es de este', L.anaRepartir(W6b, Q6b, 100, { holgura: 0.3 }).por[0].oido,
+       'la división está prohibida Pon', 'un «Pon» dicho ocho segundos antes del vecino no es del vecino');
+  /* Y por el principio: la última palabra del anterior, dicha tarde. */
+  const W7 = [{ si: 0, texto: 'Esta estatua está muy bien hecha.', v0: 8, v1: 12 }, { si: 1, texto: '¡Guardias! ¡Atrápenla!', v0: 12, v1: 15 }];
+  const Q7 = [tt('esta', 8.3), tt('estatua', 8.6), tt('está', 9.0), tt('muy', 9.3), tt('bien', 9.6), tt('hecha', 12.4), tt('guardias', 12.9), tt('atrápenla', 13.4)];
+  const X7 = L.anaRepartir(W7, Q7, 100, { holgura: 0.3 });
+  t.eq('la «hecha» del anterior, dicha ya dentro del siguiente, no se le cuelga al siguiente', X7.por[1].oido, 'guardias atrápenla');
+  t.eq('y el anterior la recupera', X7.por[0].sim, 1);
+  /* Los nombres del propio texto valen sin reparto. */
+  const Q8 = [tt('que', 30.2), tt('me', 30.4), tt('dejes', 30.6), tt('entrar', 30.9), tt('Manjea', 31.3)];
+  const X8 = L.anaRepartir([{ si: 0, texto: '¡Que me dejes entrar, Manjaya!', v0: 30, v1: 33 }], Q8, 100, { holgura: 0.3 });
+  t.eq('el nombre del texto casa aunque nadie pase el reparto', X8.por[0].sim, 1);
+  /* Y los del reparto, cuando el texto no deja ver que es nombre. */
+  const Q9 = [tt('Cabel', 40.3), tt('ven', 40.6)];
+  const X9 = L.anaRepartir([{ si: 0, texto: 'Kaveri, ven.', v0: 40, v1: 42 }], Q9, 100, { holgura: 0.3, nombres: ['Kaveri'] });
+  t.eq('con el reparto, «Cabel» es Kaveri aunque vaya al principio de la frase', X9.por[0].sim, 1);
+  const X9b = L.anaRepartir([{ si: 0, texto: 'Kaveri, ven.', v0: 40, v1: 42 }], Q9, 100, { holgura: 0.3 });
+  t.ok('sin el reparto, al principio de la frase no se sabe que es un nombre', X9b.por[0].sim < 1);
 
   t.seccion('7 · lo que devuelve el reconocedor, a su sitio y limpio');
   const mapa = [{ t: 0, a: 100, d: 5 }, { t: 5.3, a: 200, d: 5 }];
@@ -811,13 +895,13 @@ exports.pruebas = async function(t){
       karIaAudio: async () => { diario.push('audio'); if(o.audioFalla) throw new Error('formato raro'); return true; },
       karIaPreparar: async () => { diario.push('preparar en la página'); return o.preparaAqui !== false; },
       anaPlan: () => ({ tramos: o.sinVoz ? [] : [{ piezas: [{ a: 0, b: 5 }], dur: 5 }], duracion: 300, voz: o.voz || 5 }),
-      anaVentanas: () => { const v = o.ventanas || [{ si: 0, texto: 'a', v0: 1, v1: 2, tc: 3601 }]; v.graficas = o.graficas || 0; return v; },
+      anaVentanas: () => { const v = o.ventanas || [{ si: 0, texto: 'a', v0: 1, v1: 2, tc: 3601 }]; v.graficas = o.graficas || 0; v.nombres = ['Kaveri']; return v; },
       anaTranscribir: o.transcribir || (async () => { diario.push('trabajadores'); return [{ items: [], mapa: [] }]; }),
       anaTranscribirAqui: async () => { diario.push('en la página'); return [{ items: [], mapa: [] }]; },
       anaOidas: () => [],
       /* La holgura, la de verdad: gruesa con los timecodes enteros. */
       anaHolgura: (tcs) => (tcs.length && tcs.every(t => t === Math.round(t))) ? 1 : 0.3,
-      anaRepartir: (v, p, d, op) => { diario.push('holgura ' + (op && op.holgura));
+      anaRepartir: (v, p, d, op) => { diario.push('holgura ' + (op && op.holgura)); diario.push('nombres ' + ((op && op.nombres) || []).join(','));
                             return { por: o.por || { 0: { sim: 1, oido: 'a' }, 1: { sim: 0.3, oido: 'b' }, 2: { sim: 0.6, oido: 'c' } },
                             fuera: o.fuera || 0, sinTexto: 0 }; },
       anaQueda: () => '',
@@ -921,6 +1005,7 @@ exports.pruebas = async function(t){
     t.eq('cuenta los que cayeron fuera del audio', r.fuera, 7);
     t.ok('con los timecodes en segundos enteros, un segundo de holgura en los bordes', X.diario.includes('holgura 1'),
          'si no, el final del parlamento de antes se colgaba de este: «hecho ¡Gordias!»');
+    t.ok('y los nombres del reparto llegan al reparto de palabras', X.diario.includes('nombres Kaveri'));
     const F = orquesta({ ventanas: [{ si: 0, texto: 'a', v0: 1, v1: 2, tc: 3601.24 }] });
     await F.M.cotejarTodo();
     t.ok('con fotogramas, la de siempre', F.diario.includes('holgura 0.3'));

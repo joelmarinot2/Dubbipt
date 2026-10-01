@@ -460,8 +460,12 @@ exports.pruebas = async function(t){
   t.eq('la casi igual, como casi, en los dos lados', camL.find(c => c.si === 5).escritoTrozos[0].m + camL.find(c => c.si === 5).oidoTrozos[0].m, 'cc');
   /* Las marcas se cuelgan de las palabras tal como están escritas: las
      acotaciones y los signos no se compararon y van sin marca. */
-  t.eq('las acotaciones van sin marca y no descolocan las demás',
-       JSON.stringify(C.qcTrozosEscrito('(JADEA) ¿Tú? Bueno.', 'fi')), '[{"t":"(JADEA)","m":""},{"t":"¿Tú?","m":"f"},{"t":"Bueno.","m":""}]');
+  t.eq('las acotaciones no se enseñan y no descolocan las marcas de las demás',
+       JSON.stringify(C.qcTrozosEscrito('(JADEA) ¿Tú? Bueno.', 'fi')), '[{"t":"¿Tú?","m":"f"},{"t":"Bueno.","m":""}]',
+       'pedido de sala: obviar todo lo que esté entre paréntesis, también la pronunciación «(pernúru)»');
+  t.ok('y lo escrito llano va también sin ellas',
+       /const escrito = \(\(typeof anaSinAcotaciones === 'function'\) \? anaSinAcotaciones\(crudo\) : crudo\)/.test(TODO)
+       && /escritoTrozos: qcTrozosEscrito\(crudo, av\.me\),/.test(TODO));
   t.eq('un número que son varias palabras se lleva la peor de sus marcas',
        JSON.stringify(C.qcTrozosEscrito('Son 1.500', 'iif')), '[{"t":"Son","m":""},{"t":"1.500","m":"f"}]');
   t.eq('si el texto ya no es el que se analizó, sin marcas', C.qcTrozosEscrito('Otra frase distinta', 'fi'), null,

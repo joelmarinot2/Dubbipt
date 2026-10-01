@@ -2363,7 +2363,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.16.0-nube';
+const APP_VER_NUM = 'v11.17.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5516,6 +5516,10 @@ function qcTrozosEscrito(texto, me){
   for(const t of trozos){
     let m = '';
     for(let i = 0; i < t.p.length; i++){ const x = marcas[k++]; m = peor(m, x === 'i' ? '' : x); }
+    /* Las acotaciones -«(RÍE)», la pronunciación «(pernúru)»- no se comparan
+       y no se enseñan: pedido de sala, «obviar todo lo que esté entre
+       paréntesis». En el libreto siguen; aquí solo estorban. */
+    if(t.acot) continue;
     out.push({ t: t.txt, m: m });
   }
   return out;
@@ -5556,14 +5560,16 @@ function qcCambiosLista(){
     if(!av) continue;                                  // cuadra, o no se cotejó
     const quien = (b.key && charIdx && charIdx[b.key] && charIdx[b.key].display)
                     ? charIdx[b.key].display : (b.display || '');
-    const escrito = (b.lines || []).join(' ').replace(/\s+/g, ' ').trim();
+    /* Sin las acotaciones: no se comparan y en el informe solo estorban. */
+    const crudo = (b.lines || []).join(' ');
+    const escrito = ((typeof anaSinAcotaciones === 'function') ? anaSinAcotaciones(crudo) : crudo).replace(/\s+/g, ' ').trim();
     const oido = String(av.oido || '').trim();
     fuera.push({ si: si,
                  tcSec: (b.tcEff != null ? +b.tcEff : null),
                  quien: quien,
                  escrito: escrito,
                  oido: oido,
-                 escritoTrozos: qcTrozosEscrito(escrito, av.me),
+                 escritoTrozos: qcTrozosEscrito(crudo, av.me),
                  oidoTrozos: qcTrozosOido(oido, av.mo),
                  sim: +av.sim,
                  nivel: av.nivel,                       // 'mal' | 'dudoso' | 'leve' | 'sin'

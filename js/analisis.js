@@ -50,6 +50,7 @@ const ANA = {
   holgura: 0.3,     // lo que no se fía uno de los bordes de esa ventana
   holguraGruesa: 1, // ...y con los timecodes en segundos enteros, que pueden ir un segundo largos
   corto: 3,         // un parlamento de estas palabras o menos es «muy corto»: casi no se oye
+  cruce: 1.5,       // hasta dónde, desde el borde, una palabra del vecino puede haberse colado
   acotacion: 6,     // palabras que puede durar un paréntesis sin cerrar
   casi: 0.5,        // lo que cuenta una palabra casi igual: una letra de más o de menos
   trabajadores: 4,  // como mucho, por muchos núcleos que haya
@@ -471,12 +472,64 @@ function anaPalabras(texto){
  */
 const ANA_GRAFICAS = ['TEXTO', 'GRAFICA', 'GRAFICAS', 'GRAFICO', 'INSERTO', 'INSERTOS', 'CARTEL', 'CARTELES',
                       'LETRERO', 'LETREROS', 'ROTULO', 'ROTULOS', 'TITULO', 'TITULOS', 'SUBTITULO', 'SUBTITULOS',
-                      'PANTALLA', 'TEXTO EN PANTALLA', 'CREDITOS'];
+                      'PANTALLA', 'TEXTO EN PANTALLA', 'CREDITOS',
+                      /* Y en inglés, que los libretos de las plataformas vienen así. Visto en
+                         Akka: «GRAPHICS INSERTS», «PRINCIPAL PHOTOGRAPHY». */
+                      'GRAPHICS', 'GRAPHIC', 'INSERT', 'INSERTS', 'PRINCIPAL PHOTOGRAPHY', 'TITLE', 'TITLES',
+                      'TITLE CARD', 'CAPTION', 'CAPTIONS', 'SUPER', 'SUPERS', 'LOWER THIRD', 'ON SCREEN TEXT',
+                      'ONSCREEN TEXT', 'TEXT ON SCREEN', 'CHYRON', 'CREDITS', 'OPENING CREDITS', 'END CREDITS',
+                      'LETTERING', 'BURN IN', 'BURN INS', 'LOCATION CARD'];
 function anaEsGrafica(nombre){
   const n = String(nombre == null ? '' : nombre).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
   if(!n) return false;
-  return ANA_GRAFICAS.some(g => n === g || n.indexOf(g + ' ') === 0);
+  /* Sin espacios también: en el PDF del informe salía «PRINCIPAL PH OTOGRAPHY»
+     partido, y un nombre así puede venir partido también en el libreto. */
+  const sin = n.replace(/ /g, '');
+  return ANA_GRAFICAS.some(g => n === g || n.indexOf(g + ' ') === 0 || sin === g.replace(/ /g, ''));
+}
+
+/*
+ * Los NOMBRES PROPIOS: el reconocedor los escribe como le suenan -«Manjea»
+ * por Manjaya, «Cabel» por Kaveri, «Pernuro» por Pernuru, visto en Akka- y un
+ * nombre mal oído no es un cambio: el actor no cambia los nombres. Se les da
+ * más manga que a las demás palabras. Un nombre es una palabra que empieza
+ * por mayúscula sin estar al principio de una frase, más los nombres de los
+ * personajes del reparto, que llegan de fuera.
+ */
+function anaNombres(texto){
+  const out = new Set();
+  const trozos = anaTrozos(texto);
+  let inicio = true;
+  for(const t of trozos){
+    if(t.acot) continue;
+    const limpio = t.txt.replace(/^[^\p{L}\p{N}]+/u, '');
+    if(!t.p.length){ if(/[.!?…:]/.test(t.txt)) inicio = true; continue; }
+    /* Con mayúscula inicial y alguna minúscula: «Manjaya» sí, «GRAPHICS» no. */
+    const letras = limpio.replace(/[^\p{L}]/gu, '');
+    const mayus = /^\p{Lu}/u.test(letras) && /\p{Ll}/u.test(letras);
+    if(mayus && !inicio) t.p.forEach(p => out.add(p));
+    inicio = /[.!?…:]\W*$/u.test(t.txt);
+  }
+  return out;
+}
+
+/** Los nombres del reparto, listos para comparar: cada palabra de cada nombre. */
+function anaNombresDe(lista){
+  const out = new Set();
+  (lista || []).forEach(n => anaPalabras(String(n == null ? '' : n)).forEach(p => { if(p.length >= 3) out.add(p); }));
+  return out;
+}
+
+/** Si lo oído es un nombre escrito como suena: hasta una letra distinta en
+    uno de tres, dos en uno de cinco, tres en uno de ocho. */
+function anaCasiNombre(x, y){
+  x = x || ''; y = y || '';
+  if(x === y) return true;
+  const c = Math.min(x.length, y.length);
+  if(c < 3) return false;
+  const tope = c >= 8 ? 3 : (c >= 5 ? 2 : 1);
+  return anaDistancia(x, y, tope) <= tope;
 }
 
 /*
@@ -682,7 +735,7 @@ function anaOidas(items, mapa){
  * iguales a media. Es lo que decide si se avisa —«una palabra distinta» se
  * entiende; un 88 % no—.
  */
-function anaCasar(a0, b0){
+function anaCasar(a0, b0, nombres){
   a0 = a0 || []; b0 = b0 || [];
   const [ta, tb] = anaJuntarIx(a0, b0);
   const a = ta.map(t => t.p), b = tb.map(t => t.p);
@@ -705,8 +758,12 @@ function anaCasar(a0, b0){
   const at = (i, j) => i * (n + 1) + j;
   for(let i = 1; i <= m; i++){
     for(let j = 1; j <= n; j++){
-      const e = (a[i - 1] === b[j - 1]) ? 1 : (anaCasi(a[i - 1], b[j - 1]) ? ANA.casi : 0);
-      E[at(i, j)] = e === 1 ? 1 : (e ? 2 : 0);
+      let e = (a[i - 1] === b[j - 1]) ? 1 : (anaCasi(a[i - 1], b[j - 1]) ? ANA.casi : 0);
+      let k = e === 1 ? 1 : (e ? 2 : 0);
+      /* Un nombre oído como suena casa ENTERO, y se marca como casi para que se
+         vea: no es un cambio, pero quien lee sabe que ahí el reconocedor dudó. */
+      if(e < 1 && nombres && nombres.has(a[i - 1]) && anaCasiNombre(a[i - 1], b[j - 1])){ e = 1; k = 3; }
+      E[at(i, j)] = k;
       T[at(i, j)] = Math.max(T[at(i - 1, j)], T[at(i, j - 1)], e ? T[at(i - 1, j - 1)] + e : 0);
     }
   }
@@ -715,7 +772,7 @@ function anaCasar(a0, b0){
   let i = m, j = n;
   while(i > 0 && j > 0){
     const e = E[at(i, j)];
-    const diag = e ? T[at(i - 1, j - 1)] + (e === 1 ? 1 : ANA.casi) : -1;
+    const diag = e ? T[at(i - 1, j - 1)] + (e === 2 ? ANA.casi : 1) : -1;
     if(e && Math.abs(T[at(i, j)] - diag) < 1e-9){
       const k = e === 1 ? 'i' : 'c';
       ta[i - 1].ix.forEach(x => { me[x] = k; });
@@ -743,7 +800,7 @@ function anaCasar(a0, b0){
  *     dicho un poco tarde, o el principio del siguiente.
  * De todos los repartos posibles se queda el que más se parece.
  */
-function anaParlamento(escritas, v0, v1, oidas, holgura){
+function anaParlamento(escritas, v0, v1, oidas, holgura, vecinas, nombres){
   const H = (holgura != null && isFinite(+holgura)) ? +holgura : ANA.holgura;
   let c0 = -1, c1 = -1, m0 = -1, m1 = -1;
   for(let i = 0; i < oidas.length; i++){
@@ -754,6 +811,21 @@ function anaParlamento(escritas, v0, v1, oidas, holgura){
     c1 = i + 1;
     if(t >= v0 + H && t <= v1 - H){ if(m0 < 0) m0 = i; m1 = i + 1; }
   }
+  /* Lo que se cruza desde el vecino. Una palabra pegada a un borde que NO es
+     de este parlamento pero SÍ del de al lado -el «Pon» de «Pon las manos»
+     colado al final del anterior, el «9» de la respuesta- no se le obliga a
+     este: se deja fuera de lo forzado, y el reparto la deja al vecino si así
+     casa mejor. Pedido de sala: «predecir las palabras que se cruzan que no
+     hacen parte del personaje». */
+  if(m0 >= 0 && vecinas && vecinas.size){
+    /* También si la palabra es de este: soltarla no la quita si casa -el
+       reparto se queda con lo que casa- y sí quita el «el» de más cuando este
+       ya tenía el suyo. */
+    const cruce = (i) => vecinas.has(oidas[i].p);
+    while(m0 < m1 && oidas[m0].t < v0 + ANA.cruce && cruce(m0)) m0++;
+    while(m1 > m0 && oidas[m1 - 1].t > v1 - ANA.cruce && cruce(m1 - 1)) m1--;
+    if(m0 >= m1){ m0 = -1; m1 = -1; }
+  }
   if(c0 < 0) return { sim: 0, oido: '', n: 0, dif: escritas.length, me: 'f'.repeat(escritas.length), mo: '',
                       pesada: escritas.filter(p => !anaLigera(p)).length };
 
@@ -761,7 +833,7 @@ function anaParlamento(escritas, v0, v1, oidas, holgura){
   const probar = (i0, i1) => {
     const trozo = [];
     for(let i = i0; i < i1; i++) trozo.push(oidas[i].p);
-    const c = anaCasar(escritas, trozo);
+    const c = anaCasar(escritas, trozo, nombres);
     /* A igual parecido, el que más palabras casa; y a igual también, el más
        corto, que es el que menos le quita a los vecinos. */
     if(!mejor || c.sim > mejor.sim + 1e-9
@@ -802,12 +874,22 @@ function anaRepartir(ventanas, oidas, duracion, opts){
   const lista = (oidas || []).slice().sort((a, b) => a.t - b.t);
   const por = {};
   let fuera = 0, sinTexto = 0;
-  for(const v of (ventanas || [])){
-    if(!v || !isFinite(+v.v0) || !isFinite(+v.v1)) continue;
+  const vs = (ventanas || []).filter(v => v && isFinite(+v.v0) && isFinite(+v.v1));
+  /* Las palabras de cada ventana, una vez; y los nombres del reparto. */
+  const escritasDe = vs.map(v => anaPalabras(v.texto));
+  const reparto = anaNombresDe(opts.nombres);
+  for(let k = 0; k < vs.length; k++){
+    const v = vs[k];
     if(v.v1 <= 0 || v.v0 >= duracion){ fuera++; continue; }
-    const escritas = anaPalabras(v.texto);
+    const escritas = escritasDe[k];
     if(!escritas.length){ sinTexto++; continue; }
-    const r = anaParlamento(escritas, +v.v0, +v.v1, lista, opts.holgura);
+    /* Lo que dicen los de al lado, para no colgarle a este lo que es suyo. */
+    const vecinas = new Set();
+    if(k > 0) escritasDe[k - 1].forEach(p => vecinas.add(p));
+    if(k + 1 < vs.length) escritasDe[k + 1].forEach(p => vecinas.add(p));
+    const nombres = new Set(reparto);
+    anaNombres(v.texto).forEach(p => nombres.add(p));
+    const r = anaParlamento(escritas, +v.v0, +v.v1, lista, opts.holgura, vecinas, nombres);
     const o = { sim: +r.sim.toFixed(3), dif: +(+r.dif || 0).toFixed(1), oido: String(r.oido || '').slice(0, 300),
                 n: r.n, pesada: r.pesada, me: r.me, mo: r.mo };
     /* Muy corto: tres palabras dichas o menos. Se apunta, que de eso depende
@@ -1105,6 +1187,10 @@ async function anaTranscribirAqui(pcm, tramos, o){
 function anaVentanas(){
   const out = [];
   out.graficas = 0;
+  /* Los nombres del reparto: cada personaje del libreto. */
+  out.nombres = [];
+  try{ (typeof chars !== 'undefined' && Array.isArray(chars) ? chars : []).forEach(c => { if(c && (c.display || c.key)) out.nombres.push(c.display || c.key); }); }
+  catch(e){ /* sin reparto, los nombres salen solo del texto */ }
   for(let si = 0; si < script.length; si++){
     const b = script[si];
     if(!b || b.tcEff == null) continue;

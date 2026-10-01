@@ -414,7 +414,7 @@ async function cotejarTodo(){
     oidos.forEach(h => anaOidas(h.items, h.mapa).forEach(p => palabras.push(p)));
     /* Con los timecodes en segundos enteros, un segundo de holgura en los
        bordes: si no, el final del parlamento de antes se colgaba de este. */
-    const r = anaRepartir(ventanas, palabras, plan.duracion, { holgura: anaHolgura(ventanas.map(v => v.tc)) });
+    const r = anaRepartir(ventanas, palabras, plan.duracion, { holgura: anaHolgura(ventanas.map(v => v.tc)), nombres: ventanas.nombres || [] });
     let mal = 0, dudosos = 0, leves = 0, sin = 0, hechos = 0;
     for(const si in r.por){
       /* Cada resultado dice con qué oído se midió: de eso depende desde cuándo
