@@ -477,12 +477,56 @@ exports.pruebas = async function(t){
   t.eq('sin gráficas en este libreto', C.qcGraficasCuenta(), 0);
   t.ok('el panel enseña los leves y los sin comprobar plegados, aparte de los cambios',
        /<details class="qc-grupo"><summary>' \+ levesL\.length/.test(TODO) && /<details class="qc-grupo"><summary>' \+ sinL\.length/.test(TODO)
-       && /\+ \(cambios\.length \? cambios\.map\(item\)\.join\(''\)/.test(TODO),
+       && /cambios\.map\(\(c, i\) => item\(c, i \+ 1\)\)\.join\(''\)/.test(TODO),
        'la lista de arriba son solo los cambios: los leves no se mezclan con ellos');
   t.ok('y explica las marcas', /<mark class="qc-falta">Tachado<\/mark>, lo escrito que no se oyó; <mark class="qc-sobra">naranja<\/mark>/.test(TODO));
   t.ok('al volver de la nube, las marcas y lo que decide el nivel vuelven con el resultado',
        /if\(typeof r\.me === 'string' && \/\^\[icfs\]\*\$\/\.test\(r\.me\)\) c\.me = r\.me;/.test(TODO)
        && /if\(r\.corto === true\) c\.corto = true;/.test(TODO));
+
+  t.seccion('12g3 · los cambios por importancia, y de cada uno qué tipo es');
+  /* Pedido de sala: «que el reporte coloque en orden de prioridad al
+     principio y que en algún punto se vea qué tipo de cambios son». */
+  const C3 = montar([['/* ── 0 · Con qué se escucha', '/* ── 1 · Dónde hay voz'],
+                     ['/* ── 3 · Las palabras', '/* ── 5 · El reparto del trabajo'],
+                     ['/* Desde cuánto parecido se avisa.', '/** El tiempo que ha tardado'],
+                     ['/* ═══ QC · LOS DIÁLOGOS QUE CAMBIARON', '/** El panel con la lista']],
+                    ['qcCambiosLista', 'qcPorPrioridad', 'qcTiposResumen'],
+                    { window: w, esc: (x) => String(x).replace(/</g, '&lt;'), karNorm: karNormReal(), ANA: { acotacion: 6, casi: 0.5 },
+                      script: [ { tcEff: 3700, key: 'A', lines: ['Hola amigo mío.'] },
+                                { tcEff: 3650, key: 'B', lines: ['Adiós amigo'] },
+                                { tcEff: 3600, key: 'A', lines: ['Regular'] },
+                                { tcEff: 3900, key: 'C', lines: ['Si todo va bien, en unos diez días.'] } ],
+                      charIdx: { A: { display: 'ANA' }, B: { display: 'BETO' } },
+                      console: { warn: () => {}, log: () => {} } });
+  w._cotejo = { 0: { sim: 0.6, dif: 1, pesada: 1, pf: 1, ps: 0, n: 2, o: 'fiel', oido: 'hola amigo', me: 'iif', mo: 'ii' },   // una palabra de menos
+                1: { sim: 0.0, dif: 2, pesada: 4, pf: 2, ps: 2, n: 2, o: 'fiel', oido: 'otra cosa', me: 'ff', mo: 'ss' },   // otra frase
+                2: { sim: 0.0, dif: 1, pesada: 1, pf: 1, ps: 0, n: 0, o: 'fiel', oido: '', me: 'f', mo: '' },              // no se oye
+                3: { sim: 0.9, dif: 1, pesada: 0, pf: 0, ps: 0, n: 9, o: 'fiel', oido: 'pues si todo va bien en unos diez días', me: 'iiiiiiii', mo: 'siiiiiiii' } }; // leve
+  const camT = C3.qcCambiosLista();
+  t.eq('la lista sigue por tiempo, con su nivel', camT.map(c => c.si + ':' + c.nivel).join(','), '2:mal,1:mal,0:dudoso,3:leve');
+  t.eq('y cada uno dice qué tipo de cambio es', camT.map(c => c.si + ':' + c.tipo).join(','),
+       '2:no se oye,1:otra frase,0:una palabra de menos,3:conectores de más o de menos');
+  t.eq('con su grupo y su prioridad', camT.map(c => c.tipoG + '/' + c.prioridad).join(','), 'no se oye/95,otra frase/109,palabras de menos/65,conectores/8');
+  const porImp = C3.qcPorPrioridad(camT.filter(c => c.nivel === 'mal' || c.nivel === 'dudoso'));
+  t.eq('por importancia: otra frase, no se oye, una palabra de menos', porImp.map(c => c.si).join(','), '1,2,0');
+  t.eq('a igual prioridad, el que menos se parece; a igual todo, por tiempo',
+       C3.qcPorPrioridad([{ prioridad: 5, sim: 0.6, tcSec: 1, si: 0 }, { prioridad: 5, sim: 0.3, tcSec: 2, si: 1 }, { prioridad: 9, sim: 0.9, tcSec: 3, si: 2 },
+                          { prioridad: 5, sim: 0.3, tcSec: 0, si: 3 }]).map(c => c.si).join(','), '2,3,1,0');
+  t.eq('sin prioridad -un análisis de antes-, por lo que se parece y por tiempo',
+       C3.qcPorPrioridad([{ sim: 0.5, tcSec: 2, si: 0 }, { sim: 0.5, tcSec: 1, si: 1 }, { sim: 0.1, tcSec: 9, si: 2 }]).map(c => c.si).join(','), '2,1,0');
+  t.eq('el resumen cuenta por grupo, el más frecuente primero', C3.qcTiposResumen(porImp.concat([{ tipo: '2 palabras de menos', tipoG: 'palabras de menos' }])),
+       '2 palabras de menos · 1 otra frase · 1 no se oye');
+  t.eq('y sin tipos no dice nada', C3.qcTiposResumen([{ sim: 0.3 }]), '');
+  t.ok('el panel lista los cambios por importancia, numerados, con el resumen arriba y el tipo en cada uno',
+       /const cambios = qcPorPrioridad\(l\.filter\(c => c\.nivel === 'mal' \|\| c\.nivel === 'dudoso'\)\);/.test(TODO)
+       && /<div class="qc-orden">Por importancia' \+ \(qcTiposResumen\(cambios\) \? ' · ' \+ esc\(qcTiposResumen\(cambios\)\) : ''\)/.test(TODO)
+       && /<span class="qc-num">' \+ num \+ '<\/span>/.test(TODO)
+       && /\(c\.tipo \? '<span class="qc-que">' \+ esc\(c\.tipo\) \+ '<\/span>' : ''\)/.test(TODO));
+  t.ok('los leves y los sin comprobar siguen por tiempo', /const levesL = l\.filter\(c => c\.nivel === 'leve'\);/.test(TODO) && /const sinL = l\.filter\(c => c\.nivel === 'sin'\);/.test(TODO));
+  t.ok('el aviso pide el tipo con el mismo umbral desde el que no cuadra', /anaTipo\(r, COTEJO_MAL\)/.test(TODO),
+       'si no, un cambio de umbral los descolocaría: «otra frase» para el tipo y «dudoso» para el aviso');
+  t.ok('al volver de la nube, las dos cuentas vuelven con el resultado', /if\(isFinite\(\+r\.pf\) && \+r\.pf >= 0\) c\.pf = \+r\.pf;/.test(TODO) && /if\(isFinite\(\+r\.ps\) && \+r\.ps >= 0\) c\.ps = \+r\.ps;/.test(TODO));
 
   t.seccion('12h · nada se apunta solo como corrección');
   /* QC-2: el reconocedor señala; quien firma es una persona. Desde la lista

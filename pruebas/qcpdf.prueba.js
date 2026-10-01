@@ -572,6 +572,31 @@ exports.pruebas = function(t){
   t.cerca('y justo la de sus renglones, medidos palabra a palabra', altoLargo, 2.6 + renglones * (D.QCPDF_PASOS[0].fuente * 0.41), 1e-9,
           'medida como texto salía otra cosa: los trozos no son un texto');
 
+  t.seccion('18f · el informe por importancia, y en cada cambio qué tipo es');
+  /* Pedido de sala: «que el reporte coloque en orden de prioridad al
+     principio y que en algún punto se vea qué tipo de cambios son». */
+  const porImp = M.qcpdfDeCambios([
+    { tcSec: 10, quien: 'A', escrito: 'Vale', oido: 'vale no', sim: 0.5, nivel: 'dudoso', et: 'dudoso', tipo: 'una palabra de más', tipoG: 'palabras de más', prioridad: 60 },
+    { tcSec: 20, quien: 'B', escrito: 'Adiós amigo', oido: 'otra cosa', sim: 0, nivel: 'mal', et: 'no cuadra', tipo: 'otra frase', tipoG: 'otra frase', prioridad: 109 },
+    { tcSec: 30, quien: 'C', escrito: 'Regular', oido: '', sim: 0, nivel: 'mal', et: 'no cuadra', tipo: 'no se oye', tipoG: 'no se oye', prioridad: 95 },
+    { tcSec: 40, quien: 'D', escrito: 'Hola', oido: 'hola pues', sim: 0.9, nivel: 'leve', et: 'leve', tipo: 'conectores de más o de menos', tipoG: 'conectores', prioridad: 8 },
+    { tcSec: 50, quien: 'E', escrito: 'Sí señor', oido: 'otra cosa más', sim: 0, nivel: 'mal', et: 'no cuadra', tipo: 'otra frase', tipoG: 'otra frase', prioridad: 109 }
+  ], { analizados: 10 });
+  const ordenImp = porImp.filas.map(f => f.grupo ? '[' + f.grupo.split(' ·')[0] + ']' : f[1]);
+  t.eq('primero un rótulo con el resumen, y los cambios de más a menos importantes, no por tiempo', ordenImp.join(' '), '[Por importancia] B E C A [Cambios leves] D');
+  t.eq('el rótulo dice cuántos de cada tipo', porImp.filas[0].grupo, 'Por importancia · 2 otra frase · 1 no se oye · 1 palabras de más');
+  t.eq('y en cada cambio, debajo del veredicto, qué tipo es', porImp.filas[1][4], '0 % · no cuadra\notra frase');
+  t.eq('el leve también lo dice', porImp.filas[porImp.filas.length - 1][4], '90 % · leve\nconectores de más o de menos');
+  t.eq('el conteo no cuenta el rótulo', porImp.conteo, '4 cambios de 10 parlamentos');
+  const deAntes = M.qcpdfDeCambios([{ tcSec: 1, quien: 'X', escrito: 'a', oido: 'b', sim: 0.6, nivel: 'dudoso', et: 'dudoso' },
+                                    { tcSec: 2, quien: 'Y', escrito: 'a', oido: 'b', sim: 0.1, nivel: 'mal', et: 'no cuadra' }], {});
+  t.eq('un informe de antes, sin tipos: sin rótulo, y el orden por lo que se parece', deAntes.filas.map(f => f.grupo ? '[g]' : f[1]).join(''), 'YX');
+  t.eq('y el veredicto en una sola línea', deAntes.filas[0][4], '10 % · no cuadra');
+  const dImp = pintado();
+  D.qcpdfPintar(dImp, porImp, D.QCPDF_PASOS[0], false);
+  t.ok('en la hoja, el rótulo y el tipo bajo el veredicto', dImp.textos.some(x => /^Por importancia/.test(x.s)) && dImp.textos.some(x => x.s === 'otra frase'),
+       dImp.textos.map(x => x.s).filter(x => /import|frase/.test(x)).join(' | '));
+
   t.seccion('19 · la hoja es A4 y el último paso no baja de 7,5 pt');
   t.eq('ancho A4', M.QCPDF_HOJA.w, 210);
   t.eq('alto A4', M.QCPDF_HOJA.h, 297);

@@ -2363,7 +2363,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.17.0-nube';
+const APP_VER_NUM = 'v11.18.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -5573,13 +5573,36 @@ function qcCambiosLista(){
                  oidoTrozos: qcTrozosOido(oido, av.mo),
                  sim: +av.sim,
                  nivel: av.nivel,                       // 'mal' | 'dudoso' | 'leve' | 'sin'
-                 et: av.et });                          // 'no cuadra' | 'dudoso' | 'leve' | 'sin comprobar'
+                 et: av.et,                             // 'no cuadra' | 'dudoso' | 'leve' | 'sin comprobar'
+                 /* Qué tipo de cambio es y cuánto importa: para decirlo y para ordenar. */
+                 tipo: (av.tipo && av.tipo.et) || '',
+                 tipoK: (av.tipo && av.tipo.k) || '',
+                 tipoG: (av.tipo && av.tipo.grupo) || '',
+                 prioridad: (av.tipo && isFinite(+av.tipo.prioridad)) ? +av.tipo.prioridad : 0 });
   }
   fuera.sort((a, b) => {
     const A = a.tcSec == null ? Infinity : a.tcSec, B = b.tcSec == null ? Infinity : b.tcSec;
     return A === B ? a.si - b.si : (A < B ? -1 : 1);
   });
   return fuera;
+}
+
+/** Los cambios de más a menos importantes: por prioridad, a igual prioridad el
+    que menos se parece, y a igual todo, por tiempo. Pedido de sala: «que el
+    reporte coloque en orden de prioridad al principio». */
+function qcPorPrioridad(lista){
+  return (lista || []).slice().sort((a, b) =>
+    ((+b.prioridad || 0) - (+a.prioridad || 0)) || ((+a.sim || 0) - (+b.sim || 0))
+    || ((a.tcSec == null ? Infinity : a.tcSec) - (b.tcSec == null ? Infinity : b.tcSec)) || (a.si - b.si));
+}
+
+/** Cuántos de cada tipo, dicho como se dice: «12 otra frase · 8 no se oye…».
+    Por el grupo -«palabras de menos»-, no por la etiqueta de cada uno -«una
+    palabra de menos», «2 palabras de menos»-, que partiría la cuenta. */
+function qcTiposResumen(lista){
+  const cuenta = new Map();
+  (lista || []).forEach(c => { const k = c.tipoG || c.tipo; if(k) cuenta.set(k, (cuenta.get(k) || 0) + 1); });
+  return [...cuenta.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => n + ' ' + k).join(' · ');
 }
 
 /** Cuántos de cada, para las pastillas. `total` son los que CUENTAN como
@@ -5608,14 +5631,16 @@ function qcCambiosPanel(){
   const hayCotejo = !!(window._cotejo && Object.keys(window._cotejo).length);
   const pct = (s)=> Math.round((+s || 0) * 100) + ' %';
   const graficas = hayCotejo ? qcGraficasCuenta() : 0;
-  const cambios = l.filter(c => c.nivel === 'mal' || c.nivel === 'dudoso');
+  /* Los cambios, de más a menos importantes; los que no cuentan, por tiempo. */
+  const cambios = qcPorPrioridad(l.filter(c => c.nivel === 'mal' || c.nivel === 'dudoso'));
   const levesL = l.filter(c => c.nivel === 'leve');
   const sinL = l.filter(c => c.nivel === 'sin');
   const colorDe = { mal: '#F87171', dudoso: '#FBBF24', leve: '#60A5FA', sin: '#94A3B8' };
-  const item = (c) =>
+  const item = (c, num) =>
             '<div class="qc-it"><div class="qc-cu">'
-            + '<div class="qc-m"><b class="qc-tc">' + esc(qcTC(c.tcSec)) + '</b>'
+            + '<div class="qc-m">' + (num ? '<span class="qc-num">' + num + '</span>' : '') + '<b class="qc-tc">' + esc(qcTC(c.tcSec)) + '</b>'
               + (c.quien ? '<span class="qc-q">' + esc(c.quien) + '</span>' : '')
+              + (c.tipo ? '<span class="qc-que">' + esc(c.tipo) + '</span>' : '')
               + '<span class="qc-tipo" style="color:' + (colorDe[c.nivel] || '#FBBF24') + '">'
                 + esc(c.et) + ' · ' + pct(c.sim) + '</span></div>'
             + '<div class="qc-t"><span class="qc-lab">Escrito</span>' + qcTrozosHtml(c.escritoTrozos, c.escrito) + '</div>'
@@ -5644,7 +5669,10 @@ function qcCambiosPanel(){
         : '')
     + (l.length
         ? '<div class="qc-lista">'
-            + (cambios.length ? cambios.map(item).join('') : '<div class="qc-vacio">Ningún cambio de peso.</div>')
+            + (cambios.length
+                ? '<div class="qc-orden">Por importancia' + (qcTiposResumen(cambios) ? ' · ' + esc(qcTiposResumen(cambios)) : '') + '</div>'
+                  + cambios.map((c, i) => item(c, i + 1)).join('')
+                : '<div class="qc-vacio">Ningún cambio de peso.</div>')
             /* Los que no cuentan, aparte y plegados: se ven si se quiere. */
             + (levesL.length
                 ? '<details class="qc-grupo"><summary>' + levesL.length + ' cambio' + (levesL.length === 1 ? '' : 's')
@@ -11793,6 +11821,8 @@ function hydrateEpisode(d){ _epOpen(true);
       if(typeof r.me === 'string' && /^[icfs]*$/.test(r.me)) c.me = r.me;
       if(typeof r.mo === 'string' && /^[icfs]*$/.test(r.mo)) c.mo = r.mo;
       if(isFinite(+r.pesada) && +r.pesada >= 0) c.pesada = +r.pesada;
+      if(isFinite(+r.pf) && +r.pf >= 0) c.pf = +r.pf;
+      if(isFinite(+r.ps) && +r.ps >= 0) c.ps = +r.ps;
       if(isFinite(+r.n) && +r.n >= 0) c.n = +r.n;
       if(r.corto === true) c.corto = true;
       window._cotejo[k] = c;
@@ -13764,6 +13794,10 @@ mark.qc-casi{background:transparent;color:#FB923C;text-decoration:underline dott
 /* Los grupos que no cuentan -leves, sin comprobar- van plegados. */
 .qc-grupo{margin-top:10px;border-top:1px solid var(--card-b);padding-top:6px}
 .qc-grupo summary{font-size:11.5px;color:var(--dim);cursor:pointer;padding:4px 0 8px}
+/* El orden y el tipo de cada cambio. */
+.qc-orden{font-size:11.5px;color:var(--dim);margin:0 0 8px}
+.qc-num{display:inline-block;min-width:18px;font-size:11px;font-weight:800;color:var(--dim);margin-right:6px}
+.qc-que{font-size:11px;color:var(--ink);background:var(--card);border:1px solid var(--card-b);border-radius:999px;padding:1px 8px;margin-left:6px}
 .qc-lab{display:inline-block;font-size:9.5px;letter-spacing:.7px;text-transform:uppercase;
   color:var(--dim);font-weight:700;min-width:52px}
 .qc-oido{color:#FBBF24}

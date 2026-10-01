@@ -282,7 +282,8 @@ function cotejoAviso(si){
   const r = cotejoDe(si);
   if(!r) return null;
   const nivel = anaAviso(r, COTEJO_MAL, COTEJO_DUDOSO);
-  const con = (o) => Object.assign(o, { sim:r.sim, oido:r.oido, me:r.me || '', mo:r.mo || '' });
+  const con = (o) => Object.assign(o, { sim:r.sim, oido:r.oido, me:r.me || '', mo:r.mo || '',
+                                        tipo: (typeof anaTipo === 'function') ? anaTipo(r, COTEJO_MAL) : null });
   if(nivel === 'mal') return con({ nivel:'mal', et:'no cuadra', color:'#F87171' });
   if(nivel === 'dudoso') return con({ nivel:'dudoso', et:'dudoso', color:'#FBBF24' });
   /* Los dos que NO cuentan como cambio: un cambio leve -conectores, palabras

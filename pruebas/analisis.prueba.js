@@ -60,7 +60,7 @@ function logica(ana){
      'anaNumero', 'anaSinAcotaciones', 'anaFonetica', 'anaPalabras', 'anaUnir', 'anaJuntar', 'anaCasi', 'anaOidas',
      'anaCasar', 'anaParlamento', 'anaRepartir',
      'anaTrozos', 'anaEsGrafica', 'anaLigera', 'anaJuntarIx', 'anaDistancia', 'anaHolgura', 'ANA_GRAFICAS',
-     'anaNombres', 'anaNombresDe', 'anaCasiNombre'],
+     'anaNombres', 'anaNombresDe', 'anaCasiNombre', 'anaTipo', 'ANA_TIPOS'],
     { ANA: ana || REAL.ANA, karNorm: karNormReal(), console: callado });
 }
 
@@ -566,6 +566,67 @@ exports.pruebas = async function(t){
   t.eq('con el reparto, «Cabel» es Kaveri aunque vaya al principio de la frase', X9.por[0].sim, 1);
   const X9b = L.anaRepartir([{ si: 0, texto: 'Kaveri, ven.', v0: 40, v1: 42 }], Q9, 100, { holgura: 0.3 });
   t.ok('sin el reparto, al principio de la frase no se sabe que es un nombre', X9b.por[0].sim < 1);
+
+  t.seccion('6e · qué tipo de cambio es, y cuánto importa');
+  /* Pedido de sala: «que el reporte coloque en orden de prioridad al
+     principio y que en algún punto se vea qué tipo de cambios son». */
+  const E = 'Si todo va bien, en unos diez días.';
+  const casar = (a, b) => { const c = L.anaCasar(L.anaPalabras(a), L.anaPalabras(b)); c.n = L.anaPalabras(b).length; return c; };
+  const tipoDe = (a, b) => L.anaTipo(casar(a, b));
+  const cq = casar(E, 'si todo va bien en unos quince días');
+  t.eq('de las que pesan, cuántas faltan y cuántas sobran, por separado', cq.pf + '/' + cq.ps + '/' + cq.pesada, '1/1/2');
+  t.eq('otra frase', tipoDe('Adiós amigo', 'otra cosa').et, 'otra frase');
+  t.eq('no se oye', tipoDe(E, '').et, 'no se oye');
+  t.eq('una palabra cambiada', tipoDe(E, 'si todo va bien en unos quince días').et, 'una palabra cambiada');
+  t.eq('una palabra de menos', tipoDe(E, 'si todo va bien en unos días').et, 'una palabra de menos');
+  t.eq('una palabra de más', tipoDe(E, 'si todo va bien en unos diez días no').et, 'una palabra de más');
+  t.eq('varias, con la cuenta', tipoDe('Vamos a la casa grande de mi madre hoy', 'vamos a la de mi hoy').et, '3 palabras de menos');
+  t.eq('el final cambiado: lo que falta se junta al final', tipoDe(E, 'si todo va bien').et, 'el final cambiado');
+  t.eq('también cuando al final se dijo otra cosa', tipoDe(E, 'si todo va bien en unos diez días y no me lo creo').et, 'el final cambiado');
+  t.eq('una sola palabra al final no es «el final»: es una palabra cambiada', tipoDe(E, 'si todo va bien en unos diez meses').et, 'una palabra cambiada');
+  t.eq('el principio cambiado', tipoDe(E, 'en unos diez días').et, 'el principio cambiado');
+  /* El final es el final en los DOS lados y sin huecos: si falta al final
+     pero lo de más va por el medio, o si lo que falta va salteado, no. */
+  t.eq('falta al final pero sobra por el medio: cambiadas, no «el final»', L.anaTipo({ sim: 0.5, me: 'iiff', mo: 'isi', pf: 2, ps: 1, n: 3 }).k, 'cambiada');
+  t.eq('lo que falta salteado hasta el final no es «el final»', L.anaTipo({ sim: 0.5, me: 'ifif', mo: 'ii', pf: 2, ps: 0, n: 2 }).et, '2 palabras de menos');
+  t.eq('ni salteado desde el principio', L.anaTipo({ sim: 0.5, me: 'fifi', mo: 'ii', pf: 2, ps: 0, n: 2 }).et, '2 palabras de menos');
+  t.eq('sobra al final pero falta por el medio: tampoco', L.anaTipo({ sim: 0.5, me: 'ifi', mo: 'iiss', pf: 1, ps: 2, n: 4 }).k, 'cambiada');
+  t.eq('solo conectores: leve', tipoDe(E, 'pues si todo va bien en unos diez días').k, 'conectores');
+  t.eq('palabras casi iguales: leve', tipoDe(E, 'si todo va bien en unos diez día').k, 'casi');
+  t.eq('igual, sin etiqueta', tipoDe(E, E).k + '|' + tipoDe(E, E).et, 'igual|');
+  t.eq('cada tipo con su grupo, para contarlos juntos', tipoDe(E, 'si todo va bien en unos días').grupo + '|' + tipoDe('Vamos a la casa grande de mi madre hoy', 'vamos a la de mi hoy').grupo,
+       'palabras de menos|palabras de menos');
+  t.eq('sin resultado, nada', L.anaTipo(null), null);
+  /* El orden: lo que más importa, más alto. */
+  const pr = (a, b) => tipoDe(a, b).prioridad;
+  t.ok('otra frase > no se oye > el final cambiado > de menos > de más > cambiada > conectores > casi',
+       pr('Adiós amigo', 'otra cosa') > pr(E, '') && pr(E, '') > pr(E, 'si todo va bien') && pr(E, 'si todo va bien') > pr(E, 'si todo va bien en unos días')
+       && pr(E, 'si todo va bien en unos días') > pr(E, 'si todo va bien en unos diez días no')
+       && pr(E, 'si todo va bien en unos diez días no') > pr(E, 'si todo va bien en unos quince días')
+       && pr(E, 'si todo va bien en unos quince días') > pr(E, 'pues si todo va bien en unos diez días')
+       && pr(E, 'pues si todo va bien en unos diez días') > pr(E, 'si todo va bien en unos diez día'));
+  t.ok('cuantas más palabras, más arriba', pr('Vamos a la casa grande de mi madre hoy', 'vamos a la de mi hoy') > pr('Vamos a la casa grande de mi madre hoy', 'vamos a la casa grande de mi hoy'));
+  t.ok('y cuanto menos se parece la otra frase, más arriba', pr('Adiós amigo mío', 'otra cosa') > pr('Adiós amigo mío', 'adiós otra cosa'));
+  /* Lo muy corto: como lo decide el aviso. */
+  t.eq('muy corto y nada oído: lo último', L.anaTipo({ sim: 0, n: 0, corto: true, me: 'f', mo: '', pesada: 1 }).et, 'muy corto, no se oye');
+  t.eq('muy corto y una palabra de otro', L.anaTipo({ sim: 0, n: 1, corto: true, me: 'f', mo: 's', pesada: 2 }).et, 'muy corto, se oye otra cosa');
+  const cf = L.anaTipo({ sim: 0, n: 2, corto: true, me: 'f', mo: 'ss', pesada: 3 });
+  t.ok('muy corto pero con dos palabras que pesan: otra frase, algo por debajo de una larga', cf.k === 'frase' && cf.prioridad < pr('Adiós amigo', 'otra cosa') && cf.prioridad > pr(E, ''), JSON.stringify(cf));
+  const cm = L.anaTipo({ sim: 0.5, me: 'ifii', mo: 'isssi', pf: 1, ps: 3, n: 5 });
+  t.eq('varias cambiadas por el medio, con la cuenta mayor de las dos', cm.et + '/' + cm.prioridad, 'palabras cambiadas/65');
+  t.eq('con el umbral que se le pase: desde 0,6 ya es otra frase', L.anaTipo({ sim: 0.5, me: 'iif', mo: 'ii', n: 2 }, 0.6).k + '|' + L.anaTipo({ sim: 0.5, me: 'iif', mo: 'ii', n: 2 }).k, 'frase|menos');
+  /* Lo analizado antes, sin las dos cuentas: por las marcas que haya. */
+  t.eq('sin pf/ps, por las marcas', L.anaTipo({ sim: 0.6, me: 'iiifi', mo: 'iiii' }).et, 'una palabra de menos');
+  t.eq('sin marcas ni nada oído pero con parecido, otra frase y no «no se oye»', L.anaTipo({ sim: 0.3 }).k, 'frase');
+  t.eq('con algo oído aunque no haya marcas, tampoco es «no se oye»', L.anaTipo({ sim: 0, oido: 'algo' }).k, 'frase');
+  /* Y el reparto trae las dos cuentas. */
+  const Q10 = [tt('si', 10.1), tt('todo', 10.3), tt('va', 10.5), tt('bien', 10.7), tt('en', 10.9), tt('unos', 11.1), tt('días', 11.4)];
+  const X10 = L.anaRepartir([{ si: 0, texto: E, v0: 10, v1: 13 }], Q10, 100, { holgura: 0.3 }).por[0];
+  t.eq('el reparto trae las dos cuentas, para decir el tipo', X10.pf + '/' + X10.ps, '1/0');
+  t.eq('y con ellas el tipo', L.anaTipo(X10).et, 'una palabra de menos');
+  const X11 = L.anaRepartir([{ si: 0, texto: E, v0: 10, v1: 13 }], [], 100, { holgura: 0.3 }).por[0];
+  t.ok('sin nada oído, todas las que pesan faltan y ninguna sobra', X11.pf === X11.pesada && X11.pf > 0 && X11.ps === 0, JSON.stringify(X11));
+  t.eq('y es «no se oye»', L.anaTipo(X11).et, 'no se oye');
 
   t.seccion('7 · lo que devuelve el reconocedor, a su sitio y limpio');
   const mapa = [{ t: 0, a: 100, d: 5 }, { t: 5.3, a: 200, d: 5 }];

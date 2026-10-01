@@ -880,7 +880,11 @@ function qcpdfDeCambios(lista, opts){
   const todos = lista || [];
   /* Los cambios de verdad primero; los leves y los sin comprobar, aparte al
      final, cada grupo con su rotulo, y NO cuentan como cambio. Pedido de sala. */
-  const cambios = todos.filter(c => c.nivel === 'mal' || c.nivel === 'dudoso');
+  /* Por importancia, no por tiempo: lo primero del informe es lo que mas
+     importa. Pedido de sala. Lo que no cuenta sigue por tiempo. */
+  const porPrioridad = (typeof qcPorPrioridad === 'function') ? qcPorPrioridad
+    : (x) => x.slice().sort((a, b) => ((b.prioridad || 0) - (a.prioridad || 0)) || ((+a.sim || 0) - (+b.sim || 0)));
+  const cambios = porPrioridad(todos.filter(c => c.nivel === 'mal' || c.nivel === 'dudoso'));
   const leves = todos.filter(c => c.nivel === 'leve');
   const sin = todos.filter(c => c.nivel === 'sin');
   const l = cambios;
@@ -892,9 +896,19 @@ function qcpdfDeCambios(lista, opts){
     /* Lo no oído se dice: una celda en blanco parece que se olvidó. */
     (c.oido && String(c.oido).trim())
       ? ((Array.isArray(c.oidoTrozos) && c.oidoTrozos.length) ? c.oidoTrozos : c.oido) : '(nada)',
-    Math.round((+c.sim || 0) * 100) + ' % · ' + (c.et || (c.nivel === 'mal' ? 'no cuadra' : 'dudoso'))
+    /* El veredicto y, debajo, que tipo de cambio es. */
+    Math.round((+c.sim || 0) * 100) + ' % · ' + (c.et || (c.nivel === 'mal' ? 'no cuadra' : 'dudoso')) + (c.tipo ? ('\n' + c.tipo) : '')
   ];
-  const filas = cambios.map(fila);
+  const filas = [];
+  /* Arriba, cuantos de cada tipo. Solo si el analisis trae los tipos: uno
+     de antes no los trae y no hay nada que decir. */
+  const cuenta = new Map();
+  cambios.forEach(c => { const k = c.tipoG || c.tipo; if(k) cuenta.set(k, (cuenta.get(k) || 0) + 1); });
+  if(cuenta.size){
+    const resumen = [...cuenta.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => n + ' ' + k).join(' · ');
+    filas.push({ grupo: 'Por importancia · ' + resumen });
+  }
+  cambios.forEach(c => filas.push(fila(c)));
   if(leves.length){
     filas.push({ grupo: 'Cambios leves · conectores y palabras casi iguales · no cuentan como cambio' });
     leves.forEach(c => filas.push(fila(c)));

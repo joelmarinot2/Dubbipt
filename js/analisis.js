@@ -745,13 +745,15 @@ function anaCasar(a0, b0, nombres){
      ellas se pinta qué cambió, y con las que faltan y sobran se sabe si el
      cambio pesa (`pesada`: cuántas de esas no son palabras ligeras). */
   const me = new Array(a0.length).fill('f'), mo = new Array(b0.length).fill('s');
+  /* `pf` y `ps`: de las que faltan y de las que sobran, cuántas pesan. Con
+     ellas se dice qué tipo de cambio es: de menos, de más o cambiadas. */
   const pesa = () => {
-    let p = 0;
-    me.forEach((k, i) => { if(k === 'f' && !anaLigera(a0[i])) p++; });
-    mo.forEach((k, j) => { if(k === 's' && !anaLigera(b0[j])) p++; });
-    return p;
+    let pf = 0, ps = 0;
+    me.forEach((k, i) => { if(k === 'f' && !anaLigera(a0[i])) pf++; });
+    mo.forEach((k, j) => { if(k === 's' && !anaLigera(b0[j])) ps++; });
+    return { pf: pf, ps: ps, pesada: pf + ps };
   };
-  if(!m || !n) return { comunes: 0, sim: 0, dif: Math.max(m, n), me: me.join(''), mo: mo.join(''), pesada: pesa() };
+  if(!m || !n) return Object.assign({ comunes: 0, sim: 0, dif: Math.max(m, n), me: me.join(''), mo: mo.join('') }, pesa());
   /* La tabla entera, para poder volver atrás y saber QUÉ casó con qué. */
   const T = new Float64Array((m + 1) * (n + 1));
   const E = new Uint8Array((m + 1) * (n + 1));           // 1 igual, 2 casi, 0 nada
@@ -782,7 +784,68 @@ function anaCasar(a0, b0, nombres){
     else j--;
   }
   const mas = Math.max(m, n), comunes = T[at(m, n)];
-  return { comunes: comunes, sim: comunes / mas, dif: mas - comunes, me: me.join(''), mo: mo.join(''), pesada: pesa() };
+  return Object.assign({ comunes: comunes, sim: comunes / mas, dif: mas - comunes, me: me.join(''), mo: mo.join('') }, pesa());
+}
+
+/* Los tipos de cambio por su nombre de grupo, para resumir cuántos hay de cada. */
+const ANA_TIPOS = { frase: 'otra frase', nada: 'no se oye', final: 'el final cambiado', principio: 'el principio cambiado',
+                    cambiada: 'palabras cambiadas', menos: 'palabras de menos', mas: 'palabras de más',
+                    conectores: 'conectores', casi: 'palabras casi iguales', corto: 'muy cortos', cortootro: 'muy cortos, otra cosa', igual: '' };
+
+/**
+ * QUÉ TIPO de cambio es, dicho como se dice, y cuánto importa. Pedido de sala:
+ * «que en algún punto se vea qué tipo de cambios son», y que el informe los
+ * ponga «en orden de prioridad al principio». Sale de las marcas palabra a
+ * palabra, así que vale también para lo analizado antes.
+ *
+ * Devuelve `{ k, et, grupo, prioridad }`: la clave, la etiqueta, el nombre
+ * del grupo y un número para ordenar -más alto, más importante-. Primero lo
+ * que se dijo distinto del todo o no se oyó; luego lo que cambió al final o
+ * al principio; luego lo que se quitó, lo que se añadió y lo que se cambió,
+ * con más palabras antes; al final lo leve. `mal` es desde cuánto parecido
+ * no cuadra (el de `cotejoAviso`).
+ */
+function anaTipo(r, mal){
+  if(!r) return null;
+  const umbral = isFinite(+mal) ? +mal : 0.45;
+  const T = (k, et, p) => ({ k: k, et: et, grupo: ANA_TIPOS[k] || k, prioridad: p });
+  const me = String(r.me || ''), mo = String(r.mo || '');
+  const f = (me.match(/f/g) || []).length, s = (mo.match(/s/g) || []).length;
+  const c = (me.match(/c/g) || []).length;
+  const pf = isFinite(+r.pf) ? +r.pf : f, ps = isFinite(+r.ps) ? +r.ps : s;
+  const n = +r.n || 0, sim = isFinite(+r.sim) ? +r.sim : 0;
+  const nada = !n && !mo.length && !String(r.oido || '').trim();
+  /* Muy corto y sin dos palabras que pesen: no cuenta, y va lo último. */
+  if(r.corto && sim < umbral && !(n >= 2 && +r.pesada >= 2)) return nada ? T('corto', 'muy corto, no se oye', 10) : T('cortootro', 'muy corto, se oye otra cosa', 20);
+  if(nada && sim === 0) return T('nada', 'no se oye', 95);
+  if(sim < umbral) return T('frase', 'otra frase', (r.corto ? 90 : 100) + Math.round((umbral - sim) * 20));
+  if(!pf && !ps){
+    if(f || s) return T('conectores', 'conectores de más o de menos', 8);
+    if(c) return T('casi', 'palabras casi iguales', 5);
+    return T('igual', '', 0);
+  }
+  /* ¿Dónde está el cambio? Al final, al principio, o por el medio. Una sola
+     palabra no es «el final»: eso es una palabra cambiada. */
+  const donde = (() => {
+    if(Math.max(pf, ps) < 2) return '';
+    const i0 = me.indexOf('f'), i1 = me.lastIndexOf('f');
+    const j0 = mo.indexOf('s'), j1 = mo.lastIndexOf('s');
+    const soloF = (x) => !/[^f]/.test(x), soloS = (x) => !/[^s]/.test(x);
+    const finE = i0 < 0 || (i1 === me.length - 1 && soloF(me.slice(i0)));
+    const finO = j0 < 0 || (j1 === mo.length - 1 && soloS(mo.slice(j0)));
+    const iniE = i0 < 0 || (i0 === 0 && soloF(me.slice(0, i1 + 1)));
+    const iniO = j0 < 0 || (j0 === 0 && soloS(mo.slice(0, j1 + 1)));
+    /* Algo casó al otro lado seguro: si no, el parecido sería cero y ya
+       habría salido como otra frase. */
+    if(finE && finO) return 'final';
+    if(iniE && iniO) return 'principio';
+    return '';
+  })();
+  if(donde === 'final') return T('final', 'el final cambiado', 70 + 2 * (pf + ps));
+  if(donde === 'principio') return T('principio', 'el principio cambiado', 68 + 2 * (pf + ps));
+  if(pf && ps) return T('cambiada', (pf === 1 && ps === 1) ? 'una palabra cambiada' : 'palabras cambiadas', 50 + 5 * Math.max(pf, ps));
+  if(pf) return T('menos', pf === 1 ? 'una palabra de menos' : pf + ' palabras de menos', 60 + 5 * pf);
+  return T('mas', ps === 1 ? 'una palabra de más' : ps + ' palabras de más', 55 + 5 * ps);
 }
 
 /**
@@ -827,7 +890,7 @@ function anaParlamento(escritas, v0, v1, oidas, holgura, vecinas, nombres){
     if(m0 >= m1){ m0 = -1; m1 = -1; }
   }
   if(c0 < 0) return { sim: 0, oido: '', n: 0, dif: escritas.length, me: 'f'.repeat(escritas.length), mo: '',
-                      pesada: escritas.filter(p => !anaLigera(p)).length };
+                      pesada: escritas.filter(p => !anaLigera(p)).length, pf: escritas.filter(p => !anaLigera(p)).length, ps: 0 };
 
   let mejor = null;
   const probar = (i0, i1) => {
@@ -839,7 +902,7 @@ function anaParlamento(escritas, v0, v1, oidas, holgura, vecinas, nombres){
     if(!mejor || c.sim > mejor.sim + 1e-9
        || (Math.abs(c.sim - mejor.sim) <= 1e-9 && (c.comunes > mejor.comunes + 1e-9
            || (Math.abs(c.comunes - mejor.comunes) <= 1e-9 && (i1 - i0) < (mejor.i1 - mejor.i0)))))
-      mejor = { sim: c.sim, comunes: c.comunes, dif: c.dif, i0: i0, i1: i1, me: c.me, mo: c.mo, pesada: c.pesada };
+      mejor = { sim: c.sim, comunes: c.comunes, dif: c.dif, i0: i0, i1: i1, me: c.me, mo: c.mo, pesada: c.pesada, pf: c.pf, ps: c.ps };
   };
   if(m0 >= 0){
     for(let i0 = c0; i0 <= m0; i0++) for(let i1 = m1; i1 <= c1; i1++) probar(i0, i1);
@@ -858,7 +921,7 @@ function anaParlamento(escritas, v0, v1, oidas, holgura, vecinas, nombres){
     else if(mo.length) mo[mo.length - 1] = peor(mo[mo.length - 1], k);
   }
   return { sim: mejor.sim, oido: txt.join(' ').replace(/\s+/g, ' ').trim(), n: mejor.i1 - mejor.i0,
-           dif: mejor.dif, me: mejor.me, mo: mo.join(''), pesada: mejor.pesada };
+           dif: mejor.dif, me: mejor.me, mo: mo.join(''), pesada: mejor.pesada, pf: mejor.pf, ps: mejor.ps };
 }
 
 /**
@@ -891,7 +954,7 @@ function anaRepartir(ventanas, oidas, duracion, opts){
     anaNombres(v.texto).forEach(p => nombres.add(p));
     const r = anaParlamento(escritas, +v.v0, +v.v1, lista, opts.holgura, vecinas, nombres);
     const o = { sim: +r.sim.toFixed(3), dif: +(+r.dif || 0).toFixed(1), oido: String(r.oido || '').slice(0, 300),
-                n: r.n, pesada: r.pesada, me: r.me, mo: r.mo };
+                n: r.n, pesada: r.pesada, pf: r.pf, ps: r.ps, me: r.me, mo: r.mo };
     /* Muy corto: tres palabras dichas o menos. Se apunta, que de eso depende
        cómo se avisa (anaAviso). */
     if(escritas.length <= ANA.corto) o.corto = true;
