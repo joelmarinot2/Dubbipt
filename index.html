@@ -2363,7 +2363,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.18.0-nube';
+const APP_VER_NUM = 'v11.19.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -7351,7 +7351,7 @@ function renderCards(){
       try{ if(typeof renderPlanilla === 'function') renderPlanilla(); }catch(e){ fallo('renderPlanilla · index.html:4987', e); }
       try{ if(currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · index.html:4988', e, 'puede que esto no se haya guardado en la nube'); }
       try{ gestAvisar(); }catch(e){}
-      if(typeof DDL_UI!=='undefined') DDL_UI.toast('Verificado: ' + c.display + ' → ' + GEST_ORIGINAL);
+      if(typeof DDL_UI!=='undefined') DDL_UI.toast('Verificado: ' + c.display + ' → ' + ((charIdx[c.key] && charIdx[c.key].talent) || GEST_ORIGINAL));
     });
 
     // Asignar / Editar → input inline sobre la zona de talento
@@ -8680,6 +8680,18 @@ function ponerModo(epId, m){
   try{ castPintarOcupacion(); }catch(e){}
   // continuidad: lo que ya se repartió en otros capítulos del programa
   if(m === 'casting'){
+    /* El bullicio, los wallas y lo indistinto lo graban todos: TODOS puesto
+       antes de avisar de los gestos, para que no salgan como pendientes. */
+    try{
+      const td = gestMarcarTodos();
+      if(td.length){
+        renderCards();
+        castAviso('👥 ' + td.length + ' con ' + GEST_TODOS + ' porque ' + (td.length === 1 ? 'es' : 'son')
+          + ' bullicio, wallas o indistinto: ' + td.join(', '));
+        try{ if(currentEp && currentEp.id) epDataUpsert(currentEp.id, currentEp.showId); }
+        catch(e){ fallo('epDataUpsert · index.html:gestMarcarTodos', e, 'puede que esto no se haya guardado en la nube'); }
+      }
+    }catch(e){ fallo('gestMarcarTodos · index.html', e); }
     try{ gestAvisar(); }catch(e){}
     /* La base primero: la herencia y el campo de talento la necesitan puesta.
        Y de paso PRINCIPAL PHOTOGRAPHY, MAIN TITLE y BURNEDIN SUBS quedan
@@ -9397,7 +9409,8 @@ const GEST_PAL = new Set(('REACCION REACCIONES REACC REACCIONA REACCIONAN REACT 
 + 'GROWLING RUGIDO RUGE ROAR ROARS MURMULLO MURMULLOS MURMURA MURMUR MURMURS MURMURING '
 + 'MUTTER MUTTERS MUTTERING MUMBLE MUMBLES MUMBLING SUSURRO SUSURROS SUSURRA WHISPER '
 + 'WHISPERS WHISPERING AMBIENTE AMBIENTES AMBIENTAL WALLA WALLAS BULLICIO CHATTER '
-+ 'CHATTERING CROWD QUEJIDO QUEJIDOS QUEJA WHIMPER WHIMPERS WHIMPERING MOAN '
++ 'CHATTERING CROWD INDISTINTO INDISTINTOS INDISTINTA INDISTINTAS INDISTINCT '
++ 'QUEJIDO QUEJIDOS QUEJA WHIMPER WHIMPERS WHIMPERING MOAN '
 + 'MOANS MOANING DOLOR PAIN HURT BOSTEZO BOSTEZA YAWN YAWNS YAWNING RONQUIDO RONCA '
 + 'SNORE SNORES SNORING ESTORNUDO ESTORNUDA SNEEZE SNEEZES HIPO HICCUP HICCUPS '
 + 'TARAREA TARAREO HUM HUMS HUMMING CANTURREA RESOPLA RESOPLIDO SNORT SNORTS SPIT '
@@ -9450,6 +9463,20 @@ function gestRenglonMudo(t){
   return gesto > 0;
 }
 
+/* Lo que graban TODOS los talentos a la vez: el bullicio de una multitud, los
+   wallas, el murmullo indistinto. Pedido de sala: «cuando el barrido encuentre
+   (BULLICIO) (WALLAS) (INDISTINTO), pon al talento TODOS». */
+const GEST_TODOS_PAL = new Set(('BULLICIO BULLICIOS WALLA WALLAS INDISTINTO INDISTINTOS '
++ 'INDISTINTA INDISTINTAS INDISTINCT').split(/\s+/));
+const GEST_TODOS = 'TODOS';
+
+/** ¿Este renglón lleva bullicio, wallas o indistinto? Se mira el renglón
+    entero, acotaciones incluidas: es ahí donde viene. */
+function gestRenglonTodos(t){
+  const limpio = String(t == null ? '' : t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  return limpio.split(/[^A-Z0-9]+/).some(x => GEST_TODOS_PAL.has(x));
+}
+
 /** ¿Esta intervención del libreto es solo gesto? */
 function gestBloqueMudo(b){
   if(!b) return true;
@@ -9468,10 +9495,11 @@ function gestEscanear(){
   const porKey = {};
   for(const b of script){
     if(!b || !b.key) continue;
-    const e = porKey[b.key] || (porKey[b.key] = { total:0, mudos:0, muestras:[] });
+    const e = porKey[b.key] || (porKey[b.key] = { total:0, mudos:0, todos:0, muestras:[] });
     e.total++;
     if(gestBloqueMudo(b)){
       e.mudos++;
+      if((b.lines || []).some(gestRenglonTodos)) e.todos++;
       if(e.muestras.length < 4){
         const txt = (b.lines || []).join(' ').replace(/\s+/g, ' ').trim();
         if(txt) e.muestras.push(txt.slice(0, 70));
@@ -9482,8 +9510,10 @@ function gestEscanear(){
     const e = porKey[k];
     if(!e.total || e.mudos !== e.total) continue;
     const c = (typeof charIdx !== 'undefined') ? charIdx[k] : null;
+    /* `todos`: entre sus gestos hay bullicio, wallas o indistinto. Ese
+       personaje no se deja original: lo graban todos. */
     out[k] = { key:k, display:(c && c.display) || k, bloques:e.total, muestras:e.muestras,
-               talent:(c && c.talent) || '' };
+               talent:(c && c.talent) || '', todos: e.todos > 0 };
   }
   return out;
 }
@@ -9501,6 +9531,33 @@ function gestMapa(){
   return _gestMapa;
 }
 function gestOlvidar(){ _gestMapa = null; _gestSello = ''; }
+
+/**
+ * Pone TODOS a los de bullicio, wallas o indistinto, al entrar en casting.
+ * Como la X de PRINCIPAL PHOTOGRAPHY: solo a los que están VACÍOS -lo que
+ * haya escrito una persona no se toca (CAST-N1)-, y quedan dados por
+ * mirados, que la regla ya los miró. Devuelve los nombres que ha marcado.
+ */
+function gestMarcarTodos(){
+  const puestos = [];
+  const mapa = gestMapa();
+  for(const k in mapa){
+    if(!mapa[k].todos) continue;
+    const c = (typeof charIdx !== 'undefined') ? charIdx[k] : null;
+    if(!c) continue;
+    if(c.talent && String(c.talent).trim()) continue;
+    c.talent = GEST_TODOS;
+    c.noRec = true;
+    c.heredado = false;                          // no viene de otro capítulo: es una regla fija
+    c.gestOk = true;                             // ya está decidido: no queda pendiente
+    try{
+      const raw = (window._charsRaw || []).find(x => x.key === k);
+      if(raw){ raw.talent = GEST_TODOS; raw.noRec = true; raw.heredado = false; raw.gestOk = true; }
+    }catch(e){ fallo('gestMarcarTodos · index.html', e, 'el TODOS puede perderse al reabrir el capítulo'); }
+    puestos.push(c.display || k);
+  }
+  return puestos;
+}
 
 /** ¿Hay que avisar de este personaje? Mudo y todavía sin verificar. */
 function gestPendiente(key, mapa){
@@ -9521,6 +9578,12 @@ function gestPendiente(key, mapa){
  * Ctrl+Z te devuelve el talento que hubiera antes.
  */
 const GEST_ORIGINAL = 'ORIGINAL';
+/** Qué talento le toca al verificarlo: TODOS si es bullicio, wallas o
+    indistinto; ORIGINAL si solo reacciona. */
+function gestTalentoDe(key){
+  try{ const m = gestMapa()[key]; if(m && m.todos) return GEST_TODOS; }catch(e){}
+  return GEST_ORIGINAL;
+}
 function gestVerificar(key, ok, sinHistoria){
   const c = charIdx[key];
   if(c && ok && !sinHistoria){
@@ -9529,8 +9592,9 @@ function gestVerificar(key, ok, sinHistoria){
   if(c){
     c.gestOk = !!ok;
     if(ok){
-      c.talent = GEST_ORIGINAL;                  // no se dobla: queda el audio original
-      try{ c.noRec = NO_REC.has(norm(GEST_ORIGINAL)); }catch(e){ c.noRec = true; }
+      const tal = gestTalentoDe(key);
+      c.talent = tal;                            // ORIGINAL: no se dobla · TODOS: lo graban todos
+      try{ c.noRec = NO_REC.has(norm(tal)); }catch(e){ c.noRec = true; }
       c.heredado = false;                        // lo acabas de decidir tú
     }
   }
@@ -9568,7 +9632,7 @@ function gestPanel(){
     return '<div class="gest-f"><div><div class="gest-n">' + esc(x.display)
       + (ya ? ' <span class="est-ok">✓ verificado</span>' : '') + '</div>'
       + '<div class="gest-m">' + x.bloques + (x.bloques === 1 ? ' intervención' : ' intervenciones')
-      + ', todas gesto'
+      + (x.todos ? ', bullicio o wallas · lo graban ' + GEST_TODOS : ', todas gesto')
       + (function(){ const c = charIdx[x.key], t = c && c.talent;
                      return t ? ' · talento: ' + esc(t) : ''; })()
       + (x.muestras.length ? '<br><span class="gest-t">' + x.muestras.map(esc).join(' · ') + '</span>' : '')
@@ -9610,8 +9674,10 @@ function gestPanel(){
     for(const x of pend) gestVerificar(x.key, true, true);
     await repintar();
     cerrar();
+    const conTodos = pend.filter(x => x.todos).length;
     castAviso('✅ ' + pend.length + ' personaje' + (pend.length === 1 ? '' : 's') + ' de gestos verificado'
-      + (pend.length === 1 ? '' : 's') + ' · se les pone ' + GEST_ORIGINAL);
+      + (pend.length === 1 ? '' : 's') + ' · se les pone ' + GEST_ORIGINAL
+      + (conTodos ? ' (' + conTodos + ' de bullicio, ' + GEST_TODOS + ')' : ''));
   };
 }
 
