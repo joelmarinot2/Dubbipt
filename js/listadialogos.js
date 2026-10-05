@@ -180,12 +180,14 @@ function ldArmar(lista, name){
     const pag = Math.max(1, Math.ceil(clen / 1800));
     const tcSec = ldTC(f.tc, fps);
     if(!cur || cur.key !== key){
-      cur = { idx: script.length, key: key, display: (f.quien || key).toUpperCase(), tcSec: tcSec, page: pag, lines: [] };
+      /* `tcs`: el timecode de cada fila, renglón a renglón. Cuando llegue el
+         libreto traducido, con ellos se sabe quién hablaba en cada momento. */
+      cur = { idx: script.length, key: key, display: (f.quien || key).toUpperCase(), tcSec: tcSec, page: pag, lines: [], tcs: [] };
       script.push(cur);
       (scriptByKey[key] = scriptByKey[key] || []).push(cur.idx);
     }
     if(cur.tcSec == null && tcSec != null) cur.tcSec = tcSec;
-    if(f.texto) cur.lines.push(f.texto);
+    if(f.texto){ cur.lines.push(f.texto); cur.tcs.push(tcSec); }
   }
 
   const byKey = {};

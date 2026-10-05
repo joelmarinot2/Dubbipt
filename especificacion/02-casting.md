@@ -67,6 +67,7 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **CAST-35** | **El bullicio lo graban todos.** Pedido de sala: «en el barrido de quién es original, pon al talento TODOS cuando encuentre (BULLICIO) (WALLAS) (INDISTINTO)». Un personaje de solo gestos que entre ellos trae `(BULLICIO)`, `(WALLA)`/`(WALLAS)` o `(INDISTINTO)` —también `INDISTINCT`— no se deja original: al entrar en casting se le pone **`TODOS`** solo, como la X de `PRINCIPAL PHOTOGRAPHY`, se dice a quién, queda mirado y cerrado (FIN-4), y viaja a la nube. Solo a los que están **vacíos** (CAST-N1). Verificar a mano a uno de estos pone `TODOS`, no `ORIGINAL`. Uno que además dice una palabra de verdad **no entra en el barrido** y se reparte a mano: con una sola línea de ruido, un `TODOS` automático a un personaje que habla sería el error caro. | ✅ |
 | **CAST-36** | **Quien se llama WALLA es el bullicio.** La lista de diálogos de Netflix (LIB-25) trae el bullicio como un personaje más —`WALLA`—, y ese grita alguna frase suelta («Stays in Boracay!») sin dejar de serlo, así que no entra en el barrido de solo gestos. Un personaje cuyo nombre **entero** es bullicio, walla o indistinto —con un número si acaso: `WALLAS 2`— recibe `TODOS` igual que en CAST-35, y solo si está vacío. `WALLACE` y `WALLA VENDOR` son personajes y se reparten a mano. | ✅ |
 | **CAST-37** | **Con libreto traducido o sin él.** Pedido de sala: «que yo pueda marcar si es con libreto traducido o no, es para adelantar el casting si no ha llegado el libreto». Cada capítulo lleva esa marca. La pone **una persona** con el botón de la barra de casting, y un capítulo que sale de la lista de diálogos original (LIB-25) nace **sin libreto traducido**. Viaja a la nube con el capítulo. Lo que nadie ha dicho —los capítulos de siempre— cuenta como traducido. Volver a leer la lista **no pisa** lo que marcó una persona, y la marca de un capítulo no se hereda al abrir otro ni al cargar un archivo nuevo. Sin libreto traducido, el botón va en ámbar y las hojas impresas —desglose y planilla— dicen «Casting adelantado»: las líneas son las del original y cambian cuando llegue el libreto. | ✅ |
+| **CAST-38** | **Llegó el libreto: se cambia dentro del capítulo y el casting se queda.** Pedido de sala: «cuando ya tenga el libreto quiero poder subirlo e intercambiarlo, y que se peguen los talentos que ya asigné con el libreto no traducido; algunos nombres cambian por la traducción, entonces analiza el diálogo y pregúntame si esos dos personajes son los mismos». Botón **«📥 Subir libreto»** en la barra de casting: PDF, Word o Excel. El personaje que **se llama igual** se lleva su talento sin preguntar. Del que **tiene talento y ya no está con ese nombre** se busca a quién corresponde por **cuándo habla**: los dos libretos son del mismo vídeo. Primero se halla el **desfase** entre ellos —la lista de Netflix cuenta desde 00:00:00:00 y el libreto de sala suele empezar en 01:00:00:00, y sin fotogramas redondea al segundo—: el bueno es el que hace que más parlamentos del libreto nuevo tengan a alguien del viejo empezando a hablar en ese instante, y tiene que cubrir la mitad y **destacar** sobre el siguiente, porque en un diálogo apretado cualquier desfase cuadra a medias. Después, para cada parlamento del nuevo, quién hablaba entonces en el viejo: el que empieza más cerca, con segundo y medio de margen, o el último que empezó. Se **propone** al que coincide en la mitad o más de sus parlamentos y se **pregunta pareja por pareja**, con cuántos coinciden y los diálogos de los dos al lado. Nada viene marcado (CAST-8, CAST-N3): se confirma, se elige a otro o se dice que no está. Sin timecodes que cuadren no se propone a nadie. Hasta que no se confirma la ventana **no se cambia nada**, y cancelar —o un archivo que no trae libreto, o que no se puede leer— deja el capítulo exactamente como estaba. Al confirmar: lo que repartió una persona manda sobre lo que traiga escrito el archivo; dos del viejo no caben en uno del nuevo —el segundo se dice y no se pega—; los que tenían talento y no se confirmaron **se nombran**; el heredado sin verificar sigue en naranja y el confirmado queda mirado; se repasan las X, el bullicio y los gemelos del libreto nuevo; el capítulo queda **con libreto traducido** (CAST-37); y en la nube el libreto nuevo ocupa el sitio del viejo: si era la lista en Excel y llega un PDF o un Word, el capítulo **deja de apuntar a la lista** —si no, en otro equipo se volvería a leer encima— y esta se quita después. | ✅ |
 | **CAST-31** | El panel del diagnóstico de la exportación **se abre solo cuando algo no cuadra**, y «falta repartir» no es eso. Una fila del Excel se queda en blanco por dos razones que no se parecen: porque a ese personaje **todavía no se le ha puesto nadie** —el curso normal del trabajo— o porque la aplicación **sí tenía** su talento y la celda salió vacía —eso sí es una pérdida—. Solo la segunda abre el panel. Llegó de sala con el 101 de «100 days of deception»: 63 personajes, 62 repartidos, 63 filas, 62 escritas, ni un talento sin sitio, y el panel abriéndose como si hubiera fallado. La condición miraba `filasSinActor` a secas, así que saltaba con un solo personaje sin repartir: prácticamente siempre. El volcado sigue diciendo cuántas filas están sin actor, porque es un dato útil, y añade **cuántas lo están teniendo talento**, que es la cifra que decide. | ✅ |
 
 ## Reglas · personajes completados
@@ -171,6 +172,24 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
   casting, y la hoja impresa). Las mutaciones, con las de LIB-25. En el navegador: el botón en
   ámbar al entrar en casting con la lista de verdad, el cambio a mano en los
   dos sentidos y el aviso en la hoja impresa solo cuando falta el libreto.
+- **CAST-38**: `pruebas/cambiolibreto.prueba.js`, con el caso de «A Filipino
+  Christmas» en pequeño: la lista desde 00:00:00:00 con RANDOM FEMALE 4, MALE DJ
+  y WALLA, y el libreto traducido una hora más tarde, sin fotogramas, con
+  MUJER 4, DJ y AMBIENTE. Quién habla cuándo; el desfase de una hora, el del
+  libreto sin fotogramas, dos libretos que no se parecen y un ritmo regular en
+  el que ninguno destaca; quién hablaba en un instante, con el margen y sin
+  nadie cerca; las parejas propuestas con sus diálogos al lado, la que coincide
+  poco y no se propone, y sin timecodes ninguna; lo que se pega y lo que se
+  dice que no se ha pegado; que cancelar, un archivo sin libreto y un archivo
+  roto dejan cada dato del capítulo como estaba; y decir que sí con un PDF, un
+  Word y otro Excel, con lo que sube, lo que deja de apuntar el capítulo y lo
+  que pasa cuando la nube falla en cada paso. Cuarenta y seis mutaciones, todas en rojo: una nació verde —el desfase que no cubre la mitad— y se cerró. Y en el
+  navegador, con la lista de verdad (1603 filas) y un libreto de prueba hecho
+  desde ella —una hora más tarde, sin fotogramas, un renglón por parlamento y
+  con diez nombres cambiados—: cinco talentos pegados por nombre, las cinco
+  parejas bien propuestas (WALLA con AMBIENTE en 24 de 27 parlamentos, RANDOM
+  FEMALE 4 con MUJER 4 en 6 de 7) y, al confirmar, diez talentos en el libreto
+  nuevo. La ventana se ha probado ahí, a mano.
 - **CAST-28 a CAST-30** y **CAST-32 a CAST-34**: `pruebas/archivo.prueba.js`,
   con nombres de los dos capítulos que llegaron de sala. Trece mutaciones
   comprobadas en rojo. Y además se corrió la lógica contra el Excel de verdad
@@ -194,10 +213,17 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
   puente con DublajeCast— siguen sin prueba. Es la primera cosa que añadir.
 - **CAST-24**: el margen de 4 líneas es un número elegido a ojo. No hay medida
   de si en sala es el bueno.
-- **CAST-37**: cuando llega el libreto traducido hay que crear el capítulo
-  con él, y el reparto pasa por el registro del programa (CAST-6): en naranja
-  y por verificar. Cargar el libreto nuevo **dentro del mismo capítulo**
-  conservando el casting está sin hacer. Y la marca solo se ve con el capítulo
-  abierto: en la lista de capítulos del programa no sale.
+- **CAST-37**: la marca solo se ve con el capítulo abierto: en la lista de
+  capítulos del programa no sale.
+- **CAST-38**: la subida a la nube del libreto cambiado está probada con
+  dobles, **no contra Supabase**: no he entrado en la cuenta y no debo. La
+  primera vez que se use con un capítulo de verdad conviene mirarlo en otro
+  equipo. Tampoco se ha probado con un libreto traducido **real** —PDF o
+  Word—, solo con el de prueba. Si el libreto nuevo no trae timecodes no se
+  propone a nadie: comparar por el orden de los parlamentos está sin hacer. El
+  cambio **no tiene deshacer** una vez confirmado. Y las correcciones de QC y
+  los cues de ADR, que van atados al número de parlamento, no se recolocan:
+  en un capítulo que se adelanta para casting no los hay, pero cambiar el
+  libreto de uno ya grabado los descolocaría.
 - El puente con DublajeCast nunca se ha probado contra sus datos reales; no he
   entrado en su cuenta y no debo.

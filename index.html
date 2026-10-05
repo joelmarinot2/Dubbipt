@@ -1667,6 +1667,20 @@ body:not(.modo-casting) .gestbtn{ display:none; }
 .dud-b{ flex:1; padding:11px 12px !important; font-size:13.5px; }
 .dud-b.dud-ok{ background:#22C55E; color:#06210f; border-color:#22C55E; font-weight:700; }
 
+/* Cambiar el libreto: «¿son el mismo personaje?», pareja por pareja */
+.lc-lista{ max-height:50vh; }
+.lc-fila{ display:flex; align-items:flex-start; gap:12px; padding:11px 13px;
+  background:#1c1f28; border:1px solid #2b3040; border-radius:10px; }
+.lc-si{ flex:0 0 auto; display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:700;
+  white-space:nowrap; cursor:pointer; padding-top:1px; }
+.lc-si input{ accent-color:#4ADE80; width:16px; height:16px; }
+.lc-si input:disabled{ opacity:.35; }
+.lc-txt{ flex:1; min-width:0; font-size:13.5px; line-height:1.5; }
+.lc-es{ margin-top:4px; font-size:12.5px; color:#c8cfdd; }
+.lc-sel{ max-width:100%; margin-left:4px; padding:4px 7px; border-radius:7px; background:#12141b;
+  color:#e7ebf3; border:1px solid #3a4052; font-size:12.5px; }
+.lc-prueba{ margin-top:6px; font-size:11.5px; line-height:1.5; color:#8892a6; }
+
 /* ═══ Selector de modo al abrir un capítulo ═══ */
 .modo-cap{
   position:fixed; inset:0; z-index:2147483000; display:flex;
@@ -2004,6 +2018,8 @@ body.modo-casting #btnExport{ display:none !important; }
       <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar de perfil: Grabación, QC o Casting">Modo</button>
       <button class="btnv sm" id="btnGestos" style="display:none" onclick="gestPanel()" title="Personajes que en este capitulo solo hacen gestos, sin una sola palabra">🎭 Solo gestos</button>
       <button class="btnv sm" id="btnLibTrad" style="display:none" onclick="libTraducidoCambiar()" title="Marca si este capitulo tiene ya el libreto traducido o si el casting va adelantado con el original">📄 Con libreto traducido</button>
+      <button class="btnv sm" id="btnLibCambiar" style="display:none" onclick="document.getElementById('libCambioFile').click()" title="Sube el libreto traducido -o una version nueva- dentro de este capitulo: los talentos ya repartidos se conservan">📥 Subir libreto</button>
+      <input type="file" id="libCambioFile" accept="application/pdf,.pdf,.docx,.xlsx,.xlsm,.xls" style="display:none" onchange="if(this.files[0]) libCambiar(this.files[0]); this.value=''">
       <button class="btnv sm" id="btnBaseTal" style="display:none" onclick="talPanel()" title="La lista de actores de la empresa: solo se puede repartir a quien este aqui">🎭 Base de talentos</button>
       <button class="btnv sm" id="btnMeta" style="display:none" onclick="castMetaPanel()" title="Fecha, género, tiempo, director, técnico y estudio del programa">Cabecera</button>
       <button class="btnv sm" id="btnDcast" style="display:none" onclick="dcPanel()" title="Sincronizar el casting con DublajeCast">⇄ DublajeCast</button>
@@ -2366,7 +2382,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.20.0-nube';
+const APP_VER_NUM = 'v11.21.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8684,7 +8700,7 @@ function ponerModo(epId, m){
   if(bu){ bu.style.display = (m === 'casting') ? '' : 'none'; castPintarUndo(); }
   const bt = document.getElementById('btnTabla');
   if(bt) bt.style.display = (m === 'casting') ? '' : 'none';
-  for(const id of ['btnImpDes','btnImpPla','btnDcast','btnMeta','btnGestos','btnBaseTal','btnLibTrad']){
+  for(const id of ['btnImpDes','btnImpPla','btnDcast','btnMeta','btnGestos','btnBaseTal','btnLibTrad','btnLibCambiar']){
     const b = document.getElementById(id);
     if(b) b.style.display = (m === 'casting') ? '' : 'none';
   }
@@ -21844,6 +21860,7 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/sala.js"></script>
 <script src="./js/talentos.js"></script>
 <script src="./js/listadialogos.js"></script>
+<script src="./js/cambiolibreto.js"></script>
 <script src="./js/tcpantalla.js"></script>
 <script src="./js/mtc.js"></script>
 <script src="./js/qcpdf.js"></script>

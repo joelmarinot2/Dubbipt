@@ -144,6 +144,9 @@ exports.pruebas = async function(t){
   t.cerca('con el timecode de su primera fila', sc[2].tcSec, 22 + 3 / 24, 1e-9);
   t.cerca('y el efectivo, que es el que sigue el libreto', sc[4].tcEff, 35 + 12 / 24, 1e-9);
   t.eq('cada fila es un renglón del parlamento', sc[2].lines.join(' | '), "Boracay, here we come! | Whatever, bro. We're here again. | It's party time.");
+  t.eq('y cada renglón guarda su timecode: con ellos se sabrá quién hablaba cuando llegue el libreto',
+       sc[2].tcs.map(x => x.toFixed(3)).join(' '), [22 + 3 / 24, 29 + 16 / 24, 32 + 5 / 24].map(x => x.toFixed(3)).join(' '));
+  t.eq('tantos timecodes como renglones', sc.every(b => b.tcs.length === b.lines.length), true);
   t.eq('lo que va entre corchetes se deja como viene: el barrido de gestos lo entiende', sc[6].lines[0] + ' ' + sc[7].lines[0], '[INDISTINCT] [REACTION]');
   t.eq('el nombre, como está escrito', sc[1].display, 'GRAPHICS INSERTS');
   t.eq('los personajes, por líneas y luego por nombre',
@@ -219,7 +222,7 @@ exports.pruebas = async function(t){
        (F.match(/window\._libTraducido = null;/g) || []).length >= 4);
   t.ok('el botón está en la barra y solo se enseña en casting',
        /id="btnLibTrad" style="display:none" onclick="libTraducidoCambiar\(\)"/.test(fuentesHtml())
-       && /\['btnImpDes','btnImpPla','btnDcast','btnMeta','btnGestos','btnBaseTal','btnLibTrad'\]/.test(F));
+       && /\['btnImpDes','btnImpPla','btnDcast','btnMeta','btnGestos','btnBaseTal','btnLibTrad'[,\]]/.test(F));
   t.ok('y al entrar en casting se pone al día', /if\(m === 'casting'\)\{\s+try\{ libTraducidoPintar\(\); \}/.test(F));
   t.ok('guardar un capítulo que sale de la lista no pregunta por el PDF: ya trae su libreto',
        /if\(esNuevo && !lastPdfBuf && lastXlsBuf && !\(script && script\.length\)\)\{/.test(F));
