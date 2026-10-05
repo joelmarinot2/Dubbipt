@@ -66,7 +66,8 @@ exports.pruebas = function(t){
   t.seccion('2 · otras erratas');
   const lim = (xs) => { const r = M.segLimpiar(xs.map(x => blq(x))); return r.t.join(' ') + ' | ' + r.raros.map(x => x.i + ':' + x.como).join(','); };
   t.eq('una hora de MENOS', lim([4600, 4605, 1010, 4615]), '4600 4605 4610 4615 | 2:4610');
-  t.eq('dos horas de más', lim([1000, 1005, 8210, 1015]), '1000 1005 1010 1015 | 2:1010');
+  t.eq('dos horas de más', lim([1000, 1005, 8212, 1030]), '1000 1005 1012 1030 | 2:1012',
+       'a medio camino entre sus vecinos sería 1017,5: no es eso, es su timecode con dos horas menos');
   t.eq('diez minutos de más: no es cosa de horas, se pone a medio camino y se dice', lim([1000, 1005, 1610, 1015]), '1000 1005 1010 1015 | 2:1010');
   t.eq('y se apunta que no salió de las horas', M.segLimpiar([1000, 1005, 1610, 1015].map(x => blq(x))).raros[0].hora, false);
   t.eq('el último del libreto, que retrocede mucho: se queda con el de antes', lim([1000, 1005, 900]), '1000 1005 1005 | 2:1005',
@@ -84,6 +85,8 @@ exports.pruebas = function(t){
   t.eq('un libreto en orden queda igual, sin nada que decir', lim([10, 14, 14, 30, 900]), '10 14 14 30 900 | ');
   t.eq('dos que se pisan por dos segundos: se ordena y no se dice', lim([1000, 1012, 1010, 1015]), '1000 1010 1010 1015 | ',
        'se mete entre sus vecinos lo más cerca de lo que pone: en un libreto es normal, y avisar de cada pisotón sería ruido');
+  t.eq('varios con el mismo timecode son todos fiables: el que retrocede es el otro', lim([1000, 1000, 1000, 500, 1010]), '1000 1000 1000 1005 1010 | 3:1005',
+       'exigiendo que cada uno SUBA, de los tres iguales solo valdría uno y los raros serían ellos');
   t.eq('hasta medio minuto se calla', M.segLimpiar([blq(1000), blq(1029), blq(1000), blq(1040)]).raros.length, 0);
   t.eq('y desde medio minuto se dice', M.segLimpiar([blq(1000), blq(1100), blq(1001), blq(1002), blq(1040)]).raros.length, 1);
   t.eq('medio minuto justo es el listón', M.SEG_RARO, 30);
@@ -106,6 +109,12 @@ exports.pruebas = function(t){
   const g2 = SALA(); g2[2].tcSec = 1010; g2[2].tcEff = 1010;
   A.M.ponerGuion(g2);
   t.eq('con otro libreto se vuelve a calcular: este ya no tiene erratas', A.M.segTiempos().raros.length, 0);
+  /* El mismo capítulo abierto otra vez: los mismos números en otro libreto. */
+  const R = armar();
+  const r1 = R.M.segTiempos(); R.M.segAvisar();
+  R.M.ponerGuion(SALA());
+  t.ok('al volver a abrir el capítulo es otro libreto aunque diga lo mismo: se calcula de nuevo', R.M.segTiempos() !== r1);
+  t.eq('y la errata se vuelve a decir, una vez', R.M.segAvisar() + ' ' + R.avisos.length, 'true 2');
   g2[4].tcSec = 9000; g2[4].tcEff = 9000;
   t.eq('y si le cambian un timecode al mismo libreto, también', A.M.segTiempos().raros.length, 1);
 

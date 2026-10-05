@@ -238,8 +238,10 @@ qué dijo el director.
   libreto, dos seguidos y el que hereda del mal escrito; lo que NO es una
   errata —dos que se pisan por dos segundos, y el listón de medio minuto—;
   libretos sin timecodes y de antes; que se calcula una vez y otra cuando
-  cambia; el aviso, una sola vez; y el trozo de audio de cada parlamento. Las
-  mutaciones se corren después de desplegar. Y en el navegador, con un libreto
+  cambia; el aviso, una sola vez; y el trozo de audio de cada parlamento.
+  Treinta y seis mutaciones, todas en rojo: cuatro nacieron verdes —los que
+  comparten timecode, las dos horas de más, el capítulo abierto otra vez y la
+  costumbre con un libreto que no empieza en cero— y se cerraron. Y en el navegador, con un libreto
   de 260 parlamentos y esa errata en el 201: antes el seguimiento se quedaba
   en 00:16:45 y ahora llega a donde va Pro Tools, con el aviso nombrando la
   página, el personaje y el timecode.

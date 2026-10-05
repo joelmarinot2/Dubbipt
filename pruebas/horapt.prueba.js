@@ -80,6 +80,8 @@ exports.pruebas = function(t){
   t.eq('también entrando a mitad: 02:05:00 es el 01:05:00 del libreto, no el 00:05:00', c(2 * H + 300, LARGO), '3600 supuesto',
        'valen una hora y dos; la de costumbre es una');
   t.eq('con un libreto que ya cuenta desde la una, lo de costumbre es ninguna', c(H + 100, { a: H + 5, b: 2 * H + 600 }), '0 supuesto');
+  t.eq('y en uno de dos horas que cuenta desde la una, tampoco se supone una hora', c(2 * H + 100, { a: H + 5, b: 3 * H }), '0 supuesto',
+       'valen ninguna, una por delante y una por detrás: con un libreto que no empieza en cero, la de costumbre es ninguna');
   t.eq('pero si a Pro Tools ya se le vio en 00:20:00, la sesión cuenta desde cero', c(H + 5, LARGO, { min: 1200, max: H + 5 }), '0 igual',
        'con una hora de diferencia, ese 00:20:00 habría sido cuarenta minutos antes de empezar el libreto');
   t.eq('y si se le vio en 02:05:00, no puede contar desde cero', c(H + 5, LARGO, { min: H + 5, max: 2 * H + 300 }), '3600 hora');
