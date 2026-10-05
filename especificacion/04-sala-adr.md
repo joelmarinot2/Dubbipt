@@ -257,7 +257,10 @@ qué dijo el director.
   en la nube y en el equipo, avisar a los demás y deshacer; el botón del
   aviso con todos de hora y con uno que no; la lista con sus marcas, escribir
   un timecode, el que no se entiende y no marcar ninguno; y el renglón del
-  panel. Las mutaciones se corren después de desplegar. Y en el navegador, con
+  panel. Treinta y tres mutaciones: dos nacieron verdes y ninguna era un hueco
+  de las pruebas —una línea que sobraba, porque tomar la menor diferencia ya
+  es preferir «cuentan igual», y se quitó; y una mutación de la cascada que no
+  cambiaba el resultado—. Y en el navegador, con
   un libreto de 850 parlamentos de 00:00:10 a 01:10:55 y la errata en el 201:
   en 01:03:24 marca el de 01:03:20, y «Corregir» deja el 01:16:50 en 00:16:50
   en pantalla, sin nada fuera de orden y con «Deshacer».

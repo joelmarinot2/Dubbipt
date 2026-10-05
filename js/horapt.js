@@ -76,8 +76,8 @@ function hptRango(guion){
  *   igual     cuentan desde la misma hora.
  *   hora      solo una diferencia de horas deja a Pro Tools dentro del libreto.
  *   supuesto  valen varias -el libreto dura más de una hora-. Se quita la que
- *             dejaría fuera algo de lo ya visto, y de las que quedan: si
- *             «cuentan igual» es una de ellas, es esa; si no, la menor. Se
+ *             dejaría fuera algo de lo ya visto, y de las que quedan, la
+ *             menor: si «cuentan igual» es una de ellas, es esa. Se
  *             suponía que una sesión empieza en 01:00:00:00, y llegó de sala
  *             que no: «estoy en 01:03:24:00 y el libreto coloca el parlamento
  *             de 00:03:24:00». En un libreto que pasa de la hora, la una y
@@ -101,7 +101,7 @@ function hptCalcular(pt, rango, visto, fijo){
     if(tambien.length) caben = tambien;
   }
   if(caben.length === 1) return { d: caben[0] * 3600, tipo: caben[0] ? 'hora' : 'igual' };
-  if(caben.indexOf(0) >= 0) return { d: 0, tipo: 'supuesto' };
+  /* La menor: «cuentan igual» antes que una hora, una antes que dos. */
   caben.sort((x, y) => Math.abs(x) - Math.abs(y) || y - x);
   return { d: caben[0] * 3600, tipo: 'supuesto' };
 }
