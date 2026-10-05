@@ -41,6 +41,12 @@ const HPT_GUARDADO = 'ddl_pt_hora:';
  * suyo se miran los efectivos; nulo si el libreto no trae timecodes.
  */
 function hptRango(guion){
+  /* Con el libreto abierto, sobre sus tiempos LIMPIOS: un timecode mal
+     escrito -una hora de más en un parlamento- no alarga el libreto una hora. */
+  if(typeof segTiempos === 'function' && typeof script !== 'undefined' && guion === script){
+    const S = segTiempos();
+    return S.a == null ? null : { a: S.a, b: S.b };
+  }
   const de = (campo) => {
     let a = null, b = null;
     for(const x of (guion || [])){
@@ -73,7 +79,7 @@ function hptRango(guion){
  *             dejaría fuera algo de lo ya visto, y entre las que quedan se
  *             toma la de costumbre: una sesión empieza en 01:00:00:00, así
  *             que con un libreto desde cero es una hora, y con uno que ya
- *             cuenta desde la una, ninguna.
+ *             cuenta desde otra, ninguna. Si no está entre ellas, la menor.
  *   fuera     ninguna hora deja a Pro Tools dentro del libreto.
  *   sin       el libreto no trae timecodes.
  */
@@ -94,7 +100,7 @@ function hptCalcular(pt, rango, visto, fijo){
   }
   if(caben.length === 1) return { d: caben[0] * 3600, tipo: caben[0] ? 'hora' : 'igual' };
   const base = Math.floor((rango.a + HPT_MARGEN) / 3600);       // la hora desde la que cuenta el libreto
-  const costumbre = base === 0 ? [1, 0] : [0, 1 - base];
+  const costumbre = base === 0 ? [1, 0] : [0];
   for(const k of costumbre) if(caben.indexOf(k) >= 0) return { d: k * 3600, tipo: 'supuesto' };
   caben.sort((x, y) => Math.abs(x) - Math.abs(y) || y - x);
   return { d: caben[0] * 3600, tipo: 'supuesto' };

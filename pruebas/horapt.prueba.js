@@ -53,6 +53,7 @@ exports.pruebas = function(t){
   t.eq('su primer y su último timecode', JSON.stringify(M.hptRango(guion([10, 100, 2520]))), '{"a":10,"b":2520}');
   t.eq('aunque no vengan en orden', JSON.stringify(M.hptRango(guion([500, 10, 2520, 30]))), '{"a":10,"b":2520}');
   t.eq('solo los propios: uno heredado no dice nada nuevo', JSON.stringify(M.hptRango([{ tcSec: 40, tcEff: 40 }, { tcSec: null, tcEff: 40 }, { tcSec: 90, tcEff: 90 }])), '{"a":40,"b":90}');
+  t.eq('un 00:00:00:00 propio sí cuenta: es un timecode, no la falta de él', JSON.stringify(M.hptRango([{ tcSec: 0, tcEff: 0 }, { tcSec: 40, tcEff: 40 }])), '{"a":0,"b":40}');
   t.eq('si ninguno trae el suyo, los efectivos', JSON.stringify(M.hptRango([{ tcEff: 40 }, { tcEff: 95 }])), '{"a":40,"b":95}');
   t.eq('un libreto sin timecodes, nada', M.hptRango([{ tcSec: null, tcEff: 0 }, { tcEff: 0 }, null]), null);
   t.eq('y sin libreto, nada', M.hptRango(null), null);

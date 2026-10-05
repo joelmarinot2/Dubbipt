@@ -2382,7 +2382,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.22.0-nube';
+const APP_VER_NUM = 'v11.23.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -19733,10 +19733,154 @@ function studioSeekSi(si, quiet){
 }
 function stCurBlock(t){
   if(!script || !script.length) return -1;
-  let best = -1;
-  for(let i=0;i<script.length;i++){ const b=script[i];
-    if(b.tcEff!=null && b.tcEff<=t) best=i; else if(b.tcEff!=null && b.tcEff>t) break; }
+  /* Se busca sobre los tiempos LIMPIOS (segTiempos), que van en orden. Antes
+     se recorría el libreto hasta el primer timecode mayor que `t`, y un solo
+     timecode mal escrito -un 01:16:50 entre 00:16:45 y 00:16:55- paraba ahí la
+     búsqueda: el libreto dejaba de seguir desde ese parlamento hasta el final. */
+  const T = segTiempos().t;
+  let lo = 0, hi = T.length - 1, best = -1;
+  while(lo <= hi){
+    const m = (lo + hi) >> 1;
+    if(T[m] <= t){ best = m; lo = m + 1; } else hi = m - 1;
+  }
+  while(best >= 0 && (!script[best] || script[best].tcEff == null)) best--;   // uno sin tiempo no es el que suena
   return best;
+}
+
+/* ═══ LOS TIEMPOS DEL LIBRETO, LIMPIOS ═══════════════════════════════════
+
+   Llegó de sala: «un diálogo tiene mal marcado el timecode: pasa de
+   00:16:45:00 a 01:16:50:00 y luego continúa normal, 00:16:55:00. Ahí es donde
+   ocurre el problema». Un libreto lo escribe una persona, y una errata en un
+   timecode no puede dejar sin seguimiento medio capítulo.
+
+   Un libreto va en orden. De todos sus timecodes se queda uno con la fila más
+   larga que no retrocede: esos son los FIABLES. Los que se salen:
+
+   · si quitándole o poniéndole horas enteras cabe entre el fiable de antes y
+     el de después, es una hora mal escrita: se usa corregido;
+   · si se sale por poco -dos que se pisan-, se mete entre sus vecinos lo más
+     cerca de lo que pone, y no se dice nada;
+   · si se sale por mucho y no es cosa de horas, no se sabe cuál es: se pone a
+     medio camino entre el de antes y el de después.
+
+   Los timecodes del libreto NO se tocan: esto es solo para saber qué
+   parlamento suena y qué trozo de audio le toca a cada uno. Y se dice cuáles
+   son, para que alguien los corrija en el libreto. */
+
+/* Desde cuántos segundos entre lo que pone y lo que le toca se da un timecode
+   por MAL ESCRITO y se dice. Menos es un pisotón entre dos que hablan a la
+   vez, que en un libreto es normal: se ordena y no se dice nada. */
+const SEG_RARO = 30;
+/* En el primer parlamento y en el último solo hay vecino por un lado. Para
+   dar por buena una hora de más o de menos tiene que caer a menos de esto del
+   vecino que hay: sin tope, cualquier hora «cabría». */
+const SEG_BORDE = 600;
+let _segT = null;
+
+/**
+ * Limpia los tiempos de un libreto. Devuelve:
+ *
+ *   t      · el tiempo de cada parlamento para seguirlo: nunca retrocede.
+ *   raros  · los timecodes mal escritos: `[{ i, tc, como, hora, antes,
+ *            despues }]`. `como` es el tiempo con el que se sigue; `hora`
+ *            dice si salió de quitar o poner horas enteras.
+ *   a, b   · de dónde a dónde va el libreto, sin contar los raros.
+ */
+function segLimpiar(g){
+  const n = (g || []).length;
+  /* El timecode PROPIO de cada parlamento. En un libreto de antes, que no
+     dice cuál es propio y cuál heredado, vale el efectivo. */
+  const conPropio = (g || []).some(b => b && b.tcSec != null && isFinite(+b.tcSec));
+  const o = (g || []).map(b => {
+    if(!b) return null;
+    const v = conPropio ? b.tcSec : b.tcEff;
+    return (v != null && isFinite(+v) && (conPropio || +v > 0)) ? +v : null;
+  });
+  /* La fila más larga que no retrocede. */
+  const colas = [], colaI = [], previo = new Array(n).fill(-1);
+  for(let i = 0; i < n; i++){
+    if(o[i] == null) continue;
+    let lo = 0, hi = colas.length;
+    while(lo < hi){ const m = (lo + hi) >> 1; if(colas[m] <= o[i]) lo = m + 1; else hi = m; }
+    colas[lo] = o[i]; colaI[lo] = i; previo[i] = lo ? colaI[lo - 1] : -1;
+  }
+  const fiable = new Array(n).fill(false);
+  for(let i = colas.length ? colaI[colas.length - 1] : -1; i >= 0; i = previo[i]) fiable[i] = true;
+  const despuesDe = new Array(n).fill(Infinity);
+  for(let i = n - 1, s = Infinity; i >= 0; i--){ despuesDe[i] = s; if(fiable[i]) s = o[i]; }
+
+  const t = new Array(n), raros = [];
+  let cur = null, a = null, b = null;
+  for(let i = 0; i < n; i++){
+    if(fiable[i]) cur = o[i];
+    else if(o[i] != null){
+      const antes = cur, despues = despuesDe[i];
+      const suelo = (antes == null) ? -Infinity : antes;
+      const piso = isFinite(suelo) ? suelo : despues - SEG_BORDE;
+      const techo = isFinite(despues) ? despues : suelo + SEG_BORDE;
+      let como = null, hora = false;
+      for(let h = 1; h <= 23 && como == null; h++){
+        for(const k of [h, -h]){
+          const c = o[i] - 3600 * k;
+          if(c >= piso && c <= techo){ como = c; hora = true; break; }
+        }
+      }
+      if(como == null){
+        const cerca = Math.min(Math.max(o[i], suelo), despues);
+        como = (Math.abs(o[i] - cerca) < SEG_RARO) ? cerca
+             : ((isFinite(suelo) && isFinite(despues)) ? (suelo + despues) / 2 : (isFinite(suelo) ? suelo : despues));
+      }
+      cur = como;
+      if(Math.abs(o[i] - como) >= SEG_RARO)
+        raros.push({ i: i, tc: o[i], como: como, hora: hora, antes: antes, despues: isFinite(despues) ? despues : null });
+    }
+    t[i] = (cur != null) ? cur : 0;
+    if(cur != null){ if(a == null) a = cur; b = cur; }
+  }
+  return { t: t, raros: raros, a: a, b: b };
+}
+
+/** Los tiempos limpios del libreto abierto. Se guardan mientras no cambie. */
+function segTiempos(){
+  const g = (typeof script !== 'undefined' && Array.isArray(script)) ? script : [];
+  let suma = 0;
+  for(const b of g){ if(b){ suma += (b.tcSec != null ? +b.tcSec : -1) + (b.tcEff != null ? +b.tcEff : -1) * 3; } }
+  if(_segT && _segT.de === g && _segT.n === g.length && _segT.suma === suma) return _segT;
+  _segT = segLimpiar(g);
+  _segT.de = g; _segT.n = g.length; _segT.suma = suma;
+  return _segT;
+}
+
+/** Un timecode mal escrito, dicho para encontrarlo en el libreto. */
+function segRaroTexto(r){
+  const b = (script && script[r.i]) || {};
+  const tc = (x) => (typeof fmtTC4 === 'function') ? fmtTC4(x) : String(x);
+  let quien = b.display || b.key || '';
+  try{ if(b.key && charIdx[b.key] && charIdx[b.key].display) quien = charIdx[b.key].display; }catch(e){ /* sin desglose, el nombre del parlamento */ }
+  return (b.page != null ? 'pág. ' + b.page + ' · ' : '') + (quien ? quien + ' · ' : '') + tc(r.tc)
+       + ((r.antes != null && r.despues != null) ? ', entre ' + tc(r.antes) + ' y ' + tc(r.despues)
+          : (r.antes != null ? ', después de ' + tc(r.antes) : (r.despues != null ? ', antes de ' + tc(r.despues) : '')))
+       + (r.hora ? ' · se sigue como ' + tc(r.como) : ' · no es cosa de horas: se sigue como ' + tc(r.como) + ', a medio camino');
+}
+
+/** Lo que hay que decir de los timecodes mal escritos, o vacío. */
+function segRarosTexto(){
+  const S = segTiempos(), n = S.raros.length;
+  if(!n) return '';
+  return '⚠️ ' + (n === 1 ? 'Un timecode del libreto está' : n + ' timecodes del libreto están')
+       + ' fuera de orden y parece' + (n === 1 ? '' : 'n') + ' mal escrito' + (n === 1 ? '' : 's') + ': '
+       + S.raros.slice(0, 2).map(segRaroTexto).join(' ; ') + (n > 2 ? ' ; y ' + (n - 2) + ' más' : '')
+       + '. El libreto sigue igual; conviene corregirlo' + (n === 1 ? '' : 's') + ' en el guion.';
+}
+
+/** Se dice una vez por libreto, al empezar a seguirlo. */
+function segAvisar(){
+  const S = segTiempos();
+  if(S.dicho || !S.raros.length) return false;
+  S.dicho = true;
+  try{ castAviso(segRarosTexto()); }catch(e){ /* sin avisos se sigue igual */ }
+  return true;
 }
 /* ═══ EL LIBRETO SIGUE AL VÍDEO ══════════════════════════════════════════
 
@@ -20040,6 +20184,7 @@ function studioTick(forzado){
   if(t == null) return;
   /* Con el adelanto: la vista tiene que estar en el parlamento cuando empieza. */
   const bi = stCurBlock(t + SEG_ADELANTO);
+  try{ segAvisar(); }catch(e){ /* el aviso no puede tirar el seguimiento */ }
   if(bi!==studio.cur){
     studio.cur = bi;
     _stFueraAvisado = '';                      // personaje nuevo: se puede volver a avisar
@@ -20344,26 +20489,32 @@ function karLargoBloque(i){
 function karVentana(si){
   const b = script[si];
   if(!b || b.tcEff == null) return null;
-  let i0 = si; while(i0 > 0 && script[i0-1] && script[i0-1].tcEff === b.tcEff) i0--;
-  let i1 = si; while(i1+1 < script.length && script[i1+1] && script[i1+1].tcEff === b.tcEff) i1++;
+  /* Con los tiempos LIMPIOS (segTiempos): un timecode mal escrito -una hora de
+     más- le daba al parlamento de antes una hora entera de audio, y al suyo,
+     un trozo de una hora después. */
+  const T = (typeof segTiempos === 'function') ? segTiempos().t : null;
+  const de = (i) => (T && T[i] != null && script[i] && script[i].tcEff != null) ? T[i] : (script[i] ? script[i].tcEff : null);
+  const t0 = de(si);
+  let i0 = si; while(i0 > 0 && script[i0-1] && de(i0-1) === t0) i0--;
+  let i1 = si; while(i1+1 < script.length && script[i1+1] && de(i1+1) === t0) i1++;
   let fin = null;
   for(let j=i1+1; j<script.length; j++){
-    if(script[j].tcEff != null && script[j].tcEff > b.tcEff){ fin = script[j].tcEff; break; }
+    if(de(j) != null && de(j) > t0){ fin = de(j); break; }
   }
   if(fin == null){                        // último bloque: se estima el final
     let sum = 0; for(let i=i0;i<=i1;i++) sum += karLargoBloque(i);
-    fin = b.tcEff + sum * 0.18;
+    fin = t0 + sum * 0.18;
   }
-  if(i0 === i1) return [b.tcEff, fin];
+  if(i0 === i1) return [t0, fin];
   let tot = 0; for(let i=i0;i<=i1;i++) tot += karLargoBloque(i);
-  const dur = Math.max(0.2, fin - b.tcEff);
-  let c = b.tcEff;
+  const dur = Math.max(0.2, fin - t0);
+  let c = t0;
   for(let i=i0;i<=i1;i++){
     const p = dur * (karLargoBloque(i)/tot);
     if(i === si) return [c, c+p];
     c += p;
   }
-  return [b.tcEff, fin];
+  return [t0, fin];
 }
 /** Tiempos de cada palabra del bloque, en timecode de libreto. Con memoria. */
 function karBloque(si){
