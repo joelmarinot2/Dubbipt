@@ -1692,6 +1692,8 @@ function tcpPanel(){
     /* La hora entre Pro Tools y el libreto: automática, o fijada a mano. */
     +   ((typeof hptPanelHtml === 'function') ? hptPanelHtml() : '')
     + '</div>'
+    /* Los timecodes del libreto que están fuera de orden, y el botón para corregirlos. */
+    + ((typeof segPanelHtml === 'function') ? segPanelHtml() : '')
     /* Para cuando lo aprendido está mal y no hay manera de que lea: antes no
        había forma de quitar una cifra mal aprendida. */
     + ((TCP.rect || faltan.length < 10)
@@ -1764,6 +1766,7 @@ function tcpPanel(){
     const v = +e.target.value; TCP.lat = isFinite(v) ? Math.max(-2, Math.min(2, v)) : 0; tcpGuardar();
   };
   if(typeof hptPanelCablear === 'function') hptPanelCablear(ov);
+  if(typeof segPanelCablear === 'function') segPanelCablear(ov);
   { const b = ov.querySelector('#tcpCaptura'); if(b) b.onclick = ()=> tcpDiagnosticoBajar(); }
   const cero = ov.querySelector('#tcpCero');
   if(cero) cero.onclick = async () => {

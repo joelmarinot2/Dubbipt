@@ -2382,7 +2382,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.23.0-nube';
+const APP_VER_NUM = 'v11.24.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -19871,15 +19871,188 @@ function segRarosTexto(){
   return '⚠️ ' + (n === 1 ? 'Un timecode del libreto está' : n + ' timecodes del libreto están')
        + ' fuera de orden y parece' + (n === 1 ? '' : 'n') + ' mal escrito' + (n === 1 ? '' : 's') + ': '
        + S.raros.slice(0, 2).map(segRaroTexto).join(' ; ') + (n > 2 ? ' ; y ' + (n - 2) + ' más' : '')
-       + '. El libreto sigue igual; conviene corregirlo' + (n === 1 ? '' : 's') + ' en el guion.';
+       + '. Se sigue igual; con «Corregir» se arregla' + (n === 1 ? '' : 'n') + ' en el libreto.';
 }
 
-/** Se dice una vez por libreto, al empezar a seguirlo. */
+/**
+ * Se dice una vez por libreto, al empezar a seguirlo, con el botón para
+ * arreglarlo. Si todos son una hora de más o de menos se corrigen con ese
+ * clic; si alguno no se sabe cuál es, se abre la lista para escribirlo.
+ */
 function segAvisar(){
   const S = segTiempos();
   if(S.dicho || !S.raros.length) return false;
   S.dicho = true;
-  try{ castAviso(segRarosTexto()); }catch(e){ /* sin avisos se sigue igual */ }
+  const txt = segRarosTexto();
+  try{
+    if(typeof DDL_UI !== 'undefined' && DDL_UI && DDL_UI.toast)
+      DDL_UI.toast(txt, { kind: 'err', duration: 20000, actionLabel: 'Corregir', onAction: () => segCorregirDesdeAviso() });
+    else castAviso(txt);
+  }catch(e){ /* sin avisos se sigue igual */ }
+  return true;
+}
+
+/** Lo que hace el botón del aviso. */
+function segCorregirDesdeAviso(){
+  try{
+    const r = segTiempos().raros;
+    if(r.length && r.every(x => x.hora)) return segCorregir(r.map(x => ({ i: x.i, tc: x.como })));
+    return segCorregirPanel();
+  }catch(e){ fallo('segCorregirDesdeAviso · index.html', e, 'no se han podido corregir los timecodes'); }
+}
+
+/* ═══ CORREGIR LOS TIMECODES MAL ESCRITOS ════════════════════════════════
+
+   Llegó de sala al día siguiente: «aún molesta si el timecode está mal,
+   quiero que lo cambies tú o que me des la opción para cambiarlos». Seguir
+   bien no basta: el libreto seguía enseñando el 01:16:50 y el aviso volvía a
+   salir. Aquí se CAMBIA el timecode en el libreto, se guarda con el capítulo y
+   viaja a los demás equipos. El que traía el guion se guarda en `tcOrig`, por
+   si hay que volver. */
+
+/** El tiempo efectivo de cada parlamento: el suyo, o el del anterior (LIB-3). */
+function segCascada(g){
+  let ult = 0;
+  for(const b of (g || [])){
+    if(!b) continue;
+    if(b.tcSec != null) ult = b.tcSec;
+    b.tcEff = (b.tcSec != null) ? b.tcSec : ult;
+  }
+}
+
+/**
+ * Cambia timecodes en el libreto que hay en memoria. `lista` es `[{ i, tc }]`:
+ * el parlamento y su timecode nuevo, en segundos. Devuelve lo cambiado
+ * -`[{ i, antes, ahora }]`-, que es también lo que hace falta para deshacerlo.
+ */
+function segCorregirEnGuion(lista){
+  const g = (typeof script !== 'undefined' && Array.isArray(script)) ? script : [];
+  const conPropio = g.some(b => b && b.tcSec != null && isFinite(+b.tcSec));
+  const hechos = [];
+  for(const x of (lista || [])){
+    const b = x ? g[x.i] : null, v = x ? +x.tc : NaN;
+    if(!b || !isFinite(v) || v < 0) continue;
+    const antes = conPropio ? b.tcSec : b.tcEff;
+    if(antes === v) continue;
+    if(b.tcOrig == null && antes != null) b.tcOrig = antes;      // el que traía el guion
+    if(conPropio) b.tcSec = v; else b.tcEff = v;
+    if(b.tcOrig === v) delete b.tcOrig;                          // se ha vuelto al del guion
+    hechos.push({ i: x.i, antes: antes, ahora: v });
+  }
+  /* Los que no traen el suyo heredan del anterior: del corregido, no del malo. */
+  if(conPropio && hechos.length) segCascada(g);
+  return hechos;
+}
+
+/**
+ * Corrige, repinta, guarda y avisa. Con `deshaciendo`, es la vuelta atrás de
+ * una corrección y ya no ofrece deshacer otra vez.
+ */
+async function segCorregir(lista, deshaciendo){
+  const hechos = segCorregirEnGuion(lista);
+  if(!hechos.length){ try{ castAviso('No había ningún timecode que cambiar'); }catch(e){ /* sin avisos */ } return hechos; }
+  try{ if(typeof pop2 !== 'undefined' && pop2 && pop2.doc){ pop2._hiVi = null; renderLibretoBlocks(); } }
+  catch(e){ fallo('renderLibretoBlocks · index.html:segCorregir', e); }
+  try{
+    if(typeof currentEp !== 'undefined' && currentEp && currentEp.id){
+      await epDataUpsert(currentEp.id, currentEp.showId);
+      await saveEpCache(currentEp.id, new Date().toISOString());
+      if(sync.isOn && sync.channel && typeof syncEmit === 'function') syncEmit('reload', { epId: currentEp.id }, true);
+    }
+  }catch(e){ fallo('epDataUpsert · index.html:segCorregir', e, 'puede que la corrección no se haya guardado en la nube'); }
+  try{ if(typeof studio !== 'undefined' && studio){ studio.cur = -2; } if(typeof studioTick === 'function') studioTick(true); }
+  catch(e){ /* sin seguimiento en marcha no hay nada que recolocar */ }
+  const n = hechos.length;
+  const txt = (deshaciendo ? '↩ Corrección deshecha · ' : '✓ ') + n + ' timecode' + (n === 1 ? '' : 's')
+    + (deshaciendo ? ' como venía' + (n === 1 ? '' : 'n') + ' en el guion' : ' corregido' + (n === 1 ? '' : 's') + ' en el libreto: '
+       + hechos.slice(0, 2).map(h => fmtTC4(h.antes) + ' → ' + fmtTC4(h.ahora)).join(' ; ') + (n > 2 ? ' ; y ' + (n - 2) + ' más' : ''));
+  try{
+    if(!deshaciendo && typeof DDL_UI !== 'undefined' && DDL_UI && DDL_UI.toast)
+      DDL_UI.toast(txt, { duration: 12000, actionLabel: 'Deshacer', onAction: () => segCorregir(hechos.map(h => ({ i: h.i, tc: h.antes })), true) });
+    else castAviso(txt);
+  }catch(e){ /* el aviso es lo de menos: ya está corregido */ }
+  return hechos;
+}
+
+/**
+ * La lista de los que están fuera de orden, para corregirlos. Los que solo
+ * tienen una hora de más o de menos vienen marcados con su corrección; los
+ * demás no se sabe cuáles son, y se escribe el bueno.
+ */
+function segCorregirPanel(){
+  const viejo = document.getElementById('segOv'); if(viejo) viejo.remove();
+  const raros = segTiempos().raros.slice();
+  const e2 = (s) => (typeof esc === 'function') ? esc(String(s == null ? '' : s)) : String(s == null ? '' : s).replace(/</g, '&lt;');
+  const filas = raros.map((r, n) => {
+    const b = script[r.i] || {};
+    let quien = b.display || b.key || '';
+    try{ if(b.key && charIdx[b.key] && charIdx[b.key].display) quien = charIdx[b.key].display; }catch(e){ /* sin desglose */ }
+    return '<div class="lc-fila">'
+      + '<label class="lc-si"><input type="checkbox" class="seg-ok" data-n="' + n + '"' + (r.hora ? ' checked' : '') + '> Corregir</label>'
+      + '<div class="lc-txt"><b>' + e2(quien) + '</b>' + (b.page != null ? ' <span class="dud-ant">pág. ' + e2(b.page) + '</span>' : '')
+      +   '<div class="lc-es">pone <b>' + fmtTC4(r.tc) + '</b>'
+      +     ((r.antes != null && r.despues != null) ? ', entre ' + fmtTC4(r.antes) + ' y ' + fmtTC4(r.despues) : '')
+      +     ' → <input class="seg-tc lc-sel" data-n="' + n + '" value="' + fmtTC4(r.como) + '" size="12" spellcheck="false" aria-label="Timecode corregido">'
+      +     (r.hora ? '' : ' <span class="dud-ant">no se sabe cuál es: escríbelo</span>') + '</div>'
+      +   '<div class="lc-prueba">' + e2((b.lines || []).join(' ').slice(0, 110)) + '</div>'
+      + '</div></div>';
+  }).join('');
+  const html = '<div class="modo-caja" role="dialog" aria-modal="true" style="max-width:660px;text-align:left">'
+    + '<div class="modo-tit">Timecodes fuera de orden</div>'
+    + '<div class="modo-sub" style="margin-bottom:8px">' + (raros.length === 1 ? '1 parlamento' : raros.length + ' parlamentos') + ' de este libreto</div>'
+    + (raros.length
+        ? '<div class="dud-nota">Se cambian en el libreto y se guardan con el capítulo. Los que solo tienen una hora de más o de '
+          + 'menos vienen marcados con su corrección; puedes escribir otro timecode en cualquiera.</div>'
+          + '<div class="dud-lista lc-lista">' + filas + '</div>'
+        : '<div class="dud-nota">Ningún timecode de este libreto está fuera de orden.</div>')
+    + '<div class="dud-msg" id="segMsg" style="min-height:18px;margin-top:8px;font-size:12.5px;color:#ff9b9b"></div>'
+    + '<div class="dud-btns"><button class="modo-op dud-b" id="segNo">Cerrar</button>'
+    + (raros.length ? '<button class="modo-op dud-b dud-ok" id="segOk">Corregir los marcados</button>' : '') + '</div></div>';
+  const ov = document.createElement('div');
+  ov.id = 'segOv'; ov.className = 'modo-cap'; ov.innerHTML = html;
+  document.body.appendChild(ov);
+  const cerrar = () => ov.remove();
+  ov.querySelector('#segNo').onclick = cerrar;
+  ov.addEventListener('click', (ev) => { if(ev.target === ov) cerrar(); });
+  const cajas = Array.prototype.slice.call(ov.querySelectorAll('input.seg-ok'));
+  const campos = Array.prototype.slice.call(ov.querySelectorAll('input.seg-tc'));
+  /* Escribir un timecode es querer corregirlo. */
+  campos.forEach((c, n) => { c.oninput = () => { cajas[n].checked = true; c.style.borderColor = ''; }; });
+  const ok = ov.querySelector('#segOk');
+  if(ok) ok.onclick = async () => {
+    const lista = [];
+    for(let n = 0; n < raros.length; n++){
+      if(!cajas[n].checked) continue;
+      const v = parseTC(campos[n].value);
+      if(v == null || !/^\s*\d{1,2}\s*:\s*\d{2}\s*:\s*\d{2}/.test(campos[n].value)){
+        campos[n].style.borderColor = '#F87171';
+        ov.querySelector('#segMsg').textContent = 'Ese timecode no se entiende: escríbelo como 00:16:50:00';
+        try{ campos[n].focus(); }catch(e){ /* sin foco se ve igual en rojo */ }
+        return;
+      }
+      lista.push({ i: raros[n].i, tc: v });
+    }
+    if(!lista.length){ ov.querySelector('#segMsg').textContent = 'Marca al menos uno, o cierra'; return; }
+    cerrar();
+    await segCorregir(lista);
+  };
+  return ov;
+}
+
+/** El renglón del panel del timecode: cuántos hay fuera de orden, y el botón. */
+function segPanelHtml(){
+  const n = segTiempos().raros.length;
+  if(!n) return '';
+  return '<div class="meta-nota" style="margin-top:10px">⚠️ ' + (n === 1 ? 'Un timecode del libreto está' : n + ' timecodes del libreto están')
+       + ' fuera de orden. Se sigue igual, pero conviene arreglarlo' + (n === 1 ? '' : 's') + '. '
+       + '<button class="modo-op" id="tcpRaros" style="padding:5px 11px;font-size:12.5px;margin-left:4px">Corregir…</button></div>';
+}
+
+/** Conecta ese botón. */
+function segPanelCablear(ov){
+  const b = ov && ov.querySelector ? ov.querySelector('#tcpRaros') : null;
+  if(!b) return false;
+  b.onclick = () => { try{ ov.remove(); }catch(e){ /* ya cerrado */ } segCorregirPanel(); };
   return true;
 }
 /* ═══ EL LIBRETO SIGUE AL VÍDEO ══════════════════════════════════════════

@@ -25,7 +25,8 @@ const RECORTES = [
   ['/** Sílabas del texto de un bloque', '/** Tiempos de cada palabra del bloque']
 ];
 const EXPORTA = ['stCurBlock', 'segLimpiar', 'segTiempos', 'segRaroTexto', 'segRarosTexto', 'segAvisar', 'SEG_RARO', 'karVentana',
-                 'ponerGuion: (g) => { script = g; }'];
+                 'segCascada', 'segCorregirEnGuion', 'segCorregir', 'segCorregirDesdeAviso', 'segCorregirPanel', 'segPanelHtml', 'segPanelCablear',
+                 'ponerGuion: (g) => { script = g; }', 'verGuion: () => script', 'ponerEp: (e) => { currentEp = e; }'];
 
 const tc = (h, m, s) => h * 3600 + m * 60 + s;
 const blq = (propio, mas) => Object.assign({ key: 'ANA', display: 'ANA', page: 3, tcSec: propio, tcEff: propio, lines: ['Una frase de prueba.'] }, mas || {});
@@ -38,16 +39,53 @@ const SALA = () => [
   blq(tc(0, 16, 55), { key: 'BETO', display: 'BETO' }), blq(tc(0, 17, 0)), blq(tc(0, 17, 30))
 ];
 
-function armar(guion){
-  const avisos = [];
-  const M = montar(RECORTES, EXPORTA, {
-    script: guion || SALA(), charIdx: { ANA: { display: 'ANA' }, BETO: { display: 'BETO' } },
-    castAviso: (x) => avisos.push(x), fmtTC4: fmt, studio: { cur: -1 }
-  });
-  return { M, avisos };
+/* Un documento de mentira con lo justo que mira la lista de correcciones: las
+   casillas y los campos salen del propio HTML que pinta. */
+function docFalso(){
+  const puestos = [];
+  const pieza = () => ({ onclick: null, oninput: null, style: {}, checked: false, value: '', textContent: '', focus(){}, remove(){ this.quitado = true; } });
+  const doc = {
+    puestos: puestos,
+    getElementById: (id) => puestos.find(e => e.id === id && !e.quitado) || null,
+    body: { appendChild: (e) => { puestos.push(e); } },
+    createElement: () => {
+      const el = { id: '', className: '', innerHTML: '', _q: {}, quitado: false,
+        remove(){ el.quitado = true; }, addEventListener(){},
+        querySelector(s){ return el._q[s] || (el._q[s] = pieza()); },
+        querySelectorAll(s){
+          const h = el.innerHTML;
+          if(s === 'input.seg-ok') return el._ok || (el._ok = [...h.matchAll(/class="seg-ok" data-n="\d+"( checked)?/g)].map(m => Object.assign(pieza(), { checked: !!m[1] })));
+          if(s === 'input.seg-tc') return el._tc || (el._tc = [...h.matchAll(/class="seg-tc lc-sel" data-n="\d+" value="([^"]*)"/g)].map(m => Object.assign(pieza(), { value: m[1] })));
+          return [];
+        } };
+      return el;
+    }
+  };
+  return doc;
 }
 
-exports.pruebas = function(t){
+function armar(guion, o){
+  o = o || {};
+  const avisos = [], diario = [], tostadas = [];
+  const doc = docFalso();
+  const ctx = {
+    script: guion || SALA(), charIdx: { ANA: { display: 'ANA' }, BETO: { display: 'BETO' } },
+    castAviso: (x) => avisos.push(x), fmtTC4: fmt, studio: { cur: -1 },
+    currentEp: ('ep' in o) ? o.ep : { id: 'ep1', showId: 'sh1' },
+    pop2: { doc: {} }, renderLibretoBlocks: () => diario.push('pinta'),
+    epDataUpsert: async (ep, sh) => { diario.push('datos ' + ep + '/' + sh); return true; },
+    saveEpCache: async (ep) => { diario.push('copia ' + ep); },
+    sync: { isOn: true, channel: {} }, syncEmit: (que, d) => diario.push('emite ' + que + ' ' + d.epId),
+    studioTick: (f) => diario.push('tick ' + f), fallo: (d) => diario.push('fallo ' + d),
+    parseTC: (s) => { const m = String(s || '').match(/(\d{1,2})\s*:\s*(\d{2})(?:\s*:\s*(\d{2}))?(?:\s*[:;.]\s*(\d{2}))?/); if(!m) return null; return m[3] == null ? (+m[1]) * 60 + (+m[2]) : (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) + (m[4] != null ? +m[4] : 0) / 25; },
+    esc: (x) => String(x).replace(/</g, '&lt;'), document: doc
+  };
+  if(o.tostadas) ctx.DDL_UI = { toast: (txt, op) => { tostadas.push({ txt: txt, op: op || {} }); } };
+  const M = montar(RECORTES, EXPORTA, ctx);
+  return { M, avisos, diario, tostadas, doc };
+}
+
+exports.pruebas = async function(t){
   const { M } = armar();
 
   t.seccion('1 · el caso de sala: un 01:16:50 entre 00:16:45 y 00:16:55');
@@ -121,14 +159,14 @@ exports.pruebas = function(t){
   t.seccion('6 · se dice cuál es, una vez');
   const B = armar();
   t.eq('con todo para encontrarlo en el libreto', B.M.segRarosTexto(),
-       '⚠️ Un timecode del libreto está fuera de orden y parece mal escrito: pág. 3 · ANA · 01:16:50:00, entre 00:16:45:00 y 00:16:55:00 · se sigue como 00:16:50:00. El libreto sigue igual; conviene corregirlo en el guion.');
+       '⚠️ Un timecode del libreto está fuera de orden y parece mal escrito: pág. 3 · ANA · 01:16:50:00, entre 00:16:45:00 y 00:16:55:00 · se sigue como 00:16:50:00. Se sigue igual; con «Corregir» se arregla en el libreto.');
   t.eq('al empezar a seguir se avisa', B.M.segAvisar() + ' ' + B.avisos.length, 'true 1');
   B.M.segAvisar(); B.M.segAvisar();
   t.eq('y una sola vez', B.avisos.length, 1);
   const C = armar([blq(10), blq(20), blq(30)]);
   t.eq('sin erratas no se dice nada', C.M.segAvisar() + ' ' + C.avisos.length + ' «' + C.M.segRarosTexto() + '»', 'false 0 «»');
   const D = armar([blq(1000), blq(4605), blq(1610), blq(1015), blq(8220), blq(1025)]);
-  t.ok('con varias, las dos primeras y cuántas más', /^⚠️ 3 timecodes del libreto están fuera de orden y parecen mal escritos: .* ; .* ; y 1 más\. .*corregirlos en el guion\.$/.test(D.M.segRarosTexto()), D.M.segRarosTexto());
+  t.ok('con varias, las dos primeras y cuántas más', /^⚠️ 3 timecodes del libreto están fuera de orden y parecen mal escritos: .* ; .* ; y 1 más\. Se sigue igual; con «Corregir» se arreglan en el libreto\.$/.test(D.M.segRarosTexto()), D.M.segRarosTexto());
   t.ok('la que no es cosa de horas lo dice', /00:26:50:00, entre 00:16:45:00 y 00:16:55:00 · no es cosa de horas: se sigue como 00:16:50:00, a medio camino/.test(D.M.segRarosTexto()), D.M.segRarosTexto());
   t.ok('la primera del libreto dice antes de cuál', /, antes de 00:16:45:00/.test(armar([blq(4600), blq(1005), blq(1010)]).M.segRarosTexto()));
 
@@ -142,10 +180,106 @@ exports.pruebas = function(t){
   t.ok('dos que comparten timecode se reparten la ventana, como antes', comp.M.karVentana(0)[0] === 10 && comp.M.karVentana(0)[1] === comp.M.karVentana(1)[0] && comp.M.karVentana(1)[1] === 20);
   t.eq('uno sin tiempo no tiene ventana', armar([blq(10), { key: 'X', tcSec: null, tcEff: null, lines: [] }]).M.karVentana(1), null);
 
-  t.seccion('8 · dónde se usa');
+  t.seccion('9 · corregirlos en el libreto');
+  /* Llegó de sala al día siguiente: «aún molesta si el timecode está mal,
+     quiero que lo cambies tú o que me des la opción para cambiarlos». */
+  const Z = armar();
+  const hechos = Z.M.segCorregirEnGuion([{ i: 2, tc: 1010 }]);
+  t.eq('se cambia el timecode del parlamento, y se devuelve lo cambiado', JSON.stringify(hechos), '[{"i":2,"antes":4610,"ahora":1010}]');
+  const gz = Z.M.verGuion();
+  t.eq('en el libreto, el propio y el efectivo', gz[2].tcSec + ' ' + gz[2].tcEff, '1010 1010');
+  t.eq('y se guarda el que traía el guion, por si hay que volver', gz[2].tcOrig, 4610);
+  t.eq('los demás no se tocan', gz.map(b => b.tcSec).join(' '), '1000 1005 1010 1015 1020 1050');
+  t.eq('ya no hay nada fuera de orden, ni nada que decir', Z.M.segTiempos().raros.length + ' «' + Z.M.segRarosTexto() + '»', '0 «»');
+  t.eq('cambiarlo otra vez por lo mismo no es un cambio', Z.M.segCorregirEnGuion([{ i: 2, tc: 1010 }]).length, 0);
+  t.eq('volver al del guion', JSON.stringify(Z.M.segCorregirEnGuion([{ i: 2, tc: 4610 }])), '[{"i":2,"antes":1010,"ahora":4610}]');
+  t.ok('y entonces ya no consta como corregido', !('tcOrig' in Z.M.verGuion()[2]) && Z.M.verGuion()[2].tcSec === 4610);
+  t.eq('lo que no vale no cambia nada: un parlamento que no hay, un timecode que no es un número, uno negativo',
+       Z.M.segCorregirEnGuion([{ i: 99, tc: 10 }, { i: 0, tc: NaN }, { i: 1, tc: -5 }, null]).length + ' ' + Z.M.verGuion().map(b => b.tcSec).join(' '), '0 1000 1005 4610 1015 1020 1050');
+  /* El que no trae timecode hereda del corregido, no del malo. */
+  const Hh = armar([blq(1000), blq(4605), { key: 'ANA', tcSec: null, tcEff: 4605, lines: ['sigue'] }, blq(1010)]);
+  Hh.M.segCorregirEnGuion([{ i: 1, tc: 1005 }]);
+  t.eq('el que hereda del corregido hereda el timecode nuevo', Hh.M.verGuion().map(b => b.tcEff).join(' '), '1000 1005 1005 1010');
+  /* Un libreto de antes, sin timecodes propios: se cambia el efectivo y no se arrastra nada. */
+  const Vv = armar([{ key: 'A', tcEff: 10, lines: [] }, { key: 'A', tcEff: 4000, lines: [] }, { key: 'A', tcEff: 30, lines: [] }]);
+  Vv.M.segCorregirEnGuion([{ i: 1, tc: 20 }]);
+  t.eq('en un libreto de antes se cambia el efectivo, sin dejar los demás a cero', Vv.M.verGuion().map(b => b.tcEff).join(' '), '10 20 30');
+  t.eq('la cascada: el suyo, o el del anterior', (() => { const g = [{ tcSec: null }, { tcSec: 5 }, { tcSec: null }, { tcSec: 9 }, null]; Z.M.segCascada(g); return g.filter(Boolean).map(b => b.tcEff).join(' '); })(), '0 5 5 9');
+
+  t.seccion('10 · corregir: se pinta, se guarda, se avisa y se puede deshacer');
+  const C1 = armar(null, { tostadas: true });
+  const hc = await C1.M.segCorregir([{ i: 2, tc: 1010 }]);
+  t.eq('se corrige', hc.length + ' ' + C1.M.verGuion()[2].tcSec, '1 1010');
+  t.ok('se repinta el libreto, se guarda en la nube y en este equipo, y se avisa a los demás equipos',
+       C1.diario.includes('pinta') && C1.diario.includes('datos ep1/sh1') && C1.diario.includes('copia ep1') && C1.diario.includes('emite reload ep1'), C1.diario.join(' · '));
+  t.ok('y el libreto se recoloca', C1.diario.includes('tick true'));
+  t.eq('se dice qué se cambió, con el botón de deshacer', C1.tostadas[0].txt + ' [' + C1.tostadas[0].op.actionLabel + ']',
+       '✓ 1 timecode corregido en el libreto: 01:16:50:00 → 00:16:50:00 [Deshacer]');
+  await C1.tostadas[0].op.onAction();
+  t.eq('deshacer lo deja como venía en el guion', C1.M.verGuion()[2].tcSec + ' ' + ('tcOrig' in C1.M.verGuion()[2]), '4610 false');
+  t.eq('y se dice, ya sin ofrecer deshacer otra vez', C1.avisos[C1.avisos.length - 1] + ' · tostadas ' + C1.tostadas.length, '↩ Corrección deshecha · 1 timecode como venía en el guion · tostadas 1');
+  const C2 = armar(null, { ep: null });
+  await C2.M.segCorregir([{ i: 2, tc: 1010 }]);
+  t.ok('sin capítulo guardado se corrige aquí y no se sube nada', C2.M.verGuion()[2].tcSec === 1010 && !C2.diario.some(x => /^(datos|copia|emite)/.test(x)));
+  t.eq('sin nada que cambiar se dice y no se guarda', (await C2.M.segCorregir([{ i: 2, tc: 1010 }])).length + ' ' + C2.avisos[C2.avisos.length - 1], '0 No había ningún timecode que cambiar');
+
+  t.seccion('11 · el botón del aviso y la lista');
+  const A1 = armar(null, { tostadas: true });
+  A1.M.segAvisar();
+  t.eq('el aviso lleva el botón «Corregir» y dura lo bastante para leerlo', A1.tostadas[0].op.actionLabel + ' ' + (A1.tostadas[0].op.duration >= 15000) + ' ' + A1.tostadas[0].op.kind, 'Corregir true err');
+  await A1.tostadas[0].op.onAction();
+  t.eq('si todos son una hora de más o de menos, ese clic los corrige', A1.M.verGuion()[2].tcSec + ' ' + A1.M.segTiempos().raros.length, '1010 0');
+  /* Con uno que no se sabe cuál es, se abre la lista. */
+  const MIX = () => [blq(1000), blq(4605), blq(1610, { key: 'BETO', display: 'BETO', lines: ['Diez minutos de más.'] }), blq(1015), blq(1020)];
+  const A2 = armar(MIX(), { tostadas: true });
+  A2.M.segAvisar();
+  A2.tostadas[0].op.onAction();
+  const ov = A2.doc.puestos[0];
+  t.ok('con alguno que no es cosa de horas, el clic abre la lista y no cambia nada todavía', !!ov && ov.id === 'segOv' && A2.M.verGuion()[1].tcSec === 4605);
+  t.ok('la lista dice quién, qué pone, entre cuáles está y qué dice el parlamento',
+       /<b>ANA<\/b> <span class="dud-ant">pág\. 3<\/span>/.test(ov.innerHTML) && /pone <b>01:16:45:00<\/b>, entre 00:16:40:00 y 00:16:55:00/.test(ov.innerHTML) && /Diez minutos de más\./.test(ov.innerHTML));
+  const cajas = ov.querySelectorAll('input.seg-ok'), campos = ov.querySelectorAll('input.seg-tc');
+  t.eq('el de la hora viene marcado con su corrección; el otro, sin marcar y con una propuesta', cajas.map(c => c.checked).join(',') + ' ' + campos.map(c => c.value).join(','), 'true,false 00:16:45:00,00:16:50:00');
+  t.ok('y del que no se sabe se dice', /no se sabe cuál es: escríbelo/.test(ov.innerHTML));
+  /* Escribir uno lo marca. */
+  campos[1].value = '00:16:48:00'; campos[1].oninput();
+  t.eq('escribir un timecode es querer corregirlo', cajas[1].checked, true);
+  await ov.querySelector('#segOk').onclick();
+  t.eq('al corregir los marcados se cambian los dos', A2.M.verGuion().map(b => b.tcSec).join(' '), '1000 1005 1008 1015 1020');
+  t.ok('y la lista se cierra', ov.quitado === true);
+  /* Un timecode que no se entiende no cambia nada. */
+  const A3 = armar(MIX());
+  const ov3 = A3.M.segCorregirPanel();
+  ov3.querySelectorAll('input.seg-tc')[0].value = 'a las cinco';
+  await ov3.querySelector('#segOk').onclick();
+  t.ok('un timecode que no se entiende se dice, se señala y no se cambia nada',
+       /no se entiende/.test(ov3.querySelector('#segMsg').textContent) && ov3.querySelectorAll('input.seg-tc')[0].style.borderColor === '#F87171'
+       && A3.M.verGuion()[1].tcSec === 4605 && !ov3.quitado);
+  const A4 = armar(MIX());
+  const ov4 = A4.M.segCorregirPanel();
+  ov4.querySelectorAll('input.seg-ok')[0].checked = false;
+  await ov4.querySelector('#segOk').onclick();
+  t.ok('sin ninguno marcado se pide marcar alguno', /Marca al menos uno/.test(ov4.querySelector('#segMsg').textContent) && A4.M.verGuion()[1].tcSec === 4605);
+  ov4.querySelector('#segNo').onclick();
+  t.eq('cerrar no cambia nada', ov4.quitado + ' ' + A4.M.verGuion()[1].tcSec, 'true 4605');
+  const A5 = armar([blq(10), blq(20)]);
+  t.ok('sin nada fuera de orden la lista lo dice y no ofrece corregir', /Ningún timecode de este libreto está fuera de orden/.test(A5.M.segCorregirPanel().innerHTML) && !/id="segOk"/.test(A5.doc.puestos[0].innerHTML));
+  /* El renglón del panel del timecode. */
+  t.eq('en el panel del timecode, nada si no hay ninguno', A5.M.segPanelHtml(), '');
+  const A6 = armar(MIX());
+  t.ok('y si los hay, cuántos y el botón', /2 timecodes del libreto están fuera de orden/.test(A6.M.segPanelHtml()) && /<button class="modo-op" id="tcpRaros"/.test(A6.M.segPanelHtml()));
+  const panel = { quitado: false, remove(){ panel.quitado = true; }, _b: { onclick: null }, querySelector: (q) => (q === '#tcpRaros' ? panel._b : null) };
+  t.eq('el botón se conecta', A6.M.segPanelCablear(panel), true);
+  panel._b.onclick();
+  t.ok('y al pulsarlo se cierra el panel y se abre la lista', panel.quitado && A6.doc.puestos.length === 1 && A6.doc.puestos[0].id === 'segOv');
+  t.eq('sin botón no hay nada que conectar', A6.M.segPanelCablear({ querySelector: () => null }), false);
+
+  t.seccion('12 · dónde se usa');
   const F = fuentes().map(f => f.src).join('\n');
   t.ok('al seguir se avisa de los timecodes mal escritos, sin que el aviso pueda tirar el seguimiento',
        /const bi = stCurBlock\(t \+ SEG_ADELANTO\);\s+try\{ segAvisar\(\); \}catch\(e\)\{/.test(F));
+  t.ok('el panel del timecode enseña los que hay fuera de orden y conecta su botón',
+       /\+ \(\(typeof segPanelHtml === 'function'\) \? segPanelHtml\(\) : ''\)/.test(F) && /if\(typeof segPanelCablear === 'function'\) segPanelCablear\(ov\);/.test(F));
   t.ok('y la hora de Pro Tools se saca del libreto limpio: una errata no lo alarga una hora',
        /if\(typeof segTiempos === 'function' && typeof script !== 'undefined' && guion === script\)\{\s+const S = segTiempos\(\);\s+return S\.a == null \? null : \{ a: S\.a, b: S\.b \};/.test(F));
 };

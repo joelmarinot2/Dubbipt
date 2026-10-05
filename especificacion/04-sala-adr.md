@@ -103,6 +103,8 @@ qué dijo el director.
 | **PT-N2** | **Nunca dar por hecho de qué reloj cuelga el libreto.** Va escrito en el propio botón —«Seguir · PT» o «Seguir · vídeo»—, porque desde la mesa no hay otra manera de saberlo y son cosas muy distintas. | 👁 |
 | **PT-26** | **La hora de Pro Tools y la del libreto pueden no ser la misma.** Llegó de sala: «recibiendo a 24 fps dice, pero no cambió el libreto». El timecode llegaba bien por MIDI —una sesión a 23,976 se envía como MTC de 24 y se lee como 24: no era el fotograma—; lo que no cuadraba era la **hora**. El seguimiento comparaba el timecode de Pro Tools con los del libreto tal cual, y una sesión que empieza en 01:00:00:00 con un libreto que cuenta desde 00:00:00:00 —la lista de diálogos de Netflix (LIB-25), o un libreto hecho con ella— cae siempre «después del último parlamento»: el libreto se queda clavado al final. Ahora, antes de buscar el parlamento, se le restan al timecode de Pro Tools las **horas enteras** que lo separan del libreto. Se sacan solas: si solo una diferencia de horas deja a Pro Tools dentro del libreto —con dos minutos de margen por delante y por detrás—, es esa. Si valen varias —un libreto de más de una hora—, se descarta la que dejaría fuera el timecode más bajo o el más alto que ya se le ha visto a Pro Tools, y entre las que queden se toma la de costumbre: una sesión empieza en 01:00:00:00, así que con un libreto desde cero es una hora y con uno que ya cuenta desde la una, ninguna. Con la **misma hora no se resta nada**: el caso de siempre no se toca. **Se dice lo que se ve**, una vez por capítulo: que va con una hora de diferencia y a qué equivale, que no coinciden ni con horas de diferencia, o que el libreto no trae timecodes. En el panel del timecode se puede **fijar a mano** —«cuentan igual» o tantas horas por delante o por detrás— y se recuerda por capítulo en ese equipo. El contador y el tiempo que se apunta en una corrección de QC **siguen siendo los de Pro Tools**; la hora del libreto solo se usa para saber qué parlamento suena. | ✅ |
 | **PT-27** | **Un timecode mal escrito no para el seguimiento.** Llegó de sala, después de buscarlo en la hora (PT-26): «un diálogo tiene mal marcado el timecode: pasa de 00:16:45:00 a 01:16:50:00 y luego continúa normal, 00:16:55:00. Ahí es donde ocurre el problema». El seguimiento recorría el libreto hasta el primer timecode mayor que el de ahora, y ese 01:16:50 **paraba ahí la búsqueda**: desde ese parlamento hasta el final el libreto ya no seguía a nadie. Ahora se busca sobre los **tiempos limpios**. De todos los timecodes del libreto se toma la fila más larga que no retrocede —los fiables—, y los que se salen se recolocan: si quitándole o poniéndole **horas enteras** cabe entre el de antes y el de después, es una hora mal escrita y se usa corregido; si se sale por poco —dos que se pisan—, se mete entre sus vecinos lo más cerca de lo que pone y no se dice nada; si se sale por **medio minuto o más** y no es cosa de horas, no se sabe cuál es y se pone a medio camino. En el primer parlamento y en el último, que solo tienen un vecino, la hora corregida tiene que caer a menos de diez minutos de él: sin ese tope cualquier hora «cabría». **Los timecodes del libreto no se tocan.** Los limpios sirven para saber qué parlamento suena, qué trozo de audio le toca a cada uno en «Analizar cambios» —al de antes de la errata le tocaba una hora entera de audio— y de dónde a dónde va el libreto (PT-26). Y **se dice cuál es**, una vez al empezar a seguir: página, personaje, lo que pone, entre cuáles está y cómo se sigue, para que alguien lo corrija en el guion. | ✅ |
+| **PT-28** | **En un libreto que pasa de la hora, la una y tres es la una y tres.** Llegó de sala: «estoy en 01:03:24:00 en el vídeo y el libreto coloca el parlamento de 00:03:24:00». Era PT-26: cuando valían varias diferencias de hora —un libreto de más de una hora— se suponía la «de costumbre», que una sesión empieza en 01:00:00:00, y a un libreto que cuenta desde cero y pasa de la hora se le restaba una. **Enmienda a PT-26**: si «cuentan igual» es una de las que valen, **es esa**; solo cuando no cabe se toma la menor. La sesión que de verdad va una hora por delante de un libreto largo se descubre sola en cuanto Pro Tools pasa del final del libreto —ahí ya no cabe «cuentan igual»— y desde entonces no se duda; o se fija a mano en el panel. | ✅ |
+| **PT-29** | **Los timecodes mal escritos se corrigen desde la app.** Llegó de sala al día siguiente de PT-27: «aún molesta si el timecode está mal, quiero que lo cambies tú o que me des la opción para cambiarlos». Seguir bien no bastaba: el libreto seguía enseñando el 01:16:50 y el aviso volvía a salir. El aviso lleva el botón **«Corregir»**: si todos son una hora de más o de menos, ese clic los cambia; si alguno no se sabe cuál es, abre la **lista** —quién, página, lo que pone, entre cuáles está y lo que dice el parlamento— con la corrección propuesta en un campo que se puede escribir. Los de la hora vienen marcados; los demás, no: se escribe el bueno. La misma lista se abre desde el panel del timecode, que dice cuántos hay. Corregir **cambia el timecode en el libreto**, recoloca a los que heredaban de él, guarda el capítulo en la nube y en el equipo, avisa a los demás equipos y deja **«Deshacer»** a un clic; el que traía el guion se guarda (`tcOrig`). Un timecode que no se entiende no cambia nada y se señala en rojo. | ✅ |
 
 ## Nunca
 
@@ -245,6 +247,20 @@ qué dijo el director.
   de 260 parlamentos y esa errata en el 201: antes el seguimiento se quedaba
   en 00:16:45 y ahora llega a donde va Pro Tools, con el aviso nombrando la
   página, el personaje y el timecode.
+- **PT-28**, en la sección 3 y la 6 de `pruebas/horapt.prueba.js`: la 01:03:24
+  de un libreto que va de 00:00:10 a 01:09:42 no resta nada; lo visto sigue
+  mandando; y la sesión que sí va una hora por delante se descubre al ver un
+  02:05:00 y ya no se duda al volver.
+- **PT-29**, en las secciones 9 a 11 de `pruebas/tiemposlimpios.prueba.js`: el
+  timecode cambiado en el libreto con el del guion guardado; el que hereda,
+  el libreto de antes sin timecodes propios y lo que no vale; pintar, guardar
+  en la nube y en el equipo, avisar a los demás y deshacer; el botón del
+  aviso con todos de hora y con uno que no; la lista con sus marcas, escribir
+  un timecode, el que no se entiende y no marcar ninguno; y el renglón del
+  panel. Las mutaciones se corren después de desplegar. Y en el navegador, con
+  un libreto de 850 parlamentos de 00:00:10 a 01:10:55 y la errata en el 201:
+  en 01:03:24 marca el de 01:03:20, y «Corregir» deja el 01:16:50 en 00:16:50
+  en pantalla, sin nada fuera de orden y con «Deshacer».
 
 ## Sin resolver
 
@@ -255,8 +271,15 @@ qué dijo el director.
   el capítulo.
 - **PT-27**: una errata en el **último** parlamento que lo adelanta —una hora
   de más al final— no retrocede, así que no se distingue de un timecode
-  bueno. Y el parlamento con la errata no se marca en el propio libreto: solo
-  lo dice el aviso. No se ha visto todavía con el libreto de sala.
+  bueno.
+- **PT-28**: una sesión que va una hora por delante de un libreto de más de
+  una hora se coloca mal hasta que Pro Tools pasa del final del libreto, o
+  hasta que se fija a mano. Es el precio de no suponer.
+- **PT-29**: solo se pueden cambiar los timecodes que están **fuera de
+  orden**. Uno mal escrito que no rompe el orden —un 00:16:59 por 00:16:50—
+  ni se detecta ni tiene dónde corregirse. La página del PDF sigue enseñando
+  el timecode del guion. Y guardar en la nube está probado con dobles, no
+  contra Supabase.
 - **BAN-3** y **BAN-7**, en `pruebas/banda.prueba.js`, con un canvas de mentira
   que apunta cada trazo con su posición y su ancho ya escalado. La geometría es
   exacta porque el ancho de un carácter se fija en la prueba. Se comprueba el

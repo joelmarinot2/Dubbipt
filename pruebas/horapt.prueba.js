@@ -76,7 +76,9 @@ exports.pruebas = function(t){
   t.seccion('3 · cuando valen dos: un libreto de más de una hora');
   /* 01:00:05 puede ser el segundo 5 de un libreto desde cero con la sesión en
      01:00:00:00, o el minuto 60 con la sesión desde cero. */
-  t.eq('se supone la de costumbre: la sesión empieza en 01:00:00:00', c(H + 5, LARGO), '3600 supuesto');
+  t.eq('si «cuentan igual» vale, es esa: la 01:03:24 de un libreto que pasa de la hora es la 01:03:24', c(H + 204, LARGO), '0 supuesto',
+       'llegó de sala: «estoy en 01:03:24:00 y el libreto coloca el parlamento de 00:03:24:00». Se suponía que la sesión empieza en 01:00:00:00, y no');
+  t.eq('y en el primer minuto de esa hora, igual', c(H + 5, LARGO), '0 supuesto');
   t.eq('también entrando a mitad: 02:05:00 es el 01:05:00 del libreto, no el 00:05:00', c(2 * H + 300, LARGO), '3600 supuesto',
        'valen una hora y dos; la de costumbre es una');
   t.eq('con un libreto que ya cuenta desde la una, lo de costumbre es ninguna', c(H + 100, { a: H + 5, b: 2 * H + 600 }), '0 supuesto');
@@ -86,7 +88,7 @@ exports.pruebas = function(t){
        'con una hora de diferencia, ese 00:20:00 habría sido cuarenta minutos antes de empezar el libreto');
   t.eq('y si se le vio en 02:05:00, no puede contar desde cero', c(H + 5, LARGO, { min: H + 5, max: 2 * H + 300 }), '3600 hora');
   t.eq('lo visto que las descarta todas no se atiende: mejor suponer que quedarse sin ninguna',
-       c(H + 5, LARGO, { min: -5000, max: H + 5 }), '3600 supuesto', 'un rebobinado hasta mucho antes de la claqueta');
+       c(H + 5, LARGO, { min: -5000, max: H + 5 }), '0 supuesto', 'un rebobinado hasta mucho antes de la claqueta');
   t.eq('sin la de costumbre entre las que valen, la más corta', c(9 * H + 5000, { a: 4 * H, b: 6 * H + 600 }), '18000 supuesto',
        'valen cinco y seis horas: ninguna es la de costumbre, y se toma la menor');
 
@@ -134,7 +136,13 @@ exports.pruebas = function(t){
   t.eq('y como cuentan igual, no hay nada que decir', A.avisos.length, 2);
   /* Lo visto corrige lo supuesto. */
   const B = armar({ guion: guion([10, 2000, 4182]) });
-  t.eq('en un libreto largo, primero la de costumbre', B.M.hptDe(H + 5) + ' ' + B.M.HPT.tipo, '3600 supuesto');
+  t.eq('en un libreto largo, a la 01:00:05 se supone que cuentan igual', B.M.hptDe(H + 5) + ' ' + B.M.HPT.tipo, '0 supuesto');
+  t.eq('y no se avisa de nada: no hay diferencia que decir', B.avisos.length, 0);
+  /* La sesión que sí va una hora por delante se descubre al pasar del final del libreto. */
+  const B2 = armar({ guion: guion([10, 2000, 4182]) });
+  B2.M.hptDe(H + 5);
+  t.eq('al verle a Pro Tools un 02:05:00, que no cabe en el libreto, va una hora por delante', B2.M.hptDe(2 * H + 300) + ' ' + B2.M.HPT.tipo, '3600 hora');
+  t.eq('y al volver a la 01:00:05 ya no se duda', B2.M.hptDe(H + 5) + ' ' + B2.M.HPT.tipo, '3600 hora');
   t.eq('al verle a Pro Tools un 00:20:00, cuentan igual', B.M.hptDe(1200) + ' ' + B.M.HPT.tipo, '0 igual');
   t.eq('y al volver a 01:00:05 ya no se duda: sigue sin diferencia', B.M.hptDe(H + 5) + ' ' + B.M.HPT.tipo, '0 igual');
   /* Fijada a mano. */

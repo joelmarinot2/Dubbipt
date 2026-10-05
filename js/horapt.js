@@ -76,10 +76,12 @@ function hptRango(guion){
  *   igual     cuentan desde la misma hora.
  *   hora      solo una diferencia de horas deja a Pro Tools dentro del libreto.
  *   supuesto  valen varias -el libreto dura más de una hora-. Se quita la que
- *             dejaría fuera algo de lo ya visto, y entre las que quedan se
- *             toma la de costumbre: una sesión empieza en 01:00:00:00, así
- *             que con un libreto desde cero es una hora, y con uno que ya
- *             cuenta desde otra, ninguna. Si no está entre ellas, la menor.
+ *             dejaría fuera algo de lo ya visto, y de las que quedan: si
+ *             «cuentan igual» es una de ellas, es esa; si no, la menor. Se
+ *             suponía que una sesión empieza en 01:00:00:00, y llegó de sala
+ *             que no: «estoy en 01:03:24:00 y el libreto coloca el parlamento
+ *             de 00:03:24:00». En un libreto que pasa de la hora, la una y
+ *             tres es la una y tres.
  *   fuera     ninguna hora deja a Pro Tools dentro del libreto.
  *   sin       el libreto no trae timecodes.
  */
@@ -99,9 +101,7 @@ function hptCalcular(pt, rango, visto, fijo){
     if(tambien.length) caben = tambien;
   }
   if(caben.length === 1) return { d: caben[0] * 3600, tipo: caben[0] ? 'hora' : 'igual' };
-  const base = Math.floor((rango.a + HPT_MARGEN) / 3600);       // la hora desde la que cuenta el libreto
-  const costumbre = base === 0 ? [1, 0] : [0];
-  for(const k of costumbre) if(caben.indexOf(k) >= 0) return { d: k * 3600, tipo: 'supuesto' };
+  if(caben.indexOf(0) >= 0) return { d: 0, tipo: 'supuesto' };
   caben.sort((x, y) => Math.abs(x) - Math.abs(y) || y - x);
   return { d: caben[0] * 3600, tipo: 'supuesto' };
 }
