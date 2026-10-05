@@ -65,6 +65,8 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **CAST-33** | Un personaje puede tener **más de un gemelo** —su archivo y su voz en off— y se rellenan **todos**, no el primero que aparezca. Antes se devolvía uno solo, así que la otra fila seguía en blanco sin que nada lo dijera. El deshacer guarda a todos en la misma foto: si se les copia el talento, Ctrl+Z tiene que devolverlos a la vez. | ✅ |
 | **CAST-34** | El sufijo cuenta **solo al final** del nombre y **solo si es exactamente el sufijo**. `HOMBRE 1 (GRITA)` no es la voz en off de nadie, y `HENRI (VOZ DE NIÑO)` **tampoco**: si contara, se le copiaría el actor de HENRI a un personaje distinto. | ✅ |
 | **CAST-35** | **El bullicio lo graban todos.** Pedido de sala: «en el barrido de quién es original, pon al talento TODOS cuando encuentre (BULLICIO) (WALLAS) (INDISTINTO)». Un personaje de solo gestos que entre ellos trae `(BULLICIO)`, `(WALLA)`/`(WALLAS)` o `(INDISTINTO)` —también `INDISTINCT`— no se deja original: al entrar en casting se le pone **`TODOS`** solo, como la X de `PRINCIPAL PHOTOGRAPHY`, se dice a quién, queda mirado y cerrado (FIN-4), y viaja a la nube. Solo a los que están **vacíos** (CAST-N1). Verificar a mano a uno de estos pone `TODOS`, no `ORIGINAL`. Uno que además dice una palabra de verdad **no entra en el barrido** y se reparte a mano: con una sola línea de ruido, un `TODOS` automático a un personaje que habla sería el error caro. | ✅ |
+| **CAST-36** | **Quien se llama WALLA es el bullicio.** La lista de diálogos de Netflix (LIB-25) trae el bullicio como un personaje más —`WALLA`—, y ese grita alguna frase suelta («Stays in Boracay!») sin dejar de serlo, así que no entra en el barrido de solo gestos. Un personaje cuyo nombre **entero** es bullicio, walla o indistinto —con un número si acaso: `WALLAS 2`— recibe `TODOS` igual que en CAST-35, y solo si está vacío. `WALLACE` y `WALLA VENDOR` son personajes y se reparten a mano. | ✅ |
+| **CAST-37** | **Con libreto traducido o sin él.** Pedido de sala: «que yo pueda marcar si es con libreto traducido o no, es para adelantar el casting si no ha llegado el libreto». Cada capítulo lleva esa marca. La pone **una persona** con el botón de la barra de casting, y un capítulo que sale de la lista de diálogos original (LIB-25) nace **sin libreto traducido**. Viaja a la nube con el capítulo. Lo que nadie ha dicho —los capítulos de siempre— cuenta como traducido. Volver a leer la lista **no pisa** lo que marcó una persona, y la marca de un capítulo no se hereda al abrir otro ni al cargar un archivo nuevo. Sin libreto traducido, el botón va en ámbar y las hojas impresas —desglose y planilla— dicen «Casting adelantado»: las líneas son las del original y cambian cuando llegue el libreto. | ✅ |
 | **CAST-31** | El panel del diagnóstico de la exportación **se abre solo cuando algo no cuadra**, y «falta repartir» no es eso. Una fila del Excel se queda en blanco por dos razones que no se parecen: porque a ese personaje **todavía no se le ha puesto nadie** —el curso normal del trabajo— o porque la aplicación **sí tenía** su talento y la celda salió vacía —eso sí es una pérdida—. Solo la segunda abre el panel. Llegó de sala con el 101 de «100 days of deception»: 63 personajes, 62 repartidos, 63 filas, 62 escritas, ni un talento sin sitio, y el panel abriéndose como si hubiera fallado. La condición miraba `filasSinActor` a secas, así que saltaba con un solo personaje sin repartir: prácticamente siempre. El volcado sigue diciendo cuántas filas están sin actor, porque es un dato útil, y añade **cuántas lo están teniendo talento**, que es la cifra que decide. | ✅ |
 
 ## Reglas · personajes completados
@@ -157,6 +159,18 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
   el TODOS puesto solo a los vacíos y en lo crudo; que no quedan pendientes;
   que volver a entrar no repite; verificar a mano; y el orden de entrada,
   antes de avisar de los gestos). Quince mutaciones, todas en rojo.
+- **CAST-36**: la misma sección 5 de `pruebas/gestos.prueba.js` (qué nombres
+  son el bullicio y cuáles solo lo parecen; el WALLA que además grita una
+  frase, que no está en el barrido y aun así queda en TODOS; y WALLACE, que
+  no).
+- **CAST-37**: la sección 6 de `pruebas/listadialogos.prueba.js` (la lista
+  deja el capítulo sin libreto traducido y no pisa lo que dijo una persona;
+  lo que se guarda y lo que vuelve, también cuando viene raro de la nube; el
+  botón; marcar a mano con capítulo y sin él) y la 7 (por dónde se guarda,
+  por dónde vuelve, que no se hereda de un capítulo a otro, el botón solo en
+  casting, y la hoja impresa). Las mutaciones, con las de LIB-25. En el navegador: el botón en
+  ámbar al entrar en casting con la lista de verdad, el cambio a mano en los
+  dos sentidos y el aviso en la hoja impresa solo cuando falta el libreto.
 - **CAST-28 a CAST-30** y **CAST-32 a CAST-34**: `pruebas/archivo.prueba.js`,
   con nombres de los dos capítulos que llegaron de sala. Trece mutaciones
   comprobadas en rojo. Y además se corrió la lógica contra el Excel de verdad
@@ -180,5 +194,10 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
   puente con DublajeCast— siguen sin prueba. Es la primera cosa que añadir.
 - **CAST-24**: el margen de 4 líneas es un número elegido a ojo. No hay medida
   de si en sala es el bueno.
+- **CAST-37**: cuando llega el libreto traducido hay que crear el capítulo
+  con él, y el reparto pasa por el registro del programa (CAST-6): en naranja
+  y por verificar. Cargar el libreto nuevo **dentro del mismo capítulo**
+  conservando el casting está sin hacer. Y la marca solo se ve con el capítulo
+  abierto: en la lista de capítulos del programa no sale.
 - El puente con DublajeCast nunca se ha probado contra sus datos reales; no he
   entrado en su cuenta y no debo.

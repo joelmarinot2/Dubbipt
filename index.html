@@ -165,6 +165,8 @@ body.modo-casting .card.chuleada .okchk{animation:chulo .38s cubic-bezier(.2,1.4
 .lib-head h2 .sep{color:var(--ink-faint);margin:0 6px;font-weight:400}
 .lib-head .lmsg{font-size:11.5px;color:var(--ink-faint);flex:1;min-width:120px}
 .btnv.sm{padding:7px 11px;font-size:12px}
+/* Casting adelantado: el capítulo todavía no tiene el libreto traducido. */
+.btnv.sin-libreto{border-color:#F59E0B !important;color:#FBBF24 !important}
 .lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(152px,1fr));gap:12px}
 .lib.slim .lib-grid{display:none}
 .lib.slim{padding:10px 16px}
@@ -2001,6 +2003,7 @@ body.modo-casting #btnExport{ display:none !important; }
       <div class="ac-div" aria-hidden="true"></div>
       <button class="btnv sm" id="btnModo" style="display:none" onclick="cambiarModo()" title="Cambiar de perfil: Grabación, QC o Casting">Modo</button>
       <button class="btnv sm" id="btnGestos" style="display:none" onclick="gestPanel()" title="Personajes que en este capitulo solo hacen gestos, sin una sola palabra">🎭 Solo gestos</button>
+      <button class="btnv sm" id="btnLibTrad" style="display:none" onclick="libTraducidoCambiar()" title="Marca si este capitulo tiene ya el libreto traducido o si el casting va adelantado con el original">📄 Con libreto traducido</button>
       <button class="btnv sm" id="btnBaseTal" style="display:none" onclick="talPanel()" title="La lista de actores de la empresa: solo se puede repartir a quien este aqui">🎭 Base de talentos</button>
       <button class="btnv sm" id="btnMeta" style="display:none" onclick="castMetaPanel()" title="Fecha, género, tiempo, director, técnico y estudio del programa">Cabecera</button>
       <button class="btnv sm" id="btnDcast" style="display:none" onclick="dcPanel()" title="Sincronizar el casting con DublajeCast">⇄ DublajeCast</button>
@@ -2363,7 +2366,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.19.0-nube';
+const APP_VER_NUM = 'v11.20.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3907,6 +3910,7 @@ let lastXlsBuf = null, lastPdfBuf = null;
 async function loadXls(file){
   const buf = await file.arrayBuffer();
   currentEp = null;          // carga suelta: fuera de la biblioteca
+  window._libTraducido = null;   // archivo nuevo: nadie ha dicho todavía si trae libreto traducido
   await loadXlsBuf(buf, file.name);
   renderLibrary();
 }
@@ -3919,7 +3923,16 @@ async function loadXlsBuf(buf, name){
     lastXlsBuf = buf;
     const wb = XLSX.read(buf, {type:'array'});
     xlsFileName = name;
-    parseDesglose(wb);
+    /* ¿Es la lista de diálogos en idioma original -la de Netflix- y no un
+       desglose? Con ella se arma el libreto y el desglose para adelantar el
+       casting; si no lo es, el lector de desgloses de siempre. */
+    const lista = (typeof ldDeLibro === 'function') ? ldDeLibro(wb) : null;
+    if(lista){
+      ldArmar(lista, name);
+      if(!window._QUIET){ try{ ldAvisar(lista); }catch(e){ fallo('ldAvisar · index.html:loadXlsBuf', e); } }
+    } else {
+      parseDesglose(wb);
+    }
     loadProgress();
     loadUI();
     if(pdfDoc) await scanPdf();
@@ -3931,6 +3944,7 @@ async function loadXlsBuf(buf, name){
 
 async function loadPdf(file){
   currentEp = null;                 // carga suelta: fuera de la biblioteca
+  window._libTraducido = null;      // archivo nuevo: nadie ha dicho todavía si trae libreto traducido
   if(/\.(xlsx|xlsm|xls)$/i.test(file.name)){ await loadXls(file); renderLibrary(); return; }
   const buf = await file.arrayBuffer();
   if(/\.docx$/i.test(file.name) || (file.type||'').includes('word')){
@@ -8670,7 +8684,7 @@ function ponerModo(epId, m){
   if(bu){ bu.style.display = (m === 'casting') ? '' : 'none'; castPintarUndo(); }
   const bt = document.getElementById('btnTabla');
   if(bt) bt.style.display = (m === 'casting') ? '' : 'none';
-  for(const id of ['btnImpDes','btnImpPla','btnDcast','btnMeta','btnGestos','btnBaseTal']){
+  for(const id of ['btnImpDes','btnImpPla','btnDcast','btnMeta','btnGestos','btnBaseTal','btnLibTrad']){
     const b = document.getElementById(id);
     if(b) b.style.display = (m === 'casting') ? '' : 'none';
   }
@@ -8680,6 +8694,7 @@ function ponerModo(epId, m){
   try{ castPintarOcupacion(); }catch(e){}
   // continuidad: lo que ya se repartió en otros capítulos del programa
   if(m === 'casting'){
+    try{ libTraducidoPintar(); }catch(e){ fallo('libTraducidoPintar · index.html', e); }
     /* El bullicio, los wallas y lo indistinto lo graban todos: TODOS puesto
        antes de avisar de los gestos, para que no salgan como pendientes. */
     try{
@@ -9533,18 +9548,35 @@ function gestMapa(){
 function gestOlvidar(){ _gestMapa = null; _gestSello = ''; }
 
 /**
+ * ¿El personaje SE LLAMA bullicio, walla o indistinto? El nombre entero, con
+ * un número si acaso -«WALLA», «WALLAS 2», «BULLICIO»-: «WALLACE» o «WALLA
+ * VENDOR» son personajes. La lista de diálogos de Netflix lo trae así, como
+ * un personaje más, y ese grita alguna frase suelta sin dejar de ser el
+ * bullicio.
+ */
+function gestNombreTodos(nombre){
+  const toks = String(nombre == null ? '' : nombre).normalize('NFD').replace(/[^\x20-\x7E]/g, '').toUpperCase()
+    .split(/[^A-Z0-9]+/).filter(Boolean);
+  return toks.some(x => GEST_TODOS_PAL.has(x)) && toks.every(x => GEST_TODOS_PAL.has(x) || /^\d+$/.test(x));
+}
+
+/**
  * Pone TODOS a los de bullicio, wallas o indistinto, al entrar en casting.
  * Como la X de PRINCIPAL PHOTOGRAPHY: solo a los que están VACÍOS -lo que
  * haya escrito una persona no se toca (CAST-N1)-, y quedan dados por
  * mirados, que la regla ya los miró. Devuelve los nombres que ha marcado.
+ *
+ * Entran por lo que hacen -todo gestos, y entre ellos bullicio- o por cómo se
+ * llaman.
  */
 function gestMarcarTodos(){
   const puestos = [];
   const mapa = gestMapa();
-  for(const k in mapa){
-    if(!mapa[k].todos) continue;
-    const c = (typeof charIdx !== 'undefined') ? charIdx[k] : null;
+  const idx = (typeof charIdx !== 'undefined' && charIdx) ? charIdx : {};
+  for(const k in idx){
+    const c = idx[k];
     if(!c) continue;
+    if(!(mapa[k] && mapa[k].todos) && !gestNombreTodos(c.display || k)) continue;
     if(c.talent && String(c.talent).trim()) continue;
     c.talent = GEST_TODOS;
     c.noRec = true;
@@ -9719,9 +9751,13 @@ function impCabecera(titulo){
     try{ return ((sbShows().find(x => x.id === LDB.showId) || {}).name) || ''; }catch(e){ return ''; }
   })();
   const hoy = new Date().toLocaleDateString('es', { day:'2-digit', month:'long', year:'numeric' });
+  /* Si el casting va adelantado, la hoja lo dice: las líneas son las del
+     original y cambian cuando llegue el libreto traducido. */
+  const adelantado = (typeof libTraducido === 'function') && !libTraducido();
   return '<div class="enc"><div><h1>' + impEsc(titulo) + '</h1>'
        + '<div class="sub">' + impEsc(prog) + (prog && ep ? ' · ' : '') + impEsc(ep) + '</div></div>'
-       + '<div class="fecha">' + impEsc(hoy) + '</div></div>';
+       + '<div class="fecha">' + impEsc(hoy) + '</div></div>'
+       + (adelantado ? '<div class="adelantado">Casting adelantado · este capítulo todavía no tiene el libreto traducido</div>' : '');
 }
 
 const IMP_CSS = `
@@ -9732,6 +9768,8 @@ const IMP_CSS = `
   h1{ font-size:19px; margin:0; letter-spacing:.02em; }
   .sub{ font-size:12.5px; color:#444; margin-top:3px; }
   .fecha{ font-size:11px; color:#666; }
+  .adelantado{ font-size:12px; font-weight:700; color:#92400E; border:1.5px solid #D97706;
+        border-radius:4px; padding:5px 9px; margin:-4px 0 12px; }
   table{ width:100%; border-collapse:collapse; }
   th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em;
       color:#444; border-bottom:1.5px solid #111; padding:0 7px 5px; }
@@ -11356,6 +11394,7 @@ function editEpisode(){
 async function loadFileForEp(file){
   // limpiar el desglose anterior para que se regenere desde el archivo nuevo
   try{ chars=[]; charIdx={}; script=[]; scriptByKey={}; occByChar={}; charMarks={}; window._charsRaw=null; if(typeof progress!=='undefined') progress={}; }catch(e){}
+  window._libTraducido = null;   // archivo nuevo: la marca de «sin libreto traducido» no se hereda del capítulo de antes
   if(/\.(xlsx|xlsm|xls)$/i.test(file.name)){ await loadXls(file); return; }
   const buf = await file.arrayBuffer();
   if(/\.docx$/i.test(file.name) || (file.type||'').includes('word')){ await loadDocx(buf, file.name); }
@@ -11488,7 +11527,7 @@ function newEpisodeModal(){
     +'<div class="ddlm-field" style="margin-bottom:8px"><label>Guion del episodio</label>'
       +'<label class="ddlm-drop" id="neDrop"><span class="ddlm-drop-ic">'+ICO.upload+'</span>'
         +'<span class="ddlm-drop-t" id="neDropT">Arrastra o elige el guion</span>'
-        +'<span class="ddlm-drop-h">PDF · Word · Excel — el desglose se genera solo</span>'
+        +'<span class="ddlm-drop-h">PDF · Word · Excel · lista de diálogos original — el desglose se genera solo</span>'
         +'<input type="file" id="neFile2" accept="application/pdf,.pdf,.docx,.xlsx,.xlsm,.xls"></label>'
     +'</div>'
     +'<div class="ddlm-err" id="neErr"></div>'
@@ -11867,6 +11906,9 @@ function hydrateEpisode(d){ _epOpen(true);
     }
   }catch(e){}
   try{ cortesCargar(d.cortes); }catch(e){}
+  /* Con libreto traducido o sin él: lo marcó una persona, o el lector de la
+     lista de diálogos original. */
+  try{ libTraducidoCargar(d.traducido); }catch(e){}
   window._cotejo = {};
   try{
     const src = (d.cotejo && typeof d.cotejo === 'object') ? d.cotejo : {};
@@ -11935,6 +11977,7 @@ async function saveEpCache(epId, stamp){
     await idbSet('ep:'+epId, { stamp,
       meta:{ showId: currentEp ? currentEp.showId : null, name: currentEp ? currentEp.name : '' },
       data:{ _epId: epId, chars, script, numPages, tcIndex, pdfName, xlsName: xlsFileName,
+             traducido: (typeof libTraducidoParaGuardar === 'function') ? libTraducidoParaGuardar() : null,
              charsRaw: window._charsRaw || null } });
   }catch(e){}
 }
@@ -11980,6 +12023,7 @@ async function epDataUpsert(epId, showId){
     if(!script || !script.length) return false;
     if(window._dataEpId && window._dataEpId !== epId) return false;   // jamás datos cruzados
     const data = { name:(currentEp&&currentEp.name)||'', chars, script, numPages, tcIndex,
+      traducido: (typeof libTraducidoParaGuardar === 'function') ? libTraducidoParaGuardar() : null,
       pdfName, xlsName: xlsFileName, charsRaw: window._charsRaw || null,
       adr: (window._adrDatos && Object.keys(window._adrDatos).length) ? window._adrDatos : null,
       cortes: (typeof CORTES !== 'undefined' && CORTES.lista.length) ? CORTES.lista : null,
@@ -12115,7 +12159,7 @@ async function openEpisodeFromJson(ep){
     { const b=document.getElementById('btnSync'); if(b) b.style.display=''; }
     try{ updateBackBtn(); }catch(e){}
     hydrateEpisode({ _epId: ep.id, chars:j.chars, script:j.script, numPages:j.numPages,
-      tcIndex:j.tcIndex, pdfName:j.pdfName, xlsName:j.xlsName, charsRaw:j.charsRaw });
+      tcIndex:j.tcIndex, pdfName:j.pdfName, xlsName:j.xlsName, charsRaw:j.charsRaw, traducido:j.traducido });
     window._dataEpId = ep.id;
     try{ await idbSet('ep:'+ep.id, { stamp: ep.updated_at, meta:{ showId: ep.show_id, name: ep.name },
       data:{ _epId: ep.id, chars:j.chars, script:j.script, numPages:j.numPages,
@@ -12140,6 +12184,7 @@ async function ensureLibretoJson(ep){
     if(window._dataEpId !== ep.id) return;
     const jsonPath = ep.show_id+'/'+ep.id+'/libreto.json';
     const payload = JSON.stringify({ v:2, epId:ep.id, name:ep.name, chars, script, numPages, tcIndex,
+      traducido: (typeof libTraducidoParaGuardar === 'function') ? libTraducidoParaGuardar() : null,
       pdfName, xlsName:xlsFileName, charsRaw: window._charsRaw || null,
       adr: (window._adrDatos && Object.keys(window._adrDatos).length) ? window._adrDatos : null,
       cortes: (typeof CORTES !== 'undefined' && CORTES.lista.length) ? CORTES.lista : null,
@@ -12157,6 +12202,7 @@ async function ensureLibretoJson(ep){
 
 async function openEpisode(id){
   LDB.browse = false;   // al abrir, la lista se recoge
+  window._libTraducido = null;   // la marca es de cada capítulo: la del anterior no vale para este
   const row = (LDB.epsAll||[]).find(e=> e.id===id) || null;
   taskShow('open', (row && row.name) || 'Capítulo');
   taskStep('1/3 · Buscando en la caché local…', 15);
@@ -12376,7 +12422,9 @@ async function saveEpHere(){
   const name = (window._epNameOverride!=null && window._epNameOverride!=='') ? window._epNameOverride : prompt('Nombre del capítulo:', (!esNuevo && currentEp) ? currentEp.name : sug);
   window._epNameOverride = null;
   if(!name || !name.trim()) return;
-  if(esNuevo && !lastPdfBuf && lastXlsBuf){
+  /* Solo si de verdad no hay libreto: una lista de diálogos trae el suyo
+     aunque no haya PDF, y preguntar eso ahí no tiene sentido. */
+  if(esNuevo && !lastPdfBuf && lastXlsBuf && !(script && script.length)){
     if(!confirm('Este capítulo se guardaría SIN el libreto PDF (solo el desglose).\n¿Seguro? Puedes cargar el PDF abajo y volver a guardar.')) return;
   }
   libMsg('Subiendo a la nube…');
@@ -21795,6 +21843,7 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/adr.js"></script>
 <script src="./js/sala.js"></script>
 <script src="./js/talentos.js"></script>
+<script src="./js/listadialogos.js"></script>
 <script src="./js/tcpantalla.js"></script>
 <script src="./js/mtc.js"></script>
 <script src="./js/qcpdf.js"></script>

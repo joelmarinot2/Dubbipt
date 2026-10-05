@@ -21,7 +21,7 @@ exports.pruebas = function(t){
   const w = { _charsRaw: [], _dataEpId: 'x' };
   const G = montar(
     [['const GEST_PAL', '/** Aviso al entrar en casting']],
-    ['gestNucleo', 'gestRenglonMudo', 'gestBloqueMudo', 'gestEscanear', 'gestRenglonTodos', 'gestMarcarTodos',
+    ['gestNucleo', 'gestRenglonMudo', 'gestBloqueMudo', 'gestEscanear', 'gestRenglonTodos', 'gestMarcarTodos', 'gestNombreTodos',
      'gestVerificar', 'gestOlvidar', 'gestPendientes', 'GEST_TODOS', 'GEST_ORIGINAL'],
     { script, charIdx, DDL_MODO: 'casting', window: w,
       NO_REC: new Set(['ORIGINAL', 'TODOS', 'X']), norm: (s) => String(s).toUpperCase().trim(),
@@ -147,6 +147,24 @@ exports.pruebas = function(t){
   t.eq('ya no quedan pendientes de bullicio: el que reacciona, y el coro que repartió una persona sin mirarlo',
        G.gestPendientes().map(x => x.key).join(','), 'CORO,MALESOLDIER');
   t.eq('volver a entrar no los vuelve a poner', G.gestMarcarTodos().length, 0);
+  /* Y por el NOMBRE: en la lista de diálogos de Netflix el bullicio viene como
+     un personaje que se llama WALLA, y ese grita alguna frase suelta
+     -«Stays in Boracay!»- sin dejar de ser el bullicio. */
+  for(const x of ['WALLA', 'WALLAS', 'Walla', 'WALLA 2', 'BULLICIO', 'INDISTINTO'])
+    t.eq('quien se llama «' + x + '» es de todos', G.gestNombreTodos(x), true);
+  for(const x of ['WALLACE', 'WALLA VENDOR', 'MALE SOLDIER', 'TODOS', '2', '', 'PUBLICO'])
+    t.eq('«' + x + '» no', G.gestNombreTodos(x), false);
+  script.push({ idx: 9, key: 'WALLA', lines: ['[INDISTINCT]'] });
+  script.push({ idx: 10, key: 'WALLA', lines: ['Stays in Boracay!'] });
+  script.push({ idx: 11, key: 'WALLACE', lines: ['(BULLICIO)'] }, { idx: 12, key: 'WALLACE', lines: ['Buenas noches.'] });
+  charIdx.WALLA = { display: 'WALLA', talent: '' };
+  charIdx.WALLACE = { display: 'WALLACE', talent: '' };
+  w._charsRaw.push({ key: 'WALLA', talent: '' }, { key: 'WALLACE', talent: '' });
+  G.gestOlvidar();
+  t.eq('el WALLA que además grita una frase no está en el barrido de gestos', !!G.gestEscanear().WALLA, false);
+  t.eq('pero se llama WALLA: TODOS', G.gestMarcarTodos().join(','), 'WALLA');
+  t.ok('en la tarjeta y en lo crudo', charIdx.WALLA.talent === 'TODOS' && charIdx.WALLA.noRec === true && w._charsRaw.find(x => x.key === 'WALLA').talent === 'TODOS');
+  t.eq('WALLACE habla y no se llama así: se reparte a mano', charIdx.WALLACE.talent, '');
   /* Verificar a mano: TODOS para el bullicio, ORIGINAL para el que reacciona. */
   G.gestVerificar('MALESOLDIER', true);
   t.eq('verificar al que reacciona lo deja original', charIdx.MALESOLDIER.talent, G.GEST_ORIGINAL);
