@@ -1689,6 +1689,8 @@ function tcpPanel(){
     +   '</select></label>'
     +   '<label class="sala-c">Ajuste fino <input id="tcpLat" type="number" step="0.02" min="-2" max="2" '
     +     'value="' + TCP.lat + '"> s</label>'
+    /* La hora entre Pro Tools y el libreto: automática, o fijada a mano. */
+    +   ((typeof hptPanelHtml === 'function') ? hptPanelHtml() : '')
     + '</div>'
     /* Para cuando lo aprendido está mal y no hay manera de que lea: antes no
        había forma de quitar una cifra mal aprendida. */
@@ -1761,6 +1763,7 @@ function tcpPanel(){
   ov.querySelector('#tcpLat').onchange = (e) => {
     const v = +e.target.value; TCP.lat = isFinite(v) ? Math.max(-2, Math.min(2, v)) : 0; tcpGuardar();
   };
+  if(typeof hptPanelCablear === 'function') hptPanelCablear(ov);
   { const b = ov.querySelector('#tcpCaptura'); if(b) b.onclick = ()=> tcpDiagnosticoBajar(); }
   const cero = ov.querySelector('#tcpCero');
   if(cero) cero.onclick = async () => {

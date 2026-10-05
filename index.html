@@ -2382,7 +2382,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.21.0-nube';
+const APP_VER_NUM = 'v11.22.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4846,7 +4846,10 @@ function qcBorrador(){
      libreto (SEG_ADELANTO): en las últimas décimas de un parlamento el marcado
      ya es el siguiente, y el fallo que se acaba de oír es de este. */
   if(ahora != null){
-    const que = (typeof stCurBlock === 'function') ? stCurBlock(ahora) : -1;
+    /* Con la hora del libreto, no la de Pro Tools: es su parlamento el que
+       se busca. El tiempo que se apunta sigue siendo el de Pro Tools. */
+    const que = (typeof stCurBlock === 'function')
+      ? stCurBlock(ahora - ((typeof hptDe === 'function') ? hptDe(ahora) : 0)) : -1;
     if(que >= 0) si = que;
     else if(typeof studio !== 'undefined' && studio && studio.cur >= 0) si = studio.cur;
   }
@@ -20027,7 +20030,12 @@ function studioTick(forzado){
      El vídeo de aquí solo lleva el reloj cuando no hay Pro Tools leyendo, para
      que el libreto siga sirviendo a quien trabaje sin sala. */
   const pt = (typeof tcpFuente === 'function') ? tcpFuente() : null;
-  const t = (pt != null) ? pt
+  /* LA HORA. Una sesión que empieza en 01:00:00:00 y un libreto que cuenta
+     desde 00:00:00:00 son el mismo vídeo con una hora de diferencia: sin
+     restarla, Pro Tools cae siempre «después del último parlamento» y el
+     libreto se queda clavado. El contador sigue enseñando la de Pro Tools. */
+  const hora = (pt != null && typeof hptDe === 'function') ? hptDe(pt) : 0;
+  const t = (pt != null) ? pt - hora
           : ((el && el.duration) ? el.currentTime + studioTc0() + ((aj ? +aj.value : 0) || 0)/10 : null);
   if(t == null) return;
   /* Con el adelanto: la vista tiene que estar en el parlamento cuando empieza. */
@@ -21863,4 +21871,5 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/cambiolibreto.js"></script>
 <script src="./js/tcpantalla.js"></script>
 <script src="./js/mtc.js"></script>
+<script src="./js/horapt.js"></script>
 <script src="./js/qcpdf.js"></script>

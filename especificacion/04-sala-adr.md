@@ -101,6 +101,7 @@ qué dijo el director.
 |---|---|
 | **PT-N1** | **Nunca mover el libreto con una lectura suelta.** Es la diferencia entre esto y lo que se descartó la vez pasada: leyendo a pelo, el libreto daba saltos absurdos una vez de cada dos. | ✅ |
 | **PT-N2** | **Nunca dar por hecho de qué reloj cuelga el libreto.** Va escrito en el propio botón —«Seguir · PT» o «Seguir · vídeo»—, porque desde la mesa no hay otra manera de saberlo y son cosas muy distintas. | 👁 |
+| **PT-26** | **La hora de Pro Tools y la del libreto pueden no ser la misma.** Llegó de sala: «recibiendo a 24 fps dice, pero no cambió el libreto». El timecode llegaba bien por MIDI —una sesión a 23,976 se envía como MTC de 24 y se lee como 24: no era el fotograma—; lo que no cuadraba era la **hora**. El seguimiento comparaba el timecode de Pro Tools con los del libreto tal cual, y una sesión que empieza en 01:00:00:00 con un libreto que cuenta desde 00:00:00:00 —la lista de diálogos de Netflix (LIB-25), o un libreto hecho con ella— cae siempre «después del último parlamento»: el libreto se queda clavado al final. Ahora, antes de buscar el parlamento, se le restan al timecode de Pro Tools las **horas enteras** que lo separan del libreto. Se sacan solas: si solo una diferencia de horas deja a Pro Tools dentro del libreto —con dos minutos de margen por delante y por detrás—, es esa. Si valen varias —un libreto de más de una hora—, se descarta la que dejaría fuera el timecode más bajo o el más alto que ya se le ha visto a Pro Tools, y entre las que queden se toma la de costumbre: una sesión empieza en 01:00:00:00, así que con un libreto desde cero es una hora y con uno que ya cuenta desde la una, ninguna. Con la **misma hora no se resta nada**: el caso de siempre no se toca. **Se dice lo que se ve**, una vez por capítulo: que va con una hora de diferencia y a qué equivale, que no coinciden ni con horas de diferencia, o que el libreto no trae timecodes. En el panel del timecode se puede **fijar a mano** —«cuentan igual» o tantas horas por delante o por detrás— y se recuerda por capítulo en ese equipo. El contador y el tiempo que se apunta en una corrección de QC **siguen siendo los de Pro Tools**; la hora del libreto solo se usa para saber qué parlamento suena. | ✅ |
 
 ## Nunca
 
@@ -219,9 +220,25 @@ qué dijo el director.
   Buscandolas asi se encontraron ademas dos que llevaban tiempo rotas: el aviso
   de fallo y el karaoke, los dos invisibles justo con el libreto abierto, que es
   cuando hacen falta.
+- **PT-26**, en `pruebas/horapt.prueba.js`, con los números de «A Filipino
+  Christmas» —el libreto va de 00:00:10 a 01:09:42—: de dónde a dónde va un
+  libreto; la misma hora, que no resta nada; una hora por delante y por
+  detrás, y una sesión en 10:00:00:00; los dos minutos de margen y un segundo
+  más; el libreto de más de una hora, con la de costumbre y con lo ya visto
+  corrigiéndola; fijada a mano; lo que se dice y que se dice una sola vez; el
+  cambio de capítulo; y el desplegable del panel. Las mutaciones se corren después de desplegar. Y en el
+  navegador, con un timecode metido por el mismo camino que el MIDI: Pro
+  Tools en 01:06:55 y un libreto desde cero iba al último parlamento, y ahora
+  marca el de 00:06:50 y avisa de la hora de diferencia.
 
 ## Sin resolver
 
+- **PT-26**: es lo que encaja con lo que llegó de sala, pero **no se ha visto
+  en esa sesión de Pro Tools**: si el libreto sigue sin moverse, el aviso
+  dirá por qué —fuera del libreto, o sin timecodes— y eso es lo siguiente que
+  mirar. Solo se contemplan horas enteras: un libreto con otro corte, o
+  desplazado unos segundos, no se arregla aquí. Y la hora fijada a mano se
+  guarda en el equipo, no viaja con el capítulo.
 - **BAN-3** y **BAN-7**, en `pruebas/banda.prueba.js`, con un canvas de mentira
   que apunta cada trazo con su posición y su ancho ya escalado. La geometría es
   exacta porque el ancho de un carácter se fija en la prueba. Se comprueba el
