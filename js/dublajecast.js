@@ -40,8 +40,7 @@ function dcastCasarCapitulo(numero, titulo, eps){
     const igual = lista.filter(e => castNorm(e.name) === t);
     if(igual.length === 1) return igual[0];
   }
-  const n = parseInt(numero, 10);
-  if(!isFinite(n)) return null;
+  const n = parseInt(numero, 10);              // si no es número da NaN, que no casa con nada
   const conNumero = lista.filter(e => (String(e.name || '').match(/\d+/g) || []).some(x => parseInt(x, 10) === n));
   return conNumero.length === 1 ? conNumero[0] : null;
 }

@@ -45,9 +45,9 @@ function armar(o){
       return n;
     }
   };
-  let modoPuesto = null, libVistaFinal = null;
+  let modoPuesto = null, libVistaFinal = null, oyente = null;
   const M = montar(RECORTES, EXPORTA, {
-    castNorm: undefined, document: doc, window: { addEventListener: (ev) => diario.push('escucha ' + ev) },
+    castNorm: undefined, document: doc, window: { addEventListener: (ev, f) => { diario.push('escucha ' + ev); if(ev === 'message') oyente = f; } },
     location: { origin: 'https://dubbipt.vercel.app' },
     prodPuede: () => (o.puede !== undefined ? o.puede : true), PROD_SIN_PERMISO: '🔒 solo admin',
     prodCasarPrograma: (n, shows) => shows.find(s => s.name.toUpperCase() === String(n).toUpperCase()) || null,
@@ -68,7 +68,7 @@ function armar(o){
   });
   M.DCAST.marco = marco;
   M.DCAST.ov = { style: { display: '' } };
-  return { M, diario, respuestas, avisos, LDB, nodos, marco, cuerpo, modo: () => modoPuesto };
+  return { M, diario, respuestas, avisos, LDB, nodos, marco, cuerpo, modo: () => modoPuesto, oyente: () => oyente };
 }
 
 exports.pruebas = async function(t){
@@ -82,6 +82,7 @@ exports.pruebas = async function(t){
   const dudosos = [{ id: 'a', name: 'Episodio 2' }, { id: 'b', name: 'Episodio 2 (versión cine)' }];
   t.eq('dos con el mismo número: ninguno, mejor abrir el programa que equivocarse', M.dcastCasarCapitulo(2, '', dudosos), null);
   t.eq('pero si el título casa, ese', (M.dcastCasarCapitulo(2, 'Episodio 2 (versión cine)', dudosos) || {}).id, 'b');
+  t.eq('dos con el mismo título tampoco: ninguno', M.dcastCasarCapitulo(null, 'Piloto', [{ id: 'p1', name: 'Piloto' }, { id: 'p2', name: 'PILOTO' }]), null);
   t.eq('sin número ni título, ninguno', M.dcastCasarCapitulo(null, '', EPS) + ' ' + M.dcastCasarCapitulo('dos', '', EPS), 'null null');
 
   t.seccion('2 · solo se obedece a NUESTRA DublajeCast');
@@ -93,6 +94,19 @@ exports.pruebas = async function(t){
   t.eq('de otra ventana del mismo sitio, no', v(Object.assign({}, ok, { source: {} })), false);
   t.eq('sin su firma, no', v(Object.assign({}, ok, { data: { accion: 'consulta' } })) + ' ' + v(Object.assign({}, ok, { data: { fuente: 'dublajecast' } })) + ' ' + v(Object.assign({}, ok, { data: 'consulta' })), 'false false false');
   t.eq('sin marco abierto, nada', M.dcastMensajeValido(ok, null, 'https://dubbipt.vercel.app'), false);
+
+  {
+    const A = armar();
+    const f = A.oyente();
+    t.eq('Dubbipt escucha mensajes', typeof f, 'function');
+    f({ origin: 'https://otro.sitio', source: A.marco.contentWindow, data: { fuente: 'dublajecast', accion: 'talentos' } });
+    f({ origin: 'https://dubbipt.vercel.app', source: {}, data: { fuente: 'dublajecast', accion: 'talentos' } });
+    await new Promise(r => setTimeout(r, 0));
+    t.eq('y los que no vienen de nuestro marco no hacen nada', A.diario.includes('talPanel'), false);
+    f({ origin: 'https://dubbipt.vercel.app', source: A.marco.contentWindow, data: { fuente: 'dublajecast', accion: 'talentos' } });
+    await new Promise(r => setTimeout(r, 0));
+    t.eq('el nuestro, sí', A.diario.includes('talPanel'), true);
+  }
 
   t.seccion('3 · lo que pide la barra');
   {
@@ -136,6 +150,14 @@ exports.pruebas = async function(t){
     const A = armar();
     t.eq('la base de talentos, las herramientas y Producción', [await A.M.dcastAtender({ accion: 'talentos' }), await A.M.dcastAtender({ accion: 'herramientas' }), await A.M.dcastAtender({ accion: 'produccion' })].join(' '), 'talentos herramientas produccion');
     t.ok('cada una abre lo suyo', A.diario.includes('talPanel') && A.diario.includes('herramientasPanel') && A.diario.includes('prodPanel'));
+    for(const acc of ['talentos', 'herramientas']){
+      const B = armar();
+      await B.M.dcastAtender({ accion: acc });
+      t.eq(acc + ': DublajeCast se aparta para que se vea', B.M.DCAST.ov.style.display, 'none');
+    }
+    const C = armar();
+    await C.M.dcastAtender({ accion: 'produccion' });
+    t.eq('Producción se abre encima, sin cerrar DublajeCast', C.M.DCAST.ov.style.display, '');
     t.eq('algo que no se conoce, nada', await A.M.dcastAtender({ accion: 'borrarTodo' }), 'nada');
   }
 
@@ -151,8 +173,10 @@ exports.pruebas = async function(t){
     const A = armar(); A.M.DCAST.ov = null; A.M.DCAST.marco = null;
     t.eq('al administrador sí: con su marco', A.M.dcastAbrir() + ' ' + A.M.DCAST.marco.src + ' ' + A.cuerpo.clases.has('dcast-abierto'), 'true ./dublajecast/index.html true');
     const primero = A.M.DCAST.marco;
-    A.M.dcastCerrar(); A.M.dcastAbrir();
-    t.eq('y al volver es el mismo: lo que se hacía allí sigue', A.M.DCAST.marco === primero, true);
+    A.M.dcastCerrar();
+    t.eq('«Volver a Dubbipt» lo esconde', A.M.DCAST.ov.style.display + ' ' + A.cuerpo.clases.has('dcast-abierto'), 'none false');
+    A.M.dcastAbrir();
+    t.eq('y al volver es el mismo, y se ve: lo que se hacía allí sigue', (A.M.DCAST.marco === primero) + ' ' + A.M.DCAST.ov.style.display, 'true ');
     t.ok('el marco se pega una sola vez', A.diario.filter(x => x === 'pega dcastOv').length === 1);
   }
 
@@ -195,12 +219,14 @@ exports.pruebas = async function(t){
   const correr = (dentro) => {
     const enviados = [];
     const padre = { location: { origin: 'https://dubbipt.vercel.app' }, postMessage: (d, o) => enviados.push([d, o]) };
-    const win = { addEventListener: () => {}, React: null };
+    const R = { createElement: () => ({}), useState: (v) => [v, () => {}], useEffect: () => {} };
+    const win = { addEventListener: () => {}, React: R };
     win.parent = dentro ? padre : win;
-    new Function('window', 'location', 'React', PUENTE)(win, { origin: 'https://dubbipt.vercel.app' }, undefined);
+    new Function('window', 'location', 'React', PUENTE)(win, { origin: 'https://dubbipt.vercel.app' }, R);
     return { win, enviados };
   };
   const dentro = correr(true);
+  t.eq('dentro de Dubbipt, con React, hay barra', typeof dentro.win.DubbiptBarra, 'function');
   t.eq('dentro de Dubbipt, pide con su firma y solo a nuestro sitio', dentro.win.dubbiptPedir('consulta', { programa: 'X' }) + ' ' + JSON.stringify(dentro.enviados[0]), 'true [{"fuente":"dublajecast","accion":"consulta","programa":"X"},"https://dubbipt.vercel.app"]');
   const fuera = correr(false);
   t.eq('abierto suelto, no pide nada ni pinta barra', fuera.win.dubbiptPedir('consulta') + ' ' + fuera.enviados.length + ' ' + typeof fuera.win.DubbiptBarra, 'false 0 undefined');
