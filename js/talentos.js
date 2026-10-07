@@ -302,6 +302,7 @@ function talPanel(){
     + '<div class="modo-tit">Base de talentos</div>'
     + '<div class="modo-sub" style="margin-bottom:8px">'
     +   (TAL.nombres.length ? TAL.nombres.length + ' actores registrados' : 'Todavía sin base')
+    +   ((typeof PROD !== 'undefined' && PROD.datos && PROD.datos.talents.length) ? ' · con la ficha de DublajeCast' : '')
     + '</div>'
     + '<div class="meta-nota">Solo se puede repartir a quien esté aquí. Es lo que impide que '
     +   'una errata —<b>MARCELA BORDA</b> y <b>MARCELA BORDAS</b>— parta a un actor en dos por toda '

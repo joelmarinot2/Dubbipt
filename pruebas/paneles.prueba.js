@@ -188,7 +188,8 @@ exports.pruebas = function(t){
     'div#acctsOv',
     'a#·a',
     'datalist#talList',
-    'input#talFile'
+    'input#talFile',
+    'input#prodFile'      // el campo de archivo de Producción: invisible a propósito, como el de la base de talentos
   ];
 
   const pendiente = YA_LO_ESTABAN.slice();
