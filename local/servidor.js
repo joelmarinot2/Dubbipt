@@ -18,20 +18,25 @@ const path = require('path');
 const RAIZ   = path.join(__dirname, '..');
 const PUERTO = Number(process.env.PUERTO || process.argv[2] || 8080);
 
-// las cabeceras salen de vercel.json: una sola fuente de verdad
-function cabecerasDeVercel(){
+// las cabeceras salen de vercel.json: una sola fuente de verdad. Como en
+// Vercel, valen TODAS las reglas cuya ruta case, en orden, y si dos ponen la
+// misma cabecera manda la última. (DublajeCast, en /dublajecast/, lleva las
+// suyas: compila en el navegador y carga librerías que Dubbipt no permite.)
+function reglasDeVercel(){
   try{
     const v = JSON.parse(fs.readFileSync(path.join(RAIZ, 'vercel.json'), 'utf8'));
-    const gen = (v.headers || []).find(h => h.source === '/(.*)');
-    const out = {};
-    for(const h of (gen ? gen.headers : [])) out[h.key] = h.value;
-    return out;
+    return (v.headers || []).map(h => ({ re: new RegExp('^' + h.source + '$'), headers: h.headers || [] }));
   }catch(e){
     console.warn('No pude leer vercel.json, se sirve sin cabeceras:', e.message);
-    return {};
+    return [];
   }
 }
-const CABECERAS = cabecerasDeVercel();
+const REGLAS = reglasDeVercel();
+function cabecerasPara(ruta){
+  const out = {};
+  for(const r of REGLAS) if(r.re.test(ruta)) for(const h of r.headers) out[h.key] = h.value;
+  return out;
+}
 
 const TIPOS = {
   '.html':'text/html; charset=utf-8', '.js':'application/javascript; charset=utf-8',
@@ -51,7 +56,7 @@ http.createServer((req, res) => {
   fs.readFile(destino, (err, datos) => {
     if(err){ res.writeHead(404, {'Content-Type':'text/plain; charset=utf-8'}); res.end('No existe: ' + ruta); return; }
     const ext = path.extname(destino).toLowerCase();
-    const cab = Object.assign({}, CABECERAS, { 'Content-Type': TIPOS[ext] || 'application/octet-stream' });
+    const cab = Object.assign({}, cabecerasPara(ruta), { 'Content-Type': TIPOS[ext] || 'application/octet-stream' });
     // el service worker y la config nunca se cachean, igual que en Vercel
     if(/\/(sw|config)\.js$/.test(ruta)) cab['Cache-Control'] = 'no-store, max-age=0';
     if(/\/sw\.js$/.test(ruta)) cab['Service-Worker-Allowed'] = '/';
@@ -62,7 +67,7 @@ http.createServer((req, res) => {
   console.log('');
   console.log('  Dubbipt corriendo en   http://localhost:' + PUERTO);
   console.log('  Carpeta                ' + RAIZ);
-  console.log('  Cabeceras de vercel.json: ' + (Object.keys(CABECERAS).length || 'ninguna'));
+  console.log('  Cabeceras de vercel.json: ' + (REGLAS.length || 'ninguna'));
   console.log('');
   console.log('  Ctrl+C para parar.');
 });

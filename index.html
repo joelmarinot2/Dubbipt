@@ -1686,6 +1686,16 @@ body:not(.modo-casting) .gestbtn{ display:none; }
 .prod-ficha{ font-size:11.5px; color:#FCD34D; margin-left:6px; }
 .prod-papeles{ font-size:11.5px; color:#8892a6; margin-top:3px; line-height:1.45; }
 
+/* DublajeCast entero, a pantalla completa. Por debajo de los avisos y de los paneles de Dubbipt, para que se vean encima. */
+.dcast-ov{ position:fixed; inset:0; z-index:2147481000; background:#0b0d12; display:flex; flex-direction:column; }
+.dcast-barra{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 14px; background:#141720; border-bottom:1px solid #2b3040; color:#e7ebf3; font-size:13.5px; }
+.dcast-sub{ font-size:11.5px; color:#8892a6; margin-right:auto; }
+.dcast-b{ background:#1c1f28; color:#e7ebf3; border:1px solid #2b3040; border-radius:9px; padding:6px 12px; font-size:12.5px; cursor:pointer; }
+.dcast-b:hover{ border-color:#4ADE80; }
+.dcast-volver{ background:#22C55E; color:#06210f; border-color:#22C55E; font-weight:700; }
+.dcast-marco{ flex:1; width:100%; border:0; background:#0b0d12; }
+body.dcast-abierto{ overflow:hidden; }
+
 /* Cambiar el libreto: «¿son el mismo personaje?», pareja por pareja */
 .lc-lista{ max-height:50vh; }
 .lc-fila{ display:flex; align-items:flex-start; gap:12px; padding:11px 13px;
@@ -2401,7 +2411,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.26.0-nube';
+const APP_VER_NUM = 'v11.27.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8023,7 +8033,7 @@ async function renderLibrary(silent){
           + '</div></div>'
         + '<label class="dh-search"><span class="fi">🔍</span>'
           + '<input type="text" id="dashSearch" placeholder="Buscar programa…" value="'+esc(window._dashQuery||'')+'"></label>'
-        + '<button class="dh-tools" id="btnProduccion"'+((typeof prodPuede==='function' && prodPuede()) ? '' : ' style="display:none"')+' title="Lo que viene de DublajeCast: programas y capítulos con sus entregas, talentos con ficha y tráilers">🎬 Producción</button>'
+        + '<button class="dh-tools" id="btnProduccion"'+((typeof prodPuede==='function' && prodPuede()) ? '' : ' style="display:none"')+' title="DublajeCast entero, dentro de Dubbipt: todas sus funciones, y en cada programa las herramientas de Dubbipt">🎬 DublajeCast</button>'
         + '<button class="dh-tools" id="dashTools" title="Herramientas que no dependen de ningún capítulo">🧰 Herramientas</button>'
         + '<button class="dh-new" id="dashNew">＋ Nuevo programa</button>';
       { const ds=head.querySelector('#dashSearch');
@@ -8031,7 +8041,7 @@ async function renderLibrary(silent){
           const d2=document.getElementById('dashSearch'); if(d2){ d2.focus(); d2.setSelectionRange(d2.value.length,d2.value.length); } }; } }
       { const dn=head.querySelector('#dashNew'); if(dn) dn.onclick=newShow; }
       { const dt=head.querySelector('#dashTools'); if(dt) dt.onclick=()=> herramientasPanel(); }
-      { const bp=head.querySelector('#btnProduccion'); if(bp) bp.onclick=()=> prodPanel(); }
+      { const bp=head.querySelector('#btnProduccion'); if(bp) bp.onclick=()=> dcastAbrir(); }
       { const dO=head.querySelector('#dhOther'); if(dO) dO.onclick=()=> showWorkspacePicker(true); }
       // breadcrumb de espacio (queda como migaja discreta encima del panel)
       crumb.className='dashcrumb';
@@ -9372,6 +9382,10 @@ async function dcPanel(){
         +   '<button class="modo-op dc-b" id="dcLlevar"><b>Llevar a DublajeCast</b>'
         +     '<small>Escribe en su base de datos. Te enseña qué va a cambiar antes de hacerlo.</small></button>'
         +   ((typeof prodPuede === 'function' && prodPuede())
+              ? '<button class="modo-op dc-b" id="dcEntero"><b>Abrir DublajeCast completo</b>'
+              +   '<small>Todas sus funciones aquí dentro, y en cada programa las herramientas de Dubbipt.</small></button>'
+              : '')
+        +   ((typeof prodPuede === 'function' && prodPuede())
               ? '<button class="modo-op dc-b" id="dcTodo"><b>Traer TODO a Producción</b>'
               +   '<small>Programas, capítulos, talentos con su ficha, castings, tráilers y entregas: todo lo de allí, guardado aquí. Los talentos se suman a la base y los castings al registro de cada programa.</small></button>'
               : '')
@@ -9437,6 +9451,8 @@ async function dcPanel(){
     catch(err){ msg('Error: ' + err.message, true); }
     ll.disabled = false;
   };
+  const de = ov.querySelector('#dcEntero');
+  if(de) de.onclick = () => { cerrar(); dcastAbrir(); };
   const td = ov.querySelector('#dcTodo');
   if(td) td.onclick = async () => {
     td.disabled = true; msg('Leyendo todo DublajeCast…');
@@ -22234,4 +22250,5 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/mtc.js"></script>
 <script src="./js/horapt.js"></script>
 <script src="./js/produccion.js"></script>
+<script src="./js/dublajecast.js"></script>
 <script src="./js/qcpdf.js"></script>

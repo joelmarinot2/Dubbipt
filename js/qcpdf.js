@@ -1064,9 +1064,9 @@ function herramientasPanel(){
     + ((typeof prodPuede === 'function' && prodPuede())
         ? '<button class="herr-it" id="herrProd">'
           + '<span class="herr-ic">🎬</span>'
-          + '<span class="herr-tx"><b>Producción</b>'
-          + '<i>Lo que viene de DublajeCast: programas y capítulos con sus entregas y '
-          + 'DUBCARDs, talentos con su ficha y tráilers con su plazo.</i></span></button>'
+          + '<span class="herr-tx"><b>DublajeCast</b>'
+          + '<i>Toda la plataforma aquí dentro: programas, casting, reparto, talentos, '
+          + 'ocupación, tráilers, DUBCARDs y breakdowns. En cada programa, las herramientas de Dubbipt.</i></span></button>'
         : '')
     + '<div class="herr-fb"><button id="herrX">Cerrar</button></div>'
     + '</div>';
@@ -1076,7 +1076,7 @@ function herramientasPanel(){
   const c = ov.querySelector('#herrConv');
   if(c) c.onclick = ()=>{ ov.remove(); qcConvPanel(); };
   const p = ov.querySelector('#herrProd');
-  if(p) p.onclick = ()=>{ ov.remove(); prodPanel(); };
+  if(p) p.onclick = ()=>{ ov.remove(); dcastAbrir(); };
 }
 
 /* Lo que se ha soltado, esperando a convertirse. */
