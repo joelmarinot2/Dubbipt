@@ -20,6 +20,8 @@
  *   3. Sin manifiesto: no es una app que se instale aparte.
  *   4. Dentro de cada programa, la barra «Herramientas de Dubbipt»
  *      (`dublajecast/puente.js`, que es de Dubbipt y esto no toca).
+ *   5. Dos ganchos para Dubbipt: abrir una pantalla desde fuera (`__dcNav`)
+ *      y leer sus datos en vivo (`__dcDatos`). Al estar listos, avisa.
  *
  * Cómo se usa, desde la carpeta de Dubbipt:
  *     node local/traer-dublajecast.js [carpeta de DublajeCast]
@@ -52,7 +54,15 @@ const RETOQUES = [
   ['la barra de Dubbipt dentro de cada programa',
    '        {pasteOpen&&s.curSeries&&ReactDOM.createPortal(<PasteCastingModal series={s.curSeries} onClose={()=>setPasteOpen(false)}/>,document.body)}\n',
    '        {pasteOpen&&s.curSeries&&ReactDOM.createPortal(<PasteCastingModal series={s.curSeries} onClose={()=>setPasteOpen(false)}/>,document.body)}\n'
-   + '        {window.DubbiptBarra&&s.curSeries&&React.createElement(window.DubbiptBarra,{serie:s.curSeries,episodios:s.serEps})}\n']
+   + '        {window.DubbiptBarra&&s.curSeries&&React.createElement(window.DubbiptBarra,{serie:s.curSeries,episodios:s.serEps})}\n'],
+  ['los ganchos de Dubbipt: abrir una pantalla y leer los datos',
+   '  useEffect(()=>{window.__dcLogout=onLogout;},[onLogout]);\n',
+   '  useEffect(()=>{window.__dcLogout=onLogout;},[onLogout]);\n'
+   + '  /* Dubbipt: abrir una pantalla desde fuera, y leer los datos en vivo. */\n'
+   + '  const __dbDatos=useRef(null);__dbDatos.current=store.data;\n'
+   + '  useEffect(()=>{window.__dcNav=(v,sid,eid)=>{if(sid!=null)store.setSelSeriesId(sid);if(eid!==undefined&&store.setSelEpId)store.setSelEpId(eid);store.navTo(v);};'
+   + 'window.__dcDatos=()=>__dbDatos.current;try{if(window.dubbiptPedir)window.dubbiptPedir("listo");}catch(e){}'
+   + 'return()=>{window.__dcNav=null;window.__dcDatos=null;};},[]);\n']
 ];
 
 /** Aplica los retoques a un texto. Lanza si alguno no encuentra su sitio una sola vez. */

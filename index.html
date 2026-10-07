@@ -1690,10 +1690,95 @@ body:not(.modo-casting) .gestbtn{ display:none; }
 .dcast-ov{ position:fixed; inset:0; z-index:2147481000; background:#0b0d12; display:flex; flex-direction:column; }
 .dcast-barra{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 14px; background:#141720; border-bottom:1px solid #2b3040; color:#e7ebf3; font-size:13.5px; }
 .dcast-sub{ font-size:11.5px; color:#8892a6; margin-right:auto; }
-.dcast-b{ background:#1c1f28; color:#e7ebf3; border:1px solid #2b3040; border-radius:9px; padding:6px 12px; font-size:12.5px; cursor:pointer; }
+.dcast-b{ display:inline-flex; align-items:center; gap:6px; background:#1c1f28; color:#e7ebf3; border:1px solid #2b3040; border-radius:9px; padding:6px 12px; font-size:12.5px; cursor:pointer; }
 .dcast-b:hover{ border-color:#4ADE80; }
 .dcast-volver{ background:#22C55E; color:#06210f; border-color:#22C55E; font-weight:700; }
 .dcast-marco{ flex:1; width:100%; border:0; background:#0b0d12; }
+/* Casting con la organización de DublajeCast, con la cara de Dubbipt */
+.cs-nav{ display:flex; gap:4px; overflow-x:auto; background:#101215; border:1px solid #23262b; border-radius:13px; padding:5px; margin:0 0 16px; scrollbar-width:none; }
+.cs-nav::-webkit-scrollbar{ display:none; }
+.cs-nav-b{ display:inline-flex; align-items:center; gap:7px; background:transparent; border:1px solid transparent; color:#9CA3AF; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; padding:8px 12px; border-radius:9px; cursor:pointer; white-space:nowrap; }
+.cs-nav-b:hover{ color:#f2f3f5; background:#16181c; }
+.cs-nav-b.on{ background:#22C55E; color:#06210f; }
+.cs-nav-b.cs-nav-dc{ color:#8b8f97; }
+.cs-nav-b.cs-nav-dc.on{ background:#2b2f36; color:#f2f3f5; }
+.cs-vista{ border:1px solid #23262b; border-radius:18px; padding:20px 22px; font-family:'Inter',sans-serif; color:#d7dae0; }
+.cs-cab{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
+.cs-cab-t h2{ font-weight:700; color:#f2f3f5; font-size:20px; margin:0; }
+.cs-cab-sub{ color:#9CA3AF; font-size:12.5px; margin-top:2px; }
+.cs-de{ margin-left:auto; font-size:11.5px; color:#8b8f97; }
+.cs-b{ display:inline-flex; align-items:center; gap:7px; background:#16181c; border:1px solid #2b2f36; color:#e5e7eb; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; padding:8px 12px; border-radius:10px; cursor:pointer; }
+.cs-b:hover{ border-color:#4ADE80; }
+.cs-b.cs-pri{ background:#22C55E; border-color:#22C55E; color:#06210f; }
+.cs-kpis{ display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin-bottom:16px; }
+.cs-kpi{ background:#101215; border:1px solid #23262b; border-radius:13px; padding:14px; display:flex; flex-direction:column; gap:3px; }
+.cs-kpi b{ font-size:24px; color:#f2f3f5; font-weight:800; }
+.cs-kpi span{ font-size:12px; color:#9CA3AF; }
+.cs-kpi.cs-kpi-aviso b{ color:#FBBF24; }
+.cs-dos{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; }
+.cs-caja{ background:#101215; border:1px solid #23262b; border-radius:13px; padding:14px; }
+.cs-caja-t{ display:flex; align-items:center; gap:8px; font-weight:700; color:#f2f3f5; font-size:13.5px; margin-bottom:10px; }
+.cs-linea{ display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); font-size:12.5px; }
+.cs-linea:last-child{ border-bottom:none; }
+.cs-linea-g{ background:#101215; border:1px solid #23262b; border-radius:10px; padding:9px 12px; margin-bottom:6px; }
+.cs-linea-t{ flex:1; min-width:0; }
+.cs-hecho{ opacity:.65; }
+.cs-chip{ font-size:11px; font-weight:700; border-radius:999px; padding:2px 9px; white-space:nowrap; border:1px solid currentColor; }
+.cs-mal{ color:#FB7185; } .cs-urge{ color:#F97316; } .cs-pronto{ color:#FBBF24; } .cs-ok{ color:#4ADE80; } .cs-nada{ color:#8b8f97; font-size:12.5px; }
+span.cs-nada{ border-color:#3a3f47; }
+.cs-vacio{ display:flex; flex-direction:column; align-items:flex-start; gap:8px; background:#101215; border:1px dashed #2b2f36; border-radius:13px; padding:18px; font-size:13px; }
+.cs-vacio span{ color:#9CA3AF; }
+.cs-buscar input{ width:100%; box-sizing:border-box; background:#101215; border:1px solid #23262b; border-radius:10px; padding:9px 13px; color:#f2f3f5; font-family:'Inter',sans-serif; font-size:13.5px; margin-bottom:12px; outline:none; }
+.cs-sel, .cs-check{ display:inline-flex; align-items:center; gap:8px; font-size:12.5px; color:#9CA3AF; margin-bottom:12px; }
+.cs-sel select{ background:#101215; color:#f2f3f5; border:1px solid #23262b; border-radius:9px; padding:6px 9px; font-size:12.5px; }
+.cs-lista{ display:flex; flex-direction:column; gap:6px; }
+.cs-tal{ background:#101215; border:1px solid #23262b; border-radius:11px; padding:10px 13px; }
+.cs-tal-cab{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; font-size:13.5px; color:#f2f3f5; }
+.cs-ficha{ font-size:11.5px; color:#FCD34D; }
+.cs-tenue{ color:#8b8f97; font-size:11.5px; font-style:normal; }
+.cs-papeles{ display:flex; flex-direction:column; gap:2px; margin-top:5px; font-size:12px; color:#9CA3AF; }
+.cs-papeles b{ color:#d7dae0; }
+.cs-tabla{ display:flex; flex-direction:column; gap:2px; overflow-x:auto; }
+.cs-fila{ display:grid; gap:12px; align-items:center; font-size:12.5px; padding:7px 10px; border-radius:8px; min-width:620px; }
+.cs-fila:nth-child(even){ background:rgba(255,255,255,.025); }
+.cs-fila-cab{ color:#8b8f97; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; }
+.cs-ocup .cs-fila{ grid-template-columns:minmax(140px,1.3fr) 80px 80px minmax(140px,1.2fr) minmax(140px,1.5fr); }
+.cs-prod .cs-fila{ grid-template-columns:minmax(150px,1.4fr) minmax(90px,1fr) 110px 100px minmax(120px,1fr) minmax(150px,1.4fr); }
+.cs-barra-c{ position:relative; display:flex; align-items:center; gap:8px; }
+.cs-barra{ display:block; height:7px; border-radius:99px; background:linear-gradient(90deg,#22C55E,#4ADE80); min-width:3px; }
+.cs-barra-c em{ font-style:normal; color:#f2f3f5; font-weight:700; font-size:12px; }
+.cs-herr{ display:flex; gap:16px; align-items:flex-start; background:#101215; border:1px solid #23262b; border-radius:13px; padding:18px; font-size:13px; line-height:1.55; }
+.cs-herr p{ margin:0 0 10px; }
+.cs-herr-ic{ color:#4ADE80; flex-shrink:0; margin-top:2px; }
+.cs-sinprog{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:14px; padding:12px 14px; border:1px dashed #2b2f36; border-radius:13px; }
+.cs-sinprog-t{ font-family:'Inter',sans-serif; font-size:12px; font-weight:700; color:#9CA3AF; margin-right:4px; }
+body.ep-open #csNav, body.ep-open #csVista, body.ep-open #csSinProg{ display:none !important; }
+@media (max-width:640px){ .cs-vista{ padding:14px; } .cs-nav-b span{ display:none; } .cs-nav-b.on span{ display:inline; } }
+.dcast-prog{ display:inline-flex; align-items:center; gap:7px; background:#16181c; border:1px solid #2b2f36; color:#e5e7eb; border-radius:10px; padding:9px 13px; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; cursor:pointer; margin-left:8px; }
+/* El casting de cada capítulo */
+.et-cast-prin{ display:inline-flex; vertical-align:-1px; margin-right:5px; color:#FCD34D; }
+.dh-tools, .eps-opt{ display:inline-flex; align-items:center; gap:7px; }
+.dash-head .dh-search .fi{ display:inline-flex; }
+.et-castb{ display:inline-flex; align-items:center; gap:5px; margin-left:8px; background:#16181c; border:1px solid #2b2f36; color:#d7dae0; border-radius:999px; padding:2px 9px; font-family:'Inter',sans-serif; font-size:11.5px; font-weight:700; cursor:pointer; }
+.et-castb.on, .et-castb:hover{ border-color:#4ADE80; color:#f2f3f5; }
+.et-castb.choca{ border-color:rgba(245,158,11,.45); color:#FBBF24; }
+.et-cast{ margin:0; padding:12px 18px 14px; background:#0d0f12; border-top:1px solid #1c1f24; border-bottom:1px solid #1c1f24; font-family:'Inter',sans-serif; }
+.et-cast-cab{ font-size:12px; color:#9CA3AF; margin-bottom:8px; }
+.et-cast-de{ color:#6b7079; }
+.et-cast-tabla{ display:flex; flex-direction:column; gap:2px; max-height:320px; overflow:auto; }
+.et-cast-fila{ display:grid; grid-template-columns:minmax(120px,1.3fr) 70px minmax(120px,1.4fr); gap:10px; font-size:12.5px; padding:4px 6px; border-radius:6px; }
+.et-cast-fila:nth-child(odd){ background:rgba(255,255,255,.03); }
+.et-cast-per{ font-weight:700; color:#f2f3f5; }
+.et-cast-lin{ color:#8b8f97; text-align:right; }
+.et-cast-tal{ color:#4ADE80; }
+.et-cast-fila.falta .et-cast-tal{ color:#FB7185; font-style:italic; }
+.et-cast-fila.choca .et-cast-tal small{ color:#FCD34D; margin-left:4px; }
+.et-cast-vacio{ font-size:12.5px; color:#8b8f97; }
+.et-cast-btns{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+.et-cast-btns button{ display:inline-flex; align-items:center; gap:7px; background:#22C55E; color:#06210f; border:none; border-radius:9px; padding:7px 12px; font-size:12px; font-weight:700; cursor:pointer; }
+.et-cast-btns .et-cast-dc{ background:#16181c; color:#e5e7eb; border:1px solid #2b2f36; }
+.dcast-prog:hover, .et-cast-btns .et-cast-dc:hover{ border-color:#4ADE80; }
+@media (max-width:640px){ .et-cast-fila{ grid-template-columns:1fr 54px 1fr; gap:6px; font-size:12px; } }
 body.dcast-abierto{ overflow:hidden; }
 
 /* Cambiar el libreto: «¿son el mismo personaje?», pareja por pareja */
@@ -1966,8 +2051,8 @@ body.modo-casting #btnExport{ display:none !important; }
       <span class="tb-dev" id="devStat" role="status" aria-live="polite">Listo</span>
       <button class="tb-sync" id="syncChip" onclick="syncMenu()" title="Sincronización tablet ↔ escritorio" aria-label="Estado de sincronización entre tablet y escritorio" style="display:none">sincronización</button>
       <div class="tb-divider" aria-hidden="true"></div>
-      <button class="tb-icon" id="btnNotif" onclick="toggleNotif(event)" title="Notificaciones" aria-label="Notificaciones">🔔</button>
-      <button class="tb-icon" id="userBtn" onclick="toggleUserMenu(event)" title="Configuración" aria-label="Configuración y cuenta">⚙</button>
+      <button class="tb-icon" id="btnNotif" onclick="toggleNotif(event)" title="Notificaciones" aria-label="Notificaciones"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg></button>
+      <button class="tb-icon" id="userBtn" onclick="toggleUserMenu(event)" title="Configuración" aria-label="Configuración y cuenta"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
       <button class="tb-user" id="avatarBtn" onclick="toggleUserMenu(event)" title="Tu cuenta" aria-label="Tu cuenta">JP</button>
       <div class="tb-menu" id="userMenu" role="menu">
         <div class="mh">Configuración</div>
@@ -1991,7 +2076,7 @@ body.modo-casting #btnExport{ display:none !important; }
     <div class="lib-head">
       <h2 id="libCrumb">📚 Programas</h2>
       <span class="lmsg" id="libMsg"></span>
-      <button class="btnv sm" id="libToggle" style="display:none">📂 Cambiar capítulo</button>
+      <button class="btnv sm" id="libToggle" style="display:none">Cambiar capítulo</button>
       <button class="btnv sm" id="libAction" style="display:none"></button>
     </div>
     <div class="sec-title" id="ttlOpen" style="display:none"><svg class="sti" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg> Abrir un capítulo</div>
@@ -2411,7 +2496,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.27.0-nube';
+const APP_VER_NUM = 'v11.29.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -7995,7 +8080,7 @@ async function renderLibrary(silent){
     if(tg){
       if(currentEp){
         tg.style.display='';
-        tg.textContent = LDB.browse ? '▴ Ocultar lista' : '📂 Cambiar capítulo';
+        tg.textContent = LDB.browse ? 'Ocultar lista' : 'Cambiar capítulo';
         tg.onclick = ()=>{ LDB.browse = !LDB.browse; renderLibrary(true); };
       } else tg.style.display='none';
     }
@@ -8031,10 +8116,10 @@ async function renderLibrary(silent){
           + ' · ' + shows.reduce((s,sh)=> s+sbEps(sh.id).length, 0) + ' cap'+(shows.reduce((s,sh)=> s+sbEps(sh.id).length,0)===1?'':'s')
           + otherWsNote()
           + '</div></div>'
-        + '<label class="dh-search"><span class="fi">🔍</span>'
+        + '<label class="dh-search"><span class="fi">'+_svgI('<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>', 2, 14)+'</span>'
           + '<input type="text" id="dashSearch" placeholder="Buscar programa…" value="'+esc(window._dashQuery||'')+'"></label>'
-        + '<button class="dh-tools" id="btnProduccion"'+((typeof prodPuede==='function' && prodPuede()) ? '' : ' style="display:none"')+' title="DublajeCast entero, dentro de Dubbipt: todas sus funciones, y en cada programa las herramientas de Dubbipt">🎬 DublajeCast</button>'
-        + '<button class="dh-tools" id="dashTools" title="Herramientas que no dependen de ningún capítulo">🧰 Herramientas</button>'
+        + '<button class="dh-tools" id="btnProduccion"'+((typeof prodPuede==='function' && prodPuede()) ? '' : ' style="display:none"')+' title="DublajeCast tal cual, con todas sus funciones, dentro de Dubbipt">'+((typeof csIco==='function') ? csIco('externo', 14) : '')+' DublajeCast original</button>'
+        + '<button class="dh-tools" id="dashTools" title="Herramientas que no dependen de ningún capítulo">'+_svgI('<path d="M14.7 6.3a4 4 0 00-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 005.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>', 2, 14)+' Herramientas</button>'
         + '<button class="dh-new" id="dashNew">＋ Nuevo programa</button>';
       { const ds=head.querySelector('#dashSearch');
         if(ds){ ds.oninput=()=>{ window._dashQuery=ds.value; renderLibrary(true);
@@ -8042,6 +8127,8 @@ async function renderLibrary(silent){
       { const dn=head.querySelector('#dashNew'); if(dn) dn.onclick=newShow; }
       { const dt=head.querySelector('#dashTools'); if(dt) dt.onclick=()=> herramientasPanel(); }
       { const bp=head.querySelector('#btnProduccion'); if(bp) bp.onclick=()=> dcastAbrir(); }
+      /* Con el perfil Casting: las secciones de DublajeCast (Dashboard, Talentos, Ocupación…). */
+      try{ csPintar('shows', head, grid); }catch(e){ fallo('csPintar · index.html:renderLibrary', e); }
       { const dO=head.querySelector('#dhOther'); if(dO) dO.onclick=()=> showWorkspacePicker(true); }
       // breadcrumb de espacio (queda como migaja discreta encima del panel)
       crumb.className='dashcrumb';
@@ -8158,12 +8245,13 @@ async function renderLibrary(silent){
         +'<div class="eh-sub">'+eps.length+' episodio'+(eps.length===1?'':'s')+' · '+doneCount+' completado'+(doneCount===1?'':'s')+'</div></div>'
       +'<button class="eh-new" id="epsNew">＋ Nuevo episodio</button>';
     { const en=ehead.querySelector('#epsNew'); if(en) en.onclick=newEpisodeModal; }
+    try{ csPintar('eps', ehead, grid); }catch(e){ fallo('csPintar · index.html:renderLibrary', e); }
 
     // ⚡ Optimizar programa (si hay capítulos lentos)
     let optBtn = '';
     if(LDB.dataEps && eps.some(e=> !LDB.dataEps.has(e.id))){
       const slow = eps.filter(e=> !LDB.dataEps.has(e.id)).length;
-      optBtn = '<button class="eps-opt" id="epsOpt" title="Procesa los capítulos sin libreto rápido para que abran al instante">⚡ Optimizar programa ('+slow+' lento'+(slow===1?'':'s')+')</button>';
+      optBtn = '<button class="eps-opt" id="epsOpt" title="Procesa los capítulos sin libreto rápido para que abran al instante">'+_svgI('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>', 2, 14)+' Optimizar programa ('+slow+' lento'+(slow===1?'':'s')+')</button>';
     }
 
     if(!eps.length){
@@ -8200,6 +8288,8 @@ async function renderLibrary(silent){
           +'</div>';
       }).join('');
       grid.innerHTML = optBtn + '<div class="et-table">' + head + rows + '</div>';
+      /* Con el perfil Casting: el casting de cada capítulo, de DublajeCast y de Dubbipt. */
+      dcastPintarCastings(grid, sh, eps).catch(e => fallo('dcastPintarCastings · index.html:renderLibrary', e));
     }
     { const eo=document.getElementById('epsOpt'); if(eo) eo.addEventListener('click', ()=> optimizeProgram(LDB.showId)); }
 
@@ -22251,4 +22341,5 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/horapt.js"></script>
 <script src="./js/produccion.js"></script>
 <script src="./js/dublajecast.js"></script>
+<script src="./js/castingvistas.js"></script>
 <script src="./js/qcpdf.js"></script>

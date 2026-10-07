@@ -73,7 +73,7 @@
         h('b', { style: { fontSize: 12, color: '#86efac', letterSpacing: '.04em', textTransform: 'uppercase' } }, 'Herramientas de Dubbipt'),
         h('span', { style: { fontSize: 11.5, color: 'var(--text-secondary, #9aa3b5)' } },
           estado == null ? 'buscando el programa en Dubbipt…'
-          : estado.existe ? ('✓ en Dubbipt' + (estado.nombre && estado.nombre !== serie.name ? ' como «' + estado.nombre + '»' : ''))
+          : estado.existe ? ('ya está en Dubbipt' + (estado.nombre && estado.nombre !== serie.name ? ' como «' + estado.nombre + '»' : ''))
           : 'este programa todavía no está en Dubbipt'),
         h('label', { style: { marginLeft: 'auto', fontSize: 11.5, color: 'var(--text-secondary, #9aa3b5)', display: 'flex', alignItems: 'center', gap: 6 } },
           'Perfil',
@@ -82,18 +82,18 @@
             h('option', { value: 'casting' }, 'Casting'), h('option', { value: 'qc' }, 'QC'), h('option', { value: 'grabacion' }, 'Grabación')))),
       estado && !estado.existe
         ? h('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
-            h('button', { className: 'dc-btn', style: BP, onClick: function(){ pedir('crear', { programa: serie.name }); } }, '＋ Crear «' + serie.name + '» en Dubbipt'))
+            h('button', { className: 'dc-btn', style: BP, onClick: function(){ pedir('crear', { programa: serie.name }); } }, 'Crear «' + serie.name + '» en Dubbipt'))
         : h('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' } },
-            h('button', { className: 'dc-btn', style: BP, onClick: abrirPrograma, disabled: !estado }, '📂 Abrir el programa en Dubbipt'),
+            h('button', { className: 'dc-btn', style: BP, onClick: abrirPrograma, disabled: !estado }, 'Abrir el programa en Dubbipt'),
             h('select', { value: cap, onChange: function(e){ setCap(e.target.value); },
                           style: { background: '#11131a', color: '#e7ebf3', border: '1px solid #2b3040', borderRadius: 8, padding: '5px 6px', fontSize: 11.5, maxWidth: 220 } },
               h('option', { value: '' }, caps.length ? 'Elegir capítulo…' : 'Sin capítulos'),
               caps.map(function(e){ return h('option', { key: e.id, value: String(e.id) }, (e.episode_number != null ? e.episode_number + ' · ' : '') + (e.title || '')); })),
-            h('button', { className: 'dc-btn', style: B, onClick: abrirCapitulo, disabled: !capElegido || !estado }, '▶ Abrir capítulo')),
+            h('button', { className: 'dc-btn', style: B, onClick: abrirCapitulo, disabled: !capElegido || !estado }, 'Abrir capítulo')),
       h('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap' } },
-        h('button', { className: 'dc-btn', style: B, onClick: function(){ pedir('talentos', { programa: serie.name }); } }, '🎭 Base de talentos'),
-        h('button', { className: 'dc-btn', style: B, onClick: function(){ pedir('herramientas', { programa: serie.name }); } }, '🧰 Herramientas'),
-        h('button', { className: 'dc-btn', style: B, onClick: function(){ pedir('produccion', { programa: serie.name }); } }, '📦 Resumen de producción')),
+        h('button', { className: 'dc-btn', style: B, onClick: function(){ pedir('talentos', { programa: serie.name }); } }, 'Base de talentos'),
+        h('button', { className: 'dc-btn', style: B, onClick: function(){ pedir('herramientas', { programa: serie.name }); } }, 'Herramientas'),
+        h('button', { className: 'dc-btn', style: B, onClick: function(){ pedir('produccion', { programa: serie.name }); } }, 'Resumen de producción')),
       aviso ? h('div', { style: { fontSize: 11.5, color: '#FBBF24' } }, aviso) : null);
   }
   window.DubbiptBarra = DubbiptBarra;

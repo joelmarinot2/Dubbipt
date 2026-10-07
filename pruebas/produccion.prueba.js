@@ -191,10 +191,10 @@ exports.pruebas = async function(t){
   const I = armar({ shows: [{ id: 's1', name: 'A Filipino Christmas' }] });
   const ri = await I.M.prodImportar(VOLCADO(), 'DublajeCast · hoy');
   t.eq('se normaliza, se vierte y se guarda', ri.resumen.series + ' ' + ri.efectos.talentosNuevos + ' ' + ri.efectos.registros + ' ' + ri.guardado.donde + ' ' + I.M.PROD.origen, '2 3 3 tabla DublajeCast · hoy');
-  t.eq('el resumen, en un renglón', I.M.prodResumenTexto(ri), '📦 Traído de DublajeCast: 2 programas, 3 capítulos, 3 talentos, 4 asignaciones, 2 tráilers · 3 talentos nuevos en la base · 3 asignaciones al registro de 1 programa · sin programa aquí: Akka');
+  t.eq('el resumen, en un renglón', I.M.prodResumenTexto(ri), 'Traído de DublajeCast: 2 programas, 3 capítulos, 3 talentos, 4 asignaciones, 2 tráilers · 3 talentos nuevos en la base · 3 asignaciones al registro de 1 programa · sin programa aquí: Akka');
   t.eq('con conflictos y sin poder guardar, se dice', I.M.prodResumenTexto({ resumen: { series: 1, episodios: 1, talentos: 1, castings: 2, trailers: 0 }, efectos: { talentosNuevos: 1, registros: 1, programasCasados: ['X'], conflictos: 1, programasSinCasar: [] }, guardado: { ok: false, donde: '', causa: 'sin sesión' } }),
-       '📦 Traído de DublajeCast: 1 programa, 1 capítulo, 1 talento, 2 asignaciones · 1 talento nuevo en la base · 1 asignaciones al registro de 1 programa (1 se respetan como estaban aquí) · ⚠️ no se pudo guardar en la nube: sin sesión');
-  t.eq('muchos programas sin pareja: los cuatro primeros y puntos suspensivos', I.M.prodResumenTexto({ resumen: { series: 6, episodios: 0, talentos: 0, castings: 0 }, efectos: { programasSinCasar: ['A', 'B', 'C', 'D', 'E', 'F'] }, guardado: { ok: true, donde: 'tabla' } }), '📦 Traído de DublajeCast: 6 programas, 0 capítulos, 0 talentos, 0 asignaciones · sin programa aquí: A, B, C, D…');
+       'Traído de DublajeCast: 1 programa, 1 capítulo, 1 talento, 2 asignaciones · 1 talento nuevo en la base · 1 asignaciones al registro de 1 programa (1 se respetan como estaban aquí) · no se pudo guardar en la nube: sin sesión');
+  t.eq('muchos programas sin pareja: los cuatro primeros y puntos suspensivos', I.M.prodResumenTexto({ resumen: { series: 6, episodios: 0, talentos: 0, castings: 0 }, efectos: { programasSinCasar: ['A', 'B', 'C', 'D', 'E', 'F'] }, guardado: { ok: true, donde: 'tabla' } }), 'Traído de DublajeCast: 6 programas, 0 capítulos, 0 talentos, 0 asignaciones · sin programa aquí: A, B, C, D…');
   const J = armar({ tabla: 'sin' });
   const rj = await J.M.prodImportar(VOLCADO(), 'x');
   t.ok('sin tabla, el resumen dice cómo compartirlo', /guardado en este usuario: para compartirlo con el equipo, corre sql\/mejora-03-produccion\.sql/.test(J.M.prodResumenTexto(rj)));
@@ -214,7 +214,7 @@ exports.pruebas = async function(t){
   t.seccion('7 · lo que se pinta');
   const L = armar(); L.M.PROD.datos = d;
   const hp = L.M.prodHtmlProgramas(d, HOY);
-  t.ok('los programas con su cliente, estado, capítulos y la peor alerta arriba', /<b>A Filipino Christmas<\/b>/.test(hp) && /Netflix/.test(hp) && /En curso/.test(hp) && /2 cap\./.test(hp) && /⚠ Miami vencida hace 1 d · cap\. 1/.test(hp));
+  t.ok('los programas con su cliente, estado, capítulos y la peor alerta arriba', /<b>A Filipino Christmas<\/b>/.test(hp) && /Netflix/.test(hp) && /En curso/.test(hp) && /2 cap\./.test(hp) && />Miami vencida hace 1 d · cap\. 1</.test(hp));
   t.ok('el finalizado, sin alerta', /<b>Akka<\/b>[\s\S]*?Completado/.test(hp) && !/Akka[\s\S]*?DUBCARD vencida/.test(hp.split('<b>Akka</b>')[1] || ''));
   const ht = L.M.prodHtmlTalentos(d);
   t.ok('los talentos con su ficha y en qué han salido', /ANA ROJAS<\/b> <span class="prod-ficha">Femenino · Adulto · Agudo<\/span>/.test(ht) && /A Filipino Christmas: ALLY/.test(ht) && /Akka: MANJAYA/.test(ht));
@@ -243,7 +243,7 @@ exports.pruebas = async function(t){
   const F2 = fuentes().map(f => f.src).join('\n');
   const HTML = require('fs').readFileSync(require('./ayuda').INDEX, 'utf8');
   t.ok('el botón de Producción está en la cabecera de Programas, la que se ve, y no en la de la biblioteca, que la app oculta siempre',
-       /id="btnProduccion"'\+\(\(typeof prodPuede==='function' && prodPuede\(\)\) \? '' : ' style="display:none"'\)\+' title="DublajeCast entero/.test(HTML) && /head\.querySelector\('#btnProduccion'\); if\(bp\) bp\.onclick=\(\)=> dcastAbrir\(\);/.test(HTML)
+       /id="btnProduccion"'\+\(\(typeof prodPuede==='function' && prodPuede\(\)\) \? '' : ' style="display:none"'\)\+' title="DublajeCast tal cual/.test(HTML) && /head\.querySelector\('#btnProduccion'\); if\(bp\) bp\.onclick=\(\)=> dcastAbrir\(\);/.test(HTML)
        && !/<button class="btnv sm" id="btnProduccion"/.test(HTML));
   t.ok('se repinta al cambiar de perfil y al saber el rol', /prodPintarBoton\(\); \}catch\(e\)\{ fallo\('prodPintarBoton · index\.html:ponerModo'/.test(HTML) && /prodPintarBoton\(\); \}catch\(e\)\{ fallo\('prodPintarBoton · index\.html:loadMyRole'/.test(HTML));
   t.ok('«Traer TODO» y la caja de herramientas, solo para quien puede', /\(\(typeof prodPuede === 'function' && prodPuede\(\)\)\s+\? '<button class="modo-op dc-b" id="dcTodo">/.test(HTML) && /\(\(typeof prodPuede === 'function' && prodPuede\(\)\)\s+\? '<button class="herr-it" id="herrProd">/.test(F2));

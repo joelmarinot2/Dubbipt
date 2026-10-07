@@ -1063,7 +1063,7 @@ function herramientasPanel(){
       + 'sin cambiar ni una palabra. Un PDF por cada uno.</i></span></button>'
     + ((typeof prodPuede === 'function' && prodPuede())
         ? '<button class="herr-it" id="herrProd">'
-          + '<span class="herr-ic">🎬</span>'
+          + '<span class="herr-ic">' + (typeof csIco === 'function' ? csIco('programas', 18) : '') + '</span>'
           + '<span class="herr-tx"><b>DublajeCast</b>'
           + '<i>Toda la plataforma aquí dentro: programas, casting, reparto, talentos, '
           + 'ocupación, tráilers, DUBCARDs y breakdowns. En cada programa, las herramientas de Dubbipt.</i></span></button>'

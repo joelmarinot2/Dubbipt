@@ -57,12 +57,15 @@ function prodPuede(modo, rol){
   const r = (rol !== undefined) ? rol : ((typeof MYROLE !== 'undefined') ? MYROLE : null);
   return m === 'casting' && r === 'admin';
 }
-const PROD_SIN_PERMISO = '🔒 Producción es solo para el administrador, en el perfil Casting';
+const PROD_SIN_PERMISO = 'Producción es solo para el administrador, en el perfil Casting';
 
 /** Enseña o esconde la puerta de Producción según quién y en qué perfil. */
 function prodPintarBoton(){
   const b = document.getElementById('btnProduccion');
   if(b) b.style.display = prodPuede() ? '' : 'none';
+  /* La organización de DublajeCast en la biblioteca se pone o se quita con el perfil. */
+  const nav = document.getElementById('csNav');
+  if(!!nav !== prodPuede() && typeof csRepintar === 'function') csRepintar();
 }
 
 /** Un volcado vacío, con todas las listas. */
@@ -414,7 +417,7 @@ function prodExportarJson(){
 /** El resumen de una importación, en un renglón. */
 function prodResumenTexto(r){
   const s = r.resumen, e = r.efectos || {}, g = r.guardado || {};
-  let t = '📦 Traído de DublajeCast: ' + s.series + ' programa' + (s.series === 1 ? '' : 's') + ', ' + s.episodios + ' capítulo' + (s.episodios === 1 ? '' : 's')
+  let t = 'Traído de DublajeCast: ' + s.series + ' programa' + (s.series === 1 ? '' : 's') + ', ' + s.episodios + ' capítulo' + (s.episodios === 1 ? '' : 's')
     + ', ' + s.talentos + ' talento' + (s.talentos === 1 ? '' : 's') + ', ' + s.castings + ' asignaciones';
   if(s.trailers) t += ', ' + s.trailers + ' tráiler' + (s.trailers === 1 ? '' : 's');
   if(e.talentosNuevos) t += ' · ' + e.talentosNuevos + ' talento' + (e.talentosNuevos === 1 ? '' : 's') + ' nuevo' + (e.talentosNuevos === 1 ? '' : 's') + ' en la base';
@@ -422,7 +425,7 @@ function prodResumenTexto(r){
   if(e.conflictos) t += ' (' + e.conflictos + ' se respetan como estaban aquí)';
   if(e.programasSinCasar && e.programasSinCasar.length) t += ' · sin programa aquí: ' + e.programasSinCasar.slice(0, 4).join(', ') + (e.programasSinCasar.length > 4 ? '…' : '');
   if(g.donde === 'almacen') t += ' · guardado en este usuario: para compartirlo con el equipo, corre sql/mejora-03-produccion.sql una vez';
-  else if(g.ok === false) t += ' · ⚠️ no se pudo guardar en la nube: ' + g.causa;
+  else if(g.ok === false) t += ' · no se pudo guardar en la nube: ' + g.causa;
   return t;
 }
 
@@ -456,8 +459,8 @@ function prodHtmlProgramas(d, hoy){
       +   '<span class="prod-chip">' + prodEsc(prodEtiqueta(PROD_ET.estado, s.status)) + '</span>'
       +   '<span class="prod-chip">' + eps.length + ' cap.' + (hechos ? ' · ' + hechos + ' hechos' : '') + '</span>'
       +   (s.director ? '<span class="prod-chip">Dir. ' + prodEsc(s.director) + '</span>' : '')
-      +   (peor ? '<span class="prod-chip" style="color:' + prodColorAlerta(peor.nivel) + ';border-color:' + prodColorAlerta(peor.nivel) + '">⚠ ' + prodEsc(peor.texto) + ' · cap. ' + prodEsc(peor.ep.episode_number) + '</span>' : '')
-      +   '<span class="prod-flecha">' + (abierta ? '▾' : '▸') + '</span>'
+      +   (peor ? '<span class="prod-chip" style="color:' + prodColorAlerta(peor.nivel) + ';border-color:' + prodColorAlerta(peor.nivel) + '">' + prodEsc(peor.texto) + ' · cap. ' + prodEsc(peor.ep.episode_number) + '</span>' : '')
+      +   '<span class="prod-flecha">' + (typeof csIco === 'function' ? csIco((abierta ? 'abajo' : 'derecha'), 14) : '') + '</span>'
       + '</div>'
       + (abierta
           ? '<div class="prod-eps">' + (eps.length ? eps.map(e => {
@@ -532,9 +535,9 @@ function prodHtmlDatos(){
         + (donde ? '<br>Guardado ' + donde + '.' : '') + '</div>'
       : '<div class="meta-nota">Todavía no hay nada traído. Tráelo de DublajeCast con tu sesión, o desde el archivo que exporta (<b>dublajecast_backup_….json</b>).</div>')
     + '<div class="io-rej" style="margin-top:10px">'
-    +   '<button class="io-b" id="prodTraer">⇄ Traer de DublajeCast</button>'
-    +   '<button class="io-b" id="prodArchivo">⬆ Importar un JSON exportado</button>'
-    +   (r ? '<button class="io-b" id="prodBajar">⬇ Exportar JSON</button>' : '')
+    +   '<button class="io-b" id="prodTraer">' + (typeof csIco === 'function' ? csIco('traer', 14) : '') + ' Traer de DublajeCast</button>'
+    +   '<button class="io-b" id="prodArchivo">' + (typeof csIco === 'function' ? csIco('subir', 14) : '') + ' Importar un JSON exportado</button>'
+    +   (r ? '<button class="io-b" id="prodBajar">' + (typeof csIco === 'function' ? csIco('bajar', 14) : '') + ' Exportar JSON</button>' : '')
     + '</div>'
     + '<div class="meta-nota" style="margin-top:10px">Traer vuelve a cargar todo lo de allí y lo guarda aquí. Los talentos se suman a la base; los castings van al registro de cada programa que se llame igual aquí. Lo que ya estaba repartido en Dubbipt no se pisa.</div>';
 }
@@ -551,7 +554,7 @@ async function prodPanel(){
   const html = '<div class="modo-caja" role="dialog" aria-modal="true" style="max-width:860px;text-align:left">'
     + '<div class="modo-tit">Producción</div>'
     + '<div class="modo-sub" style="margin-bottom:8px">' + (r ? r.series + ' programas · ' + r.episodios + ' capítulos · ' + r.talentos + ' talentos' : 'Lo que viene de DublajeCast') + '</div>'
-    + '<div class="prod-pests">' + pest('programas', '🎬 Programas') + pest('talentos', '🎭 Talentos') + pest('trailers', '🎞 Tráilers') + pest('datos', '📦 Datos') + '</div>'
+    + '<div class="prod-pests">' + pest('programas', 'Programas') + pest('talentos', 'Talentos') + pest('trailers', 'Tráilers') + pest('datos', 'Datos') + '</div>'
     + (d && (prodVista === 'programas' || prodVista === 'talentos')
         ? '<input id="prodBuscar" type="text" placeholder="Buscar…" value="' + prodEsc(prodBuscar) + '" style="width:100%;box-sizing:border-box;background:#11131a;color:#e7ebf3;border:1px solid #2b3040;border-radius:9px;padding:8px 10px;font-size:13px;margin:8px 0">'
         : '')
@@ -579,7 +582,7 @@ async function prodPanel(){
     traer.disabled = true;
     try{
       const u = (typeof dcSesion === 'function') ? await dcSesion() : null;
-      if(!u){ msg('Primero entra en DublajeCast desde «⇄ DublajeCast», en la barra de casting, y vuelve aquí.', true); traer.disabled = false; return; }
+      if(!u){ msg('Primero entra en DublajeCast desde «DublajeCast», en la barra de casting, y vuelve aquí.', true); traer.disabled = false; return; }
       msg('Leyendo DublajeCast…');
       const r2 = await prodImportarDesdeDublajeCast();
       castAviso(prodResumenTexto(r2));
@@ -597,7 +600,7 @@ async function prodPanel(){
         const f = this.files && this.files[0]; this.value = '';
         if(!f) return;
         try{ const r2 = await prodImportarArchivo(f); castAviso(prodResumenTexto(r2)); prodVista = 'programas'; prodPanel(); }
-        catch(e){ castAviso('⚠️ No se pudo importar: ' + (e && e.message ? e.message : e)); }
+        catch(e){ castAviso('No se pudo importar: ' + (e && e.message ? e.message : e)); }
       });
     }
     inp.click();

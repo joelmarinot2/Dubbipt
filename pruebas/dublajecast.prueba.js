@@ -233,7 +233,7 @@ exports.pruebas = async function(t){
 
   t.seccion('8 · por dónde se entra');
   const HTML = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
-  t.ok('el botón de Programas abre DublajeCast entero', />🎬 DublajeCast<\/button>'/.test(HTML) && /bp\.onclick=\(\)=> dcastAbrir\(\);/.test(HTML));
+  t.ok('el botón de Programas abre DublajeCast entero', / DublajeCast original<\/button>'/.test(HTML) && /bp\.onclick=\(\)=> dcastAbrir\(\);/.test(HTML));
   t.ok('y el puente del casting también, solo para quien puede', /\? '<button class="modo-op dc-b" id="dcEntero">/.test(HTML) && /if\(de\) de\.onclick = \(\) => \{ cerrar\(\); dcastAbrir\(\); \};/.test(HTML));
   t.ok('el módulo se carga después de Producción', HTML.indexOf('<script src="./js/produccion.js"></script>') < HTML.indexOf('<script src="./js/dublajecast.js"></script>'));
 };
