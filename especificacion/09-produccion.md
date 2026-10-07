@@ -39,7 +39,10 @@ Dubbipt ya sabe hacer con ellos.
   programas por nombre exacto o parecido; verter talentos y castings
   respetando lo que había; guardar en la tabla, sin tabla en el almacén, y sin
   espacio solo en el equipo; cargar de cada sitio; y el texto del resumen.
-  Esa prueba y sus mutaciones van en el commit siguiente, después de desplegar. Y en el navegador, con ese mismo volcado: el panel con los
+  Las 47 mutaciones de `js/produccion.js` (claves que se cuelan, fechas en UTC,
+  alertas con la producción en marcha, el conflicto que se pisa, la revisión que
+  no sube, el almacén que no se intenta, el resumen que calla…) caen todas.
+  Y en el navegador, con ese mismo volcado: el panel con los
   programas y la alerta de Miami vencida, los capítulos desplegados, los
   talentos con su ficha y los tráilers con su plazo.
 - **PRO-7**: a mano, en el navegador. La subida a la tabla y al almacén está
