@@ -47,7 +47,9 @@ const LISTADO = [
   ['9   ', '00:45:34:06  ', '131376775         ', 'Samples  ', 'YARLEY G', 'Markers', 'Ruler', 'DEBE SER:EL  Inspector viene de una familia de samuráis que se mudó a Joseon (yosón).'].join(T),
   '',
   'T R A C K  L I S T I N G',
-  ['TRACK NAME:', 'Dial 1'].join(T)
+  ['TRACK NAME:', 'Dial 1'].join(T),
+  /* Un renglón de otra sección que, columna por columna, parecería un marcador. */
+  ['1', '00:59:00:00', '0', 'Samples', 'CLIP 1', 'Dial 1', 'Audio', 'no es un marcador'].join(T)
 ].join('\r\n');
 
 /* Mac Roman, como lo exporta Pro Tools para TextEdit. */
@@ -78,7 +80,7 @@ exports.pruebas = function(t){
   t.eq('NI UNA PALABRA cambiada: minúsculas, erratas y dobles espacios tal cual', inf.filas[1][1] + ' | ' + inf.filas[3][1] + ' | ' + inf.filas[4][2], 'diana | FALTA MALE INN GEST | DEBE SER:EL  Inspector viene de una familia de samuráis que se mudó a Joseon (yosón).');
   t.eq('un marcador sin comentario se queda, con el comentario vacío', JSON.stringify(inf.filas[1]), '["00:04:13:15","diana",""]');
   t.eq('un comentario partido en dos renglones va con el suyo', inf.filas[3][2], 'GUION: Pero, dígame… ¿acaso vio el aspecto del sujeto?\nY sigue: año, niño.');
-  t.ok('y lo de la sección siguiente no se cuela', !inf.filas.some(f => /Dial 1|TRACK/.test(f.join(' '))));
+  t.ok('y lo de la sección siguiente no se cuela, aunque parezca un marcador', !inf.filas.some(f => /Dial 1|TRACK|CLIP 1|00:59:00:00/.test(f.join(' '))));
   t.eq('lo quitado, dicho en corto', M.qcpdfQuitadoTexto(inf.quitado), 'quitado: 5 columnas (#, TIME REFERENCE, UNITS, TRACK NAME, TRACK TYPE), 2 filas vacías, 6 datos de sesión');
   t.eq('con nada quitado, nada que decir', M.qcpdfQuitadoTexto({ columnas: [], vacias: 0, sesion: 0 }) + '|' + M.qcpdfQuitadoTexto(null), '|');
   const mac = M.qcpdfLeerTxt(M.qcpdfDecodificar(enMac(LISTADO)), 'x.txt');

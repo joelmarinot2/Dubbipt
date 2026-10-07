@@ -784,14 +784,14 @@ function qcpdfDecodificar(buf){
   const b = new Uint8Array(buf);
   if(b.length >= 2 && b[0] === 0xFF && b[1] === 0xFE) return new TextDecoder('utf-16le').decode(b.subarray(2));
   if(b.length >= 2 && b[0] === 0xFE && b[1] === 0xFF) return new TextDecoder('utf-16be').decode(b.subarray(2));
-  const ini = (b.length >= 3 && b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) ? 3 : 0;
-  try{ return new TextDecoder('utf-8', { fatal: true }).decode(b.subarray(ini)); }
+  /* La marca de UTF-8 del principio la quita el propio decodificador. */
+  try{ return new TextDecoder('utf-8', { fatal: true }).decode(b); }
   catch(e){ /* no es UTF-8: Windows o Mac */ }
   /* El de Windows, con su tabla de 0x80 a 0x9F (comillas, «…», «€»): hay
      decodificadores que lo tratan como Latin-1 y esos se pierden. */
-  const win = new TextDecoder('windows-1252').decode(b.subarray(ini)).replace(/[-]/g, (c) => QCTXT_CP1252[c.charCodeAt(0) - 0x80] || c);
+  const win = new TextDecoder('windows-1252').decode(b).replace(/[\u0080-\u009f]/g, (c) => QCTXT_CP1252[c.charCodeAt(0) - 0x80] || c);
   let mac = null;
-  try{ mac = new TextDecoder('macintosh').decode(b.subarray(ini)); }catch(e){ mac = null; }
+  try{ mac = new TextDecoder('macintosh').decode(b); }catch(e){ mac = null; }
   return (mac != null && qcpdfPuntosCastellano(mac) > qcpdfPuntosCastellano(win)) ? mac : win;
 }
 

@@ -104,7 +104,7 @@ hacía nada; se quitó.
   (**PDF-19**, la parte del alto) **no lo pone en rojo ninguna mutación**: con
   las cuatro etiquetas que hay —todas cortas— quitarlo no cambia nada. Se deja
   como guardia, no como algo comprobado.
-- **PDF-23** a **PDF-25**: `pruebas/qctxt.prueba.js`, con un listado fabricado con la forma de Pro Tools (no se guarda el de sala). Y en el navegador, el 8-oct-2026, con un TXT **real** de Pro Tools en Mac Roman (40 marcadores, 33 pistas): 40 correcciones en dos hojas, con las tildes, «¿», «¡» y «…» enteros, solo las tres columnas que sirven, y 14 Falta y 26 Ajuste contados arriba. El archivo se borró después de la prueba.
+- **PDF-23** a **PDF-25**: `pruebas/qctxt.prueba.js`, con un listado fabricado con la forma de Pro Tools (no se guarda el de sala). Y en el navegador, el 8-oct-2026, con un TXT **real** de Pro Tools en Mac Roman (40 marcadores, 33 pistas): 40 correcciones en dos hojas, con las tildes, «¿», «¡» y «…» enteros, solo las tres columnas que sirven, y 14 Falta y 26 Ajuste contados arriba. El archivo se borró después de la prueba. Las 18 mutaciones del lector caen todas; la de la marca de UTF-8 era equivalente —el decodificador ya la quita— y esa línea se quitó.
 - Un informe de Pro Tools **real** todavía no ha pasado por el convertidor. Los
   que se han usado los fabricamos nosotros con la forma que tienen, que no es
   lo mismo: las X de una exportación de verdad las pone Pro Tools.
