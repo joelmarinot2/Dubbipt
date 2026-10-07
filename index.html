@@ -1981,7 +1981,6 @@ body.modo-casting #btnExport{ display:none !important; }
     <div class="lib-head">
       <h2 id="libCrumb">📚 Programas</h2>
       <span class="lmsg" id="libMsg"></span>
-      <button class="btnv sm" id="btnProduccion" onclick="prodPanel()" title="Lo que viene de DublajeCast: programas y capítulos con sus entregas, talentos con ficha y tráilers">🎬 Producción</button>
       <button class="btnv sm" id="libToggle" style="display:none">📂 Cambiar capítulo</button>
       <button class="btnv sm" id="libAction" style="display:none"></button>
     </div>
@@ -2402,7 +2401,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.25.0-nube';
+const APP_VER_NUM = 'v11.26.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8024,6 +8023,7 @@ async function renderLibrary(silent){
           + '</div></div>'
         + '<label class="dh-search"><span class="fi">🔍</span>'
           + '<input type="text" id="dashSearch" placeholder="Buscar programa…" value="'+esc(window._dashQuery||'')+'"></label>'
+        + '<button class="dh-tools" id="btnProduccion"'+((typeof prodPuede==='function' && prodPuede()) ? '' : ' style="display:none"')+' title="Lo que viene de DublajeCast: programas y capítulos con sus entregas, talentos con ficha y tráilers">🎬 Producción</button>'
         + '<button class="dh-tools" id="dashTools" title="Herramientas que no dependen de ningún capítulo">🧰 Herramientas</button>'
         + '<button class="dh-new" id="dashNew">＋ Nuevo programa</button>';
       { const ds=head.querySelector('#dashSearch');
@@ -8031,6 +8031,7 @@ async function renderLibrary(silent){
           const d2=document.getElementById('dashSearch'); if(d2){ d2.focus(); d2.setSelectionRange(d2.value.length,d2.value.length); } }; } }
       { const dn=head.querySelector('#dashNew'); if(dn) dn.onclick=newShow; }
       { const dt=head.querySelector('#dashTools'); if(dt) dt.onclick=()=> herramientasPanel(); }
+      { const bp=head.querySelector('#btnProduccion'); if(bp) bp.onclick=()=> prodPanel(); }
       { const dO=head.querySelector('#dhOther'); if(dO) dO.onclick=()=> showWorkspacePicker(true); }
       // breadcrumb de espacio (queda como migaja discreta encima del panel)
       crumb.className='dashcrumb';
@@ -8728,6 +8729,7 @@ function ponerModo(epId, m){
     if(b) b.style.display = (m === 'casting') ? '' : 'none';
   }
   try{ castPintarFuente(); }catch(e){}
+  try{ prodPintarBoton(); }catch(e){ fallo('prodPintarBoton · index.html:ponerModo', e); }
   // la tabla cambia de columnas según el modo: hay que repintarla
   try{ if(m === 'casting') plaOpen = true; renderPlanilla(); }catch(e){ fallo('renderPlanilla · index.html:6070', e); }
   try{ castPintarOcupacion(); }catch(e){}
@@ -9369,8 +9371,10 @@ async function dcPanel(){
         +     '<small>Pone aquí el casting que ya tengas allí. No pisa lo que hayas asignado tú.</small></button>'
         +   '<button class="modo-op dc-b" id="dcLlevar"><b>Llevar a DublajeCast</b>'
         +     '<small>Escribe en su base de datos. Te enseña qué va a cambiar antes de hacerlo.</small></button>'
-        +   '<button class="modo-op dc-b" id="dcTodo"><b>Traer TODO a Producción</b>'
-        +     '<small>Programas, capítulos, talentos con su ficha, castings, tráilers y entregas: todo lo de allí, guardado aquí. Los talentos se suman a la base y los castings al registro de cada programa.</small></button>'
+        +   ((typeof prodPuede === 'function' && prodPuede())
+              ? '<button class="modo-op dc-b" id="dcTodo"><b>Traer TODO a Producción</b>'
+              +   '<small>Programas, capítulos, talentos con su ficha, castings, tráilers y entregas: todo lo de allí, guardado aquí. Los talentos se suman a la base y los castings al registro de cada programa.</small></button>'
+              : '')
         + '</div>'
       : '<div class="dc-nota">Entra con tu cuenta de <b>dubcast.netlify.app</b>. La sesión se guarda '
         + 'aparte de la de Dubbipt, así que no te cierra esta.</div>'
@@ -17637,6 +17641,7 @@ async function loadMyRole(){
     const it = document.getElementById('miAccounts');
     if(it) it.style.display = (MYROLE==='admin') ? '' : 'none';
   }catch(e){}
+  try{ prodPintarBoton(); }catch(e){ fallo('prodPintarBoton · index.html:loadMyRole', e); }
 }
 function acctRoleLabel(r){
   return r==='admin' ? 'Administrador' : r==='casting' ? 'Casting' : 'Miembro';

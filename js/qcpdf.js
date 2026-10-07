@@ -1061,6 +1061,13 @@ function herramientasPanel(){
       + '<span class="herr-tx"><b>Convertidor PDF QC</b>'
       + '<i>Coge informes de QC o llamados de actores y los rehace en A4 limpio, '
       + 'sin cambiar ni una palabra. Un PDF por cada uno.</i></span></button>'
+    + ((typeof prodPuede === 'function' && prodPuede())
+        ? '<button class="herr-it" id="herrProd">'
+          + '<span class="herr-ic">🎬</span>'
+          + '<span class="herr-tx"><b>Producción</b>'
+          + '<i>Lo que viene de DublajeCast: programas y capítulos con sus entregas y '
+          + 'DUBCARDs, talentos con su ficha y tráilers con su plazo.</i></span></button>'
+        : '')
     + '<div class="herr-fb"><button id="herrX">Cerrar</button></div>'
     + '</div>';
   document.body.appendChild(ov);
@@ -1068,6 +1075,8 @@ function herramientasPanel(){
   const x = ov.querySelector('#herrX'); if(x) x.onclick = ()=> ov.remove();
   const c = ov.querySelector('#herrConv');
   if(c) c.onclick = ()=>{ ov.remove(); qcConvPanel(); };
+  const p = ov.querySelector('#herrProd');
+  if(p) p.onclick = ()=>{ ov.remove(); prodPanel(); };
 }
 
 /* Lo que se ha soltado, esperando a convertirse. */

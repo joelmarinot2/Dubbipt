@@ -22,7 +22,8 @@ const RECORTES = [
 const EXPORTA = ['PROD', 'PROD_CLAVES', 'prodVacio', 'prodNormalizar', 'prodEsVolcado', 'prodResumen', 'prodIndices', 'prodFecha', 'prodDias',
                  'prodAlertaMiami', 'prodAlertaDubcard', 'prodPlazo', 'prodFormatoDubcard', 'prodAlertasEp', 'prodFicha', 'prodFichaTexto',
                  'prodCasarPrograma', 'prodAplicar', 'prodGuardar', 'prodCargar', 'prodImportar', 'prodImportarArchivo', 'prodExportarJson',
-                 'prodResumenTexto', 'prodSinTabla', 'prodHtmlProgramas', 'prodHtmlTalentos', 'prodHtmlTrailers'];
+                 'prodResumenTexto', 'prodSinTabla', 'prodHtmlProgramas', 'prodHtmlTalentos', 'prodHtmlTrailers',
+                 'prodPuede', 'prodPintarBoton', 'prodPanel', 'PROD_SIN_PERMISO'];
 
 const HOY = new Date(2026, 9, 7);                      // 7 de octubre de 2026, local
 const dia = (n) => { const d = new Date(HOY); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
@@ -75,8 +76,10 @@ function armar(o){
     }) },
     auth: { getSession: async () => ({ data: { session: { user: { id: 'u1' } } } }) }
   };
+  const boton = { style: { display: 'x' } };
   const M = montar(RECORTES, EXPORTA, {
     castNorm: undefined, WORKSPACE: ('ws' in o) ? o.ws : { id: 'ws1', name: 'Estudio' },
+    DDL_MODO: ('modo' in o) ? o.modo : 'casting', MYROLE: ('rol' in o) ? o.rol : 'admin',
     sb: sb, Blob: function(partes){ this.x = partes; },
     idbGet: async (k) => (k in idb ? idb[k] : null), idbSet: async (k, v) => { idb[k] = v; diario.push('idb ' + k); },
     TAL: TAL, talCargar: async () => TAL.nombres.length,
@@ -87,10 +90,11 @@ function armar(o){
     castRegGuardar: async (id, reg) => { registros[id] = reg; diario.push('registro ' + id); return true; },
     dcLeer: async () => o.nube || VOLCADO(),
     castAviso: (x) => avisos.push(x), fallo: (d) => diario.push('fallo ' + d),
-    esc: (x) => String(x).replace(/</g, '&lt;'), document: {},
+    esc: (x) => String(x).replace(/</g, '&lt;'),
+    document: { getElementById: (id) => { diario.push('busca ' + id); return id === 'btnProduccion' ? boton : null; } },
     console: { warn: () => {}, log: () => {} }
   });
-  return { M, diario, avisos, idb, TAL, registros, sb, almacen, tabla: () => tabla };
+  return { M, diario, avisos, idb, TAL, registros, sb, almacen, boton, tabla: () => tabla };
 }
 
 exports.pruebas = async function(t){
@@ -217,10 +221,34 @@ exports.pruebas = async function(t){
   const htr = L.M.prodHtmlTrailers(d, HOY);
   t.ok('los tráilers con su plazo, los más urgentes primero', /Tráiler · mezcla[\s\S]*?Mañana[\s\S]*?Teaser[\s\S]*?Completado/.test(htr));
 
-  t.seccion('8 · por dónde se entra');
+  t.seccion('8 · quién lo ve: el administrador, en el perfil Casting');
+  t.eq('las dos cosas a la vez', [['casting', 'admin'], ['qc', 'admin'], ['grabacion', 'admin'], ['casting', 'casting'], ['casting', 'member'], ['casting', null], ['', 'admin']].map(x => L.M.prodPuede(x[0], x[1])).join(' '),
+       'true false false false false false false', 'un rol «casting» no basta: el pedido es que solo lo vea el administrador');
+  t.eq('sin decir nada, mira el perfil y el rol de ahora', armar().M.prodPuede() + ' ' + armar({ modo: 'qc' }).M.prodPuede() + ' ' + armar({ rol: 'member' }).M.prodPuede(), 'true false false');
+  for(const [que, o] of [['un miembro en Casting', { rol: 'member' }], ['el administrador en QC', { modo: 'qc' }]]){
+    const N = armar(o);
+    N.M.prodPintarBoton();
+    t.eq(que + ': el botón, escondido', N.boton.style.display, 'none');
+    await N.M.prodPanel();
+    t.eq(que + ': el panel no se abre y se dice por qué', N.avisos.join('|') + ' · ' + N.diario.includes('busca prodOv'), N.M.PROD_SIN_PERMISO + ' · true');
+    t.eq(que + ': ni se carga nada', N.diario.some(x => /^idb|^upsert/.test(x)), false);
+    let err = '';
+    try{ await N.M.prodImportar(VOLCADO(), 'x'); }catch(e){ err = e.message; }
+    t.eq(que + ': ni se puede traer', err + ' · ' + (N.M.PROD.datos === null) + ' · ' + N.diario.includes('talGuardar'), N.M.PROD_SIN_PERMISO + ' · true · false');
+  }
+  const Ad = armar(); Ad.M.prodPintarBoton();
+  t.eq('al administrador en Casting, el botón se le ve', Ad.boton.style.display, '');
+
+  t.seccion('9 · por dónde se entra');
   const F2 = fuentes().map(f => f.src).join('\n');
   const HTML = require('fs').readFileSync(require('./ayuda').INDEX, 'utf8');
-  t.ok('el botón de Producción está en la biblioteca', /id="btnProduccion" onclick="prodPanel\(\)"/.test(HTML));
+  t.ok('el botón de Producción está en la cabecera de Programas, la que se ve, y no en la de la biblioteca, que la app oculta siempre',
+       /id="btnProduccion"'\+\(\(typeof prodPuede==='function' && prodPuede\(\)\) \? '' : ' style="display:none"'\)\+' title="Lo que viene de DublajeCast/.test(HTML) && /head\.querySelector\('#btnProduccion'\); if\(bp\) bp\.onclick=\(\)=> prodPanel\(\);/.test(HTML)
+       && !/<button class="btnv sm" id="btnProduccion"/.test(HTML));
+  t.ok('se repinta al cambiar de perfil y al saber el rol', /prodPintarBoton\(\); \}catch\(e\)\{ fallo\('prodPintarBoton · index\.html:ponerModo'/.test(HTML) && /prodPintarBoton\(\); \}catch\(e\)\{ fallo\('prodPintarBoton · index\.html:loadMyRole'/.test(HTML));
+  t.ok('«Traer TODO» y la caja de herramientas, solo para quien puede', /\(\(typeof prodPuede === 'function' && prodPuede\(\)\)\s+\? '<button class="modo-op dc-b" id="dcTodo">/.test(HTML) && /\(\(typeof prodPuede === 'function' && prodPuede\(\)\)\s+\? '<button class="herr-it" id="herrProd">/.test(F2));
+  t.ok('la base de datos solo deja al administrador', (() => { const q = require('fs').readFileSync(require('path').join(__dirname, '..', 'sql', 'mejora-03-produccion.sql'), 'utf8'); return /using \(public\.is_admin\(\)\)\s+with check \(public\.is_admin\(\)\);/.test(q) && !/w\.owner = auth\.uid\(\)/.test(q); })());
+  t.ok('y también en la caja de herramientas', /id="herrProd"/.test(F2) && /#herrProd'\);\s+if\(p\) p\.onclick = \(\)=>\{ ov\.remove\(\); prodPanel\(\); \};/.test(F2));
   t.ok('y el puente con DublajeCast ofrece traerlo todo', /id="dcTodo"/.test(F2) && /const r = await prodImportarDesdeDublajeCast\(\);\s+castAviso\(prodResumenTexto\(r\)\);/.test(F2));
   t.ok('la base de talentos dice cuándo trae la ficha de DublajeCast', /con la ficha de DublajeCast/.test(F2));
 };

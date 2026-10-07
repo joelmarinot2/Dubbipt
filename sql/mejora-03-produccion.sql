@@ -7,7 +7,10 @@
 -- lo dice: funciona igual, pero solo lo ve ese usuario.
 --
 -- Una fila por espacio de trabajo con el JSON entero y un número de revisión.
--- La ve y la escribe el dueño del espacio, o un administrador.
+-- La ve y la escribe SOLO un administrador (pedido de sala: «que solo el
+-- administrador pueda verlos»). Ser dueño del espacio no basta.
+-- Si ya la habías creado con la versión anterior, córrelo otra vez: cambia la
+-- política sin tocar los datos.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 create table if not exists public.produccion (
@@ -22,14 +25,8 @@ alter table public.produccion enable row level security;
 drop policy if exists produccion_rw on public.produccion;
 create policy produccion_rw on public.produccion
   for all to authenticated
-  using (
-    exists (select 1 from public.workspaces w
-             where w.id = workspace_id and (w.owner = auth.uid() or public.is_admin()))
-  )
-  with check (
-    exists (select 1 from public.workspaces w
-             where w.id = workspace_id and (w.owner = auth.uid() or public.is_admin()))
-  );
+  using (public.is_admin())
+  with check (public.is_admin());
 
 grant select, insert, update, delete on public.produccion to authenticated;
 

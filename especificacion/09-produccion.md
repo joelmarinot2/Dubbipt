@@ -19,7 +19,8 @@ Dubbipt ya sabe hacer con ellos.
 | **PRO-4** | **Los talentos se suman a la base**, nunca se quitan. La ficha —género, edad aparente, tono de voz, registro, correo— se lee de lo traído: «Femenino · Adulto · Agudo». | ✅ |
 | **PRO-5** | **Los castings van al registro de cada programa que se llame igual aquí** —exacto o muy parecido—, para que al abrir un capítulo se hereden (CAST-6). Lo que el registro ya decía distinto **se respeta** y se cuenta: lo de Dubbipt manda. Los programas sin pareja aquí se nombran. | ✅ |
 | **PRO-6** | **Las alertas se calculan como allí**: la entrega a Miami avisa desde tres días antes y vencida, salvo que la producción ya esté en marcha; la DUBCARD igual, salvo que no haga falta o el capítulo esté finalizado. El formato de DUBCARD es el del capítulo o, si no, el del cliente: Netflix es BACKLOT y los demás Excel; «No necesita DUBCARD» si no la requiere. Los tráilers llevan su plazo: vencido, hoy, mañana, en dos, cinco o más días, o completado. Las fechas se leen como fecha local. | ✅ |
-| **PRO-7** | El panel **🎬 Producción**, en la biblioteca: programas con sus capítulos, estado, fase, DUBCARD, fechas y alertas —la peor alerta de cada programa, arriba—; talentos con su ficha y en qué han salido; tráilers con su plazo; y de dónde vino todo, con los botones para traerlo, importar un JSON y exportarlo en el formato que DublajeCast también entiende. Por ahora se **mira**: cambiar las cosas desde aquí es la fase siguiente. | ✅ |
+| **PRO-7** | El panel **🎬 Producción**, desde la cabecera de **Programas** (junto a «🧰 Herramientas») y desde la caja de herramientas: programas con sus capítulos, estado, fase, DUBCARD, fechas y alertas —la peor alerta de cada programa, arriba—; talentos con su ficha y en qué han salido; tráilers con su plazo; y de dónde vino todo, con los botones para traerlo, importar un JSON y exportarlo en el formato que DublajeCast también entiende. Por ahora se **mira**: cambiar las cosas desde aquí es la fase siguiente. | ✅ |
+| **PRO-8** | **Solo el administrador, en el perfil Casting.** Pedido de sala: «que solamente el perfil de Casting tenga acceso a esos datos y que solo el administrador pueda verlos». Las dos cosas a la vez: el perfil de trabajo es Casting **y** la cuenta es de administrador. Un rol «Casting» no basta. A los demás no se les enseña el botón 🎬 Producción, ni «Traer TODO a Producción» en el puente con DublajeCast, ni la entrada en la caja de herramientas, ni la ficha de DublajeCast en la base de talentos; si llegan al panel, no se abre y se dice por qué, y no se puede traer nada. El botón se repinta al cambiar de perfil y al saberse el rol. Quien cierra de verdad es la base de datos: la tabla `produccion` solo la ve y la escribe un administrador (`public.is_admin()`). | ✅ |
 
 ## Nunca
 
@@ -28,6 +29,7 @@ Dubbipt ya sabe hacer con ellos.
 | **PRO-N1** | **Nunca entrar en la cuenta de DublajeCast en nombre de nadie** (SYN-N2). La sesión la abre la persona en el panel. | — |
 | **PRO-N2** | **Nunca quitar nada de la base de talentos ni pisar un casting del registro** al traer: traer solo suma. | ✅ |
 | **PRO-N3** | Nunca tirar una clave del JSON porque no se conozca: es de alguien. | ✅ |
+| **PRO-N4** | Nunca enseñar Producción a quien no sea administrador, aunque sea dueño del espacio de trabajo o tenga el rol Casting. | ✅ |
 
 ## Cómo se demuestra
 
@@ -45,6 +47,7 @@ Dubbipt ya sabe hacer con ellos.
   Y en el navegador, con ese mismo volcado: el panel con los
   programas y la alerta de Miami vencida, los capítulos desplegados, los
   talentos con su ficha y los tráilers con su plazo.
+- **PRO-8**: la misma prueba, sección 8: el miembro en Casting y el administrador en QC no ven el botón, no abren el panel, no cargan ni traen nada; el administrador en Casting sí. Y que la política SQL sea solo `is_admin()`.
 - **PRO-7**: a mano, en el navegador. La subida a la tabla y al almacén está
   probada con dobles, no contra Supabase.
 
@@ -54,7 +57,7 @@ Dubbipt ya sabe hacer con ellos.
   fases, DUBCARDs, tráilers, la ficha de un talento— y escribirlos de vuelta en
   DublajeCast mientras convivan las dos, es lo siguiente. Los breakdowns y las
   apariciones se guardan pero todavía no se enseñan.
-- La tabla `produccion` hay que crearla una vez con `sql/mejora-03-produccion.sql`.
+- La tabla `produccion` hay que crearla una vez con `sql/mejora-03-produccion.sql` (si se creó con la versión anterior, correrlo otra vez para que quede solo para el administrador).
   Hasta entonces cada usuario tiene su copia en el almacén.
 - Un programa de DublajeCast que no exista como programa en Dubbipt no se crea
   solo: sus castings esperan a que exista uno con ese nombre.

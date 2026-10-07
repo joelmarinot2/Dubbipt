@@ -44,6 +44,27 @@ const PROD_ET = {
   trailer:  { pendiente: 'Pendiente', en_curso: 'En curso', completo: 'Completado' }
 };
 
+/* ── Quién lo ve ─────────────────────────────────────────────────────────
+   Pedido de sala: «que solamente el perfil de Casting tenga acceso a esos
+   datos y que solo el administrador pueda verlos». Las dos cosas a la vez: el
+   perfil de trabajo puesto es Casting Y la cuenta es de administrador. Esto
+   esconde la puerta; quien de verdad cierra es la base de datos, con la
+   política de `sql/mejora-03-produccion.sql`, que solo deja al administrador. */
+
+/** ¿Puede ver Producción? `modo` y `rol` se pueden pasar para probar; si no, los de ahora. */
+function prodPuede(modo, rol){
+  const m = (modo !== undefined) ? modo : ((typeof DDL_MODO !== 'undefined') ? DDL_MODO : '');
+  const r = (rol !== undefined) ? rol : ((typeof MYROLE !== 'undefined') ? MYROLE : null);
+  return m === 'casting' && r === 'admin';
+}
+const PROD_SIN_PERMISO = '🔒 Producción es solo para el administrador, en el perfil Casting';
+
+/** Enseña o esconde la puerta de Producción según quién y en qué perfil. */
+function prodPintarBoton(){
+  const b = document.getElementById('btnProduccion');
+  if(b) b.style.display = prodPuede() ? '' : 'none';
+}
+
 /** Un volcado vacío, con todas las listas. */
 function prodVacio(){
   const d = {};
@@ -358,6 +379,7 @@ async function prodCargar(fuerza){
  * `{ resumen, efectos, guardado }`.
  */
 async function prodImportar(payload, origen){
+  if(!prodPuede()) throw new Error(PROD_SIN_PERMISO);
   if(!prodEsVolcado(payload)) throw new Error('eso no es un volcado de DublajeCast: no trae series, capítulos, talentos ni castings');
   PROD.datos = prodNormalizar(payload);
   PROD.origen = origen || 'DublajeCast';
@@ -520,6 +542,7 @@ function prodHtmlDatos(){
 /** El panel de Producción: programas y capítulos con sus alertas, talentos con ficha, tráilers, y de dónde viene todo. */
 async function prodPanel(){
   const viejo = document.getElementById('prodOv'); if(viejo) viejo.remove();
+  if(!prodPuede()){ castAviso(PROD_SIN_PERMISO); prodPintarBoton(); return; }
   try{ await prodCargar(); }catch(e){ /* sin nube se enseña lo del equipo */ }
   const d = PROD.datos;
   const hoy = new Date();
