@@ -63,11 +63,15 @@ function retocar(html){
     if(n !== 1) throw new Error('«' + que + '»: lo que se busca aparece ' + n + ' veces (tiene que ser 1). ¿Ha cambiado DublajeCast por dentro?');
     t = t.replace(busca, () => pone);
   }
+  /* Vercel sirve la página como /dublajecast, SIN barra al final (cleanUrls),
+     y ahí una ruta relativa como «icons/…» apuntaría a la raíz de Dubbipt.
+     Todo lo de la carpeta va con su ruta entera. */
+  t = t.split('href="icons/').join('href="/dublajecast/icons/');
   /* El puente, al final del cuerpo: lo usa la barra cuando React pinta, que es después. */
   const fin = t.lastIndexOf('\n</body>');
   if(fin < 0) throw new Error('no encuentro el </body> final');
   const version = (t.match(/<meta name="dc-version" content="([^"]+)"/) || [])[1] || '?';
-  t = t.slice(0, fin) + '\n<script src="./puente.js"></script>' + t.slice(fin);
+  t = t.slice(0, fin) + '\n<script src="/dublajecast/puente.js"></script>' + t.slice(fin);
   t = t.replace('<head>', () => '<head>\n<!-- Copia de DublajeCast ' + version + ' dentro de Dubbipt (local/traer-dublajecast.js). No editar aquí: se pisa al volver a traerla. -->');
   return { html: t, version: version };
 }

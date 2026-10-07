@@ -15,7 +15,7 @@
         { "key": "Service-Worker-Allowed", "value": "/" }
       ]
     },
-    { "source": "/dublajecast/(.*)",
+    { "source": "/dublajecast(.*)",
       "headers": [
         { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
         { "key": "X-Content-Type-Options", "value": "nosniff" },
@@ -26,7 +26,7 @@
           "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' https: wss:; worker-src 'self' blob:; frame-src 'self' about: blob:; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; form-action 'self'" }
       ]
     },
-    { "source": "/((?!dublajecast/).*)",
+    { "source": "/((?!dublajecast).*)",
       "headers": [
         { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" },
         { "key": "X-Frame-Options", "value": "SAMEORIGIN" },

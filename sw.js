@@ -73,7 +73,7 @@ self.addEventListener('fetch', e => {
 
   // DublajeCast copiado dentro (dublajecast/) y su atajo a la IA (api/): van
   // directos. Sin conexión, mejor que fallen a que se sirva Dubbipt en su lugar.
-  if (url.origin === self.location.origin && /^\/(dublajecast|api)\//.test(url.pathname)) return;
+  if (url.origin === self.location.origin && /^\/(dublajecast|api)(\/|$)/.test(url.pathname)) return;
 
   // Solo se gestiona lo NUESTRO y las librerias fijadas de arriba. Todo lo
   // demas que salga a la red -por ejemplo el modelo de voz, que baja en trozos
