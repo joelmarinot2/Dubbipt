@@ -753,6 +753,114 @@ function qcpdfLeerInforme(hojas, nombre){
   return { tarjetas: qcpdfDatosSesion(todas), columnas: cols.map(c => c.et), filas: filas, nombre: nombre };
 }
 
+/* ── El TXT de marcadores de Pro Tools ─────────────────────────────────────
+   Pedido de sala: «quiero que la herramienta de PDF QC acepte este formato;
+   tienes que quitar toda la información que no sirve». Es lo que exporta Pro
+   Tools con File > Export > Session Info as Text: una cabecera de sesión y la
+   tabla de marcadores, separada por tabuladores.
+
+   Lo que sirve para corregir: dónde (LOCATION), quién o qué (NAME) y qué hay
+   que hacer (COMMENTS). Lo demás se quita: el número del marcador, la
+   referencia en muestras, las unidades, la pista («Markers»), el tipo
+   («Ruler»), las filas vacías y, de la cabecera, todo menos el nombre de la
+   sesión y el formato de timecode. Las palabras que quedan, tal cual. */
+
+/** Cuántas letras del castellano trae un texto: con eso se sabe si se ha leído
+    con la codificación buena. */
+function qcpdfPuntosCastellano(t){
+  const s = String(t);
+  const buenas = (s.match(/[áéíóúüñÁÉÍÓÚÜÑ¿¡]/g) || []).length;
+  /* Lo que solo sale cuando se ha leído con la codificación equivocada:
+     letras con acentos que el castellano no usa, y símbolos sueltos. */
+  const raras = (s.match(/[À-ÖØ-öø-ÿ‡Ž·°ˆ‰Šœžƒ†]/g) || []).filter(c => !/[áéíóúüñÁÉÍÓÚÜÑ]/.test(c)).length;
+  return buenas - raras;
+}
+
+/** El texto de un archivo. UTF-8 o UTF-16 si lo es; si no, el de Windows o el
+    de Mac de toda la vida (Mac Roman), que es como lo saca Pro Tools al
+    exportar como «TextEdit»: se queda el que da letras del castellano. Sin
+    esto, «¿» sale como «À» y las tildes desaparecen. */
+function qcpdfDecodificar(buf){
+  const b = new Uint8Array(buf);
+  if(b.length >= 2 && b[0] === 0xFF && b[1] === 0xFE) return new TextDecoder('utf-16le').decode(b.subarray(2));
+  if(b.length >= 2 && b[0] === 0xFE && b[1] === 0xFF) return new TextDecoder('utf-16be').decode(b.subarray(2));
+  const ini = (b.length >= 3 && b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) ? 3 : 0;
+  try{ return new TextDecoder('utf-8', { fatal: true }).decode(b.subarray(ini)); }
+  catch(e){ /* no es UTF-8: Windows o Mac */ }
+  /* El de Windows, con su tabla de 0x80 a 0x9F (comillas, «…», «€»): hay
+     decodificadores que lo tratan como Latin-1 y esos se pierden. */
+  const win = new TextDecoder('windows-1252').decode(b.subarray(ini)).replace(/[-]/g, (c) => QCTXT_CP1252[c.charCodeAt(0) - 0x80] || c);
+  let mac = null;
+  try{ mac = new TextDecoder('macintosh').decode(b.subarray(ini)); }catch(e){ mac = null; }
+  return (mac != null && qcpdfPuntosCastellano(mac) > qcpdfPuntosCastellano(win)) ? mac : win;
+}
+
+/** De 0x80 a 0x9F en el juego de Windows. */
+const QCTXT_CP1252 = ['€', '', '‚', 'ƒ', '„', '…', '†', '‡', 'ˆ', '‰', 'Š', '‹', 'Œ', '', 'Ž', '', '', '‘', '’', '“', '”', '•', '–', '—', '˜', '™', 'š', '›', 'œ', '', 'ž', 'Ÿ'];
+
+/** Las columnas que se quedan, por su nombre en la cabecera de Pro Tools. */
+const QCTXT_QUEDAN = [['LOCATION', /^location$/i], ['NAME', /^name$/i], ['COMMENTS', /^comments?$/i]];
+/** Un sitio: timecode, compases o minutos y segundos, como los pone Pro Tools. */
+const QCTXT_SITIO = /^\d{1,2}:\d{2}:\d{2}[:;.]\d{2,3}$|^\d+\|\d+\|\d+$|^\d{1,3}:\d{2}(?:\.\d+)?$/;
+
+/** ¿Es este texto un listado de marcadores de Pro Tools? */
+function qcpdfEsTxtProTools(txt){
+  return /M\s*A\s*R\s*K\s*E\s*R\s*S\s+L\s*I\s*S\s*T\s*I\s*N\s*G/i.test(txt) || /^\s*#?\s*\t\s*LOCATION\s*\t/im.test(txt);
+}
+
+/**
+ * El listado de marcadores leído, con la misma forma que un informe en PDF
+ * leído (qcpdfLeerInforme): { tarjetas, columnas, filas, nombre }, y además
+ * `quitado`, lo que se ha dejado fuera, para decirlo. Nulo si no es un listado.
+ */
+function qcpdfLeerTxt(txt, nombre){
+  const lineas = String(txt || '').replace(/\r\n?/g, '\n').split('\n');
+  const iCab = lineas.findIndex(l => { const c = l.split('\t').map(x => x.trim().toUpperCase()); return c.indexOf('LOCATION') >= 0 && c.indexOf('NAME') >= 0; });
+  if(iCab < 0) return null;
+  /* La cabecera de sesión, antes de la tabla: «CLAVE:<tab>valor». */
+  const sesion = {};
+  for(let i = 0; i < iCab; i++){
+    const m = lineas[i].match(/^([A-Z#][A-Z# ]*?)\s*:\s*(.*)$/);
+    if(m && m[2].trim()) sesion[m[1].trim().toUpperCase()] = m[2].trim();
+  }
+  const cab = lineas[iCab].split('\t').map(x => x.trim());
+  const idx = QCTXT_QUEDAN.map(q => cab.findIndex(c => q[1].test(c)));
+  const filas = [];
+  const quitado = { columnas: cab.filter((c, i) => c && idx.indexOf(i) < 0), vacias: 0, sesion: 0 };
+  for(let i = iCab + 1; i < lineas.length; i++){
+    const l = lineas[i];
+    /* Otra sección de Pro Tools («T R A C K  L I S T I N G»…): aquí acaba. */
+    if(/^\s*(?:[A-Z]\s){3,}/.test(l) && l.indexOf('\t') < 0) break;
+    const c = l.split('\t');
+    const v = idx.map(k => (k >= 0 && c[k] != null) ? c[k].trim() : '');
+    if(!v.join('')){ if(l.indexOf('\t') >= 0) quitado.vacias++; continue; }
+    if(!v[0]){
+      /* Sin sitio: un comentario partido en dos renglones. Va con el de arriba. */
+      if(filas.length){ const ult = filas[filas.length - 1]; for(let k = 1; k < v.length; k++) if(v[k]) ult[k] = ult[k] ? ult[k] + '\n' + v[k] : v[k]; }
+      continue;
+    }
+    if(!QCTXT_SITIO.test(v[0])) continue;
+    filas.push(v);
+  }
+  const queda = (k) => idx[k] >= 0;
+  const tarjetas = [];
+  if(sesion['SESSION NAME']) tarjetas.push({ k: 'Session Name', v: sesion['SESSION NAME'] });
+  if(sesion['TIMECODE FORMAT']) tarjetas.push({ k: 'Timecode Format', v: sesion['TIMECODE FORMAT'] });
+  quitado.sesion = Object.keys(sesion).filter(k => k !== 'SESSION NAME' && k !== 'TIMECODE FORMAT').length;
+  return { tarjetas: tarjetas, columnas: QCTXT_QUEDAN.map(q => q[0]).filter((x, k) => queda(k)),
+           filas: filas.map(f => f.filter((x, k) => queda(k))), nombre: nombre, quitado: quitado };
+}
+
+/** Lo que se ha quitado, dicho en corto. */
+function qcpdfQuitadoTexto(q){
+  if(!q) return '';
+  const p = [];
+  if(q.columnas.length) p.push(q.columnas.length + ' columna' + (q.columnas.length === 1 ? '' : 's') + ' (' + q.columnas.join(', ') + ')');
+  if(q.vacias) p.push(q.vacias + ' fila' + (q.vacias === 1 ? '' : 's') + ' vacía' + (q.vacias === 1 ? '' : 's'));
+  if(q.sesion) p.push(q.sesion + ' dato' + (q.sesion === 1 ? '' : 's') + ' de sesión');
+  return p.length ? 'quitado: ' + p.join(', ') : '';
+}
+
 /** ¿Es un llamado de actores? Se decide por lo que traen las columnas, no por
     el nombre del archivo, que lo pone cada estudio como quiere. */
 function qcpdfEsLlamado(inf){
@@ -830,7 +938,10 @@ function qcpdfDeInforme(inf, opts){
       const iCom = columnas.findIndex(c => /comment|observaci|nota/.test(String(c.et).toLowerCase()));
       if(iCom >= 0 && typeof qcTipoSugerido === 'function'){
         columnas = columnas.concat([{ et:'Tipo', peso:0.85, clase:'tipo' }]);
-        filas = filas.map(f => (f && f.grupo) ? f : f.concat([qcTipoSugerido(f[iCom])]));
+        /* Se mira también el nombre: en los marcadores de Pro Tools el «FALTA»
+           se escribe ahí («FALTA VALERIA») y el comentario lleva el guion. */
+        const iNom = columnas.findIndex(c => c.clase === 'nombre');
+        filas = filas.map(f => (f && f.grupo) ? f : f.concat([qcTipoSugerido((iNom >= 0 && iNom !== iCom ? (f[iNom] || '') + ' ' : '') + (f[iCom] || ''))]));
       }
     }
     /* Y el circulo para ir marcando lo que queda resuelto. */
@@ -840,7 +951,7 @@ function qcpdfDeInforme(inf, opts){
 
   const sinGrupo = filas.filter(f => f && !f.grupo);
   const cuantas = sinGrupo.length;
-  const base = String(inf.nombre || 'informe').replace(/\.pdf$/i, '');
+  const base = String(inf.nombre || 'informe').replace(/\.(pdf|txt)$/i, '');
   const iTipo = columnas.findIndex(c => c.clase === 'tipo');
   const chips = (!llamado && iTipo >= 0 && typeof qcCuentaTipos === 'function')
                   ? qcCuentaTipos(sinGrupo.map(f => ({ tipo: qcpdfClaveTipo(f[iTipo]) })))
@@ -1059,8 +1170,8 @@ function herramientasPanel(){
     + '<button class="herr-it" id="herrConv">'
       + '<span class="herr-ic">⤓</span>'
       + '<span class="herr-tx"><b>Convertidor PDF QC</b>'
-      + '<i>Coge informes de QC o llamados de actores y los rehace en A4 limpio, '
-      + 'sin cambiar ni una palabra. Un PDF por cada uno.</i></span></button>'
+      + '<i>Coge informes de QC o llamados de actores, en PDF o en el TXT de marcadores de Pro Tools, '
+      + 'y los rehace en A4 limpio, sin cambiar ni una palabra. Un PDF por cada uno.</i></span></button>'
     + ((typeof prodPuede === 'function' && prodPuede())
         ? '<button class="herr-it" id="herrProd">'
           + '<span class="herr-ic">' + (typeof csIco === 'function' ? csIco('programas', 18) : '') + '</span>'
@@ -1118,22 +1229,22 @@ function qcConvPintar(){
         + esc_(QCCONV.estudio || '') + '"></label>'
       + '</div>'
     + '<div class="conv-zona" id="convZona">'
-      + '<b>Suelta aquí los PDF</b><i>o pulsa para buscarlos · A4, máximo 2 hojas</i></div>'
-    + '<input type="file" id="convIn" accept="application/pdf,.pdf,image/*" multiple style="display:none">'
+      + '<b>Suelta aquí los PDF o el TXT de marcadores de Pro Tools</b><i>o pulsa para buscarlos · A4, máximo 2 hojas</i></div>'
+    + '<input type="file" id="convIn" accept="application/pdf,.pdf,text/plain,.txt,image/*" multiple style="display:none">'
     + (QCCONV.poster
-        ? '<div class="conv-post">🖼 <b>' + esc_(QCCONV.poster.nombre) + '</b>'
+        ? '<div class="conv-post">' + (typeof _svgI === 'function' ? _svgI('<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 17l-5-5-9 8"/>', 2, 14) : '') + ' <b>' + esc_(QCCONV.poster.nombre) + '</b>'
           + '<i>el informe saldrá en escala de grises</i>'
-          + '<button class="conv-q" id="convQuitaPost" title="Quitar">✕</button></div>'
+          + '<button class="conv-q" id="convQuitaPost" title="Quitar" aria-label="Quitar">' + (typeof _svgI === 'function' ? _svgI('<path d="M6 6l12 12M18 6L6 18"/>', 2, 13) : 'x') + '</button></div>'
         : '')
     + (l.length
         ? '<div class="conv-lista">' + l.map((f, i) =>
             '<div class="conv-it">'
             + '<span class="conv-n">' + esc_(f.nombre) + '</span>'
             + '<span class="conv-st ' + (f.estado || '') + '">' + esc_(f.msg || 'en espera') + '</span>'
-            + (f.listo ? '<button class="conv-dl" data-i="' + i + '" title="Descargar otra vez">⤓</button>' : '')
-            + '<button class="conv-q" data-i="' + i + '" title="Quitar">✕</button>'
+            + (f.listo ? '<button class="conv-dl" data-i="' + i + '" title="Descargar otra vez" aria-label="Descargar otra vez">' + (typeof _svgI === 'function' ? _svgI('<path d="M12 4v12"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/>', 2, 14) : 'v') + '</button>' : '')
+            + '<button class="conv-q" data-i="' + i + '" title="Quitar" aria-label="Quitar">' + (typeof _svgI === 'function' ? _svgI('<path d="M6 6l12 12M18 6L6 18"/>', 2, 13) : 'x') + '</button>'
             + '</div>').join('') + '</div>'
-        : '<div class="conv-vacio">Todavía no has soltado ningún PDF.</div>')
+        : '<div class="conv-vacio">Todavía no has soltado ningún PDF ni TXT.</div>')
     + '<div class="herr-fb">'
       + '<button class="conv-go" id="convGo"' + (l.length && !QCCONV.trabajando ? '' : ' disabled') + '>'
         + (QCCONV.trabajando ? 'Convirtiendo…' : ('Convertir' + (l.length > 1 ? ' todos' : ''))) + '</button>'
@@ -1167,7 +1278,7 @@ function qcConvEnganchar(ov){
   });
   Array.prototype.slice.call(ov.querySelectorAll('.conv-dl')).forEach(b => b.onclick = ()=>{
     const f = QCCONV.archivos[+b.dataset.i];
-    if(f && f.doc) f.doc.save(String(f.nombre).replace(/\.pdf$/i, '') + ' · QC.pdf');
+    if(f && f.doc) f.doc.save(String(f.nombre).replace(/\.(pdf|txt)$/i, '') + ' · QC.pdf');
   });
 }
 
@@ -1181,7 +1292,7 @@ async function qcConvAnadir(files){
       catch(e){ QCCONV.poster = null; }
       continue;
     }
-    if(!/pdf/i.test(f.type) && !/\.pdf$/i.test(f.name)) continue;
+    if(!/pdf/i.test(f.type) && !/\.pdf$/i.test(f.name) && !/\.txt$/i.test(f.name) && f.type !== 'text/plain') continue;
     QCCONV.archivos.push({ nombre: f.name, file: f, estado:'', msg:'en espera', listo:false, doc:null });
   }
   qcConvPintar();
@@ -1198,19 +1309,22 @@ async function qcConvTodos(){
     f.estado = ''; f.msg = 'leyendo…'; qcConvPintar();
     try{
       const buf = await f.file.arrayBuffer();
-      const hojas = await qcpdfLeerPdf(buf);
-      const inf = qcpdfLeerInforme(hojas, f.nombre);
-      if(!inf){ f.estado = 'mal'; f.msg = 'no encuentro la tabla'; continue; }
+      const esTxt = /\.txt$/i.test(f.nombre) || f.file.type === 'text/plain';
+      /* El TXT de marcadores de Pro Tools se lee aquí, sin PDF de por medio, y
+         se queda solo con lo que sirve: dónde, quién y qué. */
+      const inf = esTxt ? qcpdfLeerTxt(qcpdfDecodificar(buf), f.nombre)
+                        : qcpdfLeerInforme(await qcpdfLeerPdf(buf), f.nombre);
+      if(!inf){ f.estado = 'mal'; f.msg = esTxt ? 'no es un listado de marcadores de Pro Tools' : 'no encuentro la tabla'; continue; }
       if(!inf.filas.length){ f.estado = 'mal'; f.msg = 'la tabla está vacía'; continue; }
       f.msg = 'dibujando…'; qcConvPintar();
       const d = qcpdfDeInforme(inf, { poster: QCCONV.poster ? QCCONV.poster.dato : null,
                                       revisor: QCCONV.revisor, estudio: QCCONV.estudio });
       f.doc = await qcpdfHacer(d);
       f.listo = true; f.estado = 'ok';
-      f.msg = inf.filas.length + ' filas · listo';
+      f.msg = inf.filas.length + ' filas · listo' + (inf.quitado && qcpdfQuitadoTexto(inf.quitado) ? ' · ' + qcpdfQuitadoTexto(inf.quitado) : '');
       /* Se descarga solo: es lo que se ha pedido al pulsar «Convertir». El
          boton de al lado queda para volver a bajarlo sin repetir el trabajo. */
-      f.doc.save(String(f.nombre).replace(/\.pdf$/i, '') + ' · QC.pdf');
+      f.doc.save(String(f.nombre).replace(/\.(pdf|txt)$/i, '') + ' · QC.pdf');
     }catch(e){
       f.estado = 'mal';
       f.msg = 'falló: ' + ((e && e.message) || e);

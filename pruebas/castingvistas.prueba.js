@@ -132,6 +132,9 @@ exports.pruebas = async function(t){
        'ALLY en dos capítulos es un personaje; el casting repetido no suma dos veces sus 186 líneas');
   t.eq('con sus programas', oc[0].programas.join(','), 'A Filipino Christmas');
   t.eq('quien no tiene asignaciones no sale', oc.some(o => o.talento === 'DIANA PAZ'), false);
+  t.eq('primero quien más líneas tiene, aunque el nombre vaya después', M.csOcupacion(PR.prodNormalizar({ series: [{ id: 1, name: 'A' }], episodes: [{ id: 1, series_id: 1 }], characters: [{ id: 1, canonical_name: 'P1' }, { id: 2, canonical_name: 'P2' }],
+       talents: [{ id: 1, name: 'ZOE' }, { id: 2, name: 'ANA' }], appearances: [{ character_id: 1, episode_id: 1, line_count: 100 }, { character_id: 2, episode_id: 1, line_count: 10 }],
+       castings: [{ character_id: 1, talent_id: 1, episode_id: 1 }, { character_id: 2, talent_id: 2, episode_id: 1 }] })).map(o => o.talento).join(','), 'ZOE,ANA');
   t.eq('limitada a un programa', M.csOcupacion(d, 2).map(o => o.talento).join(',') + ' · ' + M.csOcupacion(d, '1').map(o => o.talento).join(','), 'CARLOS RUIZ · ANA ROJAS,BEATRIZ SOL');
   t.eq('un mismo nombre de personaje en dos programas son dos personajes', M.csOcupacion(PR.prodNormalizar({ series: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }], episodes: [{ id: 1, series_id: 1 }, { id: 2, series_id: 2 }], characters: [{ id: 9, canonical_name: 'MAMÁ' }], talents: [{ id: 1, name: 'X' }], castings: [{ character_id: 9, talent_id: 1, episode_id: 1 }, { character_id: 9, talent_id: 1, episode_id: 2 }] }))[0].personajes, 2);
   t.eq('sin datos, vacía', M.csOcupacion(null).length, 0);

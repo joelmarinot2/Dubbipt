@@ -45,6 +45,9 @@ en [`01-libreto.md`](01-libreto.md), de **QC-1** a **QC-7**.
 | **PDF-20** | Al convertir un informe ajeno, si **no trae** columna de tipo se **deduce del comentario** y se añade; si **sí la trae**, se respeta la suya. Deducir no cambia el texto —el comentario sigue intacto— pero es una lectura nuestra, así que no se pone encima de la de otro. | ✅ |
 | **PDF-21** | La hoja va **completamente en blanco**. La tabla se ve como tarjeta por su **borde**, no por contraste de fondo: un gris a toda página se lleva tinta en cada copia y en una impresora mediocre sale sucio. La tarjeta se sigue rellenando **fila a fila**, porque su borde se traza al final. | ✅ |
 | **PDF-22** | El informe de los diálogos que cambiaron dice **cuánto se analizó**: «**N cambios de M parlamentos**», con pastillas de **Analizados** y **Coinciden** —y las de No cuadran y Dudosos cuando hay alguno—, y en el pie **cuánto tardó el análisis**. **Sin cambios también se entrega**, con una sola fila a todo lo ancho y centrada: «Sin cambios: los M parlamentos analizados coinciden con el libreto». Una tabla vacía parece un informe roto (ver **PDF-N2**). Nunca salen menos analizados que cambios: un «3 cambios de 2» no lo cree nadie. | ✅ |
+| **PDF-23** | **El convertidor acepta el TXT de marcadores de Pro Tools** («Export Session Info as Text»), además del PDF. Pedido de sala: «que la herramienta de PDF QC acepte este formato; tienes que quitar toda la información que no sirve». Se queda lo que sirve para corregir —**LOCATION**, **NAME**, **COMMENTS**— y se quita lo demás: el número del marcador, la referencia en muestras, las unidades, la pista («Markers»), el tipo («Ruler»), las filas vacías y, de la cabecera, todo menos el nombre de la sesión y el formato de timecode. Un renglón sin sitio que trae texto es un comentario partido y va con el de arriba; otra sección de Pro Tools corta la tabla. La fila del convertidor dice qué se ha quitado. Las palabras que quedan, **tal cual** (PDF-1). | ✅ |
+| **PDF-24** | **El TXT se lee con su codificación**: UTF-8 y UTF-16 si lo son; si no, la de Windows o la de Mac de toda la vida (**Mac Roman**, como lo exporta Pro Tools para TextEdit), y se queda la que da letras del castellano y no letras raras. Sin esto «¿» sale como «À», «¡» como «Á», «…» como «É» y las tildes desaparecen. La de Windows lleva su tabla de 0x80 a 0x9F (comillas, «…», «€»), que hay decodificadores que tratan como Latin-1. | ✅ |
+| **PDF-25** | El tipo deducido (PDF-20) mira **también el nombre**, no solo el comentario: en los marcadores de Pro Tools el «FALTA» se escribe en el nombre («FALTA VALERIA») y el comentario lleva el guion. | ✅ |
 
 ## Nunca
 
@@ -101,6 +104,7 @@ hacía nada; se quitó.
   (**PDF-19**, la parte del alto) **no lo pone en rojo ninguna mutación**: con
   las cuatro etiquetas que hay —todas cortas— quitarlo no cambia nada. Se deja
   como guardia, no como algo comprobado.
+- **PDF-23** a **PDF-25**: `pruebas/qctxt.prueba.js`, con un listado fabricado con la forma de Pro Tools (no se guarda el de sala). Y en el navegador, el 8-oct-2026, con un TXT **real** de Pro Tools en Mac Roman (40 marcadores, 33 pistas): 40 correcciones en dos hojas, con las tildes, «¿», «¡» y «…» enteros, solo las tres columnas que sirven, y 14 Falta y 26 Ajuste contados arriba. El archivo se borró después de la prueba.
 - Un informe de Pro Tools **real** todavía no ha pasado por el convertidor. Los
   que se han usado los fabricamos nosotros con la forma que tienen, que no es
   lo mismo: las X de una exportación de verdad las pone Pro Tools.
