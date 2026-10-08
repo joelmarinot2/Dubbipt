@@ -246,12 +246,14 @@ exports.pruebas = async function(t){
     q.series[0].cliente = ''; q.series[1].cliente = 'HBO'; q.series[1].director = 'Rosa';
     q.trailers = [{ id: 1, series_id: 2, title: 'Tráiler' }, { id: 2, series_id: 1, title: 'Otro' }];
     q.produccion = [{ id: 1, programa: 'Akka', capitulo: 1 }, { id: 2, programa: 'akka', capitulo: 5 }, { id: 3, programa: 'A Filipino Christmas', capitulo: 1 }];
-    q.trash = [{ kind: 'episode' }];
+    q.trash = [{ kind: 'episode', series_id: 2 }];
+    q.series[0].type = 'serie'; q.series[1].type = 'pelicula';
     t.eq('fusiona', M.dcxFusionarSeries(q, 1, 2), true);
     t.eq('el repetido desaparece', q.series.map(s => s.id).join(','), '1');
     t.eq('sus capítulos y sus tráilers son del que queda', q.episodes.map(e => e.id + ':' + e.series_id).join(' ') + ' · ' + q.trailers.map(x => x.series_id).join(','), '11:1 12:1 21:1 · 1,1');
     t.eq('producción: cambia de nombre, y la que ya tenía el que queda sobra', q.produccion.map(r => r.id + ':' + r.programa + ':' + r.capitulo).join(' '), '2:A Filipino Christmas:5 3:A Filipino Christmas:1');
-    t.eq('lo que le faltaba, del repetido; lo que tenía, se queda', q.series[0].cliente + ' ' + q.series[0].director + ' ' + q.series[0].name, 'HBO Rosa A Filipino Christmas');
+    t.eq('lo que le faltaba, del repetido; lo que tenía, se queda', q.series[0].cliente + ' ' + q.series[0].director + ' ' + q.series[0].name + ' ' + q.series[0].type, 'HBO Rosa A Filipino Christmas serie');
+    t.eq('lo que ya estaba en la papelera no se toca', q.trash[1].series_id, 2);
     t.ok('el repetido, a la papelera, con lo de antes detrás', q.trash.length === 2 && q.trash[0].kind === 'series' && q.trash[0].data.series[0].id === 2 && /^Akka \(fusionado en A Filipino Christmas\)$/.test(q.trash[0].label));
     t.eq('consigo mismo o con uno que no existe, nada', [M.dcxFusionarSeries(BASE(), 1, 1), M.dcxFusionarSeries(BASE(), 1, 9), M.dcxFusionarSeries(BASE(), 9, 1)].join(' '), 'false false false');
   }

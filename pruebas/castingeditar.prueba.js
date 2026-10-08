@@ -478,9 +478,9 @@ exports.pruebas = async function(t){
     const lista = A.M.csActual().lista;
     const pares = A.M.csParecidos(lista);
     t.eq('parecen el mismo cuando un nombre es el principio del otro, palabra a palabra', pares.map(x => x.map(y => y.nombre).join(' ~ ')).join(' | '), 'ALWAYS ~ ALWAYS ON CALL');
-    t.eq('«A» no es el principio de «A FILIPINO…» si no es una palabra entera, ni «Akka» de nada', A.M.csParecidos([{ nombre: 'ALWAY' }, { nombre: 'ALWAYS' }, { nombre: 'Akka' }]).length, 0);
+    t.eq('«A» no es el principio de «A FILIPINO…» si no es una palabra entera, ni «Akka» de nada', A.M.csParecidos([{ nombre: 'ALWAY' }, { nombre: 'ALWAYS' }, { nombre: 'Akka' }, { nombre: 'THE OFFICE' }, { nombre: 'THE CROWN' }]).length, 0);
     const por = (n) => lista.find(x => x.nombre === n);
-    t.eq('se queda el que está en los dos lados; si no, el de nombre más largo', A.M.csQuedaDe(por('ALWAYS'), por('ALWAYS ON CALL')).nombre + ' · ' + A.M.csQuedaDe(por('A FILIPINO CHRISTMAS'), por('Akka')).nombre, 'ALWAYS ON CALL · A FILIPINO CHRISTMAS');
+    t.eq('se queda el que está en los dos lados; si no, el de nombre más largo', A.M.csQuedaDe(por('ALWAYS'), por('ALWAYS ON CALL')).nombre + ' · ' + A.M.csQuedaDe(por('A FILIPINO CHRISTMAS'), por('Akka')).nombre + ' · ' + A.M.csQuedaDe({ nombre: 'AKKA', show: {}, serie: {} }, { nombre: 'AKKA LA SERIE', show: {} }).nombre, 'ALWAYS ON CALL · A FILIPINO CHRISTMAS · AKKA');
     A.M.CS.vista = 'programas'; A.M.CS.filtro = 'todos';
     let c = controles(A, 'programas');
     t.ok('la lista de programas avisa de los que parecen el mismo', /Programas que parecen el mismo[\s\S]*?<b>ALWAYS<\/b> y <b>ALWAYS ON CALL<\/b>[\s\S]*?data-cs="fusionPar" data-v="s:sC\|s:sA"/.test(c.html));
