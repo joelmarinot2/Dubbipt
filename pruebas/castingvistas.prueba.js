@@ -361,7 +361,8 @@ exports.pruebas = async function(t){
     t.eq(f + ': ninguno', malas.map(([n]) => n).join(','), '');
   }
   const HTML = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
-  t.ok('la barra de Casting, a la izquierda y la sección al lado; en el móvil, arriba', /body\.cs-on:not\(\.ep-open\) #lib\{ display:grid; grid-template-columns:212px minmax\(0,1fr\);/.test(HTML) && /body\.cs-on:not\(\.ep-open\) #lib > \*:not\(#csNav\):not\(#csVista\)\{ display:none !important; \}/.test(HTML) && /@media \(max-width:860px\)\{\n  body\.cs-on:not\(\.ep-open\) #lib\{ display:block;/.test(HTML.replace(/\r\n/g, '\n')));
+  t.ok('la barra de Casting, a la izquierda y la sección al lado; en el móvil, arriba', /body\.cs-on #lib\{ display:grid; grid-template-columns:212px minmax\(0,1fr\);/.test(HTML) && /body\.cs-on #lib > \*:not\(#csNav\):not\(#csVista\)\{ display:none !important; \}/.test(HTML) && /@media \(max-width:860px\)\{\n  body\.cs-on #lib\{ display:block;/.test(HTML.replace(/\r\n/g, '\n')));
+  t.ok('y también con un capítulo abierto: Dubbipt sigue enseñando la biblioteca, y ahí no puede asomar la interfaz antigua', !/cs-on:not\(\.ep-open\)/.test(HTML) && !/body\.ep-open #csNav/.test(HTML));
   t.ok('la campana y la configuración, con iconos de trazo', /aria-label="Notificaciones"><svg /.test(HTML) && /aria-label="Configuración y cuenta"><svg /.test(HTML));
   t.ok('y Programas: buscar, Herramientas y Optimizar, también', /<span class="fi">'\+_svgI\(/.test(HTML) && /ningún capítulo">'\+_svgI\(/.test(HTML) && /abran al instante">'\+_svgI\(/.test(HTML));
 };

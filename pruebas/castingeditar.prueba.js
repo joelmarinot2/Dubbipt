@@ -325,9 +325,10 @@ exports.pruebas = async function(t){
     const tito = c.de('talento', { ch: 103 }); tito.value = 'Ana Rojas'; tito.onchange(); await espera();
     t.eq('asignar a mano también se apunta: quién, a quién, y qué había', A.H[0].que, 'TITO BOY: ANA ROJAS (antes: sin asignar)');
     t.ok('y los cambios del episodio se ven en él', /Cambios de este episodio[\s\S]*?TITO BOY: ANA ROJAS[\s\S]*?Talento cambiado en el episodio/.test(controles(A, 'episodio').html));
+    A.H.push({ cuando: '2026-10-08T09:00:00Z', quien: 'Otro', que: 'Algo de Akka', programa: 'Akka', serieId: 2 });
     A.M.CS.vista = 'programa'; A.M.CS.tab = 'historial';
     c = controles(A, 'programa');
-    t.ok('el programa tiene su pestaña de cambios, con todos los suyos', /data-v="historial">Cambios <b>3<\/b>/.test(c.html) && /<b>Pamela<\/b><span>Talento cambiado en todo el programa: ANA ROJAS → LUZ MAR/.test(c.html));
+    t.ok('el programa tiene su pestaña de cambios, con todos los suyos', /data-v="historial">Cambios <b>3<\/b>/.test(c.html) && /<b>Pamela<\/b><span>Talento cambiado en todo el programa: ANA ROJAS → LUZ MAR/.test(c.html) && !/Algo de Akka/.test(c.html));
     t.ok('y el Dashboard, los últimos', /Últimos cambios[\s\S]*?TITO BOY: ANA ROJAS/.test(controles(A, 'dashboard').html));
   }
   {
@@ -344,6 +345,8 @@ exports.pruebas = async function(t){
     const akka = progs().find(p => p.clave === 'dc:2');
     const rep = A.M.csRepetidosDc(akka, PR.prodNormalizar(A.nube()));
     t.eq('el Ep. 1 de Akka está dos veces en DublajeCast', rep.map(g => g.numero + ': se queda ' + g.keep.id + ', fusiona ' + g.dups.map(e => e.id).join(',')).join(' | '), '1: se queda 21, fusiona 22');
+    const peli = PR.prodNormalizar(Object.assign(VOLCADO(), { episodes: VOLCADO().episodes.concat([{ id: 32, series_id: 3, episode_number: 1, title: 'La peli (versión 2)' }]) }));
+    t.eq('una película con dos «episodios» no es un repetido', A.M.csRepetidosDc(A.M.csProgramas([], () => [], peli).find(p => p.clave === 'dc:3'), peli).length, 0);
     t.eq('una película no tiene repetidos, ni un programa de Dubbipt sin DublajeCast', A.M.csRepetidosDc(progs().find(p => p.clave === 'dc:3'), PR.prodNormalizar(A.nube())).length + ' ' + A.M.csRepetidosDc({ serie: null }, null).length, '0 0');
     const p1 = progs().find(p => p.clave === 's:s1');
     const inc = A.M.csInconsistencias(p1, PR.prodNormalizar(A.nube()));

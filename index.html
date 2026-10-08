@@ -1695,11 +1695,11 @@ body:not(.modo-casting) .gestbtn{ display:none; }
 .dcast-volver{ background:#22C55E; color:#06210f; border-color:#22C55E; font-weight:700; }
 .dcast-marco{ flex:1; width:100%; border:0; background:#0b0d12; }
 /* Casting: la distribución de DublajeCast -barra a la izquierda, sección a la derecha- con la cara de Dubbipt.
-   Lo de siempre de la biblioteca (mosaico de programas, tabla de capítulos) queda tapado mientras tanto. */
-body.cs-on:not(.ep-open) #lib{ display:grid; grid-template-columns:212px minmax(0,1fr); gap:18px; align-items:start; padding:16px; }
-body.cs-on:not(.ep-open) #lib > *:not(#csNav):not(#csVista){ display:none !important; }
-body.cs-on:not(.ep-open) #progHeader{ display:none !important; }
-body.ep-open #csNav, body.ep-open #csVista{ display:none !important; }
+   Lo de siempre de la biblioteca (mosaico de programas, tabla de capítulos) queda tapado SIEMPRE, también con un
+   capítulo abierto: Dubbipt sigue enseñando la biblioteca entonces, y ahí asomaba la interfaz antigua. */
+body.cs-on #lib{ display:grid; grid-template-columns:212px minmax(0,1fr); gap:18px; align-items:start; padding:16px; }
+body.cs-on #lib > *:not(#csNav):not(#csVista){ display:none !important; }
+body.cs-on #progHeader{ display:none !important; }
 .cs-nav{ display:flex; flex-direction:column; gap:2px; background:#101215; border:1px solid #23262b; border-radius:16px; padding:12px 8px; position:sticky; top:12px; }
 .cs-nav-t{ font-family:'Inter',sans-serif; font-size:10.5px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#6b7079; padding:2px 12px 10px; }
 .cs-nav-b{ display:flex; align-items:center; gap:11px; width:100%; text-align:left; background:transparent; border:1px solid transparent; color:#9CA3AF; font-family:'Inter',sans-serif; font-size:13px; font-weight:600; padding:10px 12px; border-radius:10px; cursor:pointer; }
@@ -1799,7 +1799,7 @@ body.ep-open #csNav, body.ep-open #csVista{ display:none !important; }
 .cs-rev-op label{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
 .cs-rev-btns{ display:inline-flex; gap:6px; flex-wrap:wrap; }
 @media (max-width:860px){
-  body.cs-on:not(.ep-open) #lib{ display:block; padding:12px; }
+  body.cs-on #lib{ display:block; padding:12px; }
   .cs-nav{ flex-direction:row; overflow-x:auto; position:static; margin-bottom:14px; padding:6px; scrollbar-width:none; }
   .cs-nav::-webkit-scrollbar{ display:none; }
   .cs-nav-t{ display:none; }
@@ -2575,7 +2575,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.33.0-nube';
+const APP_VER_NUM = 'v11.33.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);

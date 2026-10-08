@@ -590,7 +590,6 @@ function csContexto(p, e){
 
 /** Los apuntes de un programa, o de un episodio, por sus ids (aunque luego cambie el nombre). */
 function csHistorialDe(p, e){
-  if(!prodPuede()) return [];                       // lo que se cambió en DublajeCast, solo para el administrador
   const mismo = (a, b) => a != null && b != null && String(a) === String(b);
   return dcxHistorial().filter(x => e
     ? ((e.dcEp && mismo(x.dcEpId, e.dcEp.id)) || (e.ep && mismo(x.epId, e.ep.id)))

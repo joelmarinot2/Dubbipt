@@ -179,6 +179,9 @@ exports.pruebas = async function(t){
     t.ok('el que se queda conserva lo suyo y toma lo que le faltaba', (() => { const e = p.episodes[0]; return e.fase === 'pre_produccion' && e.title === 'Repetido' && e.fecha_miami === '2026-11-01'; })());
     t.ok('el repetido, a la papelera, con lo suyo', p.trash.length === 1 && p.trash[0].data.episodes[0].id === 13 && p.trash[0].data.castings.length === 2 && p.trash[0].data.appearances.length === 2);
     t.eq('sin elegir, manda el que se queda', (() => { const q = BASE(); q.episodes.push({ id: 13, series_id: 1, episode_number: 1 }); q.castings.push({ id: 601, character_id: 101, talent_id: 2, episode_id: 13 }); M.dcxFusionarEpisodios(q, 11, [13], {}); return q.castings.find(c => c.character_id === 101 && c.episode_id === 11).talent_id; })(), 1);
+    t.eq('lo elegido manda también donde solo estaba en los repetidos', (() => { const q = BASE(); q.episodes.push({ id: 13, series_id: 1, episode_number: 1 }, { id: 14, series_id: 1, episode_number: 1 });
+      q.castings.push({ id: 601, character_id: 103, talent_id: 1, episode_id: 13 }, { id: 602, character_id: 103, talent_id: 2, episode_id: 14 });
+      M.dcxFusionarEpisodios(q, 11, [13, 14], { '103': 2 }); return q.castings.filter(c => c.character_id === 103).map(c => c.episode_id + ':' + c.talent_id).join(' '); })(), '11:2');
     t.eq('sin repetidos de verdad, nada', M.dcxFusionarEpisodios(BASE(), 11, [11, 999]) + ' ' + M.dcxFusionarEpisodios(BASE(), 999, [11]), 'false false');
   }
 
