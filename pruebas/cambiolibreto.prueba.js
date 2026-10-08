@@ -337,7 +337,7 @@ exports.pruebas = async function(t){
   t.ok('el botón está en la barra, con su entrada de archivo',
        /id="btnLibCambiar" style="display:none" onclick="document\.getElementById\('libCambioFile'\)\.click\(\)"/.test(HTML)
        && /id="libCambioFile" accept="application\/pdf,\.pdf,\.docx,\.xlsx,\.xlsm,\.xls" style="display:none" onchange="if\(this\.files\[0\]\) libCambiar\(this\.files\[0\]\); this\.value=''"/.test(HTML));
-  t.ok('y solo se enseña en casting', /'btnBaseTal','btnLibTrad','btnLibCambiar'\]/.test(F));
+  t.ok('y solo se enseña en casting', /'btnBaseTal','btnLibTrad','btnLibCambiar'[,\]]/.test(F));
   t.ok('la ventana no trae nada marcado: cada pareja la confirma una persona',
        /<input type="checkbox" class="lc-ok" data-i="' \+ i \+ '"' \+ \(d\.propuesto \? '' : ' disabled'\) \+ '> Sí, es el mismo/.test(F) && !/class="lc-ok"[^>]*checked/.test(F));
   t.ok('al elegir otra pareja, la marca de antes no vale', /caja\.checked = false; caja\.disabled = !sel\.value;/.test(F));

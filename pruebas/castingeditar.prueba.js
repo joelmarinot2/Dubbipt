@@ -141,7 +141,7 @@ exports.pruebas = async function(t){
   const rep = M.csReparto(p1, d);
   t.eq('cada personaje: principales primero, luego por líneas', rep.map(r => r.personaje + ' ' + r.episodios + 'ep ' + r.lineas + 'l').join(' | '), 'ALLY 3ep 306l | JANA 1ep 54l | TITO BOY 1ep 12l');
   t.eq('con su talento por tramos: el relevo se ve', rep[0].tramos.map(x => x.talento + ' ' + M.csTramoTexto(x.eps)).join(' → '), 'ANA ROJAS 1–2 → BEATRIZ SOL 3');
-  t.eq('y el que no tiene, vacío', JSON.stringify(rep[2].tramos), '[{"talento":"","talentoId":null,"eps":[1]}]');
+  t.eq('y el que no tiene, vacío', JSON.stringify(rep[2].tramos), '[{"talento":"","talentoId":null,"eps":[1],"lineas":12}]');
   const desordenado = PR.prodNormalizar(Object.assign(VOLCADO(), { episodes: VOLCADO().episodes.slice().reverse() }));
   const pDes = M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], desordenado).find(p => p.clave === 's:s1');
   t.eq('los tramos siguen el orden de los episodios, vengan como vengan', M.csReparto(pDes, desordenado)[0].tramos.map(x => x.talento + ' ' + M.csTramoTexto(x.eps)).join(' → '), 'ANA ROJAS 1–2 → BEATRIZ SOL 3');
@@ -199,7 +199,27 @@ exports.pruebas = async function(t){
     t.eq('cada talento, para cambiarlo, con la lista de la base', c.de('talento', { ep: 13, ch: 101 }).value + ' ' + /<datalist id="csListaTalentos"><option value="ANA ROJAS"><option value="BEATRIZ SOL"><\/datalist>/.test(c.html), 'BEATRIZ SOL true');
     A.M.CS.tab = 'reparto';
     c = controles(A, 'programa');
-    t.ok('Reparto: los personajes, con el relevo avisado y para cambiar el talento en todos', /ANA ROJAS <i class="cs-tenue">1–2<\/i><\/span> → <span class="cs-talento">BEATRIZ SOL <i class="cs-tenue">3<\/i><\/span> <small class="cs-aviso">[\s\S]*?relevo/.test(c.html) && !!c.de('reasignar', { ch: 101 }) && c.de('principal', { ch: 101 }).classList.contains('on'));
+    t.ok('Reparto en cajas, por talento: su carga, sus personajes con líneas y episodios', /<b>ANA ROJAS<\/b><div class="cs-tenue">1 pers\. · 2 apar\. · <b>276<\/b> lín\.<\/div><\/div><span class="cs-carga cs-carga-bajo">Bajo<\/span>[\s\S]*?<b>ALLY<\/b><\/div><span class="cs-rep-lin">276 lín\.<\/span><span class="cs-rep-eps"><span class="cs-rep-ep">Ep\.1<\/span><span class="cs-rep-ep">Ep\.2<\/span><\/span>/.test(c.html)
+         && /<b>BEATRIZ SOL<\/b><div class="cs-tenue">2 pers\. · 2 apar\. · <b>84<\/b> lín\.<\/div><\/div><span class="cs-carga cs-carga-medio">Medio<\/span>/.test(c.html) && c.de('principal', { ch: 101 }).classList.contains('on'));
+    t.ok('los principales aparte, y quien aún no tiene talento, también', /<div class="cs-rep-sec">Principales \(2\)<\/div>/.test(c.html) && /<div class="cs-rep-sec">Sin talento \(1\)<\/div>[\s\S]*?<b>TITO BOY<\/b><\/div><span class="cs-rep-lin">12 lín\.<\/span>/.test(c.html));
+    t.ok('«Reasignar» abre dónde escribir el talento nuevo', !c.de('reasignar', { ch: 101 }) && (c.de('repAbrir', { v: 'ch:101' }).onclick(), !!controles(A, 'programa').de('reasignar', { ch: 101 })));
+    controles(A, 'programa').de('repCerrar').onclick();
+    t.eq('y Cancelar lo cierra', A.M.CS.repAbierto, null);
+    c.de('repVista', { v: 'personaje' }).onclick();
+    c = controles(A, 'programa');
+    t.ok('por personaje: su talento por tramos, con el relevo avisado', /ALLY<\/b><div class="cs-tenue">3 apar\. · <b>306<\/b> lín\.<\/div><\/div><small class="cs-aviso">[\s\S]*?relevo<\/small>[\s\S]*?<span class="cs-talento">ANA ROJAS<\/span><\/div><span class="cs-rep-lin">276 lín\.<\/span>[\s\S]*?<span class="cs-talento">BEATRIZ SOL<\/span><\/div><span class="cs-rep-lin">30 lín\.<\/span>/.test(c.html));
+    A.M.CS.repBuscar = 'jana'; A.M.CS.repVista = 'talento';
+    c = controles(A, 'programa');
+    t.ok('el buscador: por personaje…', /<b>BEATRIZ SOL<\/b>/.test(c.html) && !/<b>ANA ROJAS<\/b>/.test(c.html));
+    A.M.CS.repBuscar = 'ana roj';
+    c = controles(A, 'programa');
+    t.ok('…y por talento', /<b>ANA ROJAS<\/b>/.test(c.html) && !/<b>BEATRIZ SOL<\/b>/.test(c.html));
+    A.M.CS.repBuscar = 'nadie';
+    t.ok('si nada coincide, se dice', /Nada coincide con «nadie»/.test(controles(A, 'programa').html));
+    A.M.CS.repBuscar = ''; A.M.CS.repOrden = 'az';
+    c = controles(A, 'programa');
+    t.ok('de la A a la Z', c.html.indexOf('<b>ANA ROJAS</b>') < c.html.indexOf('<b>BEATRIZ SOL</b>') && /data-cs="repOrden" data-v="az">A–Z/.test(c.html));
+    A.M.CS.repOrden = 'lineas';
   }
 
   t.seccion('5 · editar: cada control, su cambio, guardado en DublajeCast');
@@ -225,6 +245,8 @@ exports.pruebas = async function(t){
     const A = armar();
     A.M.CS.vista = 'programa'; A.M.CS.prog = 's:s1'; A.M.CS.tab = 'reparto';
     let c = controles(A, 'programa');
+    c.de('repAbrir', { v: 'ch:101' }).onclick();
+    c = controles(A, 'programa');
     const re = c.de('reasignar', { ch: 101 }); re.value = 'Carla Paz'; re.onchange(); await espera();
     t.eq('cambiar el talento de un personaje en todos sus episodios', A.nube().castings.filter(x => x.character_id === 101).map(x => A.nube().talents.find(y => y.id === x.talent_id).name).join(','), 'CARLA PAZ,CARLA PAZ,CARLA PAZ');
     c = controles(A, 'programa');
@@ -464,6 +486,38 @@ exports.pruebas = async function(t){
     D.M.CS.copias = D.COPIAS.slice();
     t.eq('sin sesión de DublajeCast, la copia sigue para luego', await D.M.csDevolverCopia(77) + ' ' + !D.COPIAS[0].devuelta, 'sesion true');
     t.eq('una copia que no existe', await D.M.csDevolverCopia(5), 'no hay');
+  }
+
+  t.seccion('8b · el talento, también en lo que solo está en Dubbipt');
+  {
+    const ZS = [{ id: 'sZ', name: 'ZOMBIES' }], ZE = { sZ: [{ id: 'z1', show_id: 'sZ', name: 'Episodio 1' }, { id: 'z2', show_id: 'sZ', name: 'Episodio 2' }] };
+    const ZR = () => ({ sZ: { personajes: { MAX: { display: 'Max', talent: 'LUZ MAR', episodios: ['Episodio 1', 'Episodio 2'] }, RITA: { display: 'Rita', talent: '', episodios: ['Episodio 2'] } } } });
+    const A = armar({ shows: ZS, eps: ZE, registros: ZR() });
+    A.M.CS.vista = 'programa'; A.M.CS.prog = 's:sZ'; A.M.CS.tab = 'reparto';
+    controles(A, 'programa'); await espera();
+    let c = controles(A, 'programa');
+    t.ok('el reparto de un programa sin DublajeCast, del registro de Dubbipt', /<b>LUZ MAR<\/b><div class="cs-tenue">1 pers\. · 2 apar\. · <b>0<\/b> lín\.<\/div>[\s\S]*?<b>Max<\/b><span class="cs-tenue">de Dubbipt<\/span><\/div><span class="cs-rep-eps"><span class="cs-rep-ep">Ep\.1<\/span><span class="cs-rep-ep">Ep\.2<\/span>/.test(c.html)
+         && /Sin talento \(1\)[\s\S]*?<b>Rita<\/b>/.test(c.html));
+    c.de('repAbrir', { v: 'per:MAX' }).onclick();
+    c = controles(A, 'programa');
+    const re = c.de('reasignarDub', { per: 'Max' }); re.value = 'Ana Rojas'; re.onchange(); await espera();
+    t.eq('«Reasignar» lo cambia en el registro del programa, y se apunta', A.regGuardados.sZ.personajes.MAX.talent + ' · ' + A.regGuardados.sZ.personajes.MAX.episodios.join('+') + ' · ' + A.H[0].que + ' · ' + A.M.CS.repAbierto,
+         'Ana Rojas · Episodio 1+Episodio 2 · Max: Ana Rojas (antes: LUZ MAR) · null');
+    const B = armar({ shows: ZS, eps: ZE, registros: ZR() });
+    B.M.CS.vista = 'episodio'; B.M.CS.prog = 's:sZ'; B.M.CS.ep = 'e:z2';
+    controles(B, 'episodio'); await espera();
+    c = controles(B, 'episodio');
+    const max = c.de('talentoDub', { per: 'Max' });
+    t.eq('en el episodio, el talento se puede cambiar aunque no esté en DublajeCast', max.value + ' · ' + c.de('talentoDub', { per: 'Rita' }).value + ' · ' + max.getAttribute('data-e'), 'LUZ MAR ·  · e:z2');
+    const rita = c.de('talentoDub', { per: 'Rita' }); rita.value = '  Pepe   Gil '; rita.onchange(); await espera();
+    t.eq('y se guarda en el registro, limpio', B.regGuardados.sZ.personajes.RITA.talent + ' · ' + B.avisos[B.avisos.length - 1], 'Pepe Gil · Rita: Pepe Gil (antes: sin asignar)');
+    const C = armar({ shows: ZS, eps: ZE, registros: ZR() });
+    C.M.CS.vista = 'episodio'; C.M.CS.prog = 's:sZ'; C.M.CS.ep = 'e:z1';
+    controles(C, 'episodio'); await espera();
+    const igual = controles(C, 'episodio').de('talentoDub', { per: 'Max' }); igual.value = 'luz mar'; igual.onchange(); await espera();
+    t.eq('el mismo talento, nada que guardar', Object.keys(C.regGuardados).length + ' ' + C.H.length, '0 0');
+    C.M.CS.vista = 'programa'; C.M.CS.tab = 'casting';
+    t.ok('y en el casting de todo el programa, igual', /data-cs="talentoDub" data-e="e:z1" data-per="Max"/.test(controles(C, 'programa').html));
   }
 
   t.seccion('9 · fusionar programas');

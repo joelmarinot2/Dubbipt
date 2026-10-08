@@ -36,7 +36,8 @@
 
 const CS = { vista: 'programas', buscar: '', soloAlertas: false, programa: '',
              prog: null, ep: null, filtro: 'en_curso', buscarProg: '', orden: 'lineas', registros: {},
-             tab: 'episodios', buscarCast: '', ordenCast: 'episodio', fusion: null, elegidos: {}, copias: [], fusionProg: null };
+             tab: 'episodios', buscarCast: '', ordenCast: 'episodio', fusion: null, elegidos: {}, copias: [], fusionProg: null,
+             repVista: 'talento', repBuscar: '', repOrden: 'lineas', repGenero: '', repAbierto: null };
 
 /* Iconos de trazo, como los de Dubbipt (ICO). Ningún emoji. */
 const CS_ICO = {
@@ -466,6 +467,32 @@ async function csJuntarRegistro(deId, aId){
   return { nuevos: nuevos, choques: choques };
 }
 
+/**
+ * El talento de un personaje en el registro de casting del programa en
+ * Dubbipt: para lo que no está en DublajeCast. El registro va por personaje
+ * en todo el programa; los capítulos que se abran después lo heredan.
+ */
+async function csTalentoDub(p, personaje, nombre, e){
+  if(!p || !p.show || !personaje) return 'nada';
+  const reg = await castRegCargar(p.show.id);
+  reg.personajes = reg.personajes || {};
+  const k = castNorm(personaje), ya = reg.personajes[k];
+  const limpio = String(nombre == null ? '' : nombre).replace(/\s+/g, ' ').trim();
+  const antes = (ya && ya.talent) || '';
+  if(castNorm(antes) === castNorm(limpio)) return 'igual';
+  const eps = (ya && Array.isArray(ya.episodios)) ? ya.episodios.slice() : [];
+  if(e && e.ep && eps.indexOf(e.ep.name) < 0) eps.push(e.ep.name);
+  reg.personajes[k] = Object.assign({ display: personaje, de: 'Dubbipt' }, ya || {}, { talent: limpio, episodios: eps, ts: Date.now() });
+  const ok = await castRegGuardar(p.show.id, reg);
+  if(!ok){ castAviso('No se pudo guardar el registro de casting de «' + p.nombre + '»'); return 'error'; }
+  CS.registros[String(p.show.id)] = reg;
+  const que = personaje + ': ' + (limpio || 'sin talento') + ' (antes: ' + (antes || 'sin asignar') + ')';
+  dcxRegistrar(dcxEntrada(que, csContexto(p, e || null)));
+  castAviso(que);
+  csRepintar();
+  return 'guardado';
+}
+
 /** Fusiona `b` en `a`, preguntando antes. */
 async function csFusionarProgramas(a, b){
   const pasos = csPlanFusion(a, b);
@@ -651,12 +678,75 @@ function csReparto(p, d){
       r.episodios++; r.lineas += (+a.line_count || 0);
       const t = tal[k] || null, nombre = t ? t.name : '';
       const ult = r.tramos[r.tramos.length - 1];
-      if(ult && ult.talento === nombre) ult.eps.push(e.episode_number);
-      else r.tramos.push({ talento: nombre, talentoId: t ? t.id : null, eps: [e.episode_number] });
+      if(ult && ult.talento === nombre){ ult.eps.push(e.episode_number); ult.lineas += (+a.line_count || 0); }
+      else r.tramos.push({ talento: nombre, talentoId: t ? t.id : null, eps: [e.episode_number], lineas: (+a.line_count || 0) });
     }
   }
   return Object.keys(por).map(k => por[k])
     .sort((a, b) => (b.principal - a.principal) || (b.lineas - a.lineas) || a.personaje.localeCompare(b.personaje, 'es'));
+}
+
+/**
+ * El reparto entero: lo de DublajeCast y, además, los personajes que solo
+ * sabe el registro de casting de Dubbipt (sin líneas: el registro no las
+ * guarda). Cada uno con `clave` para abrir su «Reasignar».
+ */
+function csRepartoDe(p, d, registro){
+  const out = csReparto(p, d).map(r => Object.assign({ clave: 'ch:' + r.charId, de: 'dc' }, r));
+  const ya = new Set(out.map(r => castNorm(r.personaje)));
+  const pers = (registro && registro.personajes) || {};
+  for(const k of Object.keys(pers)){
+    const x = pers[k];
+    if(!x) continue;
+    const nombre = x.display || k;
+    if(ya.has(castNorm(nombre))) continue;
+    ya.add(castNorm(nombre));
+    const eps = (Array.isArray(x.episodios) ? x.episodios : []).map(csNumeroDe).filter(n => isFinite(n)).sort((a, b) => a - b);
+    out.push({ clave: 'per:' + castNorm(nombre), de: 'dubbipt', charId: null, personaje: nombre, principal: false,
+               episodios: (Array.isArray(x.episodios) ? x.episodios : []).length, lineas: 0,
+               tramos: [{ talento: x.talent || '', talentoId: null, eps: eps, lineas: 0 }] });
+  }
+  return out;
+}
+
+/** La carga de un talento en el programa, como la dice DublajeCast: por cuántos personajes hace. */
+function csCarga(n){ return n <= 1 ? { clave: 'bajo', texto: 'Bajo' } : (n <= 3 ? { clave: 'medio', texto: 'Medio' } : { clave: 'alto', texto: 'Alto' }); }
+
+/** El reparto por talento: cada talento con los personajes que hace, sus episodios y sus líneas. */
+function csRepartoPorTalento(rep, d){
+  const fichas = {};
+  if(d) for(const t of d.talents) fichas[castNorm(t.name)] = t;
+  const por = new Map();
+  for(const r of rep) for(const tr of r.tramos){
+    if(!tr.talento) continue;
+    const k = castNorm(tr.talento);
+    let g = por.get(k);
+    if(!g){ const t = fichas[k] || null; g = { clave: k, talento: tr.talento, ficha: t, genero: (t && t.genero) || '', personajes: [], lineas: 0, apariciones: 0, principal: false }; por.set(k, g); }
+    g.personajes.push({ r: r, eps: tr.eps, lineas: tr.lineas || 0 });
+    g.lineas += tr.lineas || 0; g.apariciones += tr.eps.length;
+    if(r.principal) g.principal = true;
+  }
+  for(const g of por.values()) g.personajes.sort((a, b) => (b.lineas - a.lineas) || a.r.personaje.localeCompare(b.r.personaje, 'es'));
+  return Array.from(por.values());
+}
+
+/**
+ * Lo que se ve del reparto: por talento o por personaje, buscado (talento o
+ * personaje), por género (por talento) y ordenado por líneas o de la A a la
+ * Z. Los principales, aparte, como en DublajeCast.
+ */
+function csRepartoVisible(rep, d, o){
+  const q = castNorm(o.buscar);
+  if(o.vista === 'personaje'){
+    const l = rep.filter(r => !q || castNorm(r.personaje).indexOf(q) >= 0 || r.tramos.some(t => castNorm(t.talento).indexOf(q) >= 0))
+      .sort(o.orden === 'az' ? (a, b) => a.personaje.localeCompare(b.personaje, 'es') : (a, b) => (b.lineas - a.lineas) || (b.episodios - a.episodios) || a.personaje.localeCompare(b.personaje, 'es'));
+    return { principales: l.filter(r => r.principal), resto: l.filter(r => !r.principal) };
+  }
+  const l = csRepartoPorTalento(rep, d)
+    .filter(g => (!q || g.clave.indexOf(q) >= 0 || g.personajes.some(x => castNorm(x.r.personaje).indexOf(q) >= 0)) && (!o.genero || g.genero === o.genero))
+    .sort(o.orden === 'az' ? (a, b) => a.talento.localeCompare(b.talento, 'es') : (a, b) => (b.lineas - a.lineas) || (b.apariciones - a.apariciones) || a.talento.localeCompare(b.talento, 'es'));
+  const sin = o.genero ? [] : rep.filter(r => r.tramos.some(t => !t.talento) && (!q || castNorm(r.personaje).indexOf(q) >= 0));
+  return { principales: l.filter(g => g.principal), resto: l.filter(g => !g.principal), sinTalento: sin };
 }
 
 /** El nombre con que se crea en Dubbipt un episodio de DublajeCast: «Episodio N», o su título si el número se repite. */
@@ -1086,19 +1176,25 @@ function csBajarCopia(id){
 
 /** La lista de talentos para elegir al escribir. */
 function csListaTalentos(d){
-  if(!d) return '';
-  return '<datalist id="csListaTalentos">' + d.talents.filter(t => t.name).map(t => '<option value="' + csEsc(t.name) + '">').join('') + '</datalist>';
+  const vistos = new Set(), nombres = [];
+  const mas = (n) => { const k = castNorm(n); if(!k || vistos.has(k)) return; vistos.add(k); nombres.push(n); };
+  if(d) d.talents.forEach(t => t.name && mas(t.name));
+  if(typeof TAL !== 'undefined' && TAL && Array.isArray(TAL.nombres)) TAL.nombres.forEach(mas);
+  if(!nombres.length) return '';
+  return '<datalist id="csListaTalentos">' + nombres.map(n => '<option value="' + csEsc(n) + '">').join('') + '</datalist>';
 }
 
 /**
  * La celda del talento: editable cuando el personaje y el episodio están en
  * DublajeCast (se guarda allí); si no, el texto. Si Dubbipt dice otro, se ve.
  */
-function csTalentoCelda(f, dcEp){
+function csTalentoCelda(f, dcEp, e){
   const nota = (f.choca ? ' <small class="cs-aviso" title="En el registro de Dubbipt pone otro talento: al realizar el casting manda el de Dubbipt">' + csIco('aviso', 12) + 'en Dubbipt: ' + csEsc(f.dubbipt) + '</small>'
              : (!f.dc && f.dubbipt ? ' <small class="cs-tenue">de Dubbipt</small>' : ''));
   if(dcEp && f.charId != null)
     return '<input class="cs-tal-in" list="csListaTalentos" data-cs="talento" data-ep="' + csEsc(dcEp.id) + '" data-ch="' + csEsc(f.charId) + '" data-per="' + csEsc(f.personaje) + '" data-antes="' + csEsc(f.dc || '') + '" value="' + csEsc(f.dc || '') + '" placeholder="Asignar…">' + nota;
+  if(e && e.ep)
+    return '<input class="cs-tal-in" list="csListaTalentos" data-cs="talentoDub" data-e="' + csEsc(e.clave) + '" data-per="' + csEsc(f.personaje) + '" data-antes="' + csEsc(f.dubbipt || '') + '" value="' + csEsc(f.dubbipt || '') + '" placeholder="Asignar…" title="Se guarda en el registro de casting del programa en Dubbipt">' + nota;
   return '<span class="cs-talento">' + (f.talento ? csEsc(f.talento) : 'sin asignar') + '</span>' + nota;
 }
 
@@ -1152,12 +1248,12 @@ function csHtmlProgramas(lista, vivo){
 
 function csHtmlPrograma(p, eps, d, registro, hayLibreto){
   const filasCast = csFilasPrograma(eps, d, registro);
-  const reparto = csReparto(p, d);
+  const reparto = csRepartoDe(p, d, registro);
   const historial = csHistorialDe(p, null);
   const pest = (k, t, n) => '<button class="cs-pest' + (CS.tab === k ? ' on' : '') + '" data-cs="tab" data-v="' + k + '">' + t + ' <b>' + n + '</b></button>';
   let cuerpo;
   if(CS.tab === 'casting') cuerpo = csHtmlCastingPrograma(filasCast);
-  else if(CS.tab === 'reparto') cuerpo = csHtmlReparto(p, reparto);
+  else if(CS.tab === 'reparto') cuerpo = csHtmlReparto(p, reparto, d);
   else if(CS.tab === 'historial') cuerpo = csHtmlHistorial(historial, true, 200);
   else cuerpo = eps.length ? '<div class="cs-eps">' + eps.map(e => {
       const c = csCastingDe(e, d, registro);
@@ -1222,29 +1318,90 @@ function csHtmlCastingPrograma(filas){
         + '<span class="cs-tenue">' + (f.e.numero != null ? f.e.numero : '—') + '</span>'
         + '<span><b>' + (f.principal ? '<i class="cs-prin" title="Principal">' + csIco('estrella', 12) + '</i>' : '') + csEsc(f.personaje) + '</b></span>'
         + '<span class="cs-tenue">' + (f.lineas || '') + '</span>'
-        + '<span>' + csTalentoCelda(f, f.e.dcEp) + '</span></div>').join('')
+        + '<span>' + csTalentoCelda(f, f.e.dcEp, f.e) + '</span></div>').join('')
     + '</div>';
 }
 
 /** El reparto de un programa: cada personaje con su talento -por tramos si cambió-, y cambiarlo en todos sus episodios. */
-function csHtmlReparto(p, reparto){
-  if(!p.serie) return '<div class="cs-nada">Este programa no está en DublajeCast: su reparto se arma al realizar el casting de cada episodio.</div>';
-  if(!reparto.length) return '<div class="cs-nada">Todavía no hay personajes: salen al subir el desglose de cada episodio.</div>';
-  return '<div class="cs-tabla cs-reparto"><div class="cs-fila cs-fila-cab"><span>Personaje</span><span>Talento</span><span>Ep.</span><span>Líneas</span><span>Cambiar en todos</span></div>'
-    + reparto.map(r => {
-        const relevo = r.tramos.filter(t => t.talento).length > 1;
-        return '<div class="cs-fila' + (r.tramos.some(t => !t.talento) ? ' cs-falta' : '') + '">'
-          + '<span><button class="cs-prin-b' + (r.principal ? ' on' : '') + '" data-cs="principal" data-ch="' + csEsc(r.charId) + '" data-per="' + csEsc(r.personaje) + '" title="' + (r.principal ? 'Quitar de principales' : 'Marcar como principal') + '">' + csIco('estrella', 13) + '</button><b>' + csEsc(r.personaje) + '</b></span>'
-          + '<span class="cs-tramos">' + r.tramos.map(t => '<span class="' + (t.talento ? 'cs-talento' : 'cs-rojo') + '">' + (t.talento ? csEsc(t.talento) : 'sin asignar') + ' <i class="cs-tenue">' + csTramoTexto(t.eps) + '</i></span>').join(' → ')
-          +   (relevo ? ' <small class="cs-aviso">' + csIco('aviso', 12) + 'relevo</small>' : '') + '</span>'
-          + '<span>' + r.episodios + '</span><span class="cs-tenue">' + r.lineas + '</span>'
-          + '<span><input class="cs-tal-in" list="csListaTalentos" data-cs="reasignar" data-ch="' + csEsc(r.charId) + '" data-per="' + csEsc(r.personaje) + '" placeholder="Nuevo talento…"></span>'
-          + '</div>';
-      }).join('') + '</div>';
+/**
+ * El reparto de un programa en cajas, como el de DublajeCast: por talento
+ * -cada talento con su carga y los personajes que hace- o por personaje -cada
+ * personaje con su talento por tramos-, con buscador de talento y de
+ * personaje, género y orden. «Reasignar» cambia el talento de un personaje en
+ * todos sus episodios: en DublajeCast si está allí, si no en el registro de
+ * casting de Dubbipt.
+ */
+function csHtmlReparto(p, reparto, d){
+  if(!reparto.length) return '<div class="cs-nada">' + (p.serie ? 'Todavía no hay personajes: salen al subir el desglose de cada episodio.' : 'Todavía no hay reparto: se arma al realizar el casting de cada episodio.') + '</div>';
+  const o = { vista: CS.repVista, buscar: CS.repBuscar, orden: CS.repOrden, genero: CS.repGenero };
+  const v = csRepartoVisible(reparto, d, o);
+  const pest = (que, k, t) => '<button class="cs-pest' + (CS[que] === k ? ' on' : '') + '" data-cs="' + que + '" data-v="' + k + '">' + t + '</button>';
+  const generos = d ? Array.from(new Set(d.talents.map(t => t.genero).filter(Boolean))) : [];
+  const sinTalento = v.sinTalento || [];
+  const total = v.principales.length + v.resto.length + sinTalento.length;
+  let n = 0;
+  const caja = o.vista === 'personaje' ? (r) => csRepCajaPersonaje(r, ++n) : (g) => csRepCajaTalento(g, ++n);
+  const seccion = (t, l) => l.length ? '<div class="cs-rep-sec">' + t + ' (' + l.length + ')</div>' + l.map(caja).join('') : '';
+  return '<div class="cs-filtros cs-rep-filtros">'
+    +   '<div class="cs-pests">' + pest('repVista', 'talento', 'Por talento') + pest('repVista', 'personaje', 'Por personaje') + '</div>'
+    +   '<label class="cs-buscar cs-buscar-prog">' + csIco('buscar', 14) + '<input type="text" data-cs="repBuscar" placeholder="Buscar talento o personaje…" value="' + csEsc(CS.repBuscar) + '"></label>'
+    +   (o.vista === 'talento' && generos.length ? '<select data-cs="repGenero"><option value="">Todos</option>' + generos.map(g => '<option value="' + csEsc(g) + '"' + (CS.repGenero === g ? ' selected' : '') + '>' + csEsc(PROD_ET.genero[g] || g) + '</option>').join('') + '</select>' : '')
+    +   '<div class="cs-pests">' + pest('repOrden', 'lineas', 'Por líneas') + pest('repOrden', 'az', 'A–Z') + '</div>'
+    + '</div>'
+    + (total ? seccion('Principales', v.principales) + seccion(o.vista === 'personaje' ? 'Personajes' : 'Reparto', v.resto)
+             + (sinTalento.length ? '<div class="cs-rep-sec">Sin talento (' + sinTalento.length + ')</div><div class="cs-rep-caja cs-rep-sin"><div class="cs-rep-cuerpo">'
+                 + sinTalento.map(r => { const t = r.tramos.filter(x => !x.talento); return csRepFila(r, csRepEstrella(r) + '<b>' + csEsc(r.personaje) + '</b>', t.reduce((s, x) => s + (x.lineas || 0), 0), [].concat.apply([], t.map(x => x.eps))); }).join('') + '</div></div>' : '')
+             : '<div class="cs-nada">Nada coincide con «' + csEsc(CS.repBuscar) + '».</div>');
+}
+
+/** Un personaje dentro de una caja: estrella, nombre, líneas, episodios y «Reasignar». */
+function csRepFila(r, cabeza, lineas, eps){
+  const abierto = CS.repAbierto === r.clave;
+  return '<div class="cs-rep-fila"><div class="cs-rep-fila-l">' + cabeza + '</div>'
+    + (lineas ? '<span class="cs-rep-lin">' + lineas + ' lín.</span>' : '')
+    + '<span class="cs-rep-eps">' + (eps || []).map(x => '<span class="cs-rep-ep">Ep.' + csEsc(x) + '</span>').join('') + '</span>'
+    + '<button class="cs-b cs-rep-re" data-cs="repAbrir" data-v="' + csEsc(r.clave) + '" title="Cambiar el talento de ' + csEsc(r.personaje) + ' en todos sus episodios">' + csIco('traer', 13) + '<span>Reasignar</span></button></div>'
+    + (abierto ? '<div class="cs-rep-nuevo"><input class="cs-tal-in" list="csListaTalentos" '
+        + (r.charId != null ? 'data-cs="reasignar" data-ch="' + csEsc(r.charId) + '"' : 'data-cs="reasignarDub"')
+        + ' data-per="' + csEsc(r.personaje) + '" placeholder="Nuevo talento para ' + csEsc(r.personaje) + ' en todos sus episodios…">'
+        + '<button class="cs-b" data-cs="repCerrar">Cancelar</button></div>' : '');
+}
+
+function csRepEstrella(r){
+  return r.charId != null
+    ? '<button class="cs-prin-b' + (r.principal ? ' on' : '') + '" data-cs="principal" data-ch="' + csEsc(r.charId) + '" data-per="' + csEsc(r.personaje) + '" title="' + (r.principal ? 'Quitar de principales' : 'Marcar como principal') + '">' + csIco('estrella', 13) + '</button>'
+    : '';
+}
+
+function csRepCajaTalento(g, n){
+  const c = csCarga(g.personajes.length);
+  const ficha = g.ficha && typeof prodFichaTexto === 'function' ? prodFichaTexto(g.ficha) : '';
+  return '<div class="cs-rep-caja"><div class="cs-rep-cab"><span class="cs-rep-n">' + n + '</span>'
+    + '<div class="cs-rep-t"><b>' + csEsc(g.talento) + '</b>' + (ficha ? '<span class="cs-ficha">' + csEsc(ficha) + '</span>' : '')
+    +   '<div class="cs-tenue">' + g.personajes.length + ' pers. · ' + g.apariciones + ' apar. · <b>' + g.lineas + '</b> lín.</div></div>'
+    + '<span class="cs-carga cs-carga-' + c.clave + '">' + c.texto + '</span></div>'
+    + '<div class="cs-rep-cuerpo">' + g.personajes.map(x => csRepFila(x.r, csRepEstrella(x.r) + '<b>' + csEsc(x.r.personaje) + '</b>' + (x.r.de === 'dubbipt' ? '<span class="cs-tenue">de Dubbipt</span>' : ''), x.lineas, x.eps)).join('') + '</div>'
+    + '</div>';
+}
+
+function csRepCajaPersonaje(r, n){
+  const relevo = r.tramos.filter(t => t.talento).length > 1;
+  return '<div class="cs-rep-caja"><div class="cs-rep-cab"><span class="cs-rep-n">' + n + '</span>'
+    + '<div class="cs-rep-t"><b>' + csRepEstrella(r) + csEsc(r.personaje) + '</b>' + (r.de === 'dubbipt' ? '<span class="cs-tenue">de Dubbipt</span>' : '')
+    +   '<div class="cs-tenue">' + r.episodios + ' apar. · <b>' + r.lineas + '</b> lín.</div></div>'
+    + (relevo ? '<small class="cs-aviso">' + csIco('aviso', 12) + 'relevo</small>' : '') + '</div>'
+    + '<div class="cs-rep-cuerpo">' + r.tramos.map((t, i) => {
+        const cabeza = t.talento ? '<span class="cs-talento">' + csEsc(t.talento) + '</span>' : '<span class="cs-rojo">sin asignar</span>';
+        return i === r.tramos.length - 1
+          ? csRepFila(r, cabeza, t.lineas, t.eps)
+          : '<div class="cs-rep-fila"><div class="cs-rep-fila-l">' + cabeza + '</div>' + (t.lineas ? '<span class="cs-rep-lin">' + t.lineas + ' lín.</span>' : '')
+            + '<span class="cs-rep-eps">' + t.eps.map(x => '<span class="cs-rep-ep">Ep.' + csEsc(x) + '</span>').join('') + '</span></div>';
+      }).join('') + '</div>'
+    + '</div>';
 }
 
 /** La tabla del casting de un episodio. */
-function csTablaCasting(filas, dcEp){
+function csTablaCasting(filas, dcEp, e){
   if(!filas.length) return '<div class="cs-nada">Este episodio todavía no tiene personajes: se sacan del libreto al realizar el casting.</div>';
   const orden = filas.slice().sort(CS.orden === 'personaje' ? (a, b) => a.personaje.localeCompare(b.personaje, 'es') : (a, b) => (b.lineas - a.lineas) || a.personaje.localeCompare(b.personaje, 'es'));
   const con = filas.filter(f => f.talento).length;
@@ -1254,7 +1411,7 @@ function csTablaCasting(filas, dcEp){
     + orden.map(f => '<div class="cs-fila' + (f.talento ? '' : ' cs-falta') + '">'
         + '<span><b>' + (f.principal ? '<i class="cs-prin" title="Principal">' + csIco('estrella', 12) + '</i>' : '') + csEsc(f.personaje) + '</b></span>'
         + '<span class="cs-tenue">' + (f.lineas || '') + '</span>'
-        + '<span>' + csTalentoCelda(f, dcEp) + '</span>'
+        + '<span>' + csTalentoCelda(f, dcEp, e) + '</span>'
         + '</div>').join('') + '</div>';
 }
 
@@ -1289,7 +1446,7 @@ function csHtmlEpisodio(p, e, d, registro, hoy){
                 + '<span class="cs-tenue">Este programa está en DublajeCast pero todavía no en Dubbipt. Créalo y añade el capítulo para realizar el casting.</span>'))
     + '</div>'
     + (dc ? csCambiadorHtml(csTalentosEn(d, [dc.id]), 'episodio') : '')
-    + csTablaCasting(filas, dc)
+    + csTablaCasting(filas, dc, e)
     + (prodPuede() ? '<div class="cs-caja cs-caja-hist"><div class="cs-caja-t">' + csIco('actualizar', 14) + 'Cambios de este episodio</div>' + csHtmlHistorial(csHistorialDe(p, e), false, 30) + '</div>' : '')
     + csListaTalentos(d);
 }
@@ -1434,6 +1591,22 @@ function csCablear(vista){
     else if(que === 'filtro') el.onclick = () => { CS.filtro = v; csRepintar(); };
     else if(que === 'orden') el.onclick = () => { CS.orden = v; csRepintar(); };
     else if(que === 'ordenCast') el.onclick = () => { CS.ordenCast = v; csRepintar(); };
+    else if(que === 'repVista') el.onclick = () => { CS.repVista = v; CS.repAbierto = null; csRepintar(); };
+    else if(que === 'repOrden') el.onclick = () => { CS.repOrden = v; csRepintar(); };
+    else if(que === 'repGenero') el.onchange = () => { CS.repGenero = el.value; csRepintar(); };
+    else if(que === 'repBuscar') el.oninput = () => escribir('repBuscar');
+    else if(que === 'repAbrir') el.onclick = () => { CS.repAbierto = (CS.repAbierto === v) ? null : v; csRepintar(); };
+    else if(que === 'repCerrar') el.onclick = () => { CS.repAbierto = null; csRepintar(); };
+    else if(que === 'talentoDub') el.onchange = () => {
+      const x = a(), e = (x.eps || []).find(y => y.clave === at('e')) || x.e || null;
+      csTalentoDub(x.p, at('per'), el.value, e).catch(err => fallo('csTalentoDub · js/castingvistas.js', err, 'el talento no se ha podido guardar'));
+    };
+    else if(que === 'reasignarDub') el.onchange = () => {
+      const x = a(), nombre = el.value.trim();
+      if(!nombre) return;
+      CS.repAbierto = null;
+      csTalentoDub(x.p, at('per'), nombre, null).catch(err => fallo('csTalentoDub · js/castingvistas.js', err, 'el talento no se ha podido guardar'));
+    };
     else if(que === 'tab') el.onclick = () => { CS.tab = v; csRepintar(); };
     else if(que === 'abrirProg') el.onclick = () => { CS.vista = 'programa'; CS.prog = v; CS.ep = null; CS.tab = 'episodios'; CS.registros = {}; csRepintar(); };
     else if(que === 'abrirEp') el.onclick = () => { CS.vista = 'episodio'; CS.ep = v; csRepintar(); };
@@ -1469,6 +1642,7 @@ function csCablear(vista){
     else if(que === 'reasignar') el.onchange = () => {
       const nombre = el.value.trim(), x = a(), ch = id(at('ch'));
       if(!nombre || !x.p || !x.p.serie) return;
+      CS.repAbierto = null;
       csEditar(pl => dcxReasignar(pl, x.p.serie.id, ch, null, nombre), (at('per') || 'Personaje') + ': ' + dcxNombreTalento(nombre) + ' en todos sus episodios', ctxDe(x));
     };
     else if(que === 'cambiar') el.onclick = () => {
