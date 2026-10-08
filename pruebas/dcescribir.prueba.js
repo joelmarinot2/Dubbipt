@@ -18,7 +18,9 @@ const { montar } = require('./ayuda');
 exports.nombre = 'Editar DublajeCast desde Dubbipt';
 
 const EXPORTA = ['DCX', 'dcxUid', 'dcxNombreTalento', 'dcxTalentoPorNombre', 'dcxAsignar', 'dcxReasignar', 'dcxEpisodio', 'dcxSerie', 'dcxPersonaje',
-                 'dcxTalento', 'dcxTalentoNuevo', 'dcxTrailerNuevo', 'dcxTrailer', 'dcxTrailerBorrar', 'dcxGuardar', 'dcxLocal'];
+                 'dcxTalento', 'dcxTalentoNuevo', 'dcxTrailerNuevo', 'dcxTrailer', 'dcxTrailerBorrar', 'dcxGuardar', 'dcxLocal',
+                 'dcxCambiarTalento', 'dcxQuien', 'dcxEntrada', 'dcxHistorial', 'dcxRegistrar', 'DCX_HISTORIAL',
+                 'dcxConflictosFusion', 'dcxFusionarEpisodios', 'dcxRelevosAceptados', 'dcxAceptarRelevo'];
 
 /* El JSON de DublajeCast, con sus nombres de siempre. */
 const BASE = () => ({
@@ -46,7 +48,8 @@ function armar(o){
       if(o.fallaEscribir) throw new Error('sin red');
       nube.payload = JSON.parse(JSON.stringify(p)); nube.rev++; diario.push('escribe ' + nube.rev); return nube.rev;
     },
-    prodNormalizar: (p) => ({ normalizado: true, talents: p.talents }), prodGuardar: async () => diario.push('prodGuardar'), PROD: PROD
+    prodNormalizar: (p) => ({ normalizado: true, talents: p.talents }), prodGuardar: async () => diario.push('prodGuardar'), PROD: PROD,
+    sbUser: ('usuario' in o) ? o.usuario : { email: 'pamela@estudio.co', user_metadata: { full_name: 'Pamela Hernández' } }
   });
   return { M, nube, diario, PROD };
 }
@@ -99,7 +102,9 @@ exports.pruebas = async function(t){
     t.eq('lo que no es de la ficha no se toca', M.dcxEpisodio(p, 11, { series_id: 2, episode_number: 9 }) + ' ' + p.episodes[0].series_id, 'false 1');
     t.eq('lo mismo que ya tenía: nada', M.dcxEpisodio(p, 11, { fase: 'produccion_activa' }), false);
     t.eq('uno que no existe: nada', M.dcxEpisodio(p, 999, { fase: 'x' }), false);
-    t.eq('el programa: estado, cliente y director', M.dcxSerie(p, 2, { status: 'completo', cliente: 'Discovery', director: 'Ana', name: 'otro' }) + ' ' + JSON.stringify(p.series[1]), 'true {"id":2,"name":"Akka","status":"completo","cliente":"Discovery","director":"Ana"}');
+    t.eq('el programa: nombre, estado, cliente y director', M.dcxSerie(p, 2, { status: 'completo', cliente: 'Discovery', director: 'Ana', name: '  Akka   2 ', type: 'x' }) + ' ' + JSON.stringify(p.series[1]), 'true {"id":2,"name":"Akka 2","status":"completo","cliente":"Discovery","director":"Ana"}');
+    t.eq('un nombre vacío no se pone', M.dcxSerie(p, 2, { name: '   ' }) + ' ' + p.series[1].name, 'false Akka 2');
+    t.eq('el título del episodio en DublajeCast', M.dcxEpisodio(p, 12, { title: 'La boda' }) + ' ' + p.episodes[1].title, 'true La boda');
     t.eq('el personaje: principal o no', M.dcxPersonaje(p, 102, { tipo: 'principal', canonical_name: 'X' }) + ' ' + JSON.stringify(p.characters[1]), 'true {"id":102,"canonical_name":"JANA","tipo":"principal"}');
     t.ok('cada cambio deja un objeto nuevo, sin tocar el de antes', (() => { const q = BASE(); const antes = q.episodes[0]; M.dcxEpisodio(q, 11, { fase: 'completado' }); return antes.fase === 'pre_produccion' && q.episodes[0] !== antes; })());
   }
@@ -122,6 +127,68 @@ exports.pruebas = async function(t){
     t.eq('cualquier tipo que no sea teaser es tráiler; sin título, nada', M.dcxTrailerNuevo(p, { title: 'X', type: 'raro' }) && p.trailers[2].type + ' ' + M.dcxTrailerNuevo(p, { title: ' ' }), 'trailer false');
     t.eq('cambiar su estado y su fecha', M.dcxTrailer(p, 7, { status: 'completo', deadline: '2026-11-01', id: 3 }) + ' ' + JSON.stringify(p.trailers[0]), 'true {"id":7,"title":"Tráiler oficial","type":"trailer","status":"completo","series_id":1,"deadline":"2026-11-01"}');
     t.eq('y borrarlo', M.dcxTrailerBorrar(p, 7) + ' ' + p.trailers.some(x => x.id === 7) + ' ' + M.dcxTrailerBorrar(p, 7), 'true false false');
+  }
+
+  t.seccion('5b · el cambiador de talento');
+  {
+    const p = BASE();
+    t.eq('en un episodio: donde estaba uno, el otro', M.dcxCambiarTalento(p, [11], 2, 'ana rojas') + ' ' + p.castings.map(c => c.id + ':' + c.talent_id).join(' '), 'true 501:1 502:1 503:2 504:1');
+    const q = BASE();
+    t.eq('en todo un programa: sus episodios, y solo donde estaba ese', M.dcxCambiarTalento(q, [11, 12], 1, 'Luz Mar') + ' ' + q.castings.map(c => c.id + ':' + (q.talents.find(x => x.id === c.talent_id) || {}).name).join(' '), 'true 501:LUZ MAR 502:LUZ MAR 503:BEATRIZ SOL 504:BEATRIZ SOL');
+    t.eq('por el mismo, nada', M.dcxCambiarTalento(BASE(), [11], 1, 'ANA ROJAS'), false);
+    t.eq('donde no estaba, nada', M.dcxCambiarTalento(BASE(), [21], 1, 'LUZ MAR'), false);
+    t.eq('sin nombre, nada', M.dcxCambiarTalento(BASE(), [11], 1, ''), false);
+  }
+
+  t.seccion('5c · quién cambió qué');
+  {
+    const A = armar();
+    t.eq('quién: su nombre en Dubbipt', A.M.dcxQuien(), 'Pamela Hernández');
+    t.eq('o su correo', armar({ usuario: { email: 'x@y.co', user_metadata: {} } }).M.dcxQuien() + ' · ' + armar({ usuario: null }).M.dcxQuien(), 'x@y.co · sin sesión');
+    const e = A.M.dcxEntrada('ALLY: LUZ MAR', { programa: 'A Filipino Christmas', serieId: 1 });
+    t.ok('un apunte: cuándo, quién, qué y dónde', /^\d{4}-\d\d-\d\dT/.test(e.cuando) && e.quien === 'Pamela Hernández' && e.que === 'ALLY: LUZ MAR' && e.programa === 'A Filipino Christmas' && e.serieId === 1);
+    await A.M.dcxGuardar(p => A.M.dcxAsignar(p, 11, 102, 'ANA ROJAS'), e);
+    t.eq('al guardar, se apunta', A.M.dcxHistorial().map(x => x.que).join(' | '), 'ALLY: LUZ MAR');
+    await A.M.dcxGuardar(p => A.M.dcxAsignar(p, 12, 102, 'ANA ROJAS'), A.M.dcxEntrada('JANA: ANA ROJAS'));
+    t.eq('lo último, primero; y se conserva al guardar lo siguiente', A.M.dcxHistorial().map(x => x.que).join(' | '), 'JANA: ANA ROJAS | ALLY: LUZ MAR');
+    await A.M.dcxGuardar(p => A.M.dcxAsignar(p, 12, 102, 'ANA ROJAS'), A.M.dcxEntrada('nada'));
+    t.eq('lo que no cambia, no se apunta', A.M.dcxHistorial().length, 2);
+    A.M.dcxRegistrar(A.M.dcxEntrada('Episodio renombrado en Dubbipt'));
+    t.ok('lo que no pasa por DublajeCast también se apunta, y se guarda', A.M.dcxHistorial()[0].que === 'Episodio renombrado en Dubbipt' && A.diario.filter(x => x === 'prodGuardar').length === 3);
+    t.eq('sin apunte, nada', A.M.dcxRegistrar(null), false);
+    for(let i = 0; i < A.M.DCX_HISTORIAL + 20; i++) A.M.dcxRegistrar({ que: 'x' + i });
+    t.eq('se guardan los últimos quinientos', A.M.dcxHistorial().length + ' ' + A.M.dcxHistorial()[0].que, '500 x519');
+  }
+  {
+    const A = armar();
+    A.M.dcxRegistrar(A.M.dcxEntrada('primero'));
+    t.eq('sin Producción todavía, se crea para apuntarlo', A.M.dcxHistorial().length, 1);
+  }
+
+  t.seccion('5d · fusionar capítulos repetidos');
+  {
+    const p = BASE();
+    p.episodes.push({ id: 13, series_id: 1, episode_number: 1, title: 'Repetido', fase: 'x', fecha_miami: '2026-11-01' });
+    p.castings.push({ id: 601, character_id: 101, talent_id: 2, episode_id: 13 }, { id: 602, character_id: 103, talent_id: 1, episode_id: 13 });
+    p.appearances = [{ id: 1, character_id: 101, episode_id: 11, line_count: 10 }, { id: 2, character_id: 101, episode_id: 13, line_count: 30 }, { id: 3, character_id: 103, episode_id: 13, line_count: 4 }];
+    t.eq('lo que choca: ALLY con ANA en el que se queda y BEATRIZ en el repetido', JSON.stringify(M.dcxConflictosFusion(p, 11, [13])), '[{"charId":101,"opciones":[1,2]}]');
+    t.ok('fusionar', M.dcxFusionarEpisodios(p, 11, [13], { '101': 2 }));
+    t.eq('el repetido se va', p.episodes.map(e => e.id).join(','), '11,12,21');
+    t.eq('las líneas, las mayores; el personaje que solo estaba allí, pasa', p.appearances.map(a => a.character_id + '@' + a.episode_id + ':' + a.line_count).join(' '), '101@11:30 103@11:4');
+    t.eq('el talento elegido, y el que solo estaba allí', p.castings.filter(c => c.episode_id === 11).map(c => c.character_id + ':' + c.talent_id).join(' '), '101:2 102:2 103:1');
+    t.ok('el que se queda conserva lo suyo y toma lo que le faltaba', (() => { const e = p.episodes[0]; return e.fase === 'pre_produccion' && e.title === 'Repetido' && e.fecha_miami === '2026-11-01'; })());
+    t.ok('el repetido, a la papelera, con lo suyo', p.trash.length === 1 && p.trash[0].data.episodes[0].id === 13 && p.trash[0].data.castings.length === 2 && p.trash[0].data.appearances.length === 2);
+    t.eq('sin elegir, manda el que se queda', (() => { const q = BASE(); q.episodes.push({ id: 13, series_id: 1, episode_number: 1 }); q.castings.push({ id: 601, character_id: 101, talent_id: 2, episode_id: 13 }); M.dcxFusionarEpisodios(q, 11, [13], {}); return q.castings.find(c => c.character_id === 101 && c.episode_id === 11).talent_id; })(), 1);
+    t.eq('sin repetidos de verdad, nada', M.dcxFusionarEpisodios(BASE(), 11, [11, 999]) + ' ' + M.dcxFusionarEpisodios(BASE(), 999, [11]), 'false false');
+  }
+
+  t.seccion('5e · los relevos que se aceptan');
+  {
+    const A = armar();
+    t.eq('se apuntan una vez', A.M.dcxAceptarRelevo('1:101:1,2') + ' ' + A.M.dcxAceptarRelevo('1:101:1,2') + ' ' + JSON.stringify(A.M.dcxRelevosAceptados()), 'true false ["1:101:1,2"]');
+    t.eq('sin clave, nada', A.M.dcxAceptarRelevo(''), false);
+    await A.M.dcxGuardar(p => A.M.dcxAsignar(p, 11, 102, 'ANA ROJAS'), null);
+    t.eq('y se conservan al guardar en DublajeCast', JSON.stringify(A.M.dcxRelevosAceptados()), '["1:101:1,2"]');
   }
 
   t.seccion('6 · guardar: sobre lo último, sin pisar a nadie');

@@ -38,7 +38,7 @@ const DC = montar([['function castNorm(t){', 'async function castRegCargar(showI
   ['dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting'],
   { castNorm: undefined, prodCasarPrograma: PR.prodCasarPrograma, prodIndices: PR.prodIndices, window: { addEventListener: () => {} }, document: {}, location: { origin: '' } });
 const DX = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ EDITAR DUBLAJECAST DESDE DUBBIPT', '/* ═══ FIN DE EDITAR DUBLAJECAST DESDE DUBBIPT']],
-  ['dcxNombreTalento', 'dcxAsignar', 'dcxReasignar', 'dcxEpisodio', 'dcxSerie', 'dcxPersonaje', 'dcxTalento', 'dcxTalentoNuevo', 'dcxTrailerNuevo', 'dcxTrailer', 'dcxTrailerBorrar'],
+  ['dcxNombreTalento', 'dcxAsignar', 'dcxReasignar', 'dcxEpisodio', 'dcxSerie', 'dcxPersonaje', 'dcxTalento', 'dcxTalentoNuevo', 'dcxTrailerNuevo', 'dcxTrailer', 'dcxTrailerBorrar', 'dcxCambiarTalento', 'dcxConflictosFusion', 'dcxFusionarEpisodios'],
   { castNorm: undefined, dcSesion: null, dcLeer: null, dcEscribir: null, prodNormalizar: null, prodGuardar: null, PROD: {} });
 
 /* Lo justo del navegador: controles con sus atributos, sacados del HTML escrito. */
@@ -74,11 +74,15 @@ function armar(o){
       if(o.fallaInsert) return { data: null, error: { message: 'sin permiso' } };
       sbInsertados.push([tabla, fila]); return { data: Object.assign({ id: 'nuevo-' + sbInsertados.length }, fila), error: null };
     } }) }),
-    upsert: async (filas) => { sbInsertados.push([tabla + '*', filas]); return { error: null }; }
+    upsert: async (filas) => { sbInsertados.push([tabla + '*', filas]); return { error: null }; },
+    delete: () => ({ eq: async (k, v) => { borrados.push(tabla + ':' + v); return { error: null }; } }),
+    update: (cambios) => ({ eq: async (k, v) => { sbInsertados.push([tabla + '~', cambios, v]); return { error: o.fallaUpdate ? { message: 'sin permiso' } : null }; } })
   }) };
+  const H = [], RELEVOS = [];
+  const borrados = [];
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
     ['CS', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
-     'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda'],
+     'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS'],
     { castNorm: (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim(),
       document: { getElementById: (id) => campos[id] || null, querySelector: () => null, body: { classList: { contains: () => false, toggle: () => {}, remove: () => {} } } },
       prodPuede: () => true, PROD: PROD, PROD_ET: PR.PROD_ET, prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard,
@@ -89,20 +93,23 @@ function armar(o){
       castRegCargar: async () => ({ personajes: {} }), castAviso: (t) => avisos.push(t), renderLibrary: () => diario.push('renderLibrary'),
       ponerModo: () => {}, openEpisode: async () => {}, newShow: async () => {}, newEpisodeModal: () => {},
       esc: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), fallo: (d) => diario.push('fallo ' + d), _svgI: undefined,
-      dcxGuardar: async (cambio) => {
+      dcxGuardar: async (cambio, entrada) => {
         if(o.sinSesion){ const e = new Error('sin sesión'); e.sinSesion = true; throw e; }
         if(o.fallaGuardar) throw new Error('sin red');
         const copia = JSON.parse(JSON.stringify(P)); const hubo = cambio(copia);
-        if(hubo){ P = copia; PROD.datos = PR.prodNormalizar(P); }
+        if(hubo){ P = copia; PROD.datos = PR.prodNormalizar(P); if(entrada) H.unshift(entrada); }
         diario.push('guarda ' + !!hubo); return { cambiado: !!hubo };
       },
       dcxNombreTalento: DX.dcxNombreTalento, dcxAsignar: DX.dcxAsignar, dcxReasignar: DX.dcxReasignar, dcxEpisodio: DX.dcxEpisodio, dcxSerie: DX.dcxSerie, dcxPersonaje: DX.dcxPersonaje,
-      dcxTalento: DX.dcxTalento, dcxTalentoNuevo: DX.dcxTalentoNuevo, dcxTrailerNuevo: DX.dcxTrailerNuevo, dcxTrailer: DX.dcxTrailer, dcxTrailerBorrar: DX.dcxTrailerBorrar,
+      dcxTalento: DX.dcxTalento, dcxTalentoNuevo: DX.dcxTalentoNuevo, dcxTrailerNuevo: DX.dcxTrailerNuevo, dcxTrailer: DX.dcxTrailer, dcxTrailerBorrar: DX.dcxTrailerBorrar, dcxCambiarTalento: DX.dcxCambiarTalento, dcxConflictosFusion: DX.dcxConflictosFusion, dcxFusionarEpisodios: DX.dcxFusionarEpisodios,
+      dcxRelevosAceptados: () => RELEVOS, dcxAceptarRelevo: (k) => { if(RELEVOS.includes(k)) return false; RELEVOS.push(k); return true; },
+      dcxHistorial: () => H, dcxEntrada: (que, ctx) => Object.assign({ cuando: '2026-10-08T10:05:00Z', quien: 'Pamela', que: que }, ctx || {}), dcxRegistrar: (e) => { H.unshift(e); return true; },
+      DDL_MODO: 'casting', currentEp: null, herramientasPanel: () => {},
       dcPanel: () => diario.push('dcPanel'),
       DDL_UI: { confirmModal: async (cfg) => { diario.push('pregunta ' + cfg.title + ' · ' + cfg.body); return o.confirmar !== false; } },
       sb: sb, uid: () => 'u' + (sbInsertados.length + 1) + '-' + Math.random().toString(36).slice(2, 6), libFetchAll: async () => diario.push('libFetchAll'),
       WORKSPACE: ('ws' in o) ? o.ws : { id: 'wsP' } });
-  return { M, diario, avisos, PROD, LDB, campos, sbInsertados, nube: () => P };
+  return { M, diario, avisos, PROD, LDB, campos, sbInsertados, H, RELEVOS, borrados, nube: () => P };
 }
 
 /** Los controles de una vista, ya enganchados. */
@@ -193,10 +200,10 @@ exports.pruebas = async function(t){
     tito.value = 'luz mar'; tito.onchange(); await espera();
     const P = A.nube();
     t.ok('asignar un talento nuevo: se da de alta y se asigna', P.talents.some(x => x.name === 'LUZ MAR') && P.castings.some(x => x.episode_id === 11 && x.character_id === 103 && x.talent_id === P.talents.find(y => y.name === 'LUZ MAR').id));
-    t.ok('y se dice y se repinta', A.avisos.includes('Asignado: LUZ MAR') && A.diario.includes('renderLibrary'));
+    t.ok('y se dice y se repinta', A.avisos.includes('TITO BOY: LUZ MAR (antes: sin asignar)') && A.diario.includes('renderLibrary'));
     c = controles(A, 'episodio');
     const jana = c.de('talento', { ep: 11, ch: 102 }); jana.value = ''; jana.onchange(); await espera();
-    t.ok('vaciarlo lo quita', !A.nube().castings.some(x => x.episode_id === 11 && x.character_id === 102) && A.avisos.includes('Talento quitado'));
+    t.ok('vaciarlo lo quita', !A.nube().castings.some(x => x.episode_id === 11 && x.character_id === 102) && A.avisos.includes('JANA: sin talento (antes: BEATRIZ SOL)'));
     c = controles(A, 'episodio');
     const fase = c.de('epCampo', { campo: 'fase' }); fase.value = 'produccion_activa'; fase.onchange(); await espera();
     const miami = c.de('epCampo', { campo: 'fecha_miami' }); miami.value = '2026-10-21'; miami.onchange(); await espera();
@@ -261,7 +268,141 @@ exports.pruebas = async function(t){
   {
     const A = armar();
     const f = { personaje: 'X', dc: 'ANA', dubbipt: 'LUZ', talento: 'LUZ', choca: true, charId: 5 };
-    t.ok('la celda avisa si Dubbipt dice otro', /data-ch="5" value="ANA"[\s\S]*?en Dubbipt: LUZ/.test(A.M.csTalentoCelda(f, { id: 9 })));
+    t.ok('la celda avisa si Dubbipt dice otro', /data-ch="5" data-per="X" data-antes="ANA" value="ANA"[\s\S]*?en Dubbipt: LUZ/.test(A.M.csTalentoCelda(f, { id: 9 })));
     t.eq('sin episodio de DublajeCast, no se edita: se lee', A.M.csTalentoCelda({ personaje: 'X', dc: '', dubbipt: 'LUZ', talento: 'LUZ', charId: null }, null), '<span class="cs-talento">LUZ</span> <small class="cs-tenue">de Dubbipt</small>');
+  }
+
+  t.seccion('6 · cada nombre, el cambiador de talento y quién cambió qué');
+  {
+    const A = armar();
+    const progs = () => A.M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], PR.prodNormalizar(A.nube()));
+    const p1 = progs().find(p => p.clave === 's:s1');
+    t.eq('renombrar un programa que está en los dos lados: en los dos', await A.M.csRenombrarPrograma(p1, '  A Filipino Christmas  2 '), 'guardado');
+    t.eq('en DublajeCast', A.nube().series[0].name, 'A Filipino Christmas 2');
+    t.eq('y en Dubbipt, el mismo programa', JSON.stringify(A.sbInsertados.filter(x => x[0] === 'shows~')), '[["shows~",{"name":"A Filipino Christmas 2"},"s1"]]');
+    t.eq('apuntado: quién, qué y dónde', JSON.stringify(A.H[0], ['quien', 'que', 'programa', 'serieId', 'showId']), '{"quien":"Pamela","que":"Programa renombrado: «A FILIPINO CHRISTMAS» → «A Filipino Christmas 2»","programa":"A FILIPINO CHRISTMAS","serieId":1,"showId":"s1"}');
+    t.eq('el mismo nombre o vacío, nada', await A.M.csRenombrarPrograma(p1, 'A FILIPINO CHRISTMAS') + ' ' + await A.M.csRenombrarPrograma(p1, '  ') + ' ' + A.H.length, 'igual igual 1');
+    const solo = A.M.csProgramas([{ id: 's9', name: 'Solo aquí' }], () => [], PR.prodNormalizar(A.nube())).find(p => p.clave === 's:s9');
+    t.eq('uno que solo está en Dubbipt: allí, y apuntado', await A.M.csRenombrarPrograma(solo, 'Solo en Dubbipt') + ' ' + A.sbInsertados.filter(x => x[0] === 'shows~').length + ' ' + A.H[0].que, 'guardado 2 Programa renombrado: «Solo aquí» → «Solo en Dubbipt»');
+    const B = armar({ fallaUpdate: true });
+    const pB = B.M.csProgramas([{ id: 's9', name: 'Solo aquí' }], () => [], PR.prodNormalizar(B.nube())).find(p => p.clave === 's:s9');
+    t.eq('si Dubbipt no deja, se dice y no se apunta', await B.M.csRenombrarPrograma(pB, 'Otro') + ' ' + B.avisos[0] + ' ' + B.H.length, 'error No se pudo renombrar en Dubbipt: sin permiso 0');
+  }
+  {
+    const A = armar();
+    const p1 = A.M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], PR.prodNormalizar(A.nube())).find(p => p.clave === 's:s1');
+    const e1 = A.M.csEpisodios(p1).find(e => e.clave === 'e:e1');
+    t.eq('renombrar un episodio en Dubbipt', await A.M.csRenombrarEpisodio(p1, e1, 'Episodio 1 · Boracay') + ' ' + JSON.stringify(A.sbInsertados[0]), 'guardado ["episodes~",{"name":"Episodio 1 · Boracay"},"e1"]');
+    t.eq('apuntado en su episodio', JSON.stringify(A.H[0], ['que', 'episodio', 'epId', 'dcEpId']), '{"que":"Episodio renombrado en Dubbipt: «Episodio 1» → «Episodio 1 · Boracay»","episodio":"Ep. 1 · Episodio 1","epId":"e1","dcEpId":11}');
+    t.eq('sin episodio de Dubbipt, nada', await A.M.csRenombrarEpisodio(p1, { ep: null }, 'X'), 'igual');
+    A.M.CS.vista = 'episodio'; A.M.CS.prog = 's:s1'; A.M.CS.ep = 'e:e1';
+    const c = controles(A, 'episodio');
+    t.ok('en el episodio: su nombre en Dubbipt y su título en DublajeCast, para cambiarlos', c.de('epNombre').value === 'Episodio 1' && c.de('epCampo', { campo: 'title' }).value === 'Boracay');
+    const tit = c.de('epCampo', { campo: 'title' }); tit.value = ' Boracay  nuevo '; tit.onchange(); await espera();
+    t.eq('el título, en DublajeCast y apuntado', A.nube().episodes.find(e => e.id === 11).title + ' · ' + A.H[0].que, 'Boracay nuevo · Título en DublajeCast:  Boracay  nuevo ');
+  }
+  {
+    const A = armar();
+    A.M.CS.vista = 'programa'; A.M.CS.prog = 's:s1'; A.M.CS.tab = 'episodios';
+    let c = controles(A, 'programa');
+    t.ok('en el programa: el cambiador, con los talentos que hay y cuántas asignaciones', /<select id="csCambiaDe"><option value="1">ANA ROJAS \(2\)<\/option><option value="2">BEATRIZ SOL \(2\)<\/option><\/select>/.test(c.html) && /data-cs="cambiar" data-ambito="programa"/.test(c.html));
+    t.ok('y su nombre para cambiarlo', c.de('progNombre').value === 'A FILIPINO CHRISTMAS');
+    A.campos.csCambiaDe = { value: '1' }; A.campos.csCambiaA = { value: 'luz mar' };
+    c.de('cambiar').onclick(); await espera();
+    t.eq('cambiar ANA ROJAS por LUZ MAR en todo el programa', A.nube().castings.map(x => x.id + ':' + A.nube().talents.find(y => y.id === x.talent_id).name).join(' '), '501:LUZ MAR 502:BEATRIZ SOL 503:LUZ MAR 504:BEATRIZ SOL');
+    t.eq('apuntado', A.H[0].que + ' · ' + A.H[0].programa, 'Talento cambiado en todo el programa: ANA ROJAS → LUZ MAR · A FILIPINO CHRISTMAS');
+    A.campos.csCambiaA = { value: '' };
+    controles(A, 'programa').de('cambiar').onclick();
+    t.ok('sin el talento nuevo, se pide', A.avisos.includes('Escribe el talento nuevo'));
+    A.M.CS.vista = 'episodio'; A.M.CS.ep = 'e:e1';
+    c = controles(A, 'episodio');
+    t.ok('en el episodio, el suyo', /data-cs="cambiar" data-ambito="episodio"/.test(c.html) && /<option value="2">BEATRIZ SOL \(1\)<\/option>/.test(c.html));
+    A.campos.csCambiaDe = { value: '2' }; A.campos.csCambiaA = { value: 'Nora Díaz' };
+    c.de('cambiar').onclick(); await espera();
+    t.eq('cambiar solo en ese episodio', A.nube().castings.map(x => x.id + ':' + A.nube().talents.find(y => y.id === x.talent_id).name).join(' '), '501:LUZ MAR 502:NORA DÍAZ 503:LUZ MAR 504:BEATRIZ SOL');
+    t.eq('apuntado en el episodio', A.H[0].que + ' · ' + A.H[0].episodio + ' · ' + A.H[0].dcEpId, 'Talento cambiado en el episodio: BEATRIZ SOL → NORA DÍAZ · Ep. 1 · Episodio 1 · 11');
+    c = controles(A, 'episodio');
+    const tito = c.de('talento', { ch: 103 }); tito.value = 'Ana Rojas'; tito.onchange(); await espera();
+    t.eq('asignar a mano también se apunta: quién, a quién, y qué había', A.H[0].que, 'TITO BOY: ANA ROJAS (antes: sin asignar)');
+    t.ok('y los cambios del episodio se ven en él', /Cambios de este episodio[\s\S]*?TITO BOY: ANA ROJAS[\s\S]*?Talento cambiado en el episodio/.test(controles(A, 'episodio').html));
+    A.M.CS.vista = 'programa'; A.M.CS.tab = 'historial';
+    c = controles(A, 'programa');
+    t.ok('el programa tiene su pestaña de cambios, con todos los suyos', /data-v="historial">Cambios <b>3<\/b>/.test(c.html) && /<b>Pamela<\/b><span>Talento cambiado en todo el programa: ANA ROJAS → LUZ MAR/.test(c.html));
+    t.ok('y el Dashboard, los últimos', /Últimos cambios[\s\S]*?TITO BOY: ANA ROJAS/.test(controles(A, 'dashboard').html));
+  }
+  {
+    const A = armar();
+    t.eq('los talentos que hay en unos episodios', JSON.stringify(A.M.csTalentosEn(PR.prodNormalizar(A.nube()), [11, 13])), '[{"id":1,"name":"ANA ROJAS","n":1},{"id":2,"name":"BEATRIZ SOL","n":2}]');
+    t.eq('sin talentos, sin cambiador', A.M.csCambiadorHtml([], 'programa'), '');
+    t.eq('sin cambios todavía, se dice', /Todavía no hay cambios apuntados/.test(controles(A, 'dashboard').html), true);
+  }
+
+  t.seccion('7 · capítulos repetidos y personajes con dos talentos');
+  {
+    const A = armar();
+    const progs = () => A.M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], PR.prodNormalizar(A.nube()));
+    const akka = progs().find(p => p.clave === 'dc:2');
+    const rep = A.M.csRepetidosDc(akka, PR.prodNormalizar(A.nube()));
+    t.eq('el Ep. 1 de Akka está dos veces en DublajeCast', rep.map(g => g.numero + ': se queda ' + g.keep.id + ', fusiona ' + g.dups.map(e => e.id).join(',')).join(' | '), '1: se queda 21, fusiona 22');
+    t.eq('una película no tiene repetidos, ni un programa de Dubbipt sin DublajeCast', A.M.csRepetidosDc(progs().find(p => p.clave === 'dc:3'), PR.prodNormalizar(A.nube())).length + ' ' + A.M.csRepetidosDc({ serie: null }, null).length, '0 0');
+    const p1 = progs().find(p => p.clave === 's:s1');
+    const inc = A.M.csInconsistencias(p1, PR.prodNormalizar(A.nube()));
+    t.eq('ALLY tiene dos talentos en el programa', inc.map(r => r.personaje + ': ' + r.talentos.map(x => x.nombre + ' ' + x.eps.join(',')).join(' / ')).join(' | '), 'ALLY: ANA ROJAS 1,2 / BEATRIZ SOL 3');
+    A.M.CS.vista = 'programa'; A.M.CS.prog = 's:s1'; A.M.CS.tab = 'episodios';
+    let c = controles(A, 'programa');
+    t.ok('el programa lo pregunta: ¿cuál vale?', /Para revisar[\s\S]*?<b>ALLY<\/b> tiene 2 talentos[\s\S]*?¿Cuál vale\?/.test(c.html) && !!c.de('usarTalento', { tal: 'ANA ROJAS' }) && !!c.de('aceptarRelevo', { ch: 101 }));
+    c.de('aceptarRelevo', { ch: 101 }).onclick();
+    t.ok('«es un relevo»: se apunta y no se vuelve a preguntar', A.RELEVOS.length === 1 && A.H[0].que === 'ALLY: relevo aceptado, se deja con sus dos talentos' && !/tiene 2 talentos/.test(controles(A, 'programa').html));
+    A.RELEVOS.length = 0;
+    c = controles(A, 'programa');
+    c.de('usarTalento', { tal: 'ANA ROJAS' }).onclick(); await espera();
+    t.eq('«ANA ROJAS en todos»: queda uno solo', A.nube().castings.filter(x => x.character_id === 101).map(x => A.nube().talents.find(y => y.id === x.talent_id).name).join(','), 'ANA ROJAS,ANA ROJAS,ANA ROJAS');
+    t.ok('apuntado, y ya no se pregunta', A.H[0].que === 'ALLY: ANA ROJAS en todos sus episodios (tenía dos talentos)' && !/tiene 2 talentos/.test(controles(A, 'programa').html));
+  }
+  {
+    const pl = VOLCADO();
+    pl.appearances.push({ character_id: 102, episode_id: 21, line_count: 5 }, { character_id: 102, episode_id: 22, line_count: 9 }, { character_id: 103, episode_id: 22, line_count: 4 });
+    pl.castings.push({ id: 601, character_id: 102, talent_id: 1, episode_id: 21 }, { id: 602, character_id: 102, talent_id: 2, episode_id: 22 }, { id: 603, character_id: 103, talent_id: 2, episode_id: 22 });
+    pl.episodes.find(e => e.id === 21).fecha_miami = '2026-10-30';
+    const A = armar({ payload: pl });
+    A.M.CS.vista = 'programa'; A.M.CS.prog = 'dc:2'; A.M.CS.tab = 'episodios';
+    let c = controles(A, 'programa');
+    t.ok('los repetidos se ofrecen fusionar', /El <b>Ep\. 1<\/b> está 2 veces en DublajeCast/.test(c.html) && !!c.de('fusionar', { v: 1 }));
+    c.de('fusionar', { v: 1 }).onclick();
+    c = controles(A, 'programa');
+    t.ok('al fusionar: cuál se queda, qué pasa, y la pregunta por lo que choca', /Se queda <b>Ep\. 1 · Akka 1 \(bis\)<\/b> \(4 registros\)/.test(c.html) && /van a la papelera de DublajeCast/.test(c.html) && /¿Cuál vale\?[\s\S]*?<b>JANA<\/b><label><input type="radio" name="csEl102" data-cs="elegir" data-ch="102" value="2" checked> BEATRIZ SOL<\/label><label><input type="radio" name="csEl102" data-cs="elegir" data-ch="102" value="1"> ANA ROJAS/.test(c.html));
+    const el = c.de('elegir', { ch: 102 }); el.value = '1'; el.onchange();
+    c.de('fusionarYa', { v: 1 }).onclick(); await espera();
+    const P = A.nube();
+    t.eq('queda un solo Ep. 1: el que más tenía', P.episodes.filter(e => e.series_id === 2).map(e => e.id).join(','), '22');
+    t.eq('con los personajes de los dos y las líneas mayores', P.appearances.filter(a => a.episode_id === 22).map(a => a.character_id + ':' + a.line_count).sort().join(' '), '102:9 103:4');
+    t.eq('con el talento elegido donde chocaban, y los que solo estaban en el repetido', P.castings.filter(x => x.episode_id === 22).map(x => x.character_id + ':' + x.talent_id).sort().join(' '), '102:1 103:2');
+    t.ok('nada se queda apuntando al repetido', !P.appearances.some(a => a.episode_id === 21) && !P.castings.some(x => x.episode_id === 21));
+    t.eq('lo que le faltaba al que se queda, del repetido', P.episodes.find(e => e.id === 22).fecha_miami, '2026-10-30');
+    t.ok('el repetido, a la papelera de DublajeCast, para poder restaurarlo', P.trash && P.trash[0].kind === 'episode' && P.trash[0].data.episodes[0].id === 21 && P.trash[0].data.castings.length === 1);
+    t.eq('y apuntado', A.H[0].que, 'Fusionado el Ep. 1: 2 capítulos repetidos en uno');
+  }
+  {
+    const A = armar();
+    A.M.CS.vista = 'programa'; A.M.CS.prog = 'dc:2';
+    const c = controles(A, 'programa'); c.de('fusionar', { v: 1 }).onclick();
+    controles(A, 'programa').de('fusionCancelar').onclick();
+    t.eq('cancelar no toca nada', A.M.CS.fusion + ' ' + A.nube().episodes.length, 'null 6');
+  }
+  {
+    const A = armar();
+    const showDup = [{ id: 's1', name: 'A FILIPINO CHRISTMAS' }];
+    const epsDup = [{ id: 'e1', show_id: 's1', name: 'Episodio 1' }, { id: 'e1b', show_id: 's1', name: 'Episodio 1 (bis)' }, { id: 'e2', show_id: 's1', name: 'Episodio 2' }];
+    const p = A.M.csProgramas(showDup, () => epsDup, PR.prodNormalizar(A.nube())).find(x => x.clave === 's:s1');
+    const hay = (id) => id === 'e1';
+    t.eq('repetidos en Dubbipt: el que tiene libreto se queda, el vacío se puede quitar', JSON.stringify(A.M.csRepetidosDub(p, hay).map(g => [g.numero, g.queda.id, g.vacios.map(x => x.id)])), '[[1,"e1",["e1b"]]]');
+    t.eq('si los dos tienen libreto, no se quita ninguno', A.M.csRepetidosDub(p, () => true)[0].vacios.length, 0);
+    t.eq('quitar los vacíos: pregunta, quita y apunta', await A.M.csQuitarVacios(p, 1, hay) + ' ' + A.borrados.join(',') + ' · ' + A.H[0].que, 'hecho episodes:e1b · Quitados los repetidos vacíos del Ep. 1: Episodio 1 (bis)');
+    const N = armar({ confirmar: false });
+    t.eq('si se dice que no, nada', await N.M.csQuitarVacios(p, 1, hay) + ' ' + N.borrados.length, 'cancelado 0');
+  }
+  {
+    const A = armar();
+    t.ok('el Dashboard dice qué programas hay que revisar', /Para revisar[\s\S]*?<b>A FILIPINO CHRISTMAS<\/b> · 1 personaje con dos talentos[\s\S]*?data-cs="abrirProg" data-v="s:s1"[\s\S]*?<b>Akka<\/b> · 1 capítulo repetido/.test(controles(A, 'dashboard').html));
   }
 };

@@ -26,7 +26,9 @@
  * dcastDatos, dcastAbrir, dcSesion, castNorm, castAviso, sbShows, LDB, libView,
  * renderLibrary, newShow, newEpisodeModal, openEpisode, ponerModo, sbEps,
  * castRegCargar, dcastSerieDe, dcastEpDeDc, dcastFilasCasting, esc, fallo, _svgI,
- * dcxGuardar y las transformaciones de js/dcescribir.js, dcPanel, DDL_UI, sb, uid,
+ * dcxGuardar y las transformaciones de js/dcescribir.js (con dcxHistorial, dcxEntrada,
+ * dcxRegistrar, dcxConflictosFusion, dcxFusionarEpisodios, dcxRelevosAceptados,
+ * dcxAceptarRelevo), herramientasPanel, currentEp, DDL_MODO, dcPanel, DDL_UI, sb, uid,
  * libFetchAll, WORKSPACE.
  */
 
@@ -34,7 +36,7 @@
 
 const CS = { vista: 'programas', buscar: '', soloAlertas: false, programa: '',
              prog: null, ep: null, filtro: 'en_curso', buscarProg: '', orden: 'lineas', registros: {},
-             tab: 'episodios', buscarCast: '', ordenCast: 'episodio' };
+             tab: 'episodios', buscarCast: '', ordenCast: 'episodio', fusion: null, elegidos: {} };
 
 /* Iconos de trazo, como los de Dubbipt (ICO). Ningún emoji. */
 const CS_ICO = {
@@ -263,7 +265,7 @@ function csRegistroDe(show){
 
 /** El programa y el episodio que se están mirando. */
 function csActual(){
-  const { datos } = dcastDatos();
+  const { datos } = csDatos();
   const lista = csProgramas((typeof sbShows === 'function') ? sbShows() : [], (typeof sbEps === 'function') ? sbEps : null, datos);
   const p = lista.find(x => x.clave === CS.prog) || null;
   const eps = p ? csEpisodios(p) : [];
@@ -313,6 +315,15 @@ function csHtmlDashboard(d, hoy, vivo){
             : '<div class="cs-nada">Ningún tráiler pendiente.</div>')
       +   '</div>'
       + '</div>'
+      + (() => {
+          const rev = csPorRevisar(csActual().lista, d, (eid) => !!(LDB.dataEps && LDB.dataEps.has(eid)));
+          return rev.length ? '<div class="cs-caja cs-caja-hist"><div class="cs-caja-t">' + csIco('aviso', 14) + 'Para revisar</div>'
+            + rev.map(x => '<div class="cs-linea"><span class="cs-linea-t"><b>' + csEsc(x.p.nombre) + '</b>'
+                + (x.repetidos ? ' · ' + x.repetidos + ' capítulo' + (x.repetidos === 1 ? '' : 's') + ' repetido' + (x.repetidos === 1 ? '' : 's') : '')
+                + (x.inconsistencias ? ' · ' + x.inconsistencias + ' personaje' + (x.inconsistencias === 1 ? '' : 's') + ' con dos talentos' : '') + '</span>'
+                + '<button class="cs-b" data-cs="abrirProg" data-v="' + csEsc(x.p.clave) + '">Revisar</button></div>').join('') + '</div>' : '';
+        })()
+      + '<div class="cs-caja cs-caja-hist"><div class="cs-caja-t">' + csIco('actualizar', 14) + 'Últimos cambios</div>' + csHtmlHistorial(dcxHistorial(), true, 12) + '</div>'
       : csVacio());
 }
 
@@ -543,22 +554,274 @@ async function csImportarTodo(){
 }
 
 /** Guardar un cambio en DublajeCast, decir cómo fue y repintar. Sin sesión, se abre la entrada. */
-async function csEditar(cambio, hecho){
-  try{
-    const r = await dcxGuardar(cambio);
-    if(r.cambiado && hecho) castAviso(hecho);
-    csRepintar();
-    return r.cambiado ? 'guardado' : 'igual';
-  }catch(e){
-    if(e && e.sinSesion){
-      castAviso('Para guardar en DublajeCast, entra con tu cuenta de DublajeCast');
-      try{ dcPanel(); }catch(x){ /* sin el panel, el aviso ya lo dice */ }
-      return 'sesion';
+function csEditar(cambio, hecho, ctx){
+  return (async () => {
+    try{
+      const r = await dcxGuardar(cambio, hecho ? dcxEntrada(hecho, ctx) : null);
+      if(r.cambiado && hecho) castAviso(hecho);
+      csRepintar();
+      return r.cambiado ? 'guardado' : 'igual';
+    }catch(e){
+      if(e && e.sinSesion){
+        castAviso('Para guardar en DublajeCast, entra con tu cuenta de DublajeCast');
+        try{ dcPanel(); }catch(x){ /* sin el panel, el aviso ya lo dice */ }
+        return 'sesion';
+      }
+      castAviso('No se pudo guardar en DublajeCast: ' + (e && e.message ? e.message : e));
+      csRepintar();
+      return 'error';
     }
-    castAviso('No se pudo guardar en DublajeCast: ' + (e && e.message ? e.message : e));
-    csRepintar();
-    return 'error';
+  })();
+}
+
+/* ── Nombres, el cambiador de talento y quién cambió qué ────────────────────
+   Pedido de sala: «que se pueda editar cada nombre y cada episodio de los
+   programas, que en cada episodio o cada programa haya un cambiador de
+   talento, que quede registrado quién cambió». */
+
+/** Dónde ocurre un cambio, para apuntarlo: el programa y el episodio, con sus ids de los dos lados. */
+function csContexto(p, e){
+  return {
+    programa: p ? p.nombre : '', serieId: (p && p.serie) ? p.serie.id : null, showId: (p && p.show) ? p.show.id : null,
+    episodio: e ? ((e.numero != null ? 'Ep. ' + e.numero + ' · ' : '') + e.titulo) : '',
+    dcEpId: (e && e.dcEp) ? e.dcEp.id : null, epId: (e && e.ep) ? e.ep.id : null
+  };
+}
+
+/** Los apuntes de un programa, o de un episodio, por sus ids (aunque luego cambie el nombre). */
+function csHistorialDe(p, e){
+  if(!prodPuede()) return [];                       // lo que se cambió en DublajeCast, solo para el administrador
+  const mismo = (a, b) => a != null && b != null && String(a) === String(b);
+  return dcxHistorial().filter(x => e
+    ? ((e.dcEp && mismo(x.dcEpId, e.dcEp.id)) || (e.ep && mismo(x.epId, e.ep.id)))
+    : ((p.serie && mismo(x.serieId, p.serie.id)) || (p.show && mismo(x.showId, p.show.id))));
+}
+
+/** «8/10/2026 14:05». */
+function csFechaHora(iso){
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('es') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+/** La lista de cambios: cuándo, quién y qué; con `donde`, también en qué programa y episodio. */
+function csHtmlHistorial(lista, donde, cuantos){
+  if(!lista.length) return '<div class="cs-nada">Todavía no hay cambios apuntados.</div>';
+  return '<div class="cs-hist">' + lista.slice(0, cuantos || 50).map(x => '<div class="cs-hist-f">'
+      + '<span class="cs-tenue">' + csEsc(csFechaHora(x.cuando)) + '</span><b>' + csEsc(x.quien) + '</b>'
+      + '<span>' + csEsc(x.que) + (donde && (x.programa || x.episodio) ? ' <i class="cs-tenue">· ' + csEsc([x.programa, x.episodio].filter(Boolean).join(' · ')) + '</i>' : '') + '</span>'
+      + '</div>').join('') + '</div>';
+}
+
+/** Los talentos que hay en unos episodios de DublajeCast, con cuántas asignaciones tiene cada uno. */
+function csTalentosEn(d, dcEpIds){
+  if(!d) return [];
+  const eps = new Set((dcEpIds || []).map(String));
+  const ix = prodIndices(d);
+  const n = {};
+  for(const c of d.castings) if(eps.has(String(c.episode_id))) n[String(c.talent_id)] = (n[String(c.talent_id)] || 0) + 1;
+  return Object.keys(n).map(id => ({ id: (ix.talent[id] || {}).id, name: (ix.talent[id] || {}).name, n: n[id] }))
+    .filter(t => t.name).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+}
+
+/** El cambiador de talento: de uno de los que hay, a otro (de la base o nuevo). */
+function csCambiadorHtml(talentos, ambito){
+  if(!talentos.length) return '';
+  return '<div class="cs-cambiador"><span class="cs-cambiador-t">' + csIco('traer', 14) + 'Cambiar talento ' + (ambito === 'programa' ? 'en todo el programa' : 'en este episodio') + '</span>'
+    + '<select id="csCambiaDe">' + talentos.map(t => '<option value="' + csEsc(t.id) + '">' + csEsc(t.name) + ' (' + t.n + ')</option>').join('') + '</select>'
+    + '<span class="cs-tenue">por</span><input id="csCambiaA" class="cs-tal-in" list="csListaTalentos" placeholder="Nuevo talento…">'
+    + '<button class="cs-b cs-pri" data-cs="cambiar" data-ambito="' + ambito + '">Cambiar</button></div>';
+}
+
+/**
+ * Renombrar un programa. Si está en los dos lados, en los dos -se casan por
+ * el nombre-: primero en DublajeCast, luego en Dubbipt. Se apunta.
+ */
+async function csRenombrarPrograma(p, nombre){
+  nombre = String(nombre == null ? '' : nombre).replace(/\s+/g, ' ').trim();
+  if(!p || !nombre || nombre === p.nombre) return 'igual';
+  const ctx = csContexto(p, null), que = 'Programa renombrado: «' + p.nombre + '» → «' + nombre + '»';
+  if(p.serie){
+    const r = await csEditar(pl => dcxSerie(pl, p.serie.id, { name: nombre }), que, ctx);
+    if(r !== 'guardado' && r !== 'igual') return r;
   }
+  if(p.show){
+    const { error } = await sb.from('shows').update({ name: nombre }).eq('id', p.show.id);
+    if(error){ castAviso('No se pudo renombrar en Dubbipt: ' + error.message); return 'error'; }
+    if(!p.serie){ dcxRegistrar(dcxEntrada(que, ctx)); castAviso(que); }
+    try{ await libFetchAll(); }catch(e){ /* se verá al recargar */ }
+    csRepintar();
+  }
+  return 'guardado';
+}
+
+/** Renombrar un episodio en Dubbipt. Se apunta. */
+async function csRenombrarEpisodio(p, e, nombre){
+  nombre = String(nombre == null ? '' : nombre).replace(/\s+/g, ' ').trim();
+  if(!e || !e.ep || !nombre || nombre === e.ep.name) return 'igual';
+  const { error } = await sb.from('episodes').update({ name: nombre }).eq('id', e.ep.id);
+  if(error){ castAviso('No se pudo renombrar el episodio: ' + error.message); return 'error'; }
+  const que = 'Episodio renombrado en Dubbipt: «' + e.ep.name + '» → «' + nombre + '»';
+  dcxRegistrar(dcxEntrada(que, csContexto(p, e)));
+  castAviso(que);
+  try{ await libFetchAll(); }catch(x){ /* se verá al recargar */ }
+  csRepintar();
+  return 'guardado';
+}
+
+/* ── Capítulos repetidos y personajes con dos talentos: lo que se pregunta ──
+   Pedido de sala: «también quiero que fusiones los capítulos repetidos y que
+   me preguntes si hay alguna inconsistencia de que un personaje tenga dos
+   talentos diferentes». */
+
+/** Lo que tiene un capítulo de DublajeCast: personajes y talentos. Para saber cuál se queda al fusionar. */
+function csPesoEpisodio(d, epId){
+  return d.appearances.filter(a => String(a.episode_id) === String(epId)).length + d.castings.filter(c => String(c.episode_id) === String(epId)).length;
+}
+
+/** Los capítulos repetidos de un programa en DublajeCast: mismo número. Se queda el que más tiene. */
+function csRepetidosDc(p, d){
+  if(!d || !p || !p.serie || p.serie.type === 'pelicula') return [];
+  const por = {};
+  for(const e of p.dcEps){
+    const n = parseInt(e.episode_number, 10);
+    if(!isFinite(n)) continue;
+    (por[n] = por[n] || []).push(e);
+  }
+  return Object.keys(por).filter(n => por[n].length > 1).map(n => {
+    const eps = por[n].slice().sort((a, b) => (csPesoEpisodio(d, b.id) - csPesoEpisodio(d, a.id)) || (String(a.id) < String(b.id) ? -1 : 1));
+    return { numero: Number(n), keep: eps[0], dups: eps.slice(1) };
+  }).sort((a, b) => a.numero - b.numero);
+}
+
+/** Los repetidos en Dubbipt: capítulos del mismo programa con el mismo número en el nombre. */
+function csRepetidosDub(p, hay){
+  if(!p || !p.show) return [];
+  const por = {};
+  for(const ep of p.eps){
+    const n = csNumeroDe(ep.name);
+    if(!isFinite(n)) continue;
+    (por[n] = por[n] || []).push(ep);
+  }
+  return Object.keys(por).filter(n => por[n].length > 1).map(n => {
+    const eps = por[n], con = eps.filter(ep => hay(ep.id));
+    /* Se pueden quitar los vacíos si a lo sumo uno tiene libreto: se queda ese, o el primero. */
+    const queda = con.length ? con[0] : eps[0];
+    return { numero: Number(n), eps: eps, conLibreto: con.length, queda: queda, vacios: con.length <= 1 ? eps.filter(ep => ep !== queda) : [] };
+  }).sort((a, b) => a.numero - b.numero);
+}
+
+/** La clave de un relevo aceptado: el programa, el personaje y los talentos que tiene. */
+function csClaveRelevo(serieId, r){
+  return String(serieId) + ':' + String(r.charId) + ':' + r.tramos.filter(t => t.talentoId != null).map(t => String(t.talentoId)).filter((x, i, l) => l.indexOf(x) === i).sort().join(',');
+}
+
+/** Los personajes de un programa con más de un talento, que nadie ha dicho todavía que sea a propósito. */
+function csInconsistencias(p, d){
+  if(!p || !p.serie) return [];
+  const aceptados = dcxRelevosAceptados();
+  return csReparto(p, d).map(r => {
+    const tal = {};
+    for(const t of r.tramos) if(t.talento){ const k = String(t.talentoId); (tal[k] = tal[k] || { id: t.talentoId, nombre: t.talento, eps: [] }).eps = tal[k].eps.concat(t.eps); }
+    return Object.assign({}, r, { talentos: Object.keys(tal).map(k => tal[k]), clave: csClaveRelevo(p.serie.id, r) });
+  }).filter(r => r.talentos.length > 1 && aceptados.indexOf(r.clave) < 0);
+}
+
+/** El panel «Para revisar» de un programa: los repetidos y los personajes con dos talentos, preguntando qué hacer con cada uno. */
+function csHtmlRevisar(p, d, hay){
+  const repDc = csRepetidosDc(p, d), repDub = csRepetidosDub(p, hay), inc = csInconsistencias(p, d);
+  if(!repDc.length && !repDub.length && !inc.length) return '';
+  const ix = d ? prodIndices(d) : null;
+  const tit = (e) => 'Ep. ' + e.episode_number + (e.title ? ' · ' + e.title : '');
+  let h = '<div class="cs-revisar"><div class="cs-caja-t">' + csIco('aviso', 14) + 'Para revisar</div>';
+  for(const g of repDc){
+    if(CS.fusion === g.numero){
+      const conflictos = dcxConflictosFusion(d, g.keep.id, g.dups.map(e => e.id));
+      h += '<div class="cs-rev cs-rev-abierto"><div><b>Fusionar el Ep. ' + g.numero + '</b></div>'
+        + '<div class="cs-tenue">Se queda <b>' + csEsc(tit(g.keep)) + '</b> (' + csPesoEpisodio(d, g.keep.id) + ' registros). Pasan a él los personajes, las líneas y los talentos de '
+        + g.dups.map(e => '<b>' + csEsc(tit(e)) + '</b>').join(', ') + ', que van a la papelera de DublajeCast.</div>'
+        + (conflictos.length ? '<div class="cs-rev-preg">Estos personajes tienen talentos distintos en los repetidos. ¿Cuál vale?</div>'
+            + conflictos.map(cf => {
+                const per = (ix.char[String(cf.charId)] || {}).name || 'Personaje';
+                const elegido = CS.elegidos[String(cf.charId)] != null ? String(CS.elegidos[String(cf.charId)]) : String(cf.opciones[0]);
+                return '<div class="cs-rev-op"><b>' + csEsc(per) + '</b>' + cf.opciones.map(tid => '<label><input type="radio" name="csEl' + csEsc(cf.charId) + '" data-cs="elegir" data-ch="' + csEsc(cf.charId) + '" value="' + csEsc(tid) + '"' + (String(tid) === elegido ? ' checked' : '') + '> '
+                  + csEsc((ix.talent[String(tid)] || {}).name || '?') + '</label>').join('') + '</div>';
+              }).join('')
+          : '')
+        + '<div class="cs-rev-btns"><button class="cs-b cs-pri" data-cs="fusionarYa" data-v="' + g.numero + '">Fusionar</button><button class="cs-b" data-cs="fusionCancelar">Cancelar</button></div></div>';
+    } else {
+      h += '<div class="cs-rev"><span>El <b>Ep. ' + g.numero + '</b> está ' + (g.dups.length + 1) + ' veces en DublajeCast: ' + [g.keep].concat(g.dups).map(e => csEsc(tit(e))).join(' · ') + '</span>'
+        + '<button class="cs-b" data-cs="fusionar" data-v="' + g.numero + '">Fusionar</button></div>';
+    }
+  }
+  for(const g of repDub){
+    h += '<div class="cs-rev"><span>El <b>Ep. ' + g.numero + '</b> está ' + g.eps.length + ' veces en Dubbipt: ' + g.eps.map(ep => csEsc(ep.name) + (hay(ep.id) ? ' (con libreto)' : ' (vacío)')).join(' · ') + '</span>'
+      + (g.vacios.length ? '<button class="cs-b" data-cs="quitarVacios" data-v="' + g.numero + '">Quitar ' + (g.vacios.length === 1 ? 'el vacío' : 'los vacíos') + '</button>'
+                         : '<span class="cs-tenue">Tienen libreto los dos: revísalos a mano.</span>') + '</div>';
+  }
+  for(const r of inc){
+    h += '<div class="cs-rev"><span><b>' + csEsc(r.personaje) + '</b> tiene ' + r.talentos.length + ' talentos: '
+      + r.talentos.map(t => '<b class="cs-talento">' + csEsc(t.nombre) + '</b> <i class="cs-tenue">Ep. ' + csTramoTexto(t.eps) + '</i>').join(' · ') + '. ¿Cuál vale?</span>'
+      + '<span class="cs-rev-btns">' + r.talentos.map(t => '<button class="cs-b" data-cs="usarTalento" data-ch="' + csEsc(r.charId) + '" data-per="' + csEsc(r.personaje) + '" data-tal="' + csEsc(t.nombre) + '">' + csEsc(t.nombre) + ' en todos</button>').join('')
+      + '<button class="cs-b" data-cs="aceptarRelevo" data-ch="' + csEsc(r.charId) + '" data-per="' + csEsc(r.personaje) + '" data-clave="' + csEsc(r.clave) + '" title="Es un cambio de voz a propósito: no se vuelve a preguntar">Es un relevo, dejarlo así</button></span></div>';
+  }
+  return h + '</div>';
+}
+
+/** Para el Dashboard: los programas que tienen algo que revisar. */
+function csPorRevisar(lista, d, hay){
+  return lista.map(p => ({ p: p, repetidos: csRepetidosDc(p, d).length + csRepetidosDub(p, hay).length, inconsistencias: csInconsistencias(p, d).length }))
+    .filter(x => x.repetidos || x.inconsistencias);
+}
+
+/** Quitar en Dubbipt los capítulos repetidos vacíos (sin libreto), preguntando antes. */
+async function csQuitarVacios(p, numero, hay){
+  const g = csRepetidosDub(p, hay).find(x => x.numero === numero);
+  if(!g || !g.vacios.length) return 'nada';
+  const ok = await DDL_UI.confirmModal({ title: 'Quitar capítulos vacíos', body: 'Se quedan «' + g.queda.name + '» y se quitan de Dubbipt ' + g.vacios.map(ep => '«' + ep.name + '»').join(', ') + ', que no tienen libreto.', confirmLabel: 'Quitar', cancelLabel: 'Cancelar', danger: true });
+  if(!ok) return 'cancelado';
+  for(const ep of g.vacios){
+    const { error } = await sb.from('episodes').delete().eq('id', ep.id);
+    if(error){ castAviso('No se pudo quitar «' + ep.name + '»: ' + error.message); return 'error'; }
+  }
+  const que = 'Quitados los repetidos vacíos del Ep. ' + numero + ': ' + g.vacios.map(ep => ep.name).join(', ');
+  dcxRegistrar(dcxEntrada(que, csContexto(p, null)));
+  castAviso(que);
+  try{ await libFetchAll(); }catch(e){ /* se verá al recargar */ }
+  csRepintar();
+  return 'hecho';
+}
+
+/** Los controles del panel «Para revisar». */
+function csCablearMas(el, que, v, at, id, a){
+  if(que === 'fusionar') el.onclick = () => { CS.fusion = Number(v); CS.elegidos = {}; csRepintar(); };
+  else if(que === 'fusionCancelar') el.onclick = () => { CS.fusion = null; CS.elegidos = {}; csRepintar(); };
+  else if(que === 'elegir') el.onchange = () => { CS.elegidos[String(at('ch'))] = id(el.value); };
+  else if(que === 'fusionarYa') el.onclick = () => {
+    const x = a(), numero = Number(v);
+    const g = csRepetidosDc(x.p, x.datos).find(r => r.numero === numero);
+    if(!g) return;
+    const keep = g.keep.id, dups = g.dups.map(e => e.id), elegidos = Object.assign({}, CS.elegidos);
+    CS.fusion = null; CS.elegidos = {};
+    csEditar(pl => dcxFusionarEpisodios(pl, keep, dups, elegidos), 'Fusionado el Ep. ' + numero + ': ' + (g.dups.length + 1) + ' capítulos repetidos en uno', csContexto(x.p, null));
+  };
+  else if(que === 'quitarVacios') el.onclick = () => {
+    const x = a();
+    csQuitarVacios(x.p, Number(v), (eid) => !!(LDB.dataEps && LDB.dataEps.has(eid))).catch(err => fallo('csQuitarVacios · js/castingvistas.js', err, 'no se han podido quitar'));
+  };
+  else if(que === 'usarTalento') el.onclick = () => {
+    const x = a(), ch = id(at('ch')), nombre = at('tal');
+    if(!x.p || !x.p.serie) return;
+    csEditar(pl => dcxReasignar(pl, x.p.serie.id, ch, null, nombre), (at('per') || 'Personaje') + ': ' + nombre + ' en todos sus episodios (tenía dos talentos)', csContexto(x.p, null));
+  };
+  else if(que === 'aceptarRelevo') el.onclick = () => {
+    const x = a();
+    if(!dcxAceptarRelevo(at('clave'))) return;
+    const que2 = (at('per') || 'Personaje') + ': relevo aceptado, se deja con sus dos talentos';
+    dcxRegistrar(dcxEntrada(que2, csContexto(x.p, null)));
+    castAviso(que2);
+    csRepintar();
+  };
 }
 
 /* ── Lo que se edita: celdas y controles ────────────────────────────────── */
@@ -577,7 +840,7 @@ function csTalentoCelda(f, dcEp){
   const nota = (f.choca ? ' <small class="cs-aviso" title="En el registro de Dubbipt pone otro talento: al realizar el casting manda el de Dubbipt">' + csIco('aviso', 12) + 'en Dubbipt: ' + csEsc(f.dubbipt) + '</small>'
              : (!f.dc && f.dubbipt ? ' <small class="cs-tenue">de Dubbipt</small>' : ''));
   if(dcEp && f.charId != null)
-    return '<input class="cs-tal-in" list="csListaTalentos" data-cs="talento" data-ep="' + csEsc(dcEp.id) + '" data-ch="' + csEsc(f.charId) + '" value="' + csEsc(f.dc || '') + '" placeholder="Asignar…">' + nota;
+    return '<input class="cs-tal-in" list="csListaTalentos" data-cs="talento" data-ep="' + csEsc(dcEp.id) + '" data-ch="' + csEsc(f.charId) + '" data-per="' + csEsc(f.personaje) + '" data-antes="' + csEsc(f.dc || '') + '" value="' + csEsc(f.dc || '') + '" placeholder="Asignar…">' + nota;
   return '<span class="cs-talento">' + (f.talento ? csEsc(f.talento) : 'sin asignar') + '</span>' + nota;
 }
 
@@ -607,6 +870,7 @@ function csHtmlProgramas(lista, vivo){
     + '<div class="cs-cab-btns">'
     +   (nProg || nEps ? '<button class="cs-b" data-cs="importarTodo" title="Crea en Dubbipt los programas y episodios que solo están en DublajeCast">' + csIco('bajar', 14)
           + '<span>Importar de DublajeCast</span><b class="cs-cuenta">' + (nProg ? nProg + ' prog. · ' : '') + nEps + ' ep.</b></button>' : '')
+    +   '<button class="cs-b" data-cs="herramientas" title="Herramientas que no dependen de ningún capítulo">' + csIco('dubcards', 14) + '<span>Herramientas</span></button>'
     +   '<button class="cs-b cs-pri" data-cs="nuevoPrograma">' + csIco('mas', 14) + '<span>Nuevo</span></button>'
     + '</div></div>'
     + '<div class="cs-filtros"><label class="cs-buscar cs-buscar-prog">' + csIco('buscar', 14)
@@ -630,10 +894,12 @@ function csHtmlProgramas(lista, vivo){
 function csHtmlPrograma(p, eps, d, registro, hayLibreto){
   const filasCast = csFilasPrograma(eps, d, registro);
   const reparto = csReparto(p, d);
+  const historial = csHistorialDe(p, null);
   const pest = (k, t, n) => '<button class="cs-pest' + (CS.tab === k ? ' on' : '') + '" data-cs="tab" data-v="' + k + '">' + t + ' <b>' + n + '</b></button>';
   let cuerpo;
   if(CS.tab === 'casting') cuerpo = csHtmlCastingPrograma(filasCast);
   else if(CS.tab === 'reparto') cuerpo = csHtmlReparto(p, reparto);
+  else if(CS.tab === 'historial') cuerpo = csHtmlHistorial(historial, true, 200);
   else cuerpo = eps.length ? '<div class="cs-eps">' + eps.map(e => {
       const c = csCastingDe(e, d, registro);
       const con = c.filter(f => f.talento).length, choques = c.filter(f => f.choca).length;
@@ -660,13 +926,18 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
                 : '<button class="cs-b cs-pri" data-cs="crearProg">' + csIco('mas', 14) + '<span>Crear en Dubbipt</span></button>')
     +   (p.serie ? '<button class="cs-b" data-cs="dcSerie">' + csIco('externo', 14) + '<span>En DublajeCast</span></button>' : '')
     + '</div></div>'
-    + (p.serie ? '<div class="cs-prog-datos">'
-        + '<button class="cs-b" data-cs="estadoProg" title="Cambiar el estado del programa en DublajeCast">' + csChip(CS_ESTADO[p.estado] || p.estado, p.estado === 'completo' ? 'hecho' : 'ok')
-        +   '<span>' + (p.estado === 'completo' ? 'Volver a En curso' : 'Marcar Completado') + '</span></button>'
-        + '<label>Cliente <input type="text" data-cs="progCampo" data-campo="cliente" value="' + csEsc(p.cliente) + '" placeholder="—"></label>'
-        + '<label>Director <input type="text" data-cs="progCampo" data-campo="director" value="' + csEsc(p.director) + '" placeholder="—"></label>'
-        + '</div>' : '')
-    + '<div class="cs-pests cs-tabs">' + pest('episodios', 'Episodios', eps.length) + pest('casting', 'Casting', filasCast.length) + pest('reparto', 'Reparto', reparto.length) + '</div>'
+    + '<div class="cs-prog-datos">'
+    +   '<label>Nombre <input type="text" data-cs="progNombre" value="' + csEsc(p.nombre) + '" title="' + (p.show && p.serie ? 'Cambia en Dubbipt y en DublajeCast a la vez' : '') + '"></label>'
+    +   (p.serie
+          ? '<button class="cs-b" data-cs="estadoProg" title="Cambiar el estado del programa en DublajeCast">' + csChip(CS_ESTADO[p.estado] || p.estado, p.estado === 'completo' ? 'hecho' : 'ok')
+            + '<span>' + (p.estado === 'completo' ? 'Volver a En curso' : 'Marcar Completado') + '</span></button>'
+            + '<label>Cliente <input type="text" data-cs="progCampo" data-campo="cliente" value="' + csEsc(p.cliente) + '" placeholder="—"></label>'
+            + '<label>Director <input type="text" data-cs="progCampo" data-campo="director" value="' + csEsc(p.director) + '" placeholder="—"></label>'
+          : '')
+    + '</div>'
+    + csHtmlRevisar(p, d, hayLibreto)
+    + (p.serie ? csCambiadorHtml(csTalentosEn(d, p.dcEps.map(e => e.id)), 'programa') : '')
+    + '<div class="cs-pests cs-tabs">' + pest('episodios', 'Episodios', eps.length) + pest('casting', 'Casting', filasCast.length) + pest('reparto', 'Reparto', reparto.length) + (prodPuede() ? pest('historial', 'Cambios', historial.length) : '') + '</div>'
     + cuerpo
     + csListaTalentos(d);
 }
@@ -698,11 +969,11 @@ function csHtmlReparto(p, reparto){
     + reparto.map(r => {
         const relevo = r.tramos.filter(t => t.talento).length > 1;
         return '<div class="cs-fila' + (r.tramos.some(t => !t.talento) ? ' cs-falta' : '') + '">'
-          + '<span><button class="cs-prin-b' + (r.principal ? ' on' : '') + '" data-cs="principal" data-ch="' + csEsc(r.charId) + '" title="' + (r.principal ? 'Quitar de principales' : 'Marcar como principal') + '">' + csIco('estrella', 13) + '</button><b>' + csEsc(r.personaje) + '</b></span>'
+          + '<span><button class="cs-prin-b' + (r.principal ? ' on' : '') + '" data-cs="principal" data-ch="' + csEsc(r.charId) + '" data-per="' + csEsc(r.personaje) + '" title="' + (r.principal ? 'Quitar de principales' : 'Marcar como principal') + '">' + csIco('estrella', 13) + '</button><b>' + csEsc(r.personaje) + '</b></span>'
           + '<span class="cs-tramos">' + r.tramos.map(t => '<span class="' + (t.talento ? 'cs-talento' : 'cs-rojo') + '">' + (t.talento ? csEsc(t.talento) : 'sin asignar') + ' <i class="cs-tenue">' + csTramoTexto(t.eps) + '</i></span>').join(' → ')
           +   (relevo ? ' <small class="cs-aviso">' + csIco('aviso', 12) + 'relevo</small>' : '') + '</span>'
           + '<span>' + r.episodios + '</span><span class="cs-tenue">' + r.lineas + '</span>'
-          + '<span><input class="cs-tal-in" list="csListaTalentos" data-cs="reasignar" data-ch="' + csEsc(r.charId) + '" placeholder="Nuevo talento…"></span>'
+          + '<span><input class="cs-tal-in" list="csListaTalentos" data-cs="reasignar" data-ch="' + csEsc(r.charId) + '" data-per="' + csEsc(r.personaje) + '" placeholder="Nuevo talento…"></span>'
           + '</div>';
       }).join('') + '</div>';
 }
@@ -726,16 +997,17 @@ function csHtmlEpisodio(p, e, d, registro, hoy){
   const dc = e.dcEp;
   const filas = csCastingDe(e, d, registro);
   const alertas = dc ? prodAlertasEp(dc, p.serie, hoy) : [];
-  const ficha = dc
-    ? '<div class="cs-ep-ficha">'
-      + '<div><span>Estado</span>' + csSelect('status', dc.status || 'en_curso', CS_OP_ESTADO) + '</div>'
-      + '<div><span>Fase</span>' + csSelect('fase', dc.fase || '', CS_OP_FASE) + '</div>'
-      + '<div><span>Miami</span><input type="date" data-cs="epCampo" data-campo="fecha_miami" value="' + csEsc(dc.fecha_miami || '') + '"></div>'
-      + '<div><span>DUBCARD</span><input type="date" data-cs="epCampo" data-campo="fecha_dubcard" value="' + csEsc(dc.fecha_dubcard || '') + '"></div>'
-      + '<div><span>Formato DUBCARD</span>' + csSelect('formato_dubcard', dc.formato_dubcard || '', CS_OP_FORMATO) + '<i class="cs-tenue">' + csEsc(prodFormatoDubcard(dc, p.serie)) + '</i></div>'
-      + (alertas.length ? '<div><span>Alertas</span><b>' + alertas.map(a => csChip(a.texto, a.nivel)).join(' ') + '</b></div>' : '')
-      + '</div>'
-    : '';
+  const ficha = '<div class="cs-ep-ficha">'
+      + (e.ep ? '<div><span>Nombre en Dubbipt</span><input type="text" data-cs="epNombre" value="' + csEsc(e.ep.name) + '" title="El número del nombre es lo que lo junta con su episodio de DublajeCast"></div>' : '')
+      + (dc ? '<div><span>Título en DublajeCast</span><input type="text" data-cs="epCampo" data-campo="title" value="' + csEsc(dc.title || '') + '"></div>'
+          + '<div><span>Estado</span>' + csSelect('status', dc.status || 'en_curso', CS_OP_ESTADO) + '</div>'
+          + '<div><span>Fase</span>' + csSelect('fase', dc.fase || '', CS_OP_FASE) + '</div>'
+          + '<div><span>Miami</span><input type="date" data-cs="epCampo" data-campo="fecha_miami" value="' + csEsc(dc.fecha_miami || '') + '"></div>'
+          + '<div><span>DUBCARD</span><input type="date" data-cs="epCampo" data-campo="fecha_dubcard" value="' + csEsc(dc.fecha_dubcard || '') + '"></div>'
+          + '<div><span>Formato DUBCARD</span>' + csSelect('formato_dubcard', dc.formato_dubcard || '', CS_OP_FORMATO) + '<i class="cs-tenue">' + csEsc(prodFormatoDubcard(dc, p.serie)) + '</i></div>'
+          + (alertas.length ? '<div><span>Alertas</span><b>' + alertas.map(a => csChip(a.texto, a.nivel)).join(' ') + '</b></div>' : '')
+        : '')
+      + '</div>';
   return '<button class="cs-volver" data-cs="volver" data-v="programa">' + csIco('izquierda', 14) + '<span>' + csEsc(p.nombre) + '</span></button>'
     + '<div class="cs-cab"><div class="cs-cab-t"><h2>' + (e.numero != null ? 'Ep. ' + e.numero + ' · ' : '') + csEsc(e.titulo) + '</h2>'
     +   '<div class="cs-cab-sub">' + csEsc(p.nombre) + (e.dcTitulo && castNorm(e.dcTitulo) !== castNorm(e.titulo) ? ' · en DublajeCast: ' + csEsc(e.dcTitulo) : '') + '</div></div>'
@@ -751,9 +1023,25 @@ function csHtmlEpisodio(p, e, d, registro, hoy){
               : '<button class="cs-cta" data-cs="crearProg">' + csIco('mas', 18) + '<span>Crear el programa en Dubbipt</span></button>'
                 + '<span class="cs-tenue">Este programa está en DublajeCast pero todavía no en Dubbipt. Créalo y añade el capítulo para realizar el casting.</span>'))
     + '</div>'
+    + (dc ? csCambiadorHtml(csTalentosEn(d, [dc.id]), 'episodio') : '')
     + csTablaCasting(filas, dc)
+    + (prodPuede() ? '<div class="cs-caja cs-caja-hist"><div class="cs-caja-t">' + csIco('actualizar', 14) + 'Cambios de este episodio</div>' + csHtmlHistorial(csHistorialDe(p, e), false, 30) + '</div>' : '')
     + csListaTalentos(d);
 }
+
+/**
+ * ¿Se enseña la organización de DublajeCast? Con el perfil Casting, siempre:
+ * pedido de sala, «cuando se abra el programa en Casting, elimina la interfaz
+ * antigua de los programas». Lo que viene de DublajeCast -sus datos, sus
+ * secciones, editar e importar- sigue siendo solo del administrador (PRO-8).
+ */
+function csActivo(){ return typeof DDL_MODO !== 'undefined' && DDL_MODO === 'casting'; }
+
+/** Los datos de DublajeCast, solo para quien puede verlos. */
+function csDatos(){ return prodPuede() ? dcastDatos() : { datos: null, vivo: false }; }
+
+/** Las secciones que se ven: todas para el administrador; Programas para los demás. */
+function csSecciones(){ return prodPuede() ? CS_SECCIONES : CS_SECCIONES.filter(s => s.v === 'programas'); }
 
 /** La sección entera, como HTML. */
 function csHtml(vista, hoy){
@@ -762,13 +1050,13 @@ function csHtml(vista, hoy){
   if(sec && sec.dc) return csHtmlHerramienta(sec);
   if(vista === 'programas' || vista === 'programa' || vista === 'episodio'){
     const a = csActual();
-    const { vivo } = dcastDatos();
+    const { vivo } = csDatos();
     const hay = (id) => !!(LDB.dataEps && LDB.dataEps.has(id));
     if(vista === 'episodio' && a.p && a.e) return csHtmlEpisodio(a.p, a.e, a.datos, csRegistroDe(a.p.show), h);
     if(vista !== 'programas' && a.p) return csHtmlPrograma(a.p, a.eps, a.datos, csRegistroDe(a.p.show), hay);
     return csHtmlProgramas(a.lista, vivo);
   }
-  const { datos, vivo } = dcastDatos();
+  const { datos, vivo } = csDatos();
   switch(vista){
     case 'dashboard':  return csHtmlDashboard(datos, h, vivo);
     case 'talentos':   return csHtmlTalentos(datos, vivo);
@@ -782,7 +1070,7 @@ function csHtml(vista, hoy){
 /** La barra de secciones, a la izquierda como en DublajeCast. */
 function csNavHtml(activa){
   return '<div class="cs-nav-t">Casting</div>'
-    + CS_SECCIONES.map(s => '<button class="cs-nav-b' + (s.v === activa ? ' on' : '') + (s.dc ? ' cs-nav-dc' : '') + '" data-v="' + s.v + '" title="' + csEsc(s.t) + (s.dc ? ' · herramienta de DublajeCast' : '') + '">'
+    + csSecciones().map(s => '<button class="cs-nav-b' + (s.v === activa ? ' on' : '') + (s.dc ? ' cs-nav-dc' : '') + '" data-v="' + s.v + '" title="' + csEsc(s.t) + (s.dc ? ' · herramienta de DublajeCast' : '') + '">'
       + csIco(s.v, 16) + '<span>' + csEsc(s.t) + '</span></button>').join('');
 }
 
@@ -790,7 +1078,7 @@ function csNavHtml(activa){
 
 /**
  * Pone o quita la organización de DublajeCast en la biblioteca. Con el perfil
- * Casting (y el administrador), la biblioteca es la barra de secciones a la
+ * Casting, la biblioteca es la barra de secciones a la
  * izquierda y la sección a la derecha; lo de siempre de Dubbipt -mosaico de
  * programas, tabla de capítulos- queda tapado por CSS (`body.cs-on`).
  * `modo` es 'shows' o 'eps', lo que acaba de pintar renderLibrary: si entró
@@ -799,13 +1087,14 @@ function csNavHtml(activa){
 function csPintar(modo, cab, grid){
   let nav = document.getElementById('csNav'), vista = document.getElementById('csVista');
   const lib = grid && grid.parentNode;
-  const puede = !!(prodPuede() && cab && grid && lib);
+  const puede = !!(csActivo() && cab && grid && lib);
   document.body.classList.toggle('cs-on', puede);
   if(!puede){
     if(nav) nav.remove();
     if(vista) vista.remove();
     return false;
   }
+  if(!csSecciones().some(sc => sc.v === CS.vista) && CS.vista !== 'programa' && CS.vista !== 'episodio'){ CS.vista = 'programas'; CS.prog = null; CS.ep = null; }
   if(modo === 'eps' && LDB.showId != null && CS.prog !== 's:' + LDB.showId){
     CS.vista = 'programa'; CS.prog = 's:' + LDB.showId; CS.ep = null;
   }
@@ -823,7 +1112,7 @@ function csPintar(modo, cab, grid){
 
 /** Ir a una sección de la barra. Programas vuelve a la lista de todos. */
 function csIr(v){
-  if(!CS_SECCIONES.some(s => s.v === v)) return false;
+  if(!csSecciones().some(s => s.v === v)) return false;
   CS.vista = v; CS.prog = null; CS.ep = null;
   try{ document.body.classList.remove('ep-open'); }catch(e){ /* sin clase que quitar */ }
   LDB.browse = true; LDB.showId = null; libView = 'shows';
@@ -833,7 +1122,8 @@ function csIr(v){
 
 /** Vuelve a pintar lo que se ve (al cambiar de perfil, al actualizar los datos). */
 function csRepintar(){
-  try{ if(document.body.classList.contains('ep-open')) return; renderLibrary(true); }
+  /* Dentro de un capítulo, no: se repinta al volver a la biblioteca. */
+  try{ if(typeof currentEp !== 'undefined' && currentEp && !LDB.browse) return; renderLibrary(true); }
   catch(e){ fallo('renderLibrary · js/castingvistas.js:csRepintar', e); }
 }
 
@@ -861,6 +1151,7 @@ async function csRealizarCasting(p, e){
 /** Los controles de una sección. */
 function csCablear(vista){
   const a = () => csActual();
+  const ctxDe = (x) => csContexto(x && x.p, x && x.e);
   vista.querySelectorAll('[data-cs]').forEach(el => {
     const que = el.getAttribute('data-cs'), v = el.getAttribute('data-v');
     const at = (k) => el.getAttribute('data-' + k);
@@ -882,6 +1173,7 @@ function csCablear(vista){
     else if(que === 'abrirEp') el.onclick = () => { CS.vista = 'episodio'; CS.ep = v; csRepintar(); };
     else if(que === 'volver') el.onclick = () => { if(v === 'programas'){ CS.vista = 'programas'; CS.prog = null; CS.ep = null; } else { CS.vista = 'programa'; CS.ep = null; } csRepintar(); };
     else if(que === 'nuevoPrograma') el.onclick = () => csNuevoPrograma('');
+    else if(que === 'herramientas') el.onclick = () => herramientasPanel();
     else if(que === 'importarTodo') el.onclick = () => csImportarTodo().catch(err => fallo('csImportarTodo · js/castingvistas.js', err, 'la importación no se ha podido hacer'));
     else if(que === 'crearProg') el.onclick = () => { const x = a(); csNuevoPrograma(x.p ? x.p.nombre : ''); };
     else if(que === 'nuevoEp') el.onclick = () => {
@@ -893,34 +1185,51 @@ function csCablear(vista){
     else if(que === 'dcSerie') el.onclick = () => { const x = a(); if(x.p && x.p.serie) dcastAbrir('series', x.p.serie.id); };
     else if(que === 'dcEp') el.onclick = () => { const x = a(); if(x.p && x.p.serie && x.e && x.e.dcEp) dcastAbrir('casting', x.p.serie.id, x.e.dcEp.id); };
     else if(que === 'realizar') el.onclick = () => { const x = a(); csRealizarCasting(x.p, x.e).catch(err => fallo('csRealizarCasting · js/castingvistas.js', err, 'el capítulo no se ha podido abrir')); };
-    /* ── Lo que se guarda en DublajeCast ── */
+    /* ── Nombres ── */
+    else if(que === 'progNombre') el.onchange = () => { const x = a(); csRenombrarPrograma(x.p, el.value).catch(err => fallo('csRenombrarPrograma · js/castingvistas.js', err, 'el programa no se ha podido renombrar')); };
+    else if(que === 'epNombre') el.onchange = () => { const x = a(); csRenombrarEpisodio(x.p, x.e, el.value).catch(err => fallo('csRenombrarEpisodio · js/castingvistas.js', err, 'el episodio no se ha podido renombrar')); };
+    /* ── Lo que se guarda en DublajeCast, apuntando quién y qué ── */
     else if(que === 'talento') el.onchange = () => {
-      const nombre = el.value.trim(), ep = id(at('ep')), ch = id(at('ch'));
-      csEditar(pl => dcxAsignar(pl, ep, ch, nombre), nombre ? 'Asignado: ' + dcxNombreTalento(nombre) : 'Talento quitado');
+      const nombre = el.value.trim(), ep = id(at('ep')), ch = id(at('ch')), x = a();
+      const antes = at('antes') || 'sin asignar', per = at('per') || 'Personaje';
+      const ctx = csContexto(x.p, x.e || (x.eps || []).find(e => e.dcEp && String(e.dcEp.id) === String(ep)) || null);
+      csEditar(pl => dcxAsignar(pl, ep, ch, nombre), per + ': ' + (nombre ? dcxNombreTalento(nombre) : 'sin talento') + ' (antes: ' + antes + ')', ctx);
     };
     else if(que === 'reasignar') el.onchange = () => {
       const nombre = el.value.trim(), x = a(), ch = id(at('ch'));
       if(!nombre || !x.p || !x.p.serie) return;
-      csEditar(pl => dcxReasignar(pl, x.p.serie.id, ch, null, nombre), 'Cambiado en todos sus episodios: ' + dcxNombreTalento(nombre));
+      csEditar(pl => dcxReasignar(pl, x.p.serie.id, ch, null, nombre), (at('per') || 'Personaje') + ': ' + dcxNombreTalento(nombre) + ' en todos sus episodios', ctxDe(x));
+    };
+    else if(que === 'cambiar') el.onclick = () => {
+      const x = a(), ambito = at('ambito');
+      const de = document.getElementById('csCambiaDe'), aI = document.getElementById('csCambiaA');
+      const deId = de ? id(de.value) : null, nombre = aI ? aI.value.trim() : '';
+      if(!nombre){ castAviso('Escribe el talento nuevo'); return; }
+      if(!x.p || !x.p.serie) return;
+      const epIds = ambito === 'episodio' ? (x.e && x.e.dcEp ? [x.e.dcEp.id] : []) : x.p.dcEps.map(e => e.id);
+      if(!epIds.length) return;
+      const ix = prodIndices(x.datos), deNombre = (ix.talent[String(deId)] || {}).name || 'el talento';
+      csEditar(pl => dcxCambiarTalento(pl, epIds, deId, nombre), 'Talento cambiado ' + (ambito === 'episodio' ? 'en el episodio' : 'en todo el programa') + ': ' + deNombre + ' → ' + dcxNombreTalento(nombre), ctxDe(x));
     };
     else if(que === 'principal') el.onclick = () => {
-      const ch = id(at('ch')), poner = !el.classList.contains('on');
-      csEditar(pl => dcxPersonaje(pl, ch, { tipo: poner ? 'principal' : 'secundario' }), poner ? 'Marcado como principal' : 'Ya no es principal');
+      const ch = id(at('ch')), poner = !el.classList.contains('on'), x = a();
+      csEditar(pl => dcxPersonaje(pl, ch, { tipo: poner ? 'principal' : 'secundario' }), (at('per') || 'Personaje') + (poner ? ': marcado como principal' : ': ya no es principal'), ctxDe(x));
     };
     else if(que === 'epCampo') el.onchange = () => {
       const x = a(); if(!x.e || !x.e.dcEp) return;
       const campo = at('campo'), valor = el.value, epId = x.e.dcEp.id;
-      csEditar(pl => dcxEpisodio(pl, epId, { [campo]: valor }), 'Guardado en DublajeCast');
+      const et = { title: 'Título en DublajeCast', status: 'Estado', fase: 'Fase', fecha_miami: 'Fecha de Miami', fecha_dubcard: 'Fecha de DUBCARD', formato_dubcard: 'Formato de DUBCARD' }[campo] || campo;
+      csEditar(pl => dcxEpisodio(pl, epId, { [campo]: campo === 'title' ? valor.replace(/\s+/g, ' ').trim() : valor }), et + ': ' + (valor || '—'), ctxDe(x));
     };
     else if(que === 'progCampo') el.onchange = () => {
       const x = a(); if(!x.p || !x.p.serie) return;
       const campo = at('campo'), valor = el.value.trim(), sid = x.p.serie.id;
-      csEditar(pl => dcxSerie(pl, sid, { [campo]: valor }), 'Guardado en DublajeCast');
+      csEditar(pl => dcxSerie(pl, sid, { [campo]: valor }), (campo === 'cliente' ? 'Cliente' : 'Director') + ': ' + (valor || '—'), ctxDe(x));
     };
     else if(que === 'estadoProg') el.onclick = () => {
       const x = a(); if(!x.p || !x.p.serie) return;
       const nuevo = x.p.estado === 'completo' ? 'en_curso' : 'completo', sid = x.p.serie.id;
-      csEditar(pl => dcxSerie(pl, sid, { status: nuevo }), nuevo === 'completo' ? 'Programa completado' : 'Programa en curso');
+      csEditar(pl => dcxSerie(pl, sid, { status: nuevo }), nuevo === 'completo' ? 'Programa completado' : 'Programa en curso', ctxDe(x));
     };
     else if(que === 'talNuevo') el.onclick = () => {
       const i = document.getElementById('csTalNuevo'), nombre = i ? i.value.trim() : '';
@@ -929,18 +1238,18 @@ function csCablear(vista){
     };
     else if(que === 'talCampo') el.onchange = () => {
       const tid = id(at('id')), campo = at('campo'), valor = el.value.trim();
-      csEditar(pl => dcxTalento(pl, tid, { [campo]: valor }), 'Ficha guardada');
+      csEditar(pl => dcxTalento(pl, tid, { [campo]: valor }), 'Ficha de talento: ' + campo + ' = ' + (valor || '—'));
     };
     else if(que === 'trNuevo') el.onclick = () => {
       const val = (k) => { const i = document.getElementById(k); return i ? i.value.trim() : ''; };
       const titulo = val('csTrTitulo');
       if(!titulo){ castAviso('Escribe el título del tráiler'); return; }
       const datos = { title: titulo, type: val('csTrTipo'), series_id: val('csTrProg') ? id(val('csTrProg')) : null, deadline: val('csTrFecha') };
-      csEditar(pl => dcxTrailerNuevo(pl, datos), 'Tráiler añadido');
+      csEditar(pl => dcxTrailerNuevo(pl, datos), 'Tráiler añadido: ' + titulo);
     };
     else if(que === 'trCampo') el.onchange = () => {
       const tid = id(at('id')), campo = at('campo'), valor = el.value;
-      csEditar(pl => dcxTrailer(pl, tid, { [campo]: valor }), 'Tráiler guardado');
+      csEditar(pl => dcxTrailer(pl, tid, { [campo]: valor }), 'Tráiler: ' + (campo === 'status' ? 'estado' : 'entrega') + ' = ' + (valor || '—'));
     };
     else if(que === 'trBorrar') el.onclick = async () => {
       const tid = id(at('id'));
@@ -949,12 +1258,13 @@ function csCablear(vista){
         : true;
       if(ok) csEditar(pl => dcxTrailerBorrar(pl, tid), 'Tráiler borrado');
     };
+    else if(typeof csCablearMas === 'function') csCablearMas(el, que, v, at, id, a);
   });
 }
 
 /** Actualizar: si DublajeCast está abierto con sesión, ya es en vivo; si no, se trae con la sesión del puente. */
 async function csActualizar(){
-  if(dcastDatos().vivo){ csRepintar(); castAviso('Al día: son los datos de DublajeCast en vivo'); return 'vivo'; }
+  if(csDatos().vivo){ csRepintar(); castAviso('Al día: son los datos de DublajeCast en vivo'); return 'vivo'; }
   let u = null;
   try{ u = (typeof dcSesion === 'function') ? await dcSesion() : null; }catch(e){ u = null; }
   if(!u){ castAviso('Para actualizar, entra en tu cuenta de DublajeCast: se abre aquí mismo'); dcastAbrir('dashboard'); return 'sesion'; }

@@ -187,7 +187,7 @@ exports.pruebas = async function(t){
   t.ok('3. en el episodio, «Realizar casting» abre el capítulo con el perfil Casting', /data-cs="realizar"/.test(CV) && /ponerModo\(e\.ep\.id, 'casting'\);[\s\S]{0,160}await openEpisode\(e\.ep\.id\);/.test(CV));
   t.ok('y la tabla vieja de capítulos ya no pinta su casting aparte', !/dcastPintarCastings/.test(HTML));
   const PROD_JS = fs.readFileSync(path.join(RAIZ, 'js', 'produccion.js'), 'utf8');
-  t.ok('cambiar de perfil pone o quita las secciones', /const nav = document\.getElementById\('csNav'\);\s+if\(!!nav !== prodPuede\(\) && typeof csRepintar === 'function'\) csRepintar\(\);/.test(PROD_JS));
+  t.ok('cambiar de perfil, o saber el rol después de pintar, repinta la biblioteca', /const activo = \(typeof csActivo === 'function'\) && csActivo\(\);\s+const clave = activo \+ '\|' \+ prodPuede\(\);\s+const nav = document\.getElementById\('csNav'\);\s+if\(typeof csRepintar === 'function' && \(!!nav !== activo \|\| \(prodPintarBoton\.clave !== undefined && prodPintarBoton\.clave !== clave\)\)\) csRepintar\(\);\s+prodPintarBoton\.clave = clave;/.test(PROD_JS));
   const COPIA = fs.readFileSync(path.join(RAIZ, 'dublajecast', 'index.html'), 'utf8');
   t.ok('DublajeCast se deja llevar a una pantalla y enseña sus datos', /window\.__dcNav=\(v,sid,eid\)=>\{if\(sid!=null\)store\.setSelSeriesId\(sid\);if\(eid!==undefined&&store\.setSelEpId\)store\.setSelEpId\(eid\);store\.navTo\(v\);\};window\.__dcDatos=\(\)=>__dbDatos\.current;/.test(COPIA)
        && /window\.dubbiptPedir\("listo"\)/.test(COPIA));

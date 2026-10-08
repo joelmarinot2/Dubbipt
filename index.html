@@ -1777,6 +1777,27 @@ body.ep-open #csNav, body.ep-open #csVista{ display:none !important; }
 .cs-tal-campos label{ display:flex; flex-direction:column; gap:4px; font-size:11px; color:#8b8f97; }
 .cs-linea select, .cs-linea input{ padding:4px 6px; font-size:12px; }
 .cs-b-icono{ padding:6px 8px; }
+/* Nombres, el cambiador de talento y quién cambió qué */
+.cs-cambiador{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#101215; border:1px solid #23262b; border-radius:12px; padding:10px 12px; margin-bottom:12px; font-size:12.5px; }
+.cs-cambiador-t{ display:inline-flex; align-items:center; gap:7px; font-weight:700; color:#f2f3f5; margin-right:4px; }
+.cs-cambiador select{ background:#0d0f12; border:1px solid #2b2f36; color:#f2f3f5; border-radius:8px; padding:6px 8px; font-family:'Inter',sans-serif; font-size:12.5px; }
+.cs-cambiador .cs-tal-in{ max-width:220px; }
+.cs-ep-ficha input[type=text]{ width:100%; box-sizing:border-box; }
+.cs-caja-hist{ margin-top:16px; }
+.cs-hist{ display:flex; flex-direction:column; gap:2px; max-height:360px; overflow:auto; }
+.cs-hist-f{ display:grid; grid-template-columns:112px minmax(90px,150px) 1fr; gap:10px; font-size:12px; padding:5px 6px; border-radius:6px; }
+.cs-hist-f:nth-child(odd){ background:rgba(255,255,255,.025); }
+.cs-hist-f b{ color:#d7dae0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+@media (max-width:640px){ .cs-hist-f{ grid-template-columns:1fr; gap:2px; } }
+/* Para revisar: capítulos repetidos y personajes con dos talentos */
+.cs-revisar{ background:#101215; border:1px solid rgba(245,158,11,.35); border-radius:13px; padding:12px 14px; margin-bottom:12px; display:flex; flex-direction:column; gap:8px; }
+.cs-revisar .cs-caja-t{ color:#FCD34D; margin-bottom:2px; }
+.cs-rev{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:space-between; font-size:12.5px; color:#d7dae0; padding:8px 0; border-top:1px solid rgba(255,255,255,.05); }
+.cs-rev-abierto{ flex-direction:column; align-items:stretch; gap:8px; }
+.cs-rev-preg{ color:#FCD34D; font-weight:600; }
+.cs-rev-op{ display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+.cs-rev-op label{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
+.cs-rev-btns{ display:inline-flex; gap:6px; flex-wrap:wrap; }
 @media (max-width:860px){
   body.cs-on:not(.ep-open) #lib{ display:block; padding:12px; }
   .cs-nav{ flex-direction:row; overflow-x:auto; position:static; margin-bottom:14px; padding:6px; scrollbar-width:none; }
@@ -2554,7 +2575,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.32.0-nube';
+const APP_VER_NUM = 'v11.33.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);

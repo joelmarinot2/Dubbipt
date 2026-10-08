@@ -63,9 +63,13 @@ const PROD_SIN_PERMISO = 'Producción es solo para el administrador, en el perfi
 function prodPintarBoton(){
   const b = document.getElementById('btnProduccion');
   if(b) b.style.display = prodPuede() ? '' : 'none';
-  /* La organización de DublajeCast en la biblioteca se pone o se quita con el perfil. */
+  /* La organización de DublajeCast en la biblioteca se pone o se quita con el
+     perfil, y cambia con el rol (el del administrador llega después de pintar). */
+  const activo = (typeof csActivo === 'function') && csActivo();
+  const clave = activo + '|' + prodPuede();
   const nav = document.getElementById('csNav');
-  if(!!nav !== prodPuede() && typeof csRepintar === 'function') csRepintar();
+  if(typeof csRepintar === 'function' && (!!nav !== activo || (prodPintarBoton.clave !== undefined && prodPintarBoton.clave !== clave))) csRepintar();
+  prodPintarBoton.clave = clave;
 }
 
 /** Un volcado vacío, con todas las listas. */

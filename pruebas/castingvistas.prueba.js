@@ -115,7 +115,11 @@ function armar(o){
       ponerModo: (ep, m) => diario.push('ponerModo ' + ep + ' ' + m), openEpisode: async (id) => diario.push('openEpisode ' + id),
       newEpisodeModal: () => { body.appendChild(Object.assign(new El('input'), { id: 'neName', value: '' })); diario.push('newEpisodeModal ' + LDB.showId); },
       renderLibrary: () => diario.push('renderLibrary'), newShow: async () => { body.appendChild(Object.assign(new El('input'), { id: 'npName', value: '', focus: () => {} })); diario.push('newShow'); },
-      esc: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), fallo: (d) => diario.push('fallo ' + d), _svgI: undefined });
+      esc: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), fallo: (d) => diario.push('fallo ' + d), _svgI: undefined,
+      currentEp: o.epAbierto ? { id: 'e1' } : null,
+      DDL_MODO: ('modo' in o) ? o.modo : 'casting', herramientasPanel: () => diario.push('herramientasPanel'),
+      dcxHistorial: () => (PROD.datos && PROD.datos.historialDubbipt) || [], dcxEntrada: (que, ctx) => Object.assign({ cuando: '2026-10-08T10:00:00Z', quien: 'Pamela', que: que }, ctx || {}),
+      dcxRegistrar: (e) => diario.push('apunta ' + e.que), dcxRelevosAceptados: () => [] });
   return { M, diario, avisos, doc, body, PROD, LDB };
 }
 
@@ -261,7 +265,7 @@ exports.pruebas = async function(t){
     t.eq('Casting: el episodio', A.M.CS.vista + ' ' + /<h2>Ep\. 1 · Episodio 1<\/h2>/.test(vista(A)), 'episodio true');
     t.ok('el principal, marcado con su estrella', /<i class="cs-prin" title="Principal">[\s\S]*?<\/i>ALLY<\/b>/.test(vista(A)) && !/<\/i>JANA<\/b>/.test(vista(A)));
     t.ok('con el botón «Realizar casting»', /<button class="cs-cta" data-cs="realizar">[\s\S]*?<span>Realizar casting<\/span><\/button>/.test(vista(A)));
-    t.ok('su ficha de DublajeCast y su tabla de casting', /<span>Fase<\/span><select data-cs="epCampo" data-campo="fase">[\s\S]*?<option value="pre_produccion" selected>Preproducción<\/option>/.test(vista(A)) && /<span>Alertas<\/span>/.test(vista(A)) && /2 de 3 personajes con talento/.test(vista(A)) && /<div class="cs-fila cs-falta"><span><b>TITO BOY<\/b><\/span><span class="cs-tenue">12<\/span><span><input class="cs-tal-in" list="csListaTalentos" data-cs="talento" data-ep="11" data-ch="103" value="" placeholder="Asignar…">/.test(vista(A)));
+    t.ok('su ficha de DublajeCast y su tabla de casting', /<span>Fase<\/span><select data-cs="epCampo" data-campo="fase">[\s\S]*?<option value="pre_produccion" selected>Preproducción<\/option>/.test(vista(A)) && /<span>Alertas<\/span>/.test(vista(A)) && /2 de 3 personajes con talento/.test(vista(A)) && /<div class="cs-fila cs-falta"><span><b>TITO BOY<\/b><\/span><span class="cs-tenue">12<\/span><span><input class="cs-tal-in" list="csListaTalentos" data-cs="talento" data-ep="11" data-ch="103" data-per="TITO BOY" data-antes="" value="" placeholder="Asignar…">/.test(vista(A)));
     control(A, 'orden', 'personaje').onclick(); A.M.csPintar('shows', b.cab, b.grid);
     t.ok('la tabla, por personaje si se pide', vista(A).indexOf('>ALLY<') < vista(A).indexOf('>JANA<') && vista(A).indexOf('>JANA<') < vista(A).indexOf('>TITO BOY<') && /class="cs-pest on" data-cs="orden" data-v="personaje"/.test(vista(A)));
     A.LDB.showId = 'otro';
@@ -313,7 +317,23 @@ exports.pruebas = async function(t){
     const b = biblioteca(N.doc);
     const nav = new El('nav'); nav.id = 'csNav'; b.lib.insertBefore(nav, b.cab);
     const vi = new El('div'); vi.id = 'csVista'; b.lib.appendChild(vi);
-    t.eq('quien no es administrador en Casting: nada de esto, y la biblioteca de siempre', N.M.csPintar('shows', b.cab, b.grid) + ' ' + N.doc.getElementById('csNav') + ' ' + N.doc.getElementById('csVista') + ' ' + N.body.classList.contains('cs-on'), 'false null null false');
+    N.M.CS.vista = 'dashboard';
+    t.eq('quien no es administrador, en Casting: la misma organización, sin la interfaz antigua', N.M.csPintar('shows', b.cab, b.grid) + ' ' + N.body.classList.contains('cs-on') + ' ' + N.M.CS.vista, 'true true programas');
+    t.ok('pero solo con Programas: nada de lo que viene de DublajeCast', (N.doc.getElementById('csNav').innerHTML.match(/class="cs-nav-b/g) || []).length === 1 && /data-v="programas"/.test(N.doc.getElementById('csNav').innerHTML)
+      && /data-v="s:s1"/.test(N.doc.getElementById('csVista').innerHTML) && !/Akka|dc:2|importarTodo/.test(N.doc.getElementById('csVista').innerHTML));
+    t.eq('y no puede ir a las demás secciones', N.M.csIr('talentos'), false);
+    N.M.CS.vista = 'programa'; N.M.CS.prog = 's:s1'; N.M.csPintar('shows', b.cab, b.grid);
+    t.ok('ni ve los cambios hechos en DublajeCast', !/data-v="historial"|Cambios de este/.test(N.doc.getElementById('csVista').innerHTML) && /<h2>A FILIPINO CHRISTMAS<\/h2>/.test(N.doc.getElementById('csVista').innerHTML));
+    N.M.CS.vista = 'programas'; N.M.CS.prog = null; N.M.csPintar('shows', b.cab, b.grid);
+    N.doc.getElementById('csVista').querySelectorAll('[data-cs]').find(c => c.getAttribute('data-cs') === 'herramientas').onclick();
+    t.ok('con las Herramientas a mano, como antes', N.diario.includes('herramientasPanel'));
+  }
+  {
+    const Q = armar({ modo: 'qc' });
+    const b = biblioteca(Q.doc);
+    const nav = new El('nav'); nav.id = 'csNav'; b.lib.insertBefore(nav, b.cab);
+    const vi = new El('div'); vi.id = 'csVista'; b.lib.appendChild(vi);
+    t.eq('en otro perfil: nada de esto, y la biblioteca de siempre', Q.M.csPintar('shows', b.cab, b.grid) + ' ' + Q.doc.getElementById('csNav') + ' ' + Q.doc.getElementById('csVista') + ' ' + Q.body.classList.contains('cs-on'), 'false null null false');
   }
   {
     const A = armar();
