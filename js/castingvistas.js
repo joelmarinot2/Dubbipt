@@ -36,7 +36,7 @@
 
 const CS = { vista: 'programas', buscar: '', soloAlertas: false, programa: '',
              prog: null, ep: null, filtro: 'en_curso', buscarProg: '', orden: 'lineas', registros: {},
-             tab: 'episodios', buscarCast: '', ordenCast: 'episodio', fusion: null, elegidos: {}, copias: [] };
+             tab: 'episodios', buscarCast: '', ordenCast: 'episodio', fusion: null, elegidos: {}, copias: [], fusionProg: null };
 
 /* Iconos de trazo, como los de Dubbipt (ICO). Ningún emoji. */
 const CS_ICO = {
@@ -62,7 +62,8 @@ const CS_ICO = {
   bajar:      '<path d="M12 4v12"/><path d="M7 11l5 5 5-5"/><path d="M4 20h16"/>',
   traer:      '<path d="M7 7h11l-3-3"/><path d="M17 17H6l3 3"/>',
   buscar:     '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
-  izquierda:  '<path d="M15 6l-6 6 6 6"/>'
+  izquierda:  '<path d="M15 6l-6 6 6 6"/>',
+  fusionar:   '<path d="M7 4v5c0 3 2 5 5 5h5"/><path d="M7 20v-6"/><path d="M14 11l3 3-3 3"/>'
 };
 /** Un icono de trazo, en el mismo dibujo que los de Dubbipt. */
 function csIco(n, sz){
@@ -338,6 +339,173 @@ function csHtmlCopias(copias){
       + '<button class="cs-b cs-pri" data-cs="devolver" data-v="' + csEsc(c.id) + '">Devolver a DublajeCast</button>'
       + '<button class="cs-b" data-cs="bajarCopia" data-v="' + csEsc(c.id) + '">Descargar</button></div>').join('')
     + '</div>';
+}
+
+/* ── Fusionar programas ─────────────────────────────────────────────────
+   Pedido de sala: «que se puedan fusionar programas como estos» (ALWAYS y
+   ALWAYS ON CALL). Uno se queda, con su nombre; el otro pasa dentro:
+     · en Dubbipt, sus capítulos se mueven al que se queda con sus libretos
+       (los archivos van por carpeta de programa), el registro de casting
+       se junta -donde dicen otro talento, manda el del que se queda- y el
+       programa vacío se borra;
+     · en DublajeCast, todo lo suyo pasa al que se queda y él va a la
+       papelera (dcxFusionarSeries);
+     · si el que se queda no está en un lado, el otro se renombra allí para
+       que casen por el nombre.
+   Primero DublajeCast: sin sesión no se toca nada en ningún lado. */
+
+/** Los programas que parecen el mismo: el nombre de uno es el principio del otro, palabra a palabra. */
+function csParecidos(lista){
+  const out = [], pal = (p) => castNorm(p.nombre).split(' ').filter(Boolean);
+  for(let i = 0; i < lista.length; i++) for(let j = i + 1; j < lista.length; j++){
+    const a = pal(lista[i]), b = pal(lista[j]);
+    if(!a.length || !b.length) continue;
+    const corto = a.length <= b.length ? a : b, largo = a.length <= b.length ? b : a;
+    if(corto.every((w, k) => largo[k] === w)) out.push([lista[i], lista[j]]);
+  }
+  return out;
+}
+
+/** De dos parecidos, cuál se queda: el que está en los dos lados; si no, el de nombre más largo. */
+function csQuedaDe(a, b){
+  const peso = (p) => (p.show ? 1 : 0) + (p.serie ? 1 : 0);
+  if(peso(a) !== peso(b)) return peso(a) > peso(b) ? a : b;
+  return String(b.nombre).length > String(a.nombre).length ? b : a;
+}
+
+function csHtmlParecidos(lista){
+  const pares = csParecidos(lista);
+  if(!pares.length) return '';
+  return '<div class="cs-caja cs-caja-hist"><div class="cs-caja-t">' + csIco('fusionar', 14) + 'Programas que parecen el mismo</div>'
+    + pares.map(([x, y]) => { const a = csQuedaDe(x, y), b = a === x ? y : x;
+        return '<div class="cs-linea"><span class="cs-linea-t"><b>' + csEsc(b.nombre) + '</b> y <b>' + csEsc(a.nombre) + '</b></span>'
+          + '<button class="cs-b" data-cs="fusionPar" data-v="' + csEsc(a.clave + '|' + b.clave) + '">' + csIco('fusionar', 14) + '<span>Fusionar</span></button></div>'; }).join('')
+    + '</div>';
+}
+
+/** Lo que va a pasar al fusionar `b` en `a`, en frases. */
+function csPlanFusion(a, b){
+  const pasos = [];
+  if(!a || !b || a.clave === b.clave) return pasos;
+  const cap = (n) => n + ' capítulo' + (n === 1 ? '' : 's');
+  if(b.show && a.show) pasos.push('En Dubbipt, ' + cap(b.eps.length) + ' de «' + b.nombre + '» pasan a «' + a.nombre + '» con sus libretos, su registro de casting se junta y «' + b.nombre + '» se borra.');
+  else if(b.show) pasos.push('En Dubbipt, «' + b.nombre + '» pasa a llamarse «' + a.nombre + '».');
+  if(b.serie && a.serie) pasos.push('En DublajeCast, ' + cap(b.dcEps.length) + ', tráilers y producción de «' + b.nombre + '» pasan a «' + a.nombre + '», y «' + b.nombre + '» va a la papelera de DublajeCast.');
+  else if(b.serie) pasos.push('En DublajeCast, «' + b.nombre + '» pasa a llamarse «' + a.nombre + '».');
+  return pasos;
+}
+
+function csHtmlFusionProg(p, lista){
+  const f = CS.fusionProg;
+  if(!f || f.de !== p.clave) return '';
+  const cerca = new Set(csParecidos(lista).filter(par => par[0].clave === p.clave || par[1].clave === p.clave).map(par => (par[0].clave === p.clave ? par[1] : par[0]).clave));
+  const otros = lista.filter(x => x.clave !== p.clave).sort((x, y) => (cerca.has(y.clave) ? 1 : 0) - (cerca.has(x.clave) ? 1 : 0));
+  const o = otros.find(x => x.clave === f.otro) || null;
+  const a = o && f.queda === 'otro' ? o : p, b = o ? (a === p ? o : p) : null;
+  const pasos = o ? csPlanFusion(a, b) : [];
+  return '<div class="cs-caja cs-fusion-prog"><div class="cs-caja-t">' + csIco('fusionar', 14) + 'Fusionar con otro programa</div>'
+    + '<label class="cs-fusion-con">Con <select data-cs="fusionOtro"><option value="">Elige el programa…</option>'
+    +   otros.map(x => '<option value="' + csEsc(x.clave) + '"' + (x.clave === f.otro ? ' selected' : '') + '>' + csEsc(x.nombre) + (cerca.has(x.clave) ? ' · parece el mismo' : '') + '</option>').join('') + '</select></label>'
+    + (o ? '<div class="cs-fusion-queda">Se queda: '
+        + '<label><input type="radio" name="csQueda" data-cs="fusionQueda" value="este"' + (a === p ? ' checked' : '') + '> ' + csEsc(p.nombre) + '</label>'
+        + '<label><input type="radio" name="csQueda" data-cs="fusionQueda" value="otro"' + (a === o ? ' checked' : '') + '> ' + csEsc(o.nombre) + '</label></div>'
+        + '<ul class="cs-fusion-plan">' + pasos.map(t => '<li>' + csEsc(t) + '</li>').join('') + '</ul>' : '')
+    + '<div class="cs-fusion-bots">' + (o && pasos.length ? '<button class="cs-b cs-pri" data-cs="fusionProgYa">' + csIco('fusionar', 14) + '<span>Fusionar</span></button>' : '')
+    +   '<button class="cs-b" data-cs="fusionProgNo">Cancelar</button></div>'
+    + '</div>';
+}
+
+/**
+ * Mueve los capítulos de Dubbipt de un programa a otro: sus archivos de
+ * carpeta en carpeta y luego la fila. Si la fila no se deja, los archivos
+ * vuelven. Se para en el primero que falle. Devuelve `{ movidos, total, fallo }`.
+ */
+async function csMoverEpisodiosDub(de, a){
+  const eps = (typeof sbEps === 'function') ? sbEps(de.id) : [];
+  let movidos = 0;
+  for(const ep of eps){
+    const viejo = de.id + '/' + ep.id + '/', nuevo = a.id + '/' + ep.id + '/';
+    const hechos = [];
+    try{
+      const ls = await sb.storage.from('libretos').list(de.id + '/' + ep.id);
+      if(ls && ls.error) throw ls.error;
+      for(const f of ((ls && ls.data) || [])){
+        const r = await sb.storage.from('libretos').move(viejo + f.name, nuevo + f.name);
+        if(r && r.error) throw r.error;
+        hechos.push(f.name);
+      }
+      const cambio = { show_id: a.id };
+      for(const k of ['xls_path', 'pdf_path', 'json_path']) if(typeof ep[k] === 'string' && ep[k].indexOf(viejo) === 0) cambio[k] = nuevo + ep[k].slice(viejo.length);
+      const { error } = await sb.from('episodes').update(cambio).eq('id', ep.id);
+      if(error) throw error;
+      movidos++;
+    }catch(e){
+      for(const n of hechos){ try{ await sb.storage.from('libretos').move(nuevo + n, viejo + n); }catch(x){ /* se queda donde llegó */ } }
+      return { movidos: movidos, total: eps.length, fallo: (ep.name || ep.id) + ': ' + ((e && e.message) || e) };
+    }
+  }
+  return { movidos: movidos, total: eps.length, fallo: '' };
+}
+
+/** Junta el registro de casting de un programa en el de otro. Donde dicen otro talento, manda el que se queda. */
+async function csJuntarRegistro(deId, aId){
+  const de = await castRegCargar(deId), a = await castRegCargar(aId);
+  a.personajes = a.personajes || {};
+  let nuevos = 0, choques = 0;
+  const sus = (de && de.personajes) || {};
+  for(const k of Object.keys(sus)){
+    const x = sus[k], y = a.personajes[k];
+    if(!y){ a.personajes[k] = x; nuevos++; continue; }
+    if(y.talent && x.talent && castNorm(y.talent) !== castNorm(x.talent)){ choques++; continue; }
+    const eps = (Array.isArray(y.episodios) ? y.episodios : []).slice();
+    for(const e of (Array.isArray(x.episodios) ? x.episodios : [])) if(eps.indexOf(e) < 0) eps.push(e);
+    a.personajes[k] = Object.assign({}, y, { talent: y.talent || x.talent, episodios: eps });
+  }
+  await castRegGuardar(aId, a);
+  delete CS.registros[String(aId)]; delete CS.registros[String(deId)];
+  return { nuevos: nuevos, choques: choques };
+}
+
+/** Fusiona `b` en `a`, preguntando antes. */
+async function csFusionarProgramas(a, b){
+  const pasos = csPlanFusion(a, b);
+  if(!pasos.length) return 'nada';
+  const ok = (typeof DDL_UI !== 'undefined' && DDL_UI.confirmModal)
+    ? await DDL_UI.confirmModal({ title: 'Fusionar programas', body: 'Se queda «' + a.nombre + '». ' + pasos.join(' ') + ' Los capítulos con el mismo número quedarán repetidos: se fusionan después en «Para revisar».', confirmLabel: 'Fusionar', cancelLabel: 'Cancelar' })
+    : true;
+  if(!ok) return 'cancelado';
+  const ctx = csContexto(a, null);
+  if(b.serie){
+    const r = await csEditar(pl => a.serie ? dcxFusionarSeries(pl, a.serie.id, b.serie.id) : dcxSerie(pl, b.serie.id, { name: a.nombre }), null, ctx);
+    if(r !== 'guardado' && r !== 'igual') return r;
+  }
+  let extra = '';
+  if(b.show){
+    if(a.show){
+      const m = await csMoverEpisodiosDub(b.show, a.show);
+      if(m.fallo){
+        castAviso('No se pudo terminar la fusión: se movieron ' + m.movidos + ' de ' + m.total + ' capítulos (' + m.fallo + '). «' + b.nombre + '» no se borra: vuelve a fusionar para terminar.');
+        try{ await libFetchAll(); }catch(e){ /* se verá al recargar */ }
+        csRepintar();
+        return 'error';
+      }
+      const j = await csJuntarRegistro(b.show.id, a.show.id);
+      if(j.choques) extra = ' · ' + j.choques + ' personaje' + (j.choques === 1 ? '' : 's') + ' con otro talento en «' + b.nombre + '»: se queda el de «' + a.nombre + '»';
+      const { error } = await sb.from('shows').delete().eq('id', b.show.id);
+      if(error) extra += ' · «' + b.nombre + '» ya está vacío, pero no se pudo borrar: ' + error.message;
+    }else{
+      const { error } = await sb.from('shows').update({ name: a.nombre }).eq('id', b.show.id);
+      if(error){ castAviso('No se pudo renombrar «' + b.nombre + '» en Dubbipt: ' + error.message); return 'error'; }
+    }
+  }
+  const que = 'Fusionado «' + b.nombre + '» en «' + a.nombre + '»';
+  dcxRegistrar(dcxEntrada(que, ctx));
+  castAviso(que + extra);
+  CS.fusionProg = null; CS.vista = 'programa'; CS.tab = 'episodios'; CS.ep = null;
+  CS.prog = a.show ? 's:' + a.show.id : (b.show ? 's:' + b.show.id : a.clave);
+  try{ await libFetchAll(); }catch(e){ /* se verá al recargar */ }
+  csRepintar();
+  return 'hecho';
 }
 
 function csHtmlTalentos(d, vivo){
@@ -826,6 +994,24 @@ function csCablearMas(el, que, v, at, id, a){
     if(!x.p || !x.p.serie) return;
     csEditar(pl => dcxReasignar(pl, x.p.serie.id, ch, null, nombre), (at('per') || 'Personaje') + ': ' + nombre + ' en todos sus episodios (tenía dos talentos)', csContexto(x.p, null));
   };
+  else if(que === 'fusionProg') el.onclick = () => { CS.fusionProg = (CS.fusionProg && CS.fusionProg.de === v) ? null : { de: v, otro: '', queda: 'este' }; csRepintar(); };
+  else if(que === 'fusionOtro') el.onchange = () => { if(CS.fusionProg){ CS.fusionProg.otro = el.value; CS.fusionProg.queda = 'este'; } csRepintar(); };
+  else if(que === 'fusionQueda') el.onchange = () => { if(CS.fusionProg) CS.fusionProg.queda = el.value; csRepintar(); };
+  else if(que === 'fusionProgNo') el.onclick = () => { CS.fusionProg = null; csRepintar(); };
+  else if(que === 'fusionPar') el.onclick = () => {
+    const [ka, kb] = String(v).split('|');
+    CS.vista = 'programa'; CS.prog = ka; CS.ep = null; CS.tab = 'episodios';
+    CS.fusionProg = { de: ka, otro: kb, queda: 'este' };
+    csRepintar();
+  };
+  else if(que === 'fusionProgYa') el.onclick = () => {
+    const x = a(), f = CS.fusionProg;
+    if(!x.p || !f) return;
+    const o = x.lista.find(y => y.clave === f.otro);
+    if(!o) return;
+    const queda = f.queda === 'otro' ? o : x.p, pasa = queda === o ? x.p : o;
+    csFusionarProgramas(queda, pasa).catch(err => fallo('csFusionarProgramas · js/castingvistas.js', err, 'los programas no se han podido fusionar'));
+  };
   else if(que === 'devolver') el.onclick = () => { csDevolverCopia(v).catch(err => fallo('csDevolverCopia · js/castingvistas.js', err, 'no se ha podido devolver')); };
   else if(que === 'bajarCopia') el.onclick = () => { csBajarCopia(v); };
   else if(que === 'aceptarRelevo') el.onclick = () => {
@@ -948,6 +1134,7 @@ function csHtmlProgramas(lista, vivo){
     + '<div class="cs-filtros"><label class="cs-buscar cs-buscar-prog">' + csIco('buscar', 14)
     +   '<input type="text" data-cs="buscarProg" placeholder="Buscar programa, cliente o director…" value="' + csEsc(CS.buscarProg) + '"></label>'
     +   '<div class="cs-pests">' + pest('todos', 'Todos') + pest('en_curso', 'En curso') + pest('completo', 'Completados') + '</div></div>'
+    + (CS.buscarProg ? '' : csHtmlParecidos(lista))
     + (vistos.length ? '<div class="cs-progs">' + vistos.map(p => {
         const n = csEpisodios(p).length;
         return '<div class="cs-prog' + (p.estado === 'completo' ? ' cs-prog-hecho' : '') + '">'
@@ -1001,7 +1188,9 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
     +   (p.show ? '<button class="cs-b cs-pri" data-cs="nuevoEp">' + csIco('mas', 14) + '<span>Nuevo episodio</span></button>'
                 : '<button class="cs-b cs-pri" data-cs="crearProg">' + csIco('mas', 14) + '<span>Crear en Dubbipt</span></button>')
     +   (p.serie ? '<button class="cs-b" data-cs="dcSerie">' + csIco('externo', 14) + '<span>En DublajeCast</span></button>' : '')
+    +   '<button class="cs-b" data-cs="fusionProg" data-v="' + csEsc(p.clave) + '" title="Juntar este programa con otro que es el mismo">' + csIco('fusionar', 14) + '<span>Fusionar</span></button>'
     + '</div></div>'
+    + csHtmlFusionProg(p, csActual().lista)
     + '<div class="cs-prog-datos">'
     +   '<label>Nombre <input type="text" data-cs="progNombre" value="' + csEsc(p.nombre) + '" title="' + (p.show && p.serie ? 'Cambia en Dubbipt y en DublajeCast a la vez' : '') + '"></label>'
     +   (p.serie

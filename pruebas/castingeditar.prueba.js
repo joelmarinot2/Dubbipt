@@ -38,7 +38,7 @@ const DC = montar([['function castNorm(t){', 'async function castRegCargar(showI
   ['dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting'],
   { castNorm: undefined, prodCasarPrograma: PR.prodCasarPrograma, prodIndices: PR.prodIndices, window: { addEventListener: () => {} }, document: {}, location: { origin: '' } });
 const DX = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ EDITAR DUBLAJECAST DESDE DUBBIPT', '/* ═══ FIN DE EDITAR DUBLAJECAST DESDE DUBBIPT']],
-  ['dcxNombreTalento', 'dcxAsignar', 'dcxReasignar', 'dcxEpisodio', 'dcxSerie', 'dcxPersonaje', 'dcxTalento', 'dcxTalentoNuevo', 'dcxTrailerNuevo', 'dcxTrailer', 'dcxTrailerBorrar', 'dcxCambiarTalento', 'dcxConflictosFusion', 'dcxFusionarEpisodios'],
+  ['dcxNombreTalento', 'dcxAsignar', 'dcxReasignar', 'dcxEpisodio', 'dcxSerie', 'dcxPersonaje', 'dcxTalento', 'dcxTalentoNuevo', 'dcxTrailerNuevo', 'dcxTrailer', 'dcxTrailerBorrar', 'dcxCambiarTalento', 'dcxConflictosFusion', 'dcxFusionarEpisodios', 'dcxFusionarSeries'],
   { castNorm: undefined, dcSesion: null, dcLeer: null, dcEscribir: null, prodNormalizar: null, prodGuardar: null, PROD: {} });
 
 /* Lo justo del navegador: controles con sus atributos, sacados del HTML escrito. */
@@ -77,21 +77,26 @@ function armar(o){
     upsert: async (filas) => { sbInsertados.push([tabla + '*', filas]); return { error: null }; },
     delete: () => ({ eq: async (k, v) => { borrados.push(tabla + ':' + v); return { error: null }; } }),
     update: (cambios) => ({ eq: async (k, v) => { sbInsertados.push([tabla + '~', cambios, v]); return { error: o.fallaUpdate ? { message: 'sin permiso' } : null }; } })
-  }) };
+  }), storage: { from: () => ({
+    list: async (ruta) => ({ data: (archivos[ruta] || []).map(n => ({ name: n })), error: null }),
+    move: async (de, a) => { if(o.fallaMover && a.indexOf(o.fallaMover) >= 0) return { error: { message: 'sin permiso para mover' } }; movidos.push(de + ' > ' + a); return { error: null }; }
+  }) } };
+  const archivos = o.archivos || {}, movidos = [], regGuardados = {};
   const H = [], RELEVOS = [];
   const borrados = [];
   const COPIAS = o.copias || [], bajados = [];
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
     ['CS', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
-     'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS', 'csAsegurarDatos', 'csDevolverCopia', 'csBajarCopia', 'CS_TRAER'],
+     'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS', 'csAsegurarDatos', 'csDevolverCopia', 'csBajarCopia', 'CS_TRAER',
+     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro'],
     { castNorm: (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim(),
       document: { getElementById: (id) => campos[id] || null, querySelector: () => null, body: { classList: { contains: () => false, toggle: () => {}, remove: () => {} } } },
       prodPuede: () => true, PROD: PROD, PROD_ET: PR.PROD_ET, prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard,
       prodFichaTexto: PR.prodFichaTexto, prodCasarPrograma: PR.prodCasarPrograma, prodPanel: () => {}, prodVista: '',
       dcastDatos: () => ({ datos: PROD.datos, vivo: false }), dcastAbrir: (v) => diario.push('dcastAbrir ' + v),
       dcastSerieDe: DC.dcastSerieDe, dcastEpDeDc: DC.dcastEpDeDc, dcastFilasCasting: DC.dcastFilasCasting,
-      sbShows: () => SHOWS, sbEps: (id) => EPS_DUB[id] || [], LDB: LDB, libView: 'shows',
-      castRegCargar: async () => ({ personajes: {} }), castAviso: (t) => avisos.push(t), renderLibrary: () => diario.push('renderLibrary'),
+      sbShows: () => o.shows || SHOWS, sbEps: (id) => (o.eps || EPS_DUB)[id] || [], LDB: LDB, libView: 'shows',
+      castRegCargar: async (id) => JSON.parse(JSON.stringify((o.registros || {})[id] || { personajes: {} })), castRegGuardar: async (id, r) => { regGuardados[id] = r; return true; }, castAviso: (t) => avisos.push(t), renderLibrary: () => diario.push('renderLibrary'),
       ponerModo: () => {}, openEpisode: async () => {}, newShow: async () => {}, newEpisodeModal: () => {},
       esc: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), fallo: (d) => diario.push('fallo ' + d), _svgI: undefined,
       dcxGuardar: async (cambio, entrada) => {
@@ -102,7 +107,7 @@ function armar(o){
         diario.push('guarda ' + !!hubo); return { cambiado: !!hubo };
       },
       dcxNombreTalento: DX.dcxNombreTalento, dcxAsignar: DX.dcxAsignar, dcxReasignar: DX.dcxReasignar, dcxEpisodio: DX.dcxEpisodio, dcxSerie: DX.dcxSerie, dcxPersonaje: DX.dcxPersonaje,
-      dcxTalento: DX.dcxTalento, dcxTalentoNuevo: DX.dcxTalentoNuevo, dcxTrailerNuevo: DX.dcxTrailerNuevo, dcxTrailer: DX.dcxTrailer, dcxTrailerBorrar: DX.dcxTrailerBorrar, dcxCambiarTalento: DX.dcxCambiarTalento, dcxConflictosFusion: DX.dcxConflictosFusion, dcxFusionarEpisodios: DX.dcxFusionarEpisodios,
+      dcxTalento: DX.dcxTalento, dcxTalentoNuevo: DX.dcxTalentoNuevo, dcxTrailerNuevo: DX.dcxTrailerNuevo, dcxTrailer: DX.dcxTrailer, dcxTrailerBorrar: DX.dcxTrailerBorrar, dcxCambiarTalento: DX.dcxCambiarTalento, dcxConflictosFusion: DX.dcxConflictosFusion, dcxFusionarEpisodios: DX.dcxFusionarEpisodios, dcxFusionarSeries: DX.dcxFusionarSeries,
       dcxRelevosAceptados: () => RELEVOS, dcxAceptarRelevo: (k) => { if(RELEVOS.includes(k)) return false; RELEVOS.push(k); return true; },
       dcxHistorial: () => H, dcxEntrada: (que, ctx) => Object.assign({ cuando: '2026-10-08T10:05:00Z', quien: 'Pamela', que: que }, ctx || {}), dcxRegistrar: (e) => { H.unshift(e); return true; },
       DDL_MODO: 'casting', currentEp: null, herramientasPanel: () => {},
@@ -115,7 +120,7 @@ function armar(o){
       prodSincronizar: async () => { diario.push('prodSincronizar'); if(o.alSincronizar) o.alSincronizar(COPIAS); return !!o.trae; },
       prodCopias: async () => COPIAS.slice(), prodCopiaDevuelta: async (id, n) => { const c = COPIAS.find(x => String(x.id) === String(id)); if(c){ c.devuelta = 1; c.devueltos = n; } return !!c; },
       ioDescargar: (nombre, texto, tipo) => bajados.push([nombre, texto, tipo]) });
-  return { M, diario, avisos, PROD, LDB, campos, sbInsertados, H, RELEVOS, borrados, nube: () => P, COPIAS, bajados };
+  return { M, diario, avisos, PROD, LDB, campos, sbInsertados, H, RELEVOS, borrados, nube: () => P, COPIAS, bajados, movidos, regGuardados };
 }
 
 /** Los controles de una vista, ya enganchados. */
@@ -459,5 +464,87 @@ exports.pruebas = async function(t){
     D.M.CS.copias = D.COPIAS.slice();
     t.eq('sin sesión de DublajeCast, la copia sigue para luego', await D.M.csDevolverCopia(77) + ' ' + !D.COPIAS[0].devuelta, 'sesion true');
     t.eq('una copia que no existe', await D.M.csDevolverCopia(5), 'no hay');
+  }
+
+  t.seccion('9 · fusionar programas');
+  const ALW = [{ id: 'sA', name: 'ALWAYS' }, { id: 'sC', name: 'ALWAYS ON CALL' }, { id: 's1', name: 'A FILIPINO CHRISTMAS' }];
+  const ALW_EPS = { sA: [{ id: 'eA1', show_id: 'sA', name: 'Episodio 1', xls_path: 'sA/eA1/desglose.xlsm', pdf_path: 'sA/eA1/libreto.pdf', json_path: 'otra/ruta.json' }, { id: 'eA2', show_id: 'sA', name: 'Episodio 2' }],
+                    sC: [{ id: 'eC1', show_id: 'sC', name: 'Episodio 1' }], s1: EPS_DUB.s1 };
+  const ALW_ARCH = { 'sA/eA1': ['desglose.xlsm', 'libreto.pdf'], 'sA/eA2': ['libreto.pdf'] };
+  const ALW_REG = { sA: { personajes: { ANA: { display: 'Ana', talent: 'LUZ MAR', episodios: ['Episodio 1'] }, LEO: { display: 'Leo', talent: 'PEPE', episodios: ['Episodio 2'] }, TOM: { display: 'Tom', talent: 'RAUL', episodios: ['Episodio 2'] } } },
+                   sC: { personajes: { ANA: { display: 'Ana', talent: 'LUZ MAR', episodios: ['Episodio 3'] }, TOM: { display: 'Tom', talent: 'BETO', episodios: ['Episodio 1'] } } } };
+  {
+    const A = armar({ shows: ALW, eps: ALW_EPS });
+    const lista = A.M.csActual().lista;
+    const pares = A.M.csParecidos(lista);
+    t.eq('parecen el mismo cuando un nombre es el principio del otro, palabra a palabra', pares.map(x => x.map(y => y.nombre).join(' ~ ')).join(' | '), 'ALWAYS ~ ALWAYS ON CALL');
+    t.eq('«A» no es el principio de «A FILIPINO…» si no es una palabra entera, ni «Akka» de nada', A.M.csParecidos([{ nombre: 'ALWAY' }, { nombre: 'ALWAYS' }, { nombre: 'Akka' }]).length, 0);
+    const por = (n) => lista.find(x => x.nombre === n);
+    t.eq('se queda el que está en los dos lados; si no, el de nombre más largo', A.M.csQuedaDe(por('ALWAYS'), por('ALWAYS ON CALL')).nombre + ' · ' + A.M.csQuedaDe(por('A FILIPINO CHRISTMAS'), por('Akka')).nombre, 'ALWAYS ON CALL · A FILIPINO CHRISTMAS');
+    A.M.CS.vista = 'programas'; A.M.CS.filtro = 'todos';
+    let c = controles(A, 'programas');
+    t.ok('la lista de programas avisa de los que parecen el mismo', /Programas que parecen el mismo[\s\S]*?<b>ALWAYS<\/b> y <b>ALWAYS ON CALL<\/b>[\s\S]*?data-cs="fusionPar" data-v="s:sC\|s:sA"/.test(c.html));
+    c.de('fusionPar').onclick();
+    c = controles(A, 'programa');
+    t.ok('«Fusionar» abre el que se queda, con el otro elegido', A.M.CS.prog === 's:sC' && /Fusionar con otro programa[\s\S]*?<option value="s:sA" selected>ALWAYS · parece el mismo<\/option>/.test(c.html));
+    t.ok('y dice lo que va a pasar', /value="este" checked> ALWAYS ON CALL[\s\S]*?<li>En Dubbipt, 2 capítulos de «ALWAYS» pasan a «ALWAYS ON CALL» con sus libretos, su registro de casting se junta y «ALWAYS» se borra\.<\/li>/.test(c.html));
+    c.de('fusionQueda', { v: undefined }); const radio = c.de('fusionQueda'); radio.value = 'otro'; radio.onchange();
+    t.ok('se puede elegir que se quede el otro', /value="otro" checked> ALWAYS<\/label>[\s\S]*?«ALWAYS ON CALL» pasan a «ALWAYS»/.test(controles(A, 'programa').html));
+    controles(A, 'programa').de('fusionProgNo').onclick();
+    t.ok('Cancelar cierra la caja', A.M.CS.fusionProg === null && !/Fusionar con otro programa/.test(controles(A, 'programa').html));
+    controles(A, 'programa').de('fusionProg').onclick();
+    t.ok('el botón «Fusionar» del programa la abre, sin nada elegido', /Fusionar con otro programa/.test(controles(A, 'programa').html) && !/data-cs="fusionProgYa"/.test(controles(A, 'programa').html));
+  }
+  {
+    /* Dos de Dubbipt: los capítulos con sus archivos, el registro, y el vacío se borra. */
+    const A = armar({ shows: ALW, eps: ALW_EPS, archivos: ALW_ARCH, registros: ALW_REG });
+    const lista = A.M.csActual().lista, queda = lista.find(x => x.nombre === 'ALWAYS ON CALL'), pasa = lista.find(x => x.nombre === 'ALWAYS');
+    t.eq('fusionar: pregunta y lo hace', await A.M.csFusionarProgramas(queda, pasa), 'hecho');
+    t.ok('preguntó diciendo lo que pasa', A.diario.some(x => /^pregunta Fusionar programas · Se queda «ALWAYS ON CALL»\. En Dubbipt, 2 capítulos/.test(x)));
+    t.eq('los archivos, de carpeta en carpeta', A.movidos.join(', '), 'sA/eA1/desglose.xlsm > sC/eA1/desglose.xlsm, sA/eA1/libreto.pdf > sC/eA1/libreto.pdf, sA/eA2/libreto.pdf > sC/eA2/libreto.pdf');
+    t.eq('y la fila, con sus rutas nuevas (las que no son de la carpeta, igual)', JSON.stringify(A.sbInsertados.filter(x => x[0] === 'episodes~').map(x => [x[2], x[1]])),
+         '[["eA1",{"show_id":"sC","xls_path":"sC/eA1/desglose.xlsm","pdf_path":"sC/eA1/libreto.pdf"}],["eA2",{"show_id":"sC"}]]');
+    const reg = A.regGuardados.sC.personajes;
+    t.eq('el registro se junta: lo nuevo entra, lo igual suma capítulos, lo distinto se queda como estaba', [reg.ANA.episodios.join('+'), reg.LEO.talent, reg.TOM.talent].join(' · '), 'Episodio 3+Episodio 1 · PEPE · BETO');
+    t.eq('el vacío se borra, y queda apuntado', A.borrados.join(',') + ' · ' + A.H[0].que, 'shows:sA · Fusionado «ALWAYS» en «ALWAYS ON CALL»');
+    t.eq('el aviso dice lo que chocaba', A.avisos[A.avisos.length - 1], 'Fusionado «ALWAYS» en «ALWAYS ON CALL» · 1 personaje con otro talento en «ALWAYS»: se queda el de «ALWAYS ON CALL»');
+    t.eq('y se queda en el programa que queda', A.M.CS.prog + ' ' + A.M.CS.vista + ' ' + A.M.CS.fusionProg, 's:sC programa null');
+  }
+  {
+    const A = armar({ shows: ALW, eps: ALW_EPS, archivos: ALW_ARCH, registros: ALW_REG, fallaMover: 'eA2' });
+    const lista = A.M.csActual().lista;
+    t.eq('si un archivo no se deja mover, se para', await A.M.csFusionarProgramas(lista.find(x => x.nombre === 'ALWAYS ON CALL'), lista.find(x => x.nombre === 'ALWAYS')), 'error');
+    t.ok('y el que se iba a borrar no se borra: se dice cuánto se movió', !A.borrados.length && /se movieron 1 de 2 capítulos \(Episodio 2: sin permiso para mover\)\. «ALWAYS» no se borra: vuelve a fusionar para terminar\./.test(A.avisos.join('|')));
+    const B = armar({ shows: ALW, eps: ALW_EPS, archivos: ALW_ARCH, fallaUpdate: true });
+    await B.M.csMoverEpisodiosDub({ id: 'sA' }, { id: 'sC' });
+    t.eq('si la fila no se deja, los archivos vuelven a su sitio', B.movidos.join(', '), 'sA/eA1/desglose.xlsm > sC/eA1/desglose.xlsm, sA/eA1/libreto.pdf > sC/eA1/libreto.pdf, sC/eA1/desglose.xlsm > sA/eA1/desglose.xlsm, sC/eA1/libreto.pdf > sA/eA1/libreto.pdf');
+    const N = armar({ shows: ALW, eps: ALW_EPS, confirmar: false });
+    const ln = N.M.csActual().lista;
+    t.eq('si se dice que no, nada', await N.M.csFusionarProgramas(ln[1], ln[0]) + ' ' + N.movidos.length + ' ' + N.borrados.length, 'cancelado 0 0');
+    t.eq('consigo mismo, nada', await N.M.csFusionarProgramas(ln[0], ln[0]), 'nada');
+  }
+  {
+    /* Con DublajeCast: el de allí pasa al que se queda. */
+    const A = armar();
+    const lista = A.M.csActual().lista, queda = lista.find(x => x.clave === 's:s1'), pasa = lista.find(x => x.clave === 'dc:2');
+    t.eq('el plan, en los dos lados', A.M.csPlanFusion(queda, pasa).join(' '), 'En DublajeCast, 2 capítulos, tráilers y producción de «Akka» pasan a «A FILIPINO CHRISTMAS», y «Akka» va a la papelera de DublajeCast.');
+    t.eq('fusionar en DublajeCast', await A.M.csFusionarProgramas(queda, pasa), 'hecho');
+    const P = A.nube();
+    t.ok('«Akka» desaparece y sus capítulos son del que queda', !P.series.some(s => s.id === 2) && P.episodes.filter(e => String(e.series_id) === '1').length === VOLCADO().episodes.filter(e => ['1', '2'].includes(String(e.series_id))).length && P.trash[0].kind === 'series');
+    t.eq('en Dubbipt no se toca nada', A.movidos.length + ' ' + A.borrados.length + ' ' + A.sbInsertados.length, '0 0 0');
+    const S = armar({ sinSesion: true });
+    const ls = S.M.csActual().lista;
+    t.eq('sin sesión de DublajeCast, nada en ningún lado', await S.M.csFusionarProgramas(ls.find(x => x.clave === 's:s1'), ls.find(x => x.clave === 'dc:2')) + ' ' + S.H.length, 'sesion 0');
+  }
+  {
+    /* Uno solo en DublajeCast y otro solo en Dubbipt: se renombra para que casen. */
+    const A = armar({ shows: [{ id: 's1', name: 'A FILIPINO CHRISTMAS' }, { id: 'sP', name: 'LA PELI DOBLADA' }], eps: { s1: EPS_DUB.s1, sP: [] } });
+    const lista = A.M.csActual().lista, peli = lista.find(x => x.clave === 'dc:3'), dub = lista.find(x => x.clave === 's:sP');
+    t.eq('se queda el de DublajeCast: el de Dubbipt se llama como él', (await A.M.csFusionarProgramas(peli, dub)) + ' ' + JSON.stringify(A.sbInsertados.filter(x => x[0] === 'shows~').map(x => [x[2], x[1].name])), 'hecho [["sP","La peli"]]');
+    t.eq('y se va a él', A.M.CS.prog, 's:sP');
+    const B = armar({ shows: [{ id: 's1', name: 'A FILIPINO CHRISTMAS' }, { id: 'sP', name: 'LA PELI DOBLADA' }], eps: { s1: EPS_DUB.s1, sP: [] } });
+    const lb = B.M.csActual().lista;
+    await B.M.csFusionarProgramas(lb.find(x => x.clave === 's:sP'), lb.find(x => x.clave === 'dc:3'));
+    t.eq('se queda el de Dubbipt: el de DublajeCast se llama como él', B.nube().series.find(s => s.id === 3).name, 'LA PELI DOBLADA');
   }
 };

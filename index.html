@@ -1735,6 +1735,13 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-eps{ display:flex; flex-direction:column; gap:8px; }
 .cs-ep{ display:flex; align-items:center; gap:12px; background:#101215; border:1px solid #23262b; border-left:3px solid #22C55E; border-radius:11px; padding:12px 16px; }
 .cs-ep-bots{ display:flex; gap:6px; flex-shrink:0; align-items:center; }
+.cs-fusion-prog{ display:flex; flex-direction:column; gap:10px; margin:10px 0; }
+.cs-fusion-con{ display:flex; align-items:center; gap:8px; font-size:13px; color:#9aa3ad; }
+.cs-fusion-con select{ flex:1; max-width:420px; background:#0b0d10; color:#e5e7eb; border:1px solid #2a2e35; border-radius:8px; padding:7px 9px; font:inherit; }
+.cs-fusion-queda{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; font-size:13px; color:#9aa3ad; }
+.cs-fusion-queda label{ display:flex; gap:6px; align-items:center; color:#e5e7eb; cursor:pointer; }
+.cs-fusion-plan{ margin:0; padding-left:18px; font-size:13px; color:#cbd5e1; display:flex; flex-direction:column; gap:4px; }
+.cs-fusion-bots{ display:flex; gap:8px; }
 .cs-ep-izq{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
 .cs-ep-t{ display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; font-size:13px; color:#d7dae0; }
 .cs-ep-t b{ color:#4ADE80; font-weight:800; }
@@ -2580,7 +2587,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.35.0-nube';
+const APP_VER_NUM = 'v11.36.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);

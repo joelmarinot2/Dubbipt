@@ -271,6 +271,39 @@ function dcxFusionarEpisodios(p, keepId, dupIds, elegidos){
   return true;
 }
 
+/**
+ * Fusiona dos programas: todo lo del repetido pasa al que se queda, como
+ * hace DublajeCast al juntar proyectos. Sus capítulos -y con ellos sus
+ * personajes y castings-, sus tráilers y lo que lleve su `series_id`; las
+ * filas de producción, que van por nombre, cambian de nombre (si el que se
+ * queda ya tiene ese capítulo, sobra la del repetido). Lo que le falte al
+ * que se queda (cliente, director…) se toma del repetido, y el repetido va
+ * a la papelera. Los capítulos con el mismo número quedan repetidos, para
+ * fusionarlos después preguntando lo que choque.
+ */
+function dcxFusionarSeries(p, keepId, dupId){
+  const series = dcxLista(p, 'series');
+  const keep = series.find(s => dcxMismo(s.id, keepId)), dup = series.find(s => dcxMismo(s.id, dupId));
+  if(!keep || !dup || keep === dup) return false;
+  const nom = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+  for(const k of Object.keys(p)){
+    if(k === 'series' || k === 'trash' || !Array.isArray(p[k])) continue;
+    p[k] = p[k].map(x => (x && typeof x === 'object' && dcxMismo(x.series_id, dup.id)) ? Object.assign({}, x, { series_id: keep.id }) : x);
+  }
+  if(Array.isArray(p.produccion)){
+    const deKeep = new Set(p.produccion.filter(r => r && nom(r.programa) === nom(keep.name)).map(r => String(r.capitulo)));
+    p.produccion = p.produccion.filter(r => !(r && nom(r.programa) === nom(dup.name) && deKeep.has(String(r.capitulo))))
+      .map(r => (r && nom(r.programa) === nom(dup.name)) ? Object.assign({}, r, { programa: keep.name }) : r);
+  }
+  const nuevoKeep = Object.assign({}, keep);
+  for(const k of ['cliente', 'director', 'studio_id', 'type', 'requiere_dubcard', 'formato_dubcard'])
+    if((nuevoKeep[k] == null || nuevoKeep[k] === '') && dup[k] != null && dup[k] !== '') nuevoKeep[k] = dup[k];
+  p.trash = [{ kind: 'series', at: Date.now(), label: dup.name + ' (fusionado en ' + keep.name + ')', data: { series: [dup] } }]
+    .concat(Array.isArray(p.trash) ? p.trash : []).slice(0, 50);
+  p.series = series.filter(s => s !== dup).map(s => (s === keep ? nuevoKeep : s));
+  return true;
+}
+
 /** Los relevos que alguien ya dijo que son a propósito: no se vuelven a preguntar. */
 function dcxRelevosAceptados(){
   const l = PROD.datos && PROD.datos.relevosAceptados;

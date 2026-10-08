@@ -20,7 +20,7 @@ exports.nombre = 'Editar DublajeCast desde Dubbipt';
 const EXPORTA = ['DCX', 'dcxUid', 'dcxNombreTalento', 'dcxTalentoPorNombre', 'dcxAsignar', 'dcxReasignar', 'dcxEpisodio', 'dcxSerie', 'dcxPersonaje',
                  'dcxTalento', 'dcxTalentoNuevo', 'dcxTrailerNuevo', 'dcxTrailer', 'dcxTrailerBorrar', 'dcxGuardar', 'dcxLocal',
                  'dcxCambiarTalento', 'dcxQuien', 'dcxEntrada', 'dcxHistorial', 'dcxRegistrar', 'DCX_HISTORIAL',
-                 'dcxConflictosFusion', 'dcxFusionarEpisodios', 'dcxRelevosAceptados', 'dcxAceptarRelevo'];
+                 'dcxConflictosFusion', 'dcxFusionarEpisodios', 'dcxRelevosAceptados', 'dcxAceptarRelevo', 'dcxFusionarSeries'];
 
 /* El JSON de DublajeCast, con sus nombres de siempre. */
 const BASE = () => ({
@@ -239,6 +239,21 @@ exports.pruebas = async function(t){
     try{ await A.M.dcxGuardar(p => A.M.dcxAsignar(p, 12, 102, 'ANA ROJAS')); }catch(e){ err = e.message; }
     await espera;
     t.eq('dos a la vez, no: el segundo espera su turno', err, 'ya se está guardando otro cambio: espera un momento');
+  }
+  t.seccion('fusionar programas, como en DublajeCast');
+  {
+    const q = BASE();
+    q.series[0].cliente = ''; q.series[1].cliente = 'HBO'; q.series[1].director = 'Rosa';
+    q.trailers = [{ id: 1, series_id: 2, title: 'Tráiler' }, { id: 2, series_id: 1, title: 'Otro' }];
+    q.produccion = [{ id: 1, programa: 'Akka', capitulo: 1 }, { id: 2, programa: 'akka', capitulo: 5 }, { id: 3, programa: 'A Filipino Christmas', capitulo: 1 }];
+    q.trash = [{ kind: 'episode' }];
+    t.eq('fusiona', M.dcxFusionarSeries(q, 1, 2), true);
+    t.eq('el repetido desaparece', q.series.map(s => s.id).join(','), '1');
+    t.eq('sus capítulos y sus tráilers son del que queda', q.episodes.map(e => e.id + ':' + e.series_id).join(' ') + ' · ' + q.trailers.map(x => x.series_id).join(','), '11:1 12:1 21:1 · 1,1');
+    t.eq('producción: cambia de nombre, y la que ya tenía el que queda sobra', q.produccion.map(r => r.id + ':' + r.programa + ':' + r.capitulo).join(' '), '2:A Filipino Christmas:5 3:A Filipino Christmas:1');
+    t.eq('lo que le faltaba, del repetido; lo que tenía, se queda', q.series[0].cliente + ' ' + q.series[0].director + ' ' + q.series[0].name, 'HBO Rosa A Filipino Christmas');
+    t.ok('el repetido, a la papelera, con lo de antes detrás', q.trash.length === 2 && q.trash[0].kind === 'series' && q.trash[0].data.series[0].id === 2 && /^Akka \(fusionado en A Filipino Christmas\)$/.test(q.trash[0].label));
+    t.eq('consigo mismo o con uno que no existe, nada', [M.dcxFusionarSeries(BASE(), 1, 1), M.dcxFusionarSeries(BASE(), 1, 9), M.dcxFusionarSeries(BASE(), 9, 1)].join(' '), 'false false false');
   }
   {
     const A = armar();
