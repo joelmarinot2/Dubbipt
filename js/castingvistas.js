@@ -986,7 +986,11 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
         +   (c.length - con ? '<span><b class="cs-rojo">' + (c.length - con) + '</b> sin asignar</span>' : '')
         +   (choques ? '<span class="cs-aviso">' + csIco('aviso', 12) + choques + ' distinto' + (choques === 1 ? '' : 's') + ' en DublajeCast</span>' : '')
         + '</div></div>'
-        + '<button class="cs-b cs-pri" data-cs="abrirEp" data-v="' + csEsc(e.clave) + '">Casting</button>'
+        /* «Casting» abre el casting de Dubbipt directamente; la ficha, aparte. Uno que solo está
+           en DublajeCast no se puede castear todavía: su ficha dice cómo crearlo. */
+        + '<div class="cs-ep-bots"><button class="cs-b" data-cs="abrirEp" data-v="' + csEsc(e.clave) + '">Ficha</button>'
+        +   (e.ep ? '<button class="cs-b cs-pri" data-cs="castear" data-v="' + csEsc(e.clave) + '" title="Abre el capítulo con el perfil Casting: la interfaz de castear de Dubbipt">' + csIco('entrar', 14) + '<span>Casting</span></button>' : '')
+        + '</div>'
         + '</div>';
     }).join('') + '</div>'
     : '<div class="cs-nada">Sin episodios todavía.' + (p.show ? ' Crea el primero con «Nuevo episodio».' : '') + '</div>';
@@ -1257,6 +1261,11 @@ function csCablear(vista){
     };
     else if(que === 'dcSerie') el.onclick = () => { const x = a(); if(x.p && x.p.serie) dcastAbrir('series', x.p.serie.id); };
     else if(que === 'dcEp') el.onclick = () => { const x = a(); if(x.p && x.p.serie && x.e && x.e.dcEp) dcastAbrir('casting', x.p.serie.id, x.e.dcEp.id); };
+    else if(que === 'castear') el.onclick = () => {
+      CS.ep = v;
+      const x = a();
+      csRealizarCasting(x.p, x.e).catch(err => fallo('csRealizarCasting · js/castingvistas.js', err, 'el capítulo no se ha podido abrir'));
+    };
     else if(que === 'realizar') el.onclick = () => { const x = a(); csRealizarCasting(x.p, x.e).catch(err => fallo('csRealizarCasting · js/castingvistas.js', err, 'el capítulo no se ha podido abrir')); };
     /* ── Nombres ── */
     else if(que === 'progNombre') el.onchange = () => { const x = a(); csRenombrarPrograma(x.p, el.value).catch(err => fallo('csRenombrarPrograma · js/castingvistas.js', err, 'el programa no se ha podido renombrar')); };

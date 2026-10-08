@@ -345,6 +345,18 @@ exports.pruebas = async function(t){
     t.eq('con un capítulo abierto, repintar no lo saca de él', E.diario.includes('renderLibrary'), false);
   }
 
+  {
+    /* «Casting» en cada episodio: directo a castear. */
+    const A = armar();
+    const b = biblioteca(A.doc);
+    A.M.csPintar('shows', b.cab, b.grid);
+    control(A, 'abrirProg', 's:s1').onclick(); A.M.csPintar('shows', b.cab, b.grid);
+    t.ok('cada episodio de Dubbipt, con «Casting» que va directo y «Ficha» aparte', /data-cs="abrirEp" data-v="e:e1">Ficha<\/button><button class="cs-b cs-pri" data-cs="castear" data-v="e:e1"[^>]*>[\s\S]*?<span>Casting<\/span>/.test(vista(A)));
+    t.eq('«Casting» no pasa por la ficha: abre el capítulo con el perfil Casting', (control(A, 'castear', 'e:e1').onclick(), await espera(), A.diario.filter(x => /^ponerModo|^openEpisode/.test(x)).join(',') + ' ' + A.LDB.showId + ' ' + A.M.CS.vista), 'ponerModo e1 casting,openEpisode e1 s1 programa');
+    A.M.CS.prog = 'dc:2'; A.M.csPintar('shows', b.cab, b.grid);
+    t.ok('uno que solo está en DublajeCast no se puede castear todavía: solo su ficha', /data-cs="abrirEp" data-v="d:/.test(vista(A)) && !/data-cs="castear"/.test(vista(A)));
+  }
+
   t.seccion('9 · Actualizar');
   {
     const V = armar({ vivo: true });
@@ -363,7 +375,8 @@ exports.pruebas = async function(t){
   }
   const HTML = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
   t.ok('la barra de Casting, a la izquierda y la sección al lado; en el móvil, arriba', /body\.cs-on #lib\{ display:grid; grid-template-columns:212px minmax\(0,1fr\);/.test(HTML) && /body\.cs-on #lib > \*:not\(#csNav\):not\(#csVista\)\{ display:none !important; \}/.test(HTML) && /@media \(max-width:860px\)\{\n  body\.cs-on #lib\{ display:block;/.test(HTML.replace(/\r\n/g, '\n')));
-  t.ok('y también con un capítulo abierto: Dubbipt sigue enseñando la biblioteca, y ahí no puede asomar la interfaz antigua', !/cs-on:not\(\.ep-open\)/.test(HTML) && !/body\.ep-open #csNav/.test(HTML));
+  t.ok('y también con un capítulo abierto: Dubbipt sigue enseñando la biblioteca, y ahí no puede asomar la interfaz antigua', !/cs-on:not\(\.ep-open\)/.test(HTML));
+  t.ok('con el capítulo abierto para castear, tampoco el panel de Casting: solo la interfaz de castear', /\nbody\.cs-on\.ep-open #lib\{ display:none !important; \}/.test(HTML));
   t.ok('el diálogo de confirmar, con el aviso de trazo y no con un «⚠»', /<span class="cf-ic"><svg /.test(HTML) && !/<span class="cf-ic">⚠/.test(HTML));
   t.ok('la campana y la configuración, con iconos de trazo', /aria-label="Notificaciones"><svg /.test(HTML) && /aria-label="Configuración y cuenta"><svg /.test(HTML));
   t.ok('y Programas: buscar, Herramientas y Optimizar, también', /<span class="fi">'\+_svgI\(/.test(HTML) && /ningún capítulo">'\+_svgI\(/.test(HTML) && /abran al instante">'\+_svgI\(/.test(HTML));

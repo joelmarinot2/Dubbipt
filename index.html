@@ -1696,9 +1696,13 @@ body:not(.modo-casting) .gestbtn{ display:none; }
 .dcast-marco{ flex:1; width:100%; border:0; background:#0b0d12; }
 /* Casting: la distribución de DublajeCast -barra a la izquierda, sección a la derecha- con la cara de Dubbipt.
    Lo de siempre de la biblioteca (mosaico de programas, tabla de capítulos) queda tapado SIEMPRE, también con un
-   capítulo abierto: Dubbipt sigue enseñando la biblioteca entonces, y ahí asomaba la interfaz antigua. */
+   capítulo abierto: Dubbipt sigue enseñando la biblioteca entonces, y ahí asomaba la interfaz antigua.
+   Y con el capítulo abierto para castear, tampoco el panel de Casting: solo la interfaz de castear («también
+   cuando se abra el panel para hacer el casting, oculta el panel que sale»). Se vuelve con «Volver» o con
+   «Cambiar capítulo», y entonces sí sale. */
 body.cs-on #lib{ display:grid; grid-template-columns:212px minmax(0,1fr); gap:18px; align-items:start; padding:16px; }
 body.cs-on #lib > *:not(#csNav):not(#csVista){ display:none !important; }
+body.cs-on.ep-open #lib{ display:none !important; }
 body.cs-on #progHeader{ display:none !important; }
 .cs-nav{ display:flex; flex-direction:column; gap:2px; background:#101215; border:1px solid #23262b; border-radius:16px; padding:12px 8px; position:sticky; top:12px; }
 .cs-nav-t{ font-family:'Inter',sans-serif; font-size:10.5px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#6b7079; padding:2px 12px 10px; }
@@ -1730,6 +1734,7 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-etq-dc{ color:#d7dae0; border-style:dashed; }
 .cs-eps{ display:flex; flex-direction:column; gap:8px; }
 .cs-ep{ display:flex; align-items:center; gap:12px; background:#101215; border:1px solid #23262b; border-left:3px solid #22C55E; border-radius:11px; padding:12px 16px; }
+.cs-ep-bots{ display:flex; gap:6px; flex-shrink:0; align-items:center; }
 .cs-ep-izq{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
 .cs-ep-t{ display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; font-size:13px; color:#d7dae0; }
 .cs-ep-t b{ color:#4ADE80; font-weight:800; }
@@ -2575,7 +2580,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.34.0-nube';
+const APP_VER_NUM = 'v11.35.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
