@@ -1735,6 +1735,13 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-eps{ display:flex; flex-direction:column; gap:8px; }
 .cs-ep{ display:flex; align-items:center; gap:12px; background:#101215; border:1px solid #23262b; border-left:3px solid #22C55E; border-radius:11px; padding:12px 16px; }
 .cs-ep-bots{ display:flex; gap:6px; flex-shrink:0; align-items:center; }
+/* El aviso de que el servidor no responde (js/salud.js). */
+.salud-aviso{ position:fixed; left:50%; bottom:16px; transform:translateX(-50%); z-index:9999; display:flex; align-items:center; gap:12px;
+  max-width:min(760px, calc(100vw - 32px)); background:#2a2010; border:1px solid #6b4f12; color:#FDE68A; border-radius:12px; padding:10px 14px;
+  font-size:13px; box-shadow:0 12px 32px rgba(0,0,0,.45); }
+.salud-aviso svg{ flex-shrink:0; color:#FBBF24; }
+.salud-aviso button{ flex-shrink:0; background:#3a2c10; color:#FDE68A; border:1px solid #6b4f12; border-radius:9px; padding:6px 11px; font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; }
+.salud-aviso button:hover{ border-color:#FBBF24; }
 /* El reparto en cajas, como en DublajeCast. */
 .cs-rep-filtros select{ background:#0b0d10; color:#e5e7eb; border:1px solid #2a2e35; border-radius:8px; padding:6px 9px; font:inherit; font-size:12.5px; }
 .cs-rep-sec{ font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#8b93a1; margin:14px 0 8px; }
@@ -2637,7 +2644,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.37.0-nube';
+const APP_VER_NUM = 'v11.38.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3107,7 +3114,18 @@ async function dondeReanudar(d){
 }
 
 // Al entrar: si es una RECARGA, a donde se estaba; si no, la sesión desde el principio.
+/* Al entrar con la sesión guardada, la sesión llega ANTES de que el navegador
+   termine de cargar los archivos de js/ (los pide uno tras otro y, mientras
+   espera la red, deja correr lo pendiente). Se vio en sala el 8 de octubre:
+   «prodPintarBoton / talCargar / csPintar is not defined» al entrar, y la
+   biblioteca de Casting a medias. Lo que los usa espera a que estén todos. */
+function ddlAunCargando(f){
+  if(typeof document === 'undefined' || document.readyState !== 'loading') return false;
+  document.addEventListener('DOMContentLoaded', () => f(), { once:true });
+  return true;
+}
 function postLogin(){
+  if(ddlAunCargando(postLogin)) return;
   const d = dondeLeer();
   if(d){
     dondeReanudar(d).catch((e) => fallo('dondeReanudar · index.html:postLogin', e, 'no se ha podido volver a donde estabas'));
@@ -3628,6 +3646,11 @@ function authErrMsg(error, sinSesion){
     return { txt:'Correo o contraseña incorrectos.' };
   if(m.includes('rate limit') || m.includes('too many') || code===429 || String(code)==='429')
     return { txt:'Demasiados intentos seguidos. Espera unos minutos y vuelve a probar.' };
+  /* SYN-19: el 8 de octubre el servidor no respondía y aquí salía un «Detalle» incomprensible. */
+  if((+code >= 500) || /gateway|time-?out|timed out|upstream|service unavailable|bad gateway/.test(m)){
+    try{ if(typeof saludFallo === 'function'){ saludFallo(); saludFallo(); } }catch(e){ /* sin vigía */ }
+    return { txt:'El servidor de Dubbipt no responde ahora mismo: no es tu contraseña. Espera unos minutos y vuelve a probar.' };
+  }
   if(m.includes('failed to fetch') || m.includes('networkerror') || m.includes('network request failed') || m.includes('load failed'))
     return { txt:'No se pudo conectar con el servidor. Revisa la conexión de este dispositivo (o si la red bloquea el acceso).' };
   if(m.includes('auth session missing') || m.includes('session missing'))
@@ -8085,12 +8108,14 @@ async function libFetchAll(){
   }
   if(!sh.error) LDB.shows = sh.data || [];
   if(!ep.error) LDB.epsAll = ep.data || [];
+  try{ if(typeof saludNota === 'function'){ saludNota(sh); saludNota(ep); } }catch(e){ /* sin vigía, igual */ }
   _libLoaded = true;
   idbSet('library', { shows: LDB.shows||[], eps: LDB.epsAll||[] });
 }
 async function libEnsure(){
   if(_libLoaded){
-    if(!window.OFFLINE && Date.now() - _libLastBg > 5000){
+    /* SYN-18: antes cada 5 s; con muchas pantallas abiertas, demasiado para el servidor. */
+    if(!window.OFFLINE && Date.now() - _libLastBg > 30000 && !(typeof saludPausa === 'function' && saludPausa())){
       _libLastBg = Date.now();
       libFetchAll().then(()=> renderLibrary(true)).catch(()=>{});
     }
@@ -8206,6 +8231,10 @@ function otherWsNote(){
   }catch(e){ return ''; }
 }
 async function renderLibrary(silent){
+  if(typeof ddlAunCargando === 'function' && document.readyState === 'loading'){
+    if(!renderLibrary._esperando){ renderLibrary._esperando = true; ddlAunCargando(() => { renderLibrary._esperando = false; renderLibrary(silent); }); }
+    return;
+  }
   if((!sb || !sbUser) && !window.OFFLINE) return;
   try{ refreshTopbar(); }catch(e){ fallo('refreshTopbar · index.html:5518', e); }
   const grid = $('libGrid'), crumb = $('libCrumb'), act = $('libAction'), lib = $('lib');
@@ -12817,7 +12846,7 @@ const uid = ()=>{
    capítulo abierto, descargan los archivos nuevos solos. Cada 45 s
    además se revisa por si algún aviso se perdió (respaldo).
    ================================================================ */
-const LIBRT = { ch:null, on:false, busy:false, next:0 };
+const LIBRT = { ch:null, on:false, busy:false, next:0, fallos:0 };
 function libRealtimeStart(){
   if(!sb || !sbUser || LIBRT.busy || LIBRT.on) return;
   LIBRT.busy = true;
@@ -12826,10 +12855,11 @@ function libRealtimeStart(){
   LIBRT.ch = ch;
   ch.on('broadcast', { event:'lib' }, ({payload})=> onLibPing(payload))
     .subscribe((st)=>{
-      if(st==='SUBSCRIBED'){ LIBRT.on = true; LIBRT.busy = false; LIBRT.next = 0; }
+      if(st==='SUBSCRIBED'){ LIBRT.on = true; LIBRT.busy = false; LIBRT.next = 0; LIBRT.fallos = 0; }
       else if(st==='CHANNEL_ERROR' || st==='TIMED_OUT' || st==='CLOSED'){
-        LIBRT.on = false; LIBRT.busy = false;
-        LIBRT.next = Date.now() + 2000;      // el vigía del worker lo reintenta
+        LIBRT.on = false; LIBRT.busy = false; LIBRT.fallos++;
+        // el vigía del worker lo reintenta: a los 2 s, y cada fallo seguido el doble, hasta 2 min (SYN-18)
+        LIBRT.next = Date.now() + Math.min(120000, 2000 * Math.pow(2, LIBRT.fallos - 1));
       }
     });
 }
@@ -12838,7 +12868,20 @@ function libPing(t, id, showId){
     if(LIBRT.on && LIBRT.ch) LIBRT.ch.send({ type:'broadcast', event:'lib', payload:{ t, id, showId, at:Date.now() } });
   }catch(e){}
 }
-async function onLibPing(p){
+/* SYN-18: un aviso de otro equipo hacía que TODAS las pantallas abiertas
+   recargaran la biblioteca entera en el mismo instante. Ahora los avisos
+   seguidos se juntan en una sola recarga, cada pantalla espera un momento
+   distinto (1,5 a 4 s), una pestaña escondida lo deja para cuando se vea, y
+   con el servidor caído no se insiste. */
+const LIBPING = { tmr: null, ultimo: null, pendiente: false };
+function onLibPing(p){
+  LIBPING.ultimo = (LIBPING.ultimo && LIBPING.ultimo.id && !(p && p.id)) ? LIBPING.ultimo : (p || LIBPING.ultimo);
+  if(typeof document !== 'undefined' && document.hidden){ LIBPING.pendiente = true; return; }
+  if(LIBPING.tmr) return;
+  LIBPING.tmr = setTimeout(() => { LIBPING.tmr = null; const q = LIBPING.ultimo; LIBPING.ultimo = null; libPingAtender(q); }, 1500 + Math.floor(Math.random() * 2500));
+}
+async function libPingAtender(p){
+  if(typeof saludPausa === 'function' && saludPausa()) return;
   try{
     await libFetchAll();
     renderLibrary(true);
@@ -12853,6 +12896,9 @@ async function onLibPing(p){
 let _libAutoAt = 0;
 async function libAutoRefresh(){
   if(!sb || !sbUser) return;
+  /* SYN-18: una pestaña escondida no necesita la biblioteca al día: al volver se refresca. */
+  if(typeof document !== 'undefined' && document.hidden) return;
+  if(typeof saludPausa === 'function' && saludPausa()) return;
   if(Date.now() - _libAutoAt < 20000) return;   // no repetir si varios caminos coinciden
   _libAutoAt = Date.now();
   try{
@@ -12877,7 +12923,7 @@ async function refreshOpenEpisodeFromCloud(){
   }catch(e){}
   try{
     const epId0 = currentEp.id;
-    const { data:ep } = await sb.from('episodes').select('*').eq('id', currentEp.id).single();
+    const { data:ep } = await sb.from('episodes').select('id,show_id,name,xls_path,pdf_path,xls_name,pdf_name').eq('id', currentEp.id).single();
     if(!currentEp || currentEp.id !== epId0) return;   // cambió de capítulo mientras tanto
     if(!ep) return;
     currentEp = { id:ep.id, showId:ep.show_id, name:ep.name };
@@ -17618,13 +17664,15 @@ function ddlOnTick(){
     if(sync.isOn && sync.channel){ try{ sync.channel.send({ type:'broadcast', event:'ping', payload:{} }); }catch(e){} }
     try{ if(sb) sb.auth.getSession(); }catch(e){ fallo('sb.auth.getSession · index.html:13182', e); }   // renueva el token aun en fondo
   }
-  // 4) cada ~45 s: biblioteca al día (capítulos/archivos de otros equipos)
-  if(_ddlTick % 900 === 0){ try{ if(typeof libAutoRefresh==='function') libAutoRefresh(); }catch(e){} }
+  // 4) cada ~2 min: biblioteca al día (capítulos/archivos de otros equipos). Antes cada 45 s
+  //    y también con la pestaña escondida (SYN-18); lo inmediato llega por el aviso en vivo.
+  if(_ddlTick % 2400 === 0){ try{ if(typeof libAutoRefresh==='function') libAutoRefresh(); }catch(e){} }
 }
 function syncHealth(){
   // biblioteca en vivo caída → reintentar
   try{
-    if(sb && sbUser && typeof LIBRT!=='undefined' && !LIBRT.on && !LIBRT.busy && Date.now() >= (LIBRT.next||0) && typeof libRealtimeStart==='function') libRealtimeStart();
+    if(sb && sbUser && typeof LIBRT!=='undefined' && !LIBRT.on && !LIBRT.busy && Date.now() >= (LIBRT.next||0) && typeof libRealtimeStart==='function'
+       && !(typeof saludPausa === 'function' && saludPausa())) libRealtimeStart();
   }catch(e){}
   if(!sync.role) return;
   // canal "zombi": el socket murió sin avisar → derribar y reconectar YA
@@ -17664,6 +17712,8 @@ document.addEventListener('visibilitychange', ()=>{
   else if(sync.isOn && sync.channel){
     try{ sync.channel.track({ role: sync.role, id: sync.meId }); }catch(e){}   // refrescar presencia
   }
+  // un aviso de otro equipo que llegó con la pestaña escondida: ponerse al día ya (SYN-18)
+  try{ if(typeof LIBPING !== 'undefined' && LIBPING.pendiente){ LIBPING.pendiente = false; _libAutoAt = 0; } }catch(e){}
   try{ if(sb && sbUser && typeof libAutoRefresh==='function') libAutoRefresh(); }catch(e){}
 });
 window.addEventListener('online', ()=>{
@@ -17749,6 +17799,12 @@ function onlineRoleLabel(r){
 function onlineWsPayload(){
   return { n:onlineName(), role:(typeof DEVROLE!=='undefined' && DEVROLE) || null };
 }
+/* SYN-18: el reintento de la presencia, a los 4 s y cada fallo seguido el doble, hasta 2 min;
+   con el servidor caído, a los 2 min directamente. */
+function onlineEspera(fallos){
+  if(typeof saludPausa === 'function' && saludPausa()) return 120000;
+  return Math.min(120000, 4000 * Math.pow(2, Math.max(0, (Math.floor(+fallos) || 1) - 1)));
+}
 function onlineConnect(){
   if(!sb || !sbUser || window.OFFLINE) return;
   // 1) canal global: solo cuenta cabezas, sin publicar NADA
@@ -17758,9 +17814,10 @@ function onlineConnect(){
       online.chG = g;
       ['sync','join','leave'].forEach(ev=> g.on('presence', { event:ev }, ()=> onlineRefresh()));
       g.subscribe(async (st)=>{
-        if(st==='SUBSCRIBED'){ try{ await g.track({}); }catch(e){} onlineRefresh(); }
+        if(st==='SUBSCRIBED'){ online.fallosG = 0; try{ await g.track({}); }catch(e){} onlineRefresh(); }
         else if(st==='CHANNEL_ERROR' || st==='TIMED_OUT' || st==='CLOSED'){
-          online.chG=null; online.total=0; updateOnlineChip(); setTimeout(onlineConnect, 4000);
+          online.chG=null; online.total=0; updateOnlineChip(); online.fallosG = (online.fallosG || 0) + 1;
+          setTimeout(onlineConnect, onlineEspera(online.fallosG));
         }
       });
     }catch(e){ console.warn('presencia · contador', e); }
@@ -17779,10 +17836,10 @@ function onlineJoinWs(){
     online.chW = w;
     ['sync','join','leave'].forEach(ev=> w.on('presence', { event:ev }, ()=> onlineRefresh()));
     w.subscribe(async (st)=>{
-      if(st==='SUBSCRIBED'){ try{ await w.track(onlineWsPayload()); }catch(e){} onlineRefresh(); }
+      if(st==='SUBSCRIBED'){ online.fallosW = 0; try{ await w.track(onlineWsPayload()); }catch(e){} onlineRefresh(); }
       else if(st==='CHANNEL_ERROR' || st==='TIMED_OUT' || st==='CLOSED'){
-        online.chW=null; online.people=[]; updateOnlineChip();
-        setTimeout(()=>{ if(!online.chW) onlineJoinWs(); }, 4000);
+        online.chW=null; online.people=[]; updateOnlineChip(); online.fallosW = (online.fallosW || 0) + 1;
+        setTimeout(()=>{ if(!online.chW) onlineJoinWs(); }, onlineEspera(online.fallosW));
       }
     });
   }catch(e){ console.warn('presencia · espacio', e); }
@@ -22483,4 +22540,5 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/dcescribir.js"></script>
 <script src="./js/castingvistas.js"></script>
 <script src="./js/castdisponible.js"></script>
+<script src="./js/salud.js"></script>
 <script src="./js/qcpdf.js"></script>
