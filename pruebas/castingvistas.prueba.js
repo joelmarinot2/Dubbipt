@@ -174,6 +174,7 @@ exports.pruebas = async function(t){
   t.eq('todos los programas: los de Dubbipt con lo que sabe DublajeCast, y los que solo están allí', progs.map(p => p.clave + ' ' + p.nombre + ' ' + p.estado).join(' | '), 's:s1 A FILIPINO CHRISTMAS en_curso | dc:2 Akka en_curso | dc:3 Dofus completo');
   t.eq('con su cliente, de DublajeCast', progs.map(p => p.cliente || '—').join(' '), 'Netflix Discovery —');
   t.eq('uno de Dubbipt que DublajeCast no tiene, en curso y sin serie', JSON.stringify(M.csProgramas([{ id: 'x', name: 'Nuevo' }], () => [], d).find(p => p.clave === 's:x'), ['estado', 'serie']), '{"estado":"en_curso","serie":null}');
+  t.eq('todos por nombre, vengan de donde vengan', M.csProgramas([{ id: 'z', name: 'Zeta' }], () => [], d).map(p => p.nombre).join(','), 'A Filipino Christmas,Akka,Dofus,Zeta');
   t.eq('sin datos de DublajeCast, solo los de Dubbipt', M.csProgramas(SHOWS, () => [], null).map(p => p.clave).join(','), 's:s1');
   t.eq('filtrar por estado, como en DublajeCast', ['todos', 'en_curso', 'completo'].map(f => M.csFiltrarProgramas(progs, f, '').length).join(' '), '3 2 1');
   t.eq('y buscar por nombre o cliente, sin mayúsculas', M.csFiltrarProgramas(progs, 'todos', 'netflix').map(p => p.nombre).join(',') + ' · ' + M.csFiltrarProgramas(progs, 'en_curso', 'dofus').length, 'A FILIPINO CHRISTMAS · 0');
@@ -184,7 +185,10 @@ exports.pruebas = async function(t){
   t.eq('los de un programa que solo está en DublajeCast', epsAkka.map(e => e.clave + ' ' + e.titulo).join(' | '), 'd:21 Akka 1');
   const mezcla = M.csEpisodios(M.csProgramas(SHOWS, () => [{ id: 'e1', name: 'Episodio 1' }], PR.prodNormalizar({ series: [{ id: 1, name: 'A Filipino Christmas' }], episodes: [{ id: 11, series_id: 1, episode_number: 1 }, { id: 13, series_id: 1, episode_number: 3, title: 'Año nuevo' }] }))[0]);
   t.eq('y los que DublajeCast tiene y Dubbipt todavía no, en su sitio', mezcla.map(e => e.clave + ' ' + e.numero).join(' | '), 'e:e1 1 | d:13 3');
+  const porTitulo = M.csEpisodios(M.csProgramas(SHOWS, () => [{ id: 'f', name: 'Año nuevo' }], PR.prodNormalizar({ series: [{ id: 1, name: 'A Filipino Christmas' }], episodes: [{ id: 13, series_id: 1, episode_number: 3, title: 'Año nuevo' }] }))[0]);
+  t.eq('un episodio que casa por título lleva el número de DublajeCast', porTitulo.map(e => e.clave + ' ' + e.numero).join(' | '), 'e:f 3');
   t.eq('el número de un nombre', [M.csNumeroDe('Episodio 12'), M.csNumeroDe('E02 Piloto'), M.csNumeroDe('Especial')].join(' '), '12 2 NaN');
+  t.eq('un episodio que solo está en DublajeCast no recoge nada del registro, ni lo apuntado sin capítulo', DC.dcastFilasCasting(d, d.episodes.find(e => e.id === 21), { personajes: { X: { display: 'X', talent: 'Y', episodios: [''] } } }, '').map(f => f.personaje).join(','), 'MANJAYA');
   t.eq('el casting de un episodio: DublajeCast y el registro de Dubbipt', M.csCastingDe(eps1[0], d, REGISTRO).map(f => f.personaje + '=' + f.talento + (f.choca ? '!' : '')).join(' '), 'ALLY=ANA ROJAS JANA=LUZ MAR! TITO BOY=');
 
   t.seccion('7 · lo que se pinta: con los datos, sin ellos, y sin emojis');
@@ -210,6 +214,14 @@ exports.pruebas = async function(t){
     t.ok('ni un capítulo con alertas, lo dice', /Ningún capítulo con alertas\./.test(B.M.csHtml('produccion', HOY)));
   }
 
+  {
+    const T = armar();
+    const filas = [{ personaje: 'ZOE', lineas: 100, talento: 'A' }, { personaje: 'ANA', lineas: 5, talento: '' }];
+    const orden = () => { const h = T.M.csTablaCasting(filas); return h.indexOf('>ZOE<') < h.indexOf('>ANA<') ? 'ZOE,ANA' : 'ANA,ZOE'; };
+    T.M.CS.orden = 'lineas'; const l = orden(); T.M.CS.orden = 'personaje';
+    t.eq('la tabla del casting, por líneas o por personaje', l + ' · ' + orden(), 'ZOE,ANA · ANA,ZOE');
+  }
+
   t.seccion('8 · la distribución de DublajeCast, montada en la biblioteca');
   const vista = (A) => A.doc.getElementById('csVista').innerHTML;
   const control = (A, que, v) => A.doc.getElementById('csVista').querySelectorAll('[data-cs]').find(c => c.getAttribute('data-cs') === que && (v === undefined || c.getAttribute('data-v') === v));
@@ -229,7 +241,10 @@ exports.pruebas = async function(t){
     t.eq('Abrir: el programa, con sus episodios', A.M.CS.vista + ' ' + /<h2>A FILIPINO CHRISTMAS<\/h2>/.test(vista(A)) + ' ' + /Episodios \(3\)/.test(vista(A)), 'programa true true');
     t.ok('cada episodio con su estado en Dubbipt y su casting', /<b>Ep\. 1<\/b><span>Episodio 1<\/span>[\s\S]*?Con libreto[\s\S]*?<b>3<\/b> pers\.[\s\S]*?data-cs="abrirEp" data-v="e:e1"/.test(vista(A)) && /Episodio 2<\/span>[\s\S]*?Sin libreto/.test(vista(A)));
     t.ok('la barra sigue con Programas activa', /class="cs-nav-b on" data-v="programas"/.test(A.doc.getElementById('csNav').innerHTML));
-    await espera(); A.M.csPintar('shows', b.cab, b.grid);
+    const antes = A.diario.filter(x => x === 'renderLibrary').length;
+    await espera(); await espera();
+    t.eq('al llegar el registro de Dubbipt, se repinta solo', A.diario.filter(x => x === 'renderLibrary').length, antes + 1);
+    A.M.csPintar('shows', b.cab, b.grid);
     t.ok('al llegar el registro de Dubbipt, se avisa del talento distinto', A.diario.includes('registro s1') && /1 distinto en DublajeCast/.test(vista(A)));
     control(A, 'nuevoEp').onclick();
     t.ok('Nuevo episodio, en este programa', A.diario.includes('newEpisodeModal s1'));
@@ -237,10 +252,12 @@ exports.pruebas = async function(t){
     t.ok('y el programa en DublajeCast', A.diario.includes('dcastAbrir series'));
     control(A, 'abrirEp', 'e:e1').onclick(); A.M.csPintar('shows', b.cab, b.grid);
     t.eq('Casting: el episodio', A.M.CS.vista + ' ' + /<h2>Ep\. 1 · Episodio 1<\/h2>/.test(vista(A)), 'episodio true');
+    t.ok('el principal, marcado con su estrella', /<i class="cs-prin" title="Principal">[\s\S]*?<\/i>ALLY<\/b>/.test(vista(A)) && !/<\/i>JANA<\/b>/.test(vista(A)));
     t.ok('con el botón «Realizar casting»', /<button class="cs-cta" data-cs="realizar">[\s\S]*?<span>Realizar casting<\/span><\/button>/.test(vista(A)));
     t.ok('su ficha de DublajeCast y su tabla de casting', /<span>Fase<\/span><b>Preproducción<\/b>/.test(vista(A)) && /<span>Alertas<\/span>/.test(vista(A)) && /2 de 3 personajes con talento/.test(vista(A)) && /TITO BOY[\s\S]*?sin asignar/.test(vista(A)));
     control(A, 'orden', 'personaje').onclick(); A.M.csPintar('shows', b.cab, b.grid);
     t.ok('la tabla, por personaje si se pide', vista(A).indexOf('>ALLY<') < vista(A).indexOf('>JANA<') && vista(A).indexOf('>JANA<') < vista(A).indexOf('>TITO BOY<') && /class="cs-pest on" data-cs="orden" data-v="personaje"/.test(vista(A)));
+    A.LDB.showId = 'otro';
     await control(A, 'realizar').onclick(); await espera();
     t.ok('Realizar casting: el capítulo de Dubbipt, abierto con el perfil Casting', A.diario.includes('ponerModo e1 casting') && A.diario.includes('openEpisode e1') && A.LDB.showId === 's1');
     t.eq('y el registro se volverá a leer al volver', 's1' in A.M.CS.registros, false);
@@ -257,8 +274,10 @@ exports.pruebas = async function(t){
     A.M.CS.vista = 'pegado'; A.M.csPintar('shows', b.cab, b.grid);
     control(A, 'herramienta').onclick();
     t.ok('las herramientas de DublajeCast se abren en su pantalla', A.diario.includes('dcastAbrir pegado'));
+    A.M.CS.prog = 's:s1'; A.M.CS.ep = 'e:e1'; A.M.csPintar('shows', b.cab, b.grid);
     A.doc.getElementById('csNav').querySelectorAll('.cs-nav-b').find(x => x.dataset.v === 'talentos').onclick();
     t.eq('pulsar una sección de la barra va a ella, desde donde sea', [A.M.CS.vista, String(A.M.CS.prog), String(A.LDB.showId), A.LDB.browse].join(' '), 'talentos null null true');
+    t.eq('y el episodio también', String(A.M.CS.ep), 'null');
   }
   {
     const A = armar();
@@ -315,6 +334,7 @@ exports.pruebas = async function(t){
     t.eq(f + ': ninguno', malas.map(([n]) => n).join(','), '');
   }
   const HTML = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
+  t.ok('la barra de Casting, a la izquierda y la sección al lado; en el móvil, arriba', /body\.cs-on:not\(\.ep-open\) #lib\{ display:grid; grid-template-columns:212px minmax\(0,1fr\);/.test(HTML) && /body\.cs-on:not\(\.ep-open\) #lib > \*:not\(#csNav\):not\(#csVista\)\{ display:none !important; \}/.test(HTML) && /@media \(max-width:860px\)\{\n  body\.cs-on:not\(\.ep-open\) #lib\{ display:block;/.test(HTML.replace(/\r\n/g, '\n')));
   t.ok('la campana y la configuración, con iconos de trazo', /aria-label="Notificaciones"><svg /.test(HTML) && /aria-label="Configuración y cuenta"><svg /.test(HTML));
   t.ok('y Programas: buscar, Herramientas y Optimizar, también', /<span class="fi">'\+_svgI\(/.test(HTML) && /ningún capítulo">'\+_svgI\(/.test(HTML) && /abran al instante">'\+_svgI\(/.test(HTML));
 };
