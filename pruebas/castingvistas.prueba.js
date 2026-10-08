@@ -188,7 +188,11 @@ exports.pruebas = async function(t){
   t.eq('todos por nombre, vengan de donde vengan', M.csProgramas([{ id: 'z', name: 'Zeta' }], () => [], d).map(p => p.nombre).join(','), 'A Filipino Christmas,Akka,Dofus,Zeta');
   t.eq('sin datos de DublajeCast, solo los de Dubbipt', M.csProgramas(SHOWS, () => [], null).map(p => p.clave).join(','), 's:s1');
   t.eq('filtrar por estado, como en DublajeCast', ['todos', 'en_curso', 'completo'].map(f => M.csFiltrarProgramas(progs, f, '').length).join(' '), '3 2 1');
-  t.eq('y buscar por nombre o cliente, sin mayúsculas', M.csFiltrarProgramas(progs, 'todos', 'netflix').map(p => p.nombre).join(',') + ' · ' + M.csFiltrarProgramas(progs, 'en_curso', 'dofus').length, 'A FILIPINO CHRISTMAS · 0');
+  t.eq('y buscar por nombre o cliente, sin mayúsculas', M.csFiltrarProgramas(progs, 'todos', 'netflix').map(p => p.nombre).join(',') + ' · ' + M.csFiltrarProgramas(progs, 'en_curso', 'dofus').length, 'A FILIPINO CHRISTMAS · 1');
+  t.eq('buscando se mira en todos, también los completados, aunque se esté en «En curso»', M.csFiltrarProgramas(progs, 'en_curso', 'dofus').map(p => p.estado).join(','), 'completo');
+  t.eq('palabra a palabra, también en los capítulos: «filipino 102» encuentra el programa que tiene el 102', M.csFiltrarProgramas([{ nombre: 'A FILIPINO CHRISTMAS', eps: [{ name: 'Episodio 102' }], dcEps: [] }, { nombre: 'Otro', eps: [{ name: 'Episodio 102' }], dcEps: [] }], 'en_curso', 'filipino 102').map(p => p.nombre).join(','), 'A FILIPINO CHRISTMAS');
+  t.eq('y en los de DublajeCast, por título o número', M.csFiltrarProgramas([{ nombre: 'Akka', eps: [], dcEps: [{ title: 'The Last New Year', episode_number: 7 }] }], 'todos', 'akka 7').length + ' ' + M.csFiltrarProgramas([{ nombre: 'Akka', eps: [], dcEps: [{ title: 'The Last New Year', episode_number: 7 }] }], 'todos', 'last year').length, '1 1');
+  t.eq('si falta una palabra, no', M.csFiltrarProgramas([{ nombre: 'A FILIPINO CHRISTMAS', eps: [{ name: 'Episodio 101' }], dcEps: [] }], 'todos', 'filipino 102').length, 0);
   const p1 = progs[0], eps1 = M.csEpisodios(p1);
   t.eq('los episodios: los de Dubbipt con su pareja de DublajeCast, por número; sin número, al final', eps1.map(e => e.clave + ' ' + e.numero + ' ' + (e.dcEp ? e.dcEp.id : '—')).join(' | '), 'e:e1 1 11 | e:e2 2 12 | e:e9 null —');
   t.eq('con el título de DublajeCast cuando es otro', eps1[0].dcTitulo, 'Boracay');

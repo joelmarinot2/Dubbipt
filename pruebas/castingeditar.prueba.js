@@ -88,7 +88,7 @@ function armar(o){
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
     ['CS', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
      'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS', 'csAsegurarDatos', 'csDevolverCopia', 'csBajarCopia', 'CS_TRAER',
-     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub'],
+     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB'],
     { castNorm: (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim(),
       document: { getElementById: (id) => campos[id] || null, querySelector: () => null, body: { classList: { contains: () => false, toggle: () => {}, remove: () => {} } } },
       prodPuede: () => true, PROD: PROD, PROD_ET: PR.PROD_ET, prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard,
@@ -571,6 +571,20 @@ exports.pruebas = async function(t){
                       registros: { sA: { personajes: {}, capitulos: { 'Episodio 5': { ts: 1, personajes: {} }, 'Episodio 1': { ts: 1, personajes: { X: {} } } } }, sC: { personajes: {}, capitulos: { 'Episodio 1': { ts: 2, personajes: {} } } } } });
     await A.M.csJuntarRegistro('sA', 'sC');
     t.eq('al fusionar programas, las fotos de los capítulos pasan; las que ya tenía el que se queda, se quedan', Object.keys(A.regGuardados.sC.capitulos).sort().join(',') + ' · ' + Object.keys(A.regGuardados.sC.capitulos['Episodio 1'].personajes).length, 'Episodio 1,Episodio 5 · 0');
+  }
+
+  t.seccion('8d · moverse por Casting trae lo nuevo, sin recargar');
+  {
+    const A = armar();
+    const veces = () => A.diario.filter(x => x === 'libFetchAll').length;
+    t.eq('al moverse, se pide la biblioteca', A.M.csAlDia() + ' ' + (await espera(), await espera(), veces()), 'true 1');
+    t.eq('como mucho cada 10 s', A.M.csAlDia() + ' ' + veces() + ' ' + A.M.CS_BIB.cada, 'false 1 10000');
+    t.eq('«Actualizar» no espera', A.M.csAlDia(true) + ' ' + (await espera(), await espera(), veces()), 'true 2');
+    t.ok('y después repinta, para que se vea', A.diario.lastIndexOf('renderLibrary') > A.diario.lastIndexOf('libFetchAll'));
+    A.M.CS_BIB.ultima = 0;
+    A.M.CS.vista = 'programas'; A.M.CS.filtro = 'todos';
+    controles(A, 'programas').de('abrirProg').onclick(); await espera(); await espera();
+    t.eq('abrir un programa lo trae', veces(), 3);
   }
 
   t.seccion('9 · fusionar programas');

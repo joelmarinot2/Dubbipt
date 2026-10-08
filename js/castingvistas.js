@@ -222,9 +222,20 @@ function csProgramas(shows, epsDe, d){
 
 /** Los programas que se ven: por estado (todos, en curso, completados) y por lo que se busque en nombre, cliente o director. */
 function csFiltrarProgramas(lista, filtro, buscar){
-  const q = castNorm(buscar);
-  return lista.filter(p => (filtro === 'todos' || !filtro || p.estado === filtro)
-    && (!q || [p.nombre, p.cliente, p.director].some(x => castNorm(x).indexOf(q) >= 0)));
+  /* Pedido de sala: «algunos programas no se encuentran, por ejemplo Filipino 102».
+     Se busca palabra a palabra -todas tienen que estar- en el programa, su
+     cliente, su director y sus capítulos (nombre, título y número), y
+     buscando se mira en TODOS, también los completados: buscar es querer
+     encontrarlo, esté en la pestaña que esté. */
+  const palabras = castNorm(buscar).split(' ').filter(Boolean);
+  if(!palabras.length) return lista.filter(p => filtro === 'todos' || !filtro || p.estado === filtro);
+  return lista.filter(p => {
+    const donde = [p.nombre, p.cliente, p.director]
+      .concat((p.eps || []).map(e => e && e.name))
+      .concat((p.dcEps || []).map(e => e ? (e.title || '') + ' ' + (e.episode_number != null ? e.episode_number : '') : ''))
+      .map(x => castNorm(x)).join(' | ');
+    return palabras.every(w => donde.indexOf(w) >= 0);
+  });
 }
 
 /**
@@ -1588,10 +1599,27 @@ function csPintar(modo, cab, grid){
   return true;
 }
 
+/**
+ * Ponerse al día con la biblioteca al moverse por Casting: lo que otros
+ * acaban de crear se ve sin recargar la página. Antes, moverse entre
+ * programas y episodios solo repintaba lo que ya había. Como mucho cada
+ * 10 s, y no con el servidor caído (SYN-18). `ya`: aunque no hayan pasado.
+ */
+const CS_BIB = { ultima: 0, cada: 10000 };
+function csAlDia(ya){
+  if(typeof libFetchAll !== 'function' || (typeof window !== 'undefined' && window.OFFLINE)) return false;
+  if(typeof saludPausa === 'function' && saludPausa()) return false;
+  if(!ya && Date.now() - CS_BIB.ultima < CS_BIB.cada) return false;
+  CS_BIB.ultima = Date.now();
+  Promise.resolve().then(() => libFetchAll()).then(() => csRepintar()).catch(() => { /* se verá en el siguiente repaso */ });
+  return true;
+}
+
 /** Ir a una sección de la barra. Programas vuelve a la lista de todos. */
 function csIr(v){
   if(!csSecciones().some(s => s.v === v)) return false;
   CS.vista = v; CS.prog = null; CS.ep = null;
+  csAlDia();
   try{ document.body.classList.remove('ep-open'); }catch(e){ /* sin clase que quitar */ }
   LDB.browse = true; LDB.showId = null; libView = 'shows';
   try{ renderLibrary(true); }catch(e){ fallo('renderLibrary · js/castingvistas.js:csIr', e); }
@@ -1663,9 +1691,9 @@ function csCablear(vista){
       csTalentoDub(x.p, at('per'), nombre, null).catch(err => fallo('csTalentoDub · js/castingvistas.js', err, 'el talento no se ha podido guardar'));
     };
     else if(que === 'tab') el.onclick = () => { CS.tab = v; csRepintar(); };
-    else if(que === 'abrirProg') el.onclick = () => { CS.vista = 'programa'; CS.prog = v; CS.ep = null; CS.tab = 'episodios'; CS.registros = {}; csRepintar(); };
+    else if(que === 'abrirProg') el.onclick = () => { CS.vista = 'programa'; CS.prog = v; CS.ep = null; CS.tab = 'episodios'; CS.registros = {}; csRepintar(); csAlDia(); };
     else if(que === 'abrirEp') el.onclick = () => { CS.vista = 'episodio'; CS.ep = v; csRepintar(); };
-    else if(que === 'volver') el.onclick = () => { if(v === 'programas'){ CS.vista = 'programas'; CS.prog = null; CS.ep = null; } else { CS.vista = 'programa'; CS.ep = null; } csRepintar(); };
+    else if(que === 'volver') el.onclick = () => { if(v === 'programas'){ CS.vista = 'programas'; CS.prog = null; CS.ep = null; } else { CS.vista = 'programa'; CS.ep = null; } csRepintar(); csAlDia(); };
     else if(que === 'nuevoPrograma') el.onclick = () => csNuevoPrograma('');
     else if(que === 'herramientas') el.onclick = () => herramientasPanel();
     else if(que === 'importarTodo') el.onclick = () => csImportarTodo().catch(err => fallo('csImportarTodo · js/castingvistas.js', err, 'la importación no se ha podido hacer'));
@@ -1764,6 +1792,7 @@ function csCablear(vista){
 
 /** Actualizar: si DublajeCast está abierto con sesión, ya es en vivo; si no, se trae con la sesión del puente. */
 async function csActualizar(){
+  csAlDia(true);                 // «Actualizar» trae también lo nuevo de Dubbipt, ya
   if(csDatos().vivo){ csRepintar(); castAviso('Al día: son los datos de DublajeCast en vivo'); return 'vivo'; }
   let u = null;
   try{ u = (typeof dcSesion === 'function') ? await dcSesion() : null; }catch(e){ u = null; }
