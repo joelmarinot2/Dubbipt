@@ -366,14 +366,32 @@ function csHtmlCopias(copias){
        que casen por el nombre.
    Primero DublajeCast: sin sesión no se toca nada en ningún lado. */
 
-/** Los programas que parecen el mismo: el nombre de uno es el principio del otro, palabra a palabra. */
+/**
+ * Los programas que parecen el mismo:
+ *   · el nombre de uno es el principio del otro, palabra a palabra («ALWAYS» y
+ *     «ALWAYS ON CALL»);
+ *   · o todas las palabras con sentido del corto están en el largo, en
+ *     cualquier sitio («FILIPINO» y «A FILIPINO CHRISMAS», pedido de sala:
+ *     «aún no está Filipino 102» -el 102 estaba en el otro-).
+ * Una palabra larga escrita casi igual cuenta como la misma (CHRISMAS y
+ * CHRISTMAS). Las palabras vacías (THE, LOS, DE…) no bastan solas.
+ */
+const CS_VACIAS = new Set(['A', 'THE', 'OF', 'AND', 'EL', 'LA', 'LOS', 'LAS', 'DE', 'DEL', 'Y', 'UN', 'UNA', 'EN', 'LE', 'LES', 'DES', 'DU', 'ET', 'O', 'OS', 'AS', 'DA', 'DO']);
+function csMismaPalabra(a, b){
+  if(a === b) return true;
+  if(a.length < 5 || b.length < 5) return false;
+  return (typeof castSimil === 'function') && castSimil(a, b) >= 0.85;
+}
 function csParecidos(lista){
   const out = [], pal = (p) => castNorm(p.nombre).split(' ').filter(Boolean);
   for(let i = 0; i < lista.length; i++) for(let j = i + 1; j < lista.length; j++){
     const a = pal(lista[i]), b = pal(lista[j]);
     if(!a.length || !b.length) continue;
     const corto = a.length <= b.length ? a : b, largo = a.length <= b.length ? b : a;
-    if(corto.every((w, k) => largo[k] === w)) out.push([lista[i], lista[j]]);
+    const principio = corto.every((w, k) => csMismaPalabra(largo[k], w));
+    const llenas = corto.filter(w => !CS_VACIAS.has(w) && w.length >= 3);
+    const dentro = llenas.length > 0 && llenas.every(w => largo.some(x => csMismaPalabra(x, w)));
+    if(principio || dentro) out.push([lista[i], lista[j]]);
   }
   return out;
 }
@@ -393,6 +411,25 @@ function csHtmlParecidos(lista){
         return '<div class="cs-linea"><span class="cs-linea-t"><b>' + csEsc(b.nombre) + '</b> y <b>' + csEsc(a.nombre) + '</b></span>'
           + '<button class="cs-b" data-cs="fusionPar" data-v="' + csEsc(a.clave + '|' + b.clave) + '">' + csIco('fusionar', 14) + '<span>Fusionar</span></button></div>'; }).join('')
     + '</div>';
+}
+
+/**
+ * Dentro de un programa: si hay otro que parece el mismo, decirlo arriba con
+ * sus capítulos, que es donde estará lo que aquí falta (el 102 de «A FILIPINO
+ * CHRISMAS» mientras se miraba «FILIPINO»), y ofrecer fusionarlos.
+ */
+function csHtmlOtroIgual(p, lista){
+  if(CS.fusionProg && CS.fusionProg.de === p.clave) return '';
+  const otros = csParecidos(lista).filter(par => par[0].clave === p.clave || par[1].clave === p.clave).map(par => (par[0].clave === p.clave ? par[1] : par[0]));
+  if(!otros.length) return '';
+  return '<div class="cs-caja cs-caja-hist cs-otro-igual">' + otros.map(o => {
+      const eps = csEpisodios(o), a = csQuedaDe(p, o), b = a === p ? o : p;
+      const nums = eps.slice(0, 6).map(e => e.numero != null ? 'Ep. ' + e.numero : e.titulo).join(', ') + (eps.length > 6 ? '…' : '');
+      return '<div class="cs-linea">' + csIco('aviso', 14) + '<span class="cs-linea-t">Hay otro programa que parece este: <b>' + csEsc(o.nombre) + '</b>'
+        + ' · ' + eps.length + ' episodio' + (eps.length === 1 ? '' : 's') + (nums ? ' (' + csEsc(nums) + ')' : '') + '</span>'
+        + '<button class="cs-b" data-cs="abrirProg" data-v="' + csEsc(o.clave) + '">Abrir</button>'
+        + '<button class="cs-b cs-pri" data-cs="fusionPar" data-v="' + csEsc(a.clave + '|' + b.clave) + '">' + csIco('fusionar', 14) + '<span>Fusionar</span></button></div>';
+    }).join('') + '</div>';
 }
 
 /** Lo que va a pasar al fusionar `b` en `a`, en frases. */
@@ -1353,6 +1390,7 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
     +   '<button class="cs-b" data-cs="fusionProg" data-v="' + csEsc(p.clave) + '" title="Juntar este programa con otro que es el mismo">' + csIco('fusionar', 14) + '<span>Fusionar</span></button>'
     + '</div></div>'
     + csHtmlFusionProg(p, csActual().lista)
+    + csHtmlOtroIgual(p, csActual().lista)
     + '<div class="cs-prog-datos">'
     +   '<label>Nombre <input type="text" data-cs="progNombre" value="' + csEsc(p.nombre) + '" title="' + (p.show && p.serie ? 'Cambia en Dubbipt y en DublajeCast a la vez' : '') + '"></label>'
     +   (p.serie

@@ -37,6 +37,7 @@ const PR = montar([['function castNorm(t){', 'async function castRegCargar(showI
 const DC = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ DUBLAJECAST ENTERO', '/* ═══ FIN DE DUBLAJECAST ENTERO']],
   ['dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting'],
   { castNorm: undefined, prodCasarPrograma: PR.prodCasarPrograma, prodIndices: PR.prodIndices, window: { addEventListener: () => {} }, document: {}, location: { origin: '' } });
+const SIM = montar([['function castSimil(a, b){', '/* ── El registro, guardado por programa']], ['castSimil'], {});
 const DX = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ EDITAR DUBLAJECAST DESDE DUBBIPT', '/* ═══ FIN DE EDITAR DUBLAJECAST DESDE DUBBIPT']],
   ['dcxNombreTalento', 'dcxAsignar', 'dcxReasignar', 'dcxEpisodio', 'dcxSerie', 'dcxPersonaje', 'dcxTalento', 'dcxTalentoNuevo', 'dcxTrailerNuevo', 'dcxTrailer', 'dcxTrailerBorrar', 'dcxCambiarTalento', 'dcxConflictosFusion', 'dcxFusionarEpisodios', 'dcxFusionarSeries'],
   { castNorm: undefined, dcSesion: null, dcLeer: null, dcEscribir: null, prodNormalizar: null, prodGuardar: null, PROD: {} });
@@ -114,7 +115,7 @@ function armar(o){
       dcPanel: () => diario.push('dcPanel'),
       DDL_UI: { confirmModal: async (cfg) => { diario.push('pregunta ' + cfg.title + ' · ' + cfg.body); return o.confirmar !== false; } },
       sb: sb, uid: () => 'u' + (sbInsertados.length + 1) + '-' + Math.random().toString(36).slice(2, 6), libFetchAll: async () => diario.push('libFetchAll'),
-      WORKSPACE: ('ws' in o) ? o.ws : { id: 'wsP' },
+      WORKSPACE: ('ws' in o) ? o.ws : { id: 'wsP' }, castSimil: SIM.castSimil,
       prodWs: () => 'wsP', prodPerdidoTexto: PR.prodPerdidoTexto, prodRecuperar: PR.prodRecuperar,
       prodCargar: async () => { diario.push('prodCargar'); PROD.cargado = true; PROD.ws = 'wsP'; },
       prodSincronizar: async () => { diario.push('prodSincronizar'); if(o.alSincronizar) o.alSincronizar(COPIAS); return !!o.trae; },
@@ -600,6 +601,17 @@ exports.pruebas = async function(t){
     const pares = A.M.csParecidos(lista);
     t.eq('parecen el mismo cuando un nombre es el principio del otro, palabra a palabra', pares.map(x => x.map(y => y.nombre).join(' ~ ')).join(' | '), 'ALWAYS ~ ALWAYS ON CALL');
     t.eq('«A» no es el principio de «A FILIPINO…» si no es una palabra entera, ni «Akka» de nada', A.M.csParecidos([{ nombre: 'ALWAY' }, { nombre: 'ALWAYS' }, { nombre: 'Akka' }, { nombre: 'THE OFFICE' }, { nombre: 'THE CROWN' }]).length, 0);
+    t.eq('o todas sus palabras están en el otro, en cualquier sitio: «FILIPINO» y «A FILIPINO CHRISMAS»', A.M.csParecidos([{ nombre: 'FILIPINO' }, { nombre: 'A FILIPINO CHRISMAS' }, { nombre: 'DOFUS' }]).map(x => x.map(y => y.nombre).join(' ~ ')).join(' | '), 'FILIPINO ~ A FILIPINO CHRISMAS');
+    {
+      const F = armar({ shows: [{ id: 'sF', name: 'FILIPINO' }, { id: 'sX', name: 'A FILIPINO CHRISMAS' }], eps: { sF: [{ id: 'f1', show_id: 'sF', name: 'Episodio 101' }], sX: [{ id: 'f2', show_id: 'sX', name: '102' }] } });
+      F.M.CS.vista = 'programa'; F.M.CS.prog = 's:sF'; F.M.CS.tab = 'episodios'; F.M.CS.fusionProg = null;
+      const cf = controles(F, 'programa');
+      t.ok('dentro del programa, se avisa del otro que parece el mismo, con sus capítulos', /Hay otro programa que parece este: <b>A FILIPINO CHRISMAS<\/b> · 4 episodios \(Ep\. 1, Ep\. 2, Ep\. 3, Ep\. 102\)/.test(cf.html) && cf.de('abrirProg', { v: 's:sX' }) && cf.de('fusionPar', { v: 's:sX|s:sF' }));
+      cf.de('fusionPar').onclick();
+      t.ok('y «Fusionar» abre la fusión ya elegida, sin repetir el aviso', F.M.CS.prog === 's:sX' && F.M.CS.fusionProg.otro === 's:sF' && !/Hay otro programa que parece este/.test(controles(F, 'programa').html));
+    }
+    t.eq('una palabra larga casi igual cuenta como la misma', A.M.csParecidos([{ nombre: 'A FILIPINO CHRISMAS' }, { nombre: 'A Filipino Christmas' }]).length, 1);
+    t.eq('las palabras vacías solas no bastan', A.M.csParecidos([{ nombre: 'THE' }, { nombre: 'THE CROWN' }, { nombre: 'LOS DE' }, { nombre: 'LOS SIMPSON DE SIEMPRE' }]).map(x => x.map(y => y.nombre).join(' ~ ')).join(' | '), 'THE ~ THE CROWN');
     const por = (n) => lista.find(x => x.nombre === n);
     t.eq('se queda el que está en los dos lados; si no, el de nombre más largo', A.M.csQuedaDe(por('ALWAYS'), por('ALWAYS ON CALL')).nombre + ' · ' + A.M.csQuedaDe(por('A FILIPINO CHRISTMAS'), por('Akka')).nombre + ' · ' + A.M.csQuedaDe({ nombre: 'AKKA', show: {}, serie: {} }, { nombre: 'AKKA LA SERIE', show: {} }).nombre, 'ALWAYS ON CALL · A FILIPINO CHRISTMAS · AKKA');
     A.M.CS.vista = 'programas'; A.M.CS.filtro = 'todos';
