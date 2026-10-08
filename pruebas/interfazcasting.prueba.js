@@ -87,11 +87,11 @@ const REGISTRO = { personajes: { JANA: { display: 'JANA', talent: 'LUZ MAR', epi
 
 /* Producción de verdad, para normalizar e indexar como en la app. */
 const PR = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ PRODUCCIÓN · LO QUE VIENE DE DUBLAJECAST', '/* ═══ FIN DE PRODUCCIÓN']],
-  ['prodNormalizar', 'prodIndices', 'prodCasarPrograma'], { castNorm: undefined, console: { warn: () => {} } });
+  ['prodNormalizar', 'prodIndices', 'prodCasarPrograma', 'prodSinNada'], { castNorm: undefined, console: { warn: () => {} } });
 
 function armar(o){
   o = o || {};
-  const diario = [], avisos = [];
+  const diario = [], avisos = [], esperas = [];
   const doc = { body: new El('body'), createElement: (t) => new El(t), getElementById: (id) => doc.body.querySelector('#' + id) };
   doc.body.classList.add = doc.body.classList.add;
   const PROD = { datos: ('datos' in o) ? o.datos : PR.prodNormalizar(VOLCADO), cuando: new Date(2026, 9, 6).getTime() };
@@ -107,8 +107,10 @@ function armar(o){
       sbShows: () => [SH], sbEps: () => EPS, LDB: LDB, libView: 'eps',
       renderLibrary: () => {}, precacheShowData: () => {}, updateBackBtn: () => {}, refreshTopbar: () => {}, ponerModo: () => {},
       openEpisode: async (id) => diario.push('openEpisode ' + id), newShow: async () => {}, talPanel: () => {}, herramientasPanel: () => {},
+      prodSinNada: PR.prodSinNada, setTimeout: (f, ms) => { esperas.push(ms); return esperas.length; },
+      prodTomar: async () => ({ puesto: true }), prodGuardar: async () => diario.push('prodGuardar'),
       fallo: (d) => diario.push('fallo ' + d) });
-  return { M, diario, avisos, doc, PROD, LDB };
+  return { M, diario, avisos, doc, PROD, LDB, esperas };
 }
 
 exports.pruebas = async function(t){
@@ -146,9 +148,23 @@ exports.pruebas = async function(t){
   {
     const A = armar();
     t.eq('sin DublajeCast abierto, lo traído', A.M.dcastDatos().vivo + ' ' + (A.M.dcastDatos().datos === A.PROD.datos), 'false true');
-    A.M.DCAST.marco = { contentWindow: { __dcDatos: () => ({ series: [{ id: 9, name: 'Nueva' }], characters: [{ id: 1, canonical_name: 'X' }] }) } };
+    const NUEVA = () => ({ series: [{ id: 9, name: 'Nueva' }], characters: [{ id: 1, canonical_name: 'X' }] });
+    let nube = 'synced';
+    A.M.DCAST.marco = { contentWindow: { __dcDatos: NUEVA, __dcNube: () => nube } };
     const v = A.M.dcastDatos();
-    t.eq('abierto y con sesión, lo de ahora mismo, normalizado', v.vivo + ' ' + v.datos.series[0].name + ' ' + v.datos.characters[0].name + ' ' + Array.isArray(v.datos.castings), 'true Nueva X true');
+    t.eq('abierto y al día con su nube, lo de ahora mismo, normalizado', v.vivo + ' ' + v.datos.series[0].name + ' ' + v.datos.characters[0].name + ' ' + Array.isArray(v.datos.castings), 'true Nueva X true');
+    t.ok('y se apunta para guardarlo en Dubbipt', A.M.DCAST.porGuardar && A.M.DCAST.porGuardar.series[0].name === 'Nueva' && A.esperas.length === 1);
+    A.M.dcastDatos();
+    t.eq('pintar otra vez no pone otra espera: se guarda una vez, al final', A.esperas.length, 1);
+    nube = 'connecting';
+    t.eq('sin estar al día con su nube, y con algo guardado aquí: lo guardado', A.M.dcastDatos().vivo + ' ' + (A.M.dcastDatos().datos === A.PROD.datos), 'false true');
+    A.M.DCAST.marco = { contentWindow: { __dcDatos: () => ({ series: [], talents: [] }), __dcNube: () => 'synced' } };
+    t.eq('vacío, aunque diga que está al día: lo guardado', A.M.dcastDatos().vivo, false);
+    A.M.DCAST.marco = { contentWindow: { __dcDatos: NUEVA } };
+    t.eq('una copia vieja sin el gancho de la nube: lo guardado', A.M.dcastDatos().vivo, false);
+    const B = armar(); B.PROD.datos = null;
+    B.M.DCAST.marco = { contentWindow: { __dcDatos: NUEVA, __dcNube: () => 'off' } };
+    t.eq('sin nada guardado aquí, lo que enseñe, aunque no esté al día', B.M.dcastDatos().vivo + ' ' + !!B.M.DCAST.porGuardar, 'true false');
     A.M.DCAST.marco = { contentWindow: { __dcDatos: () => null } };
     t.eq('abierto sin sesión, lo traído', A.M.dcastDatos().vivo, false);
     A.M.DCAST.marco = { get contentWindow(){ throw new Error('cruzado'); } };
@@ -191,4 +207,6 @@ exports.pruebas = async function(t){
   const COPIA = fs.readFileSync(path.join(RAIZ, 'dublajecast', 'index.html'), 'utf8');
   t.ok('DublajeCast se deja llevar a una pantalla y enseña sus datos', /window\.__dcNav=\(v,sid,eid\)=>\{if\(sid!=null\)store\.setSelSeriesId\(sid\);if\(eid!==undefined&&store\.setSelEpId\)store\.setSelEpId\(eid\);store\.navTo\(v\);\};window\.__dcDatos=\(\)=>__dbDatos\.current;/.test(COPIA)
        && /window\.dubbiptPedir\("listo"\)/.test(COPIA));
+  t.ok('y dice si está al día con su nube: después de saberlo, no antes', /const cloudStatus=cloud\.status;[\s\S]{0,400}__dbNube\.current=cloudStatus;[\s\S]{0,600}window\.__dcNube=\(\)=>__dbNube\.current;/.test(COPIA)
+       && /window\.__dcNube=null;/.test(COPIA));
 };

@@ -36,7 +36,7 @@
 
 const CS = { vista: 'programas', buscar: '', soloAlertas: false, programa: '',
              prog: null, ep: null, filtro: 'en_curso', buscarProg: '', orden: 'lineas', registros: {},
-             tab: 'episodios', buscarCast: '', ordenCast: 'episodio', fusion: null, elegidos: {} };
+             tab: 'episodios', buscarCast: '', ordenCast: 'episodio', fusion: null, elegidos: {}, copias: [] };
 
 /* Iconos de trazo, como los de Dubbipt (ICO). Ningún emoji. */
 const CS_ICO = {
@@ -323,8 +323,21 @@ function csHtmlDashboard(d, hoy, vivo){
                 + (x.inconsistencias ? ' · ' + x.inconsistencias + ' personaje' + (x.inconsistencias === 1 ? '' : 's') + ' con dos talentos' : '') + '</span>'
                 + '<button class="cs-b" data-cs="abrirProg" data-v="' + csEsc(x.p.clave) + '">Revisar</button></div>').join('') + '</div>' : '';
         })()
+      + csHtmlCopias(CS.copias)
       + '<div class="cs-caja cs-caja-hist"><div class="cs-caja-t">' + csIco('actualizar', 14) + 'Últimos cambios</div>' + csHtmlHistorial(dcxHistorial(), true, 12) + '</div>'
       : csVacio());
+}
+
+/** Lo que desapareció de DublajeCast y Dubbipt guardó: para devolverlo o bajarlo. */
+function csHtmlCopias(copias){
+  const l = (copias || []).filter(c => c && !c.devuelta && c.total);
+  if(!l.length) return '';
+  return '<div class="cs-caja cs-caja-hist"><div class="cs-caja-t">' + csIco('aviso', 14) + 'Lo que se borró en DublajeCast</div>'
+    + '<div class="cs-nada">Dubbipt guardó una copia antes de que se perdiera. Devolverlo solo añade lo que falta: lo que hay ahora no se toca.</div>'
+    + l.map(c => '<div class="cs-linea"><span class="cs-linea-t"><b>' + csEsc(csFechaHora(new Date(c.cuando).toISOString())) + '</b> · faltaban ' + csEsc(prodPerdidoTexto(c.por)) + '</span>'
+      + '<button class="cs-b cs-pri" data-cs="devolver" data-v="' + csEsc(c.id) + '">Devolver a DublajeCast</button>'
+      + '<button class="cs-b" data-cs="bajarCopia" data-v="' + csEsc(c.id) + '">Descargar</button></div>').join('')
+    + '</div>';
 }
 
 function csHtmlTalentos(d, vivo){
@@ -813,6 +826,8 @@ function csCablearMas(el, que, v, at, id, a){
     if(!x.p || !x.p.serie) return;
     csEditar(pl => dcxReasignar(pl, x.p.serie.id, ch, null, nombre), (at('per') || 'Personaje') + ': ' + nombre + ' en todos sus episodios (tenía dos talentos)', csContexto(x.p, null));
   };
+  else if(que === 'devolver') el.onclick = () => { csDevolverCopia(v).catch(err => fallo('csDevolverCopia · js/castingvistas.js', err, 'no se ha podido devolver')); };
+  else if(que === 'bajarCopia') el.onclick = () => { csBajarCopia(v); };
   else if(que === 'aceptarRelevo') el.onclick = () => {
     const x = a();
     if(!dcxAceptarRelevo(at('clave'))) return;
@@ -821,6 +836,64 @@ function csCablearMas(el, que, v, at, id, a){
     castAviso(que2);
     csRepintar();
   };
+}
+
+/* ── Que no se borre nada ───────────────────────────────────────────────
+   Pedido de sala: «trae todos los datos de DublajeCast y que no se borren».
+   Al entrar en Casting se carga lo guardado en Dubbipt y, si hay sesión de
+   DublajeCast, se trae lo último sin preguntar. Lo que desaparezca allí
+   queda en una copia, y desde el Dashboard se devuelve. */
+
+const CS_TRAER_CADA = 120000;                 // como mucho, una vez cada dos minutos
+const CS_TRAER = { yendo: false, ultima: 0 };
+
+/** Carga lo guardado y trae lo último de DublajeCast, en segundo plano. Repinta si cambió algo. */
+function csAsegurarDatos(){
+  if(!prodPuede() || CS_TRAER.yendo) return false;
+  const falta = !PROD.cargado || PROD.ws !== prodWs();
+  if(!falta && Date.now() - CS_TRAER.ultima < CS_TRAER_CADA) return false;
+  CS_TRAER.yendo = true; CS_TRAER.ultima = Date.now();
+  return (async () => {
+    let cambio = false;
+    try{ if(falta){ await prodCargar(); cambio = !!PROD.datos; } }catch(e){ fallo('prodCargar · js/castingvistas.js:csAsegurarDatos', e); }
+    const antes = (CS.copias || []).length;
+    try{ if(await prodSincronizar()) cambio = true; }catch(e){ /* sin DublajeCast ahora: queda lo guardado */ }
+    try{ CS.copias = await prodCopias(); }catch(e){ CS.copias = []; }
+    const nueva = CS.copias.length > antes && CS.copias[0] && !CS.copias[0].devuelta && (Date.now() - CS.copias[0].cuando < CS_TRAER_CADA);
+    if(nueva) castAviso('En DublajeCast faltan ' + prodPerdidoTexto(CS.copias[0].por) + ' que antes estaban. Dubbipt guardó una copia: se puede devolver desde el Dashboard de Casting');
+    CS_TRAER.yendo = false;
+    if(cambio || nueva || CS.copias.length !== antes) csRepintar();
+    return cambio;
+  })();
+}
+
+/** Devuelve a DublajeCast lo que tenía una copia y ya no está. Pregunta antes. */
+async function csDevolverCopia(id){
+  const c = (CS.copias || []).find(x => String(x.id) === String(id));
+  if(!c) return 'no hay';
+  const texto = prodPerdidoTexto(c.por);
+  const ok = (typeof DDL_UI !== 'undefined' && DDL_UI.confirmModal)
+    ? await DDL_UI.confirmModal({ title: 'Devolver a DublajeCast', body: 'Vuelve a DublajeCast lo que tenía la copia del ' + csFechaHora(new Date(c.cuando).toISOString()) + ' y ya no está (' + texto + '). Lo que hay ahora no se toca.', confirmLabel: 'Devolver', cancelLabel: 'Cancelar' })
+    : true;
+  if(!ok) return 'cancelado';
+  let n = 0;
+  const r = await csEditar(pl => { n = prodRecuperar(pl, c.datos); return n > 0; }, 'Devuelto a DublajeCast lo que se había borrado (' + texto + ')', {});
+  if(r === 'guardado' || r === 'igual'){
+    await prodCopiaDevuelta(c.id, n);
+    try{ CS.copias = await prodCopias(); }catch(e){ /* se verá al recargar */ }
+    if(r === 'igual') castAviso('Ya estaba todo en DublajeCast: no faltaba nada');
+    csRepintar();
+  }
+  return r;
+}
+
+/** Baja una copia en el formato de DublajeCast, que la sabe importar. */
+function csBajarCopia(id){
+  const c = (CS.copias || []).find(x => String(x.id) === String(id));
+  if(!c) return false;
+  const json = JSON.stringify(Object.assign({ _version: 'dublajecast_v2', _exportedAt: new Date(c.cuando).toISOString(), _de: 'Dubbipt' }, c.datos), null, 2);
+  ioDescargar('dublajecast_copia_' + new Date(c.cuando).toISOString().slice(0, 10) + '.json', json, 'application/json');
+  return true;
 }
 
 /* ── Lo que se edita: celdas y controles ────────────────────────────────── */
@@ -1106,6 +1179,7 @@ function csPintar(modo, cab, grid){
   nav.querySelectorAll('.cs-nav-b').forEach(b => { b.onclick = () => csIr(b.dataset.v); });
   vista.innerHTML = csHtml(CS.vista);
   csCablear(vista);
+  csAsegurarDatos();
   return true;
 }
 

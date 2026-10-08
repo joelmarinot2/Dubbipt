@@ -321,7 +321,7 @@ async function dcxGuardar(cambio, entrada){
 /** Lo escrito, también aquí: Producción lo guarda y se pinta ya, sin esperar a DublajeCast. */
 function dcxLocal(p, entrada){
   const historial = dcxHistorial(), relevos = dcxRelevosAceptados();
-  PROD.datos = prodNormalizar(p);
+  PROD.datos = (typeof prodConservarPropio === 'function') ? prodConservarPropio(prodNormalizar(p), PROD.datos) : prodNormalizar(p);
   /* Lo que es solo de Dubbipt (quién cambió qué, los relevos aceptados) no viene de DublajeCast: se conserva. */
   if(relevos.length) PROD.datos.relevosAceptados = relevos;
   PROD.datos.historialDubbipt = entrada ? [entrada].concat(historial).slice(0, DCX_HISTORIAL) : historial;

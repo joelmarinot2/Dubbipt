@@ -33,7 +33,7 @@ const SHOWS = [{ id: 's1', name: 'A FILIPINO CHRISTMAS' }];
 const EPS_DUB = { s1: [{ id: 'e1', show_id: 's1', name: 'Episodio 1' }, { id: 'e2', show_id: 's1', name: 'Episodio 2' }] };
 
 const PR = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ PRODUCCIÓN · LO QUE VIENE DE DUBLAJECAST', '/* ═══ FIN DE PRODUCCIÓN']],
-  ['prodNormalizar', 'prodIndices', 'prodCasarPrograma', 'prodAlertasEp', 'prodPlazo', 'prodFormatoDubcard', 'prodFichaTexto', 'PROD_ET'], { castNorm: undefined, console: { warn: () => {} } });
+  ['prodNormalizar', 'prodIndices', 'prodCasarPrograma', 'prodAlertasEp', 'prodPlazo', 'prodFormatoDubcard', 'prodFichaTexto', 'PROD_ET', 'prodPerdidoTexto', 'prodRecuperar'], { castNorm: undefined, console: { warn: () => {} } });
 const DC = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ DUBLAJECAST ENTERO', '/* ═══ FIN DE DUBLAJECAST ENTERO']],
   ['dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting'],
   { castNorm: undefined, prodCasarPrograma: PR.prodCasarPrograma, prodIndices: PR.prodIndices, window: { addEventListener: () => {} }, document: {}, location: { origin: '' } });
@@ -80,9 +80,10 @@ function armar(o){
   }) };
   const H = [], RELEVOS = [];
   const borrados = [];
+  const COPIAS = o.copias || [], bajados = [];
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
     ['CS', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
-     'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS'],
+     'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS', 'csAsegurarDatos', 'csDevolverCopia', 'csBajarCopia', 'CS_TRAER'],
     { castNorm: (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim(),
       document: { getElementById: (id) => campos[id] || null, querySelector: () => null, body: { classList: { contains: () => false, toggle: () => {}, remove: () => {} } } },
       prodPuede: () => true, PROD: PROD, PROD_ET: PR.PROD_ET, prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard,
@@ -108,8 +109,13 @@ function armar(o){
       dcPanel: () => diario.push('dcPanel'),
       DDL_UI: { confirmModal: async (cfg) => { diario.push('pregunta ' + cfg.title + ' · ' + cfg.body); return o.confirmar !== false; } },
       sb: sb, uid: () => 'u' + (sbInsertados.length + 1) + '-' + Math.random().toString(36).slice(2, 6), libFetchAll: async () => diario.push('libFetchAll'),
-      WORKSPACE: ('ws' in o) ? o.ws : { id: 'wsP' } });
-  return { M, diario, avisos, PROD, LDB, campos, sbInsertados, H, RELEVOS, borrados, nube: () => P };
+      WORKSPACE: ('ws' in o) ? o.ws : { id: 'wsP' },
+      prodWs: () => 'wsP', prodPerdidoTexto: PR.prodPerdidoTexto, prodRecuperar: PR.prodRecuperar,
+      prodCargar: async () => { diario.push('prodCargar'); PROD.cargado = true; PROD.ws = 'wsP'; },
+      prodSincronizar: async () => { diario.push('prodSincronizar'); if(o.alSincronizar) o.alSincronizar(COPIAS); return !!o.trae; },
+      prodCopias: async () => COPIAS.slice(), prodCopiaDevuelta: async (id, n) => { const c = COPIAS.find(x => String(x.id) === String(id)); if(c){ c.devuelta = 1; c.devueltos = n; } return !!c; },
+      ioDescargar: (nombre, texto, tipo) => bajados.push([nombre, texto, tipo]) });
+  return { M, diario, avisos, PROD, LDB, campos, sbInsertados, H, RELEVOS, borrados, nube: () => P, COPIAS, bajados };
 }
 
 /** Los controles de una vista, ya enganchados. */
@@ -407,5 +413,51 @@ exports.pruebas = async function(t){
   {
     const A = armar();
     t.ok('el Dashboard dice qué programas hay que revisar', /Para revisar[\s\S]*?<b>A FILIPINO CHRISTMAS<\/b> · 1 personaje con dos talentos[\s\S]*?data-cs="abrirProg" data-v="s:s1"[\s\S]*?<b>Akka<\/b> · 1 capítulo repetido/.test(controles(A, 'dashboard').html));
+    t.ok('sin nada borrado, no sale el apartado', !/Lo que se borró en DublajeCast/.test(controles(A, 'dashboard').html));
+  }
+
+  t.seccion('8 · que no se borre nada');
+  {
+    /* Al entrar: lo guardado y lo último, una vez; sin prisa de repetir. */
+    const A = armar({ trae: true });
+    A.PROD.cargado = false;
+    await A.M.csAsegurarDatos();
+    t.eq('carga lo guardado y trae lo último, y repinta', A.diario.filter(x => /^prodCargar|^prodSincronizar|^renderLibrary/.test(x)).join(','), 'prodCargar,prodSincronizar,renderLibrary');
+    t.eq('pintar otra vez enseguida no vuelve a traer', await A.M.csAsegurarDatos() + ' ' + A.diario.filter(x => x === 'prodSincronizar').length, 'false 1');
+    A.M.CS_TRAER.ultima = Date.now() - 121000;
+    await A.M.csAsegurarDatos();
+    t.eq('a los dos minutos, sí', A.diario.filter(x => x === 'prodSincronizar').length, 2);
+    const N = armar(); N.PROD.cargado = true; N.PROD.ws = 'wsP';
+    await N.M.csAsegurarDatos();
+    t.eq('si DublajeCast no trae nada nuevo, no repinta', N.diario.filter(x => x === 'renderLibrary').length, 0);
+  }
+  {
+    /* Si al traer falta algo, se avisa y se ofrece devolverlo. */
+    const COPIA = () => ({ id: 77, cuando: Date.now(), por: { series: 1, episodes: 3 }, total: 4, datos: PR.prodNormalizar(VOLCADO()) });
+    const copia = COPIA();
+    const A = armar({ trae: true, payload: Object.assign(VOLCADO(), { series: VOLCADO().series.filter(s => s.id !== 3) }), alSincronizar: (l) => l.unshift(copia) });
+    A.PROD.cargado = true; A.PROD.ws = 'wsP';
+    await A.M.csAsegurarDatos();
+    t.eq('se avisa de lo que falta', A.avisos.join('|'), 'En DublajeCast faltan 1 programa, 3 capítulos que antes estaban. Dubbipt guardó una copia: se puede devolver desde el Dashboard de Casting');
+    let c = controles(A, 'dashboard');
+    t.ok('el Dashboard lo enseña, con devolver y descargar', /Lo que se borró en DublajeCast[\s\S]*?faltaban 1 programa, 3 capítulos[\s\S]*?data-cs="devolver" data-v="77"[\s\S]*?data-cs="bajarCopia" data-v="77"/.test(c.html));
+    c.de('bajarCopia').onclick();
+    const bajado = A.bajados[0];
+    t.ok('descargar: un archivo que DublajeCast sabe importar', /^dublajecast_copia_\d{4}-\d\d-\d\d\.json$/.test(bajado[0]) && JSON.parse(bajado[1])._version === 'dublajecast_v2' && JSON.parse(bajado[1]).series.length === VOLCADO().series.length && bajado[2] === 'application/json');
+    const antes = A.nube().series.length;
+    t.eq('devolver: pregunta, vuelve lo que faltaba y se apunta', await A.M.csDevolverCopia(77) + ' ' + (A.nube().series.length - antes) + ' · ' + A.H[0].que,
+         'guardado 1 · Devuelto a DublajeCast lo que se había borrado (1 programa, 3 capítulos)');
+    t.ok('preguntó diciendo que lo de ahora no se toca', A.diario.some(x => /^pregunta Devolver a DublajeCast · .*Lo que hay ahora no se toca\./.test(x)));
+    t.eq('y la copia queda como devuelta: ya no sale', A.COPIAS[0].devuelta + ' ' + /Lo que se borró en DublajeCast/.test(controles(A, 'dashboard').html), '1 false');
+    const B = armar({ copias: [COPIA()] });
+    B.M.CS.copias = B.COPIAS.slice();
+    t.eq('si ya estaba todo, se dice y no se escribe nada', await B.M.csDevolverCopia(77) + ' ' + B.avisos.includes('Ya estaba todo en DublajeCast: no faltaba nada'), 'igual true');
+    const C = armar({ copias: [COPIA()], confirmar: false });
+    C.M.CS.copias = C.COPIAS.slice();
+    t.eq('si se dice que no, nada', await C.M.csDevolverCopia(77) + ' ' + C.diario.filter(x => /^guarda/.test(x)).length + ' ' + !C.COPIAS[0].devuelta, 'cancelado 0 true');
+    const D = armar({ copias: [COPIA()], sinSesion: true });
+    D.M.CS.copias = D.COPIAS.slice();
+    t.eq('sin sesión de DublajeCast, la copia sigue para luego', await D.M.csDevolverCopia(77) + ' ' + !D.COPIAS[0].devuelta, 'sesion true');
+    t.eq('una copia que no existe', await D.M.csDevolverCopia(5), 'no hay');
   }
 };

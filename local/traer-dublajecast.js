@@ -20,8 +20,9 @@
  *   3. Sin manifiesto: no es una app que se instale aparte.
  *   4. Dentro de cada programa, la barra «Herramientas de Dubbipt»
  *      (`dublajecast/puente.js`, que es de Dubbipt y esto no toca).
- *   5. Dos ganchos para Dubbipt: abrir una pantalla desde fuera (`__dcNav`)
- *      y leer sus datos en vivo (`__dcDatos`). Al estar listos, avisa.
+ *   5. Ganchos para Dubbipt: abrir una pantalla desde fuera (`__dcNav`),
+ *      leer sus datos en vivo (`__dcDatos`) y si están al día con su nube
+ *      (`__dcNube`): solo entonces Dubbipt los guarda. Al estar listos, avisa.
  *
  * Cómo se usa, desde la carpeta de Dubbipt:
  *     node local/traer-dublajecast.js [carpeta de DublajeCast]
@@ -59,10 +60,10 @@ const RETOQUES = [
    '  useEffect(()=>{window.__dcLogout=onLogout;},[onLogout]);\n',
    '  useEffect(()=>{window.__dcLogout=onLogout;},[onLogout]);\n'
    + '  /* Dubbipt: abrir una pantalla desde fuera, y leer los datos en vivo. */\n'
-   + '  const __dbDatos=useRef(null);__dbDatos.current=store.data;\n'
+   + '  const __dbDatos=useRef(null);__dbDatos.current=store.data;const __dbNube=useRef("off");__dbNube.current=cloudStatus;\n'
    + '  useEffect(()=>{window.__dcNav=(v,sid,eid)=>{if(sid!=null)store.setSelSeriesId(sid);if(eid!==undefined&&store.setSelEpId)store.setSelEpId(eid);store.navTo(v);};'
-   + 'window.__dcDatos=()=>__dbDatos.current;try{if(window.dubbiptPedir)window.dubbiptPedir("listo");}catch(e){}'
-   + 'return()=>{window.__dcNav=null;window.__dcDatos=null;};},[]);\n']
+   + 'window.__dcDatos=()=>__dbDatos.current;window.__dcNube=()=>__dbNube.current;try{if(window.dubbiptPedir)window.dubbiptPedir("listo");}catch(e){}'
+   + 'return()=>{window.__dcNav=null;window.__dcDatos=null;window.__dcNube=null;};},[]);\n']
 ];
 
 /** Aplica los retoques a un texto. Lanza si alguno no encuentra su sitio una sola vez. */

@@ -6621,8 +6621,8 @@ function AppShell({onLogout,session}){
   const cloudStatus=cloud.status;
   useEffect(()=>{window.__dcLogout=onLogout;},[onLogout]);
   /* Dubbipt: abrir una pantalla desde fuera, y leer los datos en vivo. */
-  const __dbDatos=useRef(null);__dbDatos.current=store.data;
-  useEffect(()=>{window.__dcNav=(v,sid,eid)=>{if(sid!=null)store.setSelSeriesId(sid);if(eid!==undefined&&store.setSelEpId)store.setSelEpId(eid);store.navTo(v);};window.__dcDatos=()=>__dbDatos.current;try{if(window.dubbiptPedir)window.dubbiptPedir("listo");}catch(e){}return()=>{window.__dcNav=null;window.__dcDatos=null;};},[]);
+  const __dbDatos=useRef(null);__dbDatos.current=store.data;const __dbNube=useRef("off");__dbNube.current=cloudStatus;
+  useEffect(()=>{window.__dcNav=(v,sid,eid)=>{if(sid!=null)store.setSelSeriesId(sid);if(eid!==undefined&&store.setSelEpId)store.setSelEpId(eid);store.navTo(v);};window.__dcDatos=()=>__dbDatos.current;window.__dcNube=()=>__dbNube.current;try{if(window.dubbiptPedir)window.dubbiptPedir("listo");}catch(e){}return()=>{window.__dcNav=null;window.__dcDatos=null;window.__dcNube=null;};},[]);
   useEffect(()=>{window.__dcBusySaving=()=>store.saveStatus==="saving"||cloudStatus==="saving";return()=>{window.__dcBusySaving=null;};},[store.saveStatus,cloudStatus]);
   // Autorización: rol "lector" bloquea toda mutación de datos en un único punto (dispatch)
   const blockedAt=useRef(0);

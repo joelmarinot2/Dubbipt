@@ -25,7 +25,7 @@
 
 /* ═══ DUBLAJECAST ENTERO ════════════════════════════════════════════════════ */
 
-const DCAST = { ruta: './dublajecast/index.html', ov: null, marco: null, pendiente: null };
+const DCAST = { ruta: './dublajecast/index.html', ov: null, marco: null, pendiente: null, porGuardar: null, temporizador: null, firma: '' };
 const DCAST_PERFILES = ['casting', 'qc', 'grabacion'];
 
 /**
@@ -194,10 +194,42 @@ function dcastDatos(){
     const w = DCAST.marco && DCAST.marco.contentWindow;
     if(w && typeof w.__dcDatos === 'function'){
       const v = w.__dcDatos();
-      if(v && typeof v === 'object') return { datos: prodNormalizar(v), vivo: true };
+      const d = (v && typeof v === 'object') ? prodNormalizar(v) : null;
+      /* Al día con su nube: lo que se ve en vivo vale, y se guarda aquí. Sin
+         nube (sin sesión, conectando) puede ser una copia vieja o nada: solo
+         se usa si aquí no hay nada guardado. Vacío, nunca. */
+      const nube = (typeof w.__dcNube === 'function') ? w.__dcNube() : '';
+      const alDia = nube === 'synced' || nube === 'saving';
+      if(d && !prodSinNada(d) && (alDia || prodSinNada(PROD.datos))){
+        if(alDia) dcastRecordar(v);
+        return { datos: d, vivo: true };
+      }
     }
   }catch(e){ /* sin acceso al marco: lo traído */ }
   return { datos: PROD.datos, vivo: false };
+}
+
+/**
+ * Lo que DublajeCast enseña en vivo, guardado también en Dubbipt: así, al
+ * cerrarlo o al recargar, Casting lo sigue teniendo. Se guarda a los pocos
+ * segundos del último cambio, y solo si cambió.
+ */
+const DCAST_RECORDAR_MS = 8000;
+function dcastRecordar(v){
+  DCAST.porGuardar = v;
+  if(DCAST.temporizador) return;
+  DCAST.temporizador = setTimeout(async () => {
+    DCAST.temporizador = null;
+    const p = DCAST.porGuardar; DCAST.porGuardar = null;
+    if(!p || !prodPuede()) return;
+    let firma = '';
+    try{ firma = JSON.stringify(p); }catch(e){ return; }
+    if(firma === DCAST.firma) return;
+    try{
+      const r = await prodTomar(JSON.parse(firma), 'DublajeCast en vivo');
+      if(r.puesto){ DCAST.firma = firma; await prodGuardar(); }
+    }catch(e){ fallo('guardar lo de DublajeCast · js/dublajecast.js:dcastRecordar', e, 'lo de DublajeCast no se ha guardado en Dubbipt; se intenta con el siguiente cambio'); }
+  }, DCAST_RECORDAR_MS);
 }
 
 /** El programa de DublajeCast que corresponde a uno de Dubbipt. */

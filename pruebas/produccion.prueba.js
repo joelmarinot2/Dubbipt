@@ -23,7 +23,9 @@ const EXPORTA = ['PROD', 'PROD_CLAVES', 'prodVacio', 'prodNormalizar', 'prodEsVo
                  'prodAlertaMiami', 'prodAlertaDubcard', 'prodPlazo', 'prodFormatoDubcard', 'prodAlertasEp', 'prodFicha', 'prodFichaTexto',
                  'prodCasarPrograma', 'prodAplicar', 'prodGuardar', 'prodCargar', 'prodImportar', 'prodImportarArchivo', 'prodExportarJson',
                  'prodResumenTexto', 'prodSinTabla', 'prodHtmlProgramas', 'prodHtmlTalentos', 'prodHtmlTrailers',
-                 'prodPuede', 'prodPintarBoton', 'prodPanel', 'PROD_SIN_PERMISO'];
+                 'prodPuede', 'prodPintarBoton', 'prodPanel', 'PROD_SIN_PERMISO',
+                 'prodSinNada', 'prodPerdido', 'prodConservarPropio', 'prodPerdidoTexto', 'prodCopias', 'prodCopiaGuardar', 'prodCopiaDevuelta',
+                 'prodTomar', 'prodRecuperar', 'prodSincronizar', 'PROD_COPIAS'];
 
 const HOY = new Date(2026, 9, 7);                      // 7 de octubre de 2026, local
 const dia = (n) => { const d = new Date(HOY); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
@@ -88,13 +90,14 @@ function armar(o){
     sbShows: () => o.shows || [],
     castRegCargar: async (id) => JSON.parse(JSON.stringify(registros[id] || { personajes: {} })),
     castRegGuardar: async (id, reg) => { registros[id] = reg; diario.push('registro ' + id); return true; },
-    dcLeer: async () => o.nube || VOLCADO(),
+    dcLeer: async () => { diario.push('dcLeer'); return o.nube ? o.nube() : VOLCADO(); },
+    dcSesion: async () => (('sesion' in o) ? o.sesion : { id: 'dc1' }), dcast: o.dcast || { rev: 4 },
     castAviso: (x) => avisos.push(x), fallo: (d) => diario.push('fallo ' + d),
     esc: (x) => String(x).replace(/</g, '&lt;'),
     document: { getElementById: (id) => { diario.push('busca ' + id); return id === 'btnProduccion' ? boton : null; } },
     console: { warn: () => {}, log: () => {} }
   });
-  return { M, diario, avisos, idb, TAL, registros, sb, almacen, boton, tabla: () => tabla };
+  return { M, diario, avisos, idb, TAL, registros, sb, almacen, boton, tabla: () => tabla, ponerTabla: (x) => { tabla = x; } };
 }
 
 exports.pruebas = async function(t){
@@ -238,6 +241,78 @@ exports.pruebas = async function(t){
   }
   const Ad = armar(); Ad.M.prodPintarBoton();
   t.eq('al administrador en Casting, el botón se le ve', Ad.boton.style.display, '');
+
+  t.seccion('10 · que no se borre nada');
+  {
+    const { M } = armar();
+    t.eq('vacío de verdad: sin programas, capítulos, personajes, talentos ni castings', [null, M.prodNormalizar({}), M.prodNormalizar({ studios: [{ id: 1 }] }), M.prodNormalizar({ talents: [{ id: 1, name: 'A' }] })].map(M.prodSinNada).join(' '), 'true true true false');
+    const viejo = M.prodNormalizar(VOLCADO());
+    const nuevo = M.prodNormalizar(Object.assign(VOLCADO(), { series: VOLCADO().series.slice(0, 1), episodes: VOLCADO().episodes.filter(e => e.id !== 21), trash: [], clienteList: [] }));
+    viejo.clienteList = ['Netflix', 'Discovery']; nuevo.clienteList = ['Netflix'];
+    t.eq('lo que falta, por lista, sin contar la papelera', JSON.stringify(M.prodPerdido(viejo, nuevo)), '{"total":3,"por":{"series":1,"episodes":1,"clienteList":1}}');
+    t.eq('y en palabras', M.prodPerdidoTexto({ series: 1, episodes: 14, clienteList: 1 }), '1 programa, 14 capítulos, 1 clienteList');
+    t.eq('lo mismo, nada falta; y lo nuevo no cuenta', M.prodPerdido(viejo, M.prodNormalizar(Object.assign(VOLCADO(), { clienteList: ['Netflix', 'Discovery', 'HBO'], talents: VOLCADO().talents.concat([{ id: 9, name: 'Z' }]) }))).total, 0);
+    const conPropio = Object.assign(M.prodNormalizar(VOLCADO()), { historialDubbipt: [{ que: 'algo' }], relevosAceptados: ['1|2'] });
+    const puesto = M.prodConservarPropio(M.prodNormalizar(VOLCADO()), conPropio);
+    t.ok('lo que es solo de Dubbipt se conserva', puesto.historialDubbipt[0].que === 'algo' && puesto.relevosAceptados[0] === '1|2');
+    t.ok('y lo que trae DublajeCast manda en lo suyo', M.prodConservarPropio({ loQueSea: 1 }, { loQueSea: 2, series: [{ id: 1 }] }).loQueSea === 1 && !('series' in M.prodConservarPropio({}, { series: [1] })));
+  }
+  {
+    /* Poner encima de lo guardado. */
+    const A = armar();
+    A.ponerTabla({ data: Object.assign(VOLCADO(), { historialDubbipt: [{ que: 'cambio de antes' }] }), rev: 3, updated_at: '2026-10-07T10:00:00Z' });
+    const r1 = await A.M.prodTomar({ series: [], episodes: [] }, 'x');
+    t.eq('llega vacío: no se pone, y antes se cargó lo guardado', r1.puesto + ' ' + A.M.PROD.datos.series.length, 'false 2');
+    const menos = Object.assign(VOLCADO(), { series: VOLCADO().series.slice(0, 1), episodes: VOLCADO().episodes.filter(e => e.series_id !== 2), castings: VOLCADO().castings.filter(c => c.id !== 3) });
+    const r2 = await A.M.prodTomar(menos, 'DublajeCast · hoy');
+    t.eq('falta algo: se pone, y antes se guarda copia de lo de antes', r2.puesto + ' ' + r2.perdido.total + ' ' + (r2.copia && r2.copia.datos.series.length) + ' ' + A.M.PROD.datos.series.length, 'true 3 2 1');
+    t.eq('el historial de Dubbipt sigue ahí', A.M.PROD.datos.historialDubbipt[0].que, 'cambio de antes');
+    t.ok('la copia, en el equipo y en la carpeta del usuario', A.idb['ddl-produccion-copias::ws1'].length === 1 && A.diario.includes('almacen _diag/u1/produccion-copias.json'));
+    const r3 = await A.M.prodTomar(menos, 'otra vez');
+    t.eq('sin perder nada, sin copia nueva', r3.puesto + ' ' + r3.copia + ' ' + A.idb['ddl-produccion-copias::ws1'].length, 'true null 1');
+    delete A.idb['ddl-produccion-copias::ws1'];
+    t.eq('sin las del equipo, las de la nube', (await A.M.prodCopias()).map(c => c.total).join(','), '3');
+    const B = armar();
+    for(let i = 0; i < A.M.PROD_COPIAS + 3; i++){ B.M.PROD.datos = B.M.prodNormalizar(VOLCADO()); B.M.PROD.cargado = true; B.M.PROD.ws = 'ws1'; await B.M.prodTomar(menos, 'x'); }
+    t.eq('se guardan las últimas, no todas', B.idb['ddl-produccion-copias::ws1'].length + ' ' + JSON.parse(B.almacen['_diag/u1/produccion-copias.json'].x[0]).length, A.M.PROD_COPIAS + ' 3');
+    const id = (await A.M.prodCopias())[0].id;
+    t.eq('se apunta que se devolvió', await A.M.prodCopiaDevuelta(id, 4) + ' ' + (await A.M.prodCopias())[0].devueltos + ' ' + await A.M.prodCopiaDevuelta('no', 1), 'true 4 false');
+  }
+  {
+    /* Devolver: solo añade. */
+    const { M } = armar();
+    const copia = M.prodNormalizar(VOLCADO());
+    const ahora = JSON.parse(JSON.stringify(VOLCADO()));
+    ahora.series = ahora.series.slice(0, 1); ahora.episodes = ahora.episodes.filter(e => e.id !== 21);
+    ahora.castings = ahora.castings.filter(c => c.id !== 3 && c.id !== 2).concat([{ id: 50, character_id: '102', talent_id: 3, episode_id: '11' }]);
+    ahora.series[0].name = 'Cambiado ahora';
+    const n = M.prodRecuperar(ahora, copia);
+    t.eq('vuelve lo que faltaba', n + ' ' + ahora.series.map(s => s.id).join(',') + ' ' + ahora.episodes.map(e => e.id).join(','), '3 1,2 11,12,21');
+    t.eq('lo que hay ahora no se toca', ahora.series[0].name, 'Cambiado ahora');
+    t.eq('una asignación no vuelve si el personaje ya tiene otra en ese capítulo', ahora.castings.map(c => c.id).sort((a, b) => a - b).join(','), '1,3,4,50');
+    t.eq('devolver otra vez no duplica nada', M.prodRecuperar(ahora, copia), 0);
+    t.eq('sin copia, nada', M.prodRecuperar(ahora, null), 0);
+  }
+  {
+    /* Traer solo, al entrar en Casting. */
+    const S = armar();
+    t.eq('con sesión, trae y guarda', await S.M.prodSincronizar() + ' ' + S.M.PROD.dcRev + ' ' + S.diario.some(x => /^upsert produccion/.test(x)), 'true 4 true');
+    const lecturas = S.diario.filter(x => x === 'dcLeer').length;
+    t.eq('si DublajeCast no ha cambiado, no se vuelve a guardar', await S.M.prodSincronizar() + ' ' + S.diario.filter(x => /^upsert/.test(x)).length + ' ' + (S.diario.filter(x => x === 'dcLeer').length - lecturas), 'false 1 1');
+    t.ok('la revisión de DublajeCast viaja con la copia del equipo', S.idb['ddl-produccion::ws1'].dcRev === 4);
+    t.eq('sin sesión de DublajeCast, nada', await armar({ sesion: null }).M.prodSincronizar(), false);
+    t.eq('quien no es administrador, nada', await armar({ rol: 'member' }).M.prodSincronizar(), false);
+    const V = armar({ nube: () => ({ series: [], talents: [] }) });
+    V.idb['ddl-produccion::ws1'] = { datos: VOLCADO(), rev: 1, origen: 'antes', cuando: 1 };
+    t.eq('si DublajeCast llega vacío, se queda lo guardado', await V.M.prodSincronizar() + ' ' + V.M.PROD.datos.series.length, 'false 2');
+    let mal = '';
+    try{ await V.M.prodImportar({ series: [], episodes: [] }, 'x'); }catch(e){ mal = e.message; }
+    t.ok('y traerlo a mano tampoco lo borra: se dice', /ha llegado vacío: se queda lo que ya estaba guardado/.test(mal) && V.M.PROD.datos.series.length === 2);
+    const H = armar();
+    H.ponerTabla({ data: Object.assign(VOLCADO(), { historialDubbipt: [{ que: 'quién cambió qué' }] }), rev: 3, updated_at: '2026-10-07T10:00:00Z' });
+    await H.M.prodImportar(VOLCADO(), 'x');
+    t.eq('«Actualizar» ya no borra quién cambió qué', H.M.PROD.datos.historialDubbipt[0].que, 'quién cambió qué');
+  }
 
   t.seccion('9 · por dónde se entra');
   const F2 = fuentes().map(f => f.src).join('\n');

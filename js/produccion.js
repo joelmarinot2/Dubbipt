@@ -26,7 +26,7 @@
 
 /* ═══ PRODUCCIÓN · LO QUE VIENE DE DUBLAJECAST ═════════════════════════════ */
 
-const PROD = { datos: null, rev: 0, origen: '', donde: '', cuando: 0, cargado: false, ws: null };
+const PROD = { datos: null, rev: 0, origen: '', donde: '', cuando: 0, cargado: false, ws: null, dcRev: null };
 
 /* Las listas que trae DublajeCast. Si falta alguna, se crea vacía. */
 const PROD_CLAVES = ['series', 'episodes', 'characters', 'aliases', 'appearances', 'talents', 'castings',
@@ -316,7 +316,7 @@ function prodRutaAlmacen(uid){ return '_diag/' + uid + '/produccion.json'; }
  */
 async function prodGuardar(){
   if(!PROD.datos) return { ok: false, donde: '', causa: 'no hay datos que guardar' };
-  const paquete = { datos: PROD.datos, rev: PROD.rev, origen: PROD.origen, cuando: PROD.cuando };
+  const paquete = { datos: PROD.datos, rev: PROD.rev, origen: PROD.origen, cuando: PROD.cuando, dcRev: PROD.dcRev };
   try{ await idbSet(prodClaveLocal(), paquete); }catch(e){ /* sin copia en el equipo: queda la nube */ }
   const ws = prodWs();
   if(!ws) return { ok: true, donde: 'equipo', causa: 'sin espacio de trabajo elegido: solo en este equipo' };
@@ -345,6 +345,7 @@ async function prodCargar(fuerza){
   try{ local = await idbGet(prodClaveLocal()); }catch(e){ local = null; }
   const pon = (datos, rev, origen, cuando, donde) => {
     PROD.datos = prodNormalizar(datos); PROD.rev = +rev || 0; PROD.origen = origen || ''; PROD.cuando = +cuando || 0; PROD.donde = donde;
+    PROD.dcRev = (local && local.dcRev != null) ? local.dcRev : null;
   };
   if(prodWs()){
     try{
@@ -352,7 +353,7 @@ async function prodCargar(fuerza){
       if(!error && data && data.data){
         pon(data.data, data.rev, (local && local.origen) || 'DublajeCast', Date.parse(data.updated_at) || 0, 'tabla');
         PROD.cargado = true;
-        try{ await idbSet(prodClaveLocal(), { datos: PROD.datos, rev: PROD.rev, origen: PROD.origen, cuando: PROD.cuando }); }catch(e){ /* sin copia */ }
+        try{ await idbSet(prodClaveLocal(), { datos: PROD.datos, rev: PROD.rev, origen: PROD.origen, cuando: PROD.cuando, dcRev: PROD.dcRev }); }catch(e){ /* sin copia */ }
         return prodResumen(PROD.datos);
       }
       if(error && !prodSinTabla(error)) fallo('produccion · js/produccion.js:prodCargar', error);
@@ -378,6 +379,171 @@ async function prodCargar(fuerza){
   return null;
 }
 
+/* ── Que no se borre nada ─────────────────────────────────────────────────
+   Pedido de sala: «trae todos los datos de DublajeCast y que no se borren».
+   Lo traído se guarda en Dubbipt y se vuelve a cargar solo al entrar en
+   Casting. Al poner algo nuevo encima de lo guardado:
+     · si llega vacío (DublajeCast sin sesión o a medio cargar) y aquí había
+       datos, no se pone: se queda lo guardado;
+     · lo que es solo de Dubbipt -quién cambió qué, relevos aceptados- no
+       viene de DublajeCast, que no lo conoce: se conserva;
+     · si falta algo que había, ANTES se guarda una copia de lo de antes, y
+       desde Casting se puede devolver a DublajeCast. Devolver solo AÑADE lo
+       que falta: nunca quita ni cambia lo que hay ahora. */
+
+const PROD_COPIAS = 10;                 // copias en el equipo
+const PROD_COPIAS_NUBE = 3;             // y las últimas, en la carpeta del usuario
+function prodClaveCopias(){ return 'ddl-produccion-copias::' + (prodWs() || 'sin-espacio'); }
+function prodRutaCopias(uid){ return '_diag/' + uid + '/produccion-copias.json'; }
+
+/** ¿No trae nada de nada? */
+function prodSinNada(d){
+  return !d || ['series', 'episodes', 'characters', 'talents', 'castings'].every(k => !Array.isArray(d[k]) || !d[k].length);
+}
+
+/** Con qué se reconoce cada cosa: su id; las listas de nombres, el nombre. */
+function prodIdDe(x){
+  if(x && typeof x === 'object') return x.id != null ? 'i:' + String(x.id) : null;
+  return x == null ? null : 'v:' + String(x);
+}
+
+/** Lo que había en `viejo` y en `nuevo` ya no está: `{ total, por: { series: 2, … } }`. La papelera no cuenta. */
+function prodPerdido(viejo, nuevo){
+  const out = { total: 0, por: {} };
+  if(!viejo || !nuevo) return out;
+  for(const k of PROD_CLAVES){
+    if(k === 'trash') continue;
+    const a = Array.isArray(viejo[k]) ? viejo[k] : [];
+    if(!a.length) continue;
+    const hay = new Set((Array.isArray(nuevo[k]) ? nuevo[k] : []).map(prodIdDe));
+    const fuera = a.filter(x => { const id = prodIdDe(x); return id != null && !hay.has(id); }).length;
+    if(fuera){ out.por[k] = fuera; out.total += fuera; }
+  }
+  return out;
+}
+
+/** Lo que es solo de Dubbipt (lo que DublajeCast no trae), de `viejo` a `nuevo`. */
+function prodConservarPropio(nuevo, viejo){
+  if(!viejo || !nuevo) return nuevo;
+  for(const k in viejo){
+    if(PROD_CLAVES.indexOf(k) >= 0 || /^_/.test(k) || k in nuevo) continue;
+    nuevo[k] = viejo[k];
+  }
+  return nuevo;
+}
+
+/** Lo que falta, en palabras: «2 programas, 14 capítulos». */
+const PROD_NOMBRES = { series: ['programa', 'programas'], episodes: ['capítulo', 'capítulos'], characters: ['personaje', 'personajes'],
+  talents: ['talento', 'talentos'], castings: ['asignación', 'asignaciones'], appearances: ['aparición', 'apariciones'], trailers: ['tráiler', 'tráilers'],
+  team: ['persona del equipo', 'personas del equipo'], studios: ['estudio', 'estudios'], breakdowns: ['breakdown', 'breakdowns'], entregas: ['entrega', 'entregas'] };
+function prodPerdidoTexto(por){
+  return Object.keys(por || {}).map(k => { const n = por[k], nom = PROD_NOMBRES[k] || [k, k]; return n + ' ' + nom[n === 1 ? 0 : 1]; }).join(', ');
+}
+
+/** Las copias guardadas, la más nueva primero: las del equipo y, si no hay, las de la nube. */
+async function prodCopias(){
+  let l = null;
+  try{ l = await idbGet(prodClaveCopias()); }catch(e){ l = null; }
+  if(Array.isArray(l) && l.length) return l;
+  try{
+    const uid = await prodUid();
+    if(uid){
+      const r = await sb.storage.from('libretos').download(prodRutaCopias(uid));
+      if(r && r.data){ const n = JSON.parse(await r.data.text()); if(Array.isArray(n)) return n; }
+    }
+  }catch(e){ /* sin nube: no hay copias */ }
+  return [];
+}
+
+/** Guarda `datos` como copia, con lo que se iba a perder. Devuelve la copia. */
+async function prodCopiaGuardar(datos, perdido){
+  const copia = { id: Date.now(), cuando: Date.now(), por: perdido.por, total: perdido.total, resumen: prodResumen(datos), datos: datos };
+  const l = [copia].concat(await prodCopias()).slice(0, PROD_COPIAS);
+  try{ await idbSet(prodClaveCopias(), l); }catch(e){ /* sin copia en el equipo: queda la nube */ }
+  try{
+    const uid = await prodUid();
+    if(uid) await sb.storage.from('libretos').upload(prodRutaCopias(uid),
+      new Blob([JSON.stringify(l.slice(0, PROD_COPIAS_NUBE))], { type: 'application/json' }), { upsert: true });
+  }catch(e){ /* sin nube: queda la del equipo */ }
+  return copia;
+}
+
+/** Apunta en la copia que ya se devolvió a DublajeCast. */
+async function prodCopiaDevuelta(id, n){
+  const l = await prodCopias();
+  const c = l.find(x => String(x.id) === String(id));
+  if(!c) return false;
+  c.devuelta = Date.now(); c.devueltos = n;
+  try{ await idbSet(prodClaveCopias(), l); }catch(e){ /* se verá sin la marca */ }
+  return true;
+}
+
+/**
+ * Pone lo nuevo de DublajeCast en lugar de lo guardado, sin perder nada (ver
+ * arriba). Devuelve `{ puesto, perdido, copia }`; `puesto` es falso cuando
+ * llegó vacío y se quedó lo de antes.
+ */
+async function prodTomar(payload, origen){
+  if(!PROD.cargado || PROD.ws !== prodWs()){ try{ await prodCargar(); }catch(e){ /* sin lo guardado: lo nuevo es lo primero */ } }
+  const nuevo = prodNormalizar(payload);
+  const viejo = PROD.datos;
+  if(prodSinNada(nuevo) && viejo && !prodSinNada(viejo)) return { puesto: false, perdido: { total: 0, por: {} }, copia: null };
+  const perdido = prodPerdido(viejo, nuevo);
+  const copia = perdido.total ? await prodCopiaGuardar(viejo, perdido) : null;
+  PROD.datos = prodConservarPropio(nuevo, viejo);
+  PROD.origen = origen || PROD.origen || 'DublajeCast';
+  PROD.cuando = Date.now();
+  PROD.cargado = true; PROD.ws = prodWs();
+  return { puesto: true, perdido: perdido, copia: copia };
+}
+
+/**
+ * Devuelve a `p` (lo de DublajeCast ahora) lo que la copia tenía y ya no
+ * está. Solo añade: lo que hay se queda como está. Una asignación o una
+ * aparición no vuelve si ese personaje ya tiene otra en ese capítulo.
+ * Devuelve cuántas cosas volvieron.
+ */
+function prodRecuperar(p, copiaDatos){
+  let n = 0;
+  const parDe = (x) => (x && x.character_id != null && x.episode_id != null) ? String(x.character_id) + '|' + String(x.episode_id) : null;
+  for(const k of PROD_CLAVES){
+    if(k === 'trash') continue;
+    const viejos = (copiaDatos && Array.isArray(copiaDatos[k])) ? copiaDatos[k] : [];
+    if(!viejos.length) continue;
+    if(!Array.isArray(p[k])) p[k] = [];
+    const ids = new Set(p[k].map(prodIdDe));
+    const pares = (k === 'castings' || k === 'appearances') ? new Set(p[k].map(parDe).filter(Boolean)) : null;
+    for(const x of viejos){
+      const id = prodIdDe(x);
+      if(id == null || ids.has(id)) continue;
+      if(pares){ const par = parDe(x); if(par && pares.has(par)) continue; if(par) pares.add(par); }
+      p[k].push((x && typeof x === 'object') ? JSON.parse(JSON.stringify(x)) : x);
+      ids.add(id); n++;
+    }
+  }
+  return n;
+}
+
+/**
+ * Trae lo último de DublajeCast sin preguntar, si hay sesión en el puente.
+ * Solo cuando DublajeCast ha cambiado desde la última vez. Devuelve true si
+ * ha puesto algo nuevo.
+ */
+async function prodSincronizar(){
+  if(!prodPuede()) return false;
+  let u = null;
+  try{ u = (typeof dcSesion === 'function') ? await dcSesion() : null; }catch(e){ u = null; }
+  if(!u) return false;
+  const p = await dcLeer();
+  const rev = (typeof dcast !== 'undefined' && dcast) ? dcast.rev : null;
+  if(rev != null && PROD.dcRev === rev && PROD.datos && PROD.ws === prodWs()) return false;
+  const r = await prodTomar(p, 'DublajeCast · ' + new Date().toLocaleDateString('es'));
+  if(!r.puesto) return false;
+  PROD.dcRev = rev;
+  await prodGuardar();
+  return true;
+}
+
 /* ── Traer ─────────────────────────────────────────────────────────────── */
 
 /**
@@ -388,14 +554,12 @@ async function prodCargar(fuerza){
 async function prodImportar(payload, origen){
   if(!prodPuede()) throw new Error(PROD_SIN_PERMISO);
   if(!prodEsVolcado(payload)) throw new Error('eso no es un volcado de DublajeCast: no trae series, capítulos, talentos ni castings');
-  PROD.datos = prodNormalizar(payload);
-  PROD.origen = origen || 'DublajeCast';
-  PROD.cuando = Date.now();
-  PROD.cargado = true; PROD.ws = prodWs();
+  const tomado = await prodTomar(payload, origen || 'DublajeCast');
+  if(!tomado.puesto) throw new Error('DublajeCast ha llegado vacío: se queda lo que ya estaba guardado, no se borra nada');
   const resumen = prodResumen(PROD.datos);
   const efectos = await prodAplicar(PROD.datos);
   const guardado = await prodGuardar();
-  return { resumen: resumen, efectos: efectos, guardado: guardado };
+  return { resumen: resumen, efectos: efectos, guardado: guardado, perdido: tomado.perdido, copia: tomado.copia };
 }
 
 /** Desde la nube de DublajeCast, con la sesión que la persona abrió en su panel. */
