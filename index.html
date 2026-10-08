@@ -1723,8 +1723,14 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-pest.on{ background:#22C55E; color:#06210f; }
 .cs-pest.on b{ color:#06210f; }
 .cs-progs{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; }
-.cs-prog{ background:#101215; border:1px solid #23262b; border-top:3px solid #22C55E; border-radius:13px; padding:15px 16px; display:flex; flex-direction:column; gap:8px; }
-.cs-prog.cs-prog-hecho{ border-top-color:#4b5563; opacity:.8; }
+/* En curso en ámbar y completado en verde: que no se confundan (PRO-25). */
+.cs-prog{ background:#101215; border:1px solid #23262b; border-top:3px solid #FBBF24; border-radius:13px; padding:15px 16px; display:flex; flex-direction:column; gap:8px; }
+.cs-prog.cs-prog-hecho{ border-top-color:#22C55E; background:#0e1411; opacity:.82; }
+.cs-prog-bots{ display:flex; gap:6px; margin-top:auto; }
+.cs-prog-bots .cs-prog-abrir{ flex:1; margin-top:0; }
+.cs-prog-marcar{ padding:6px 10px; font-size:12px; }
+.cs-estado{ display:inline-flex; align-items:center; gap:4px; }
+.cs-estado-en_curso{ color:#FBBF24; } .cs-estado-completo{ color:#4ADE80; } .cs-estado-pendiente{ color:#93C5FD; }
 .cs-prog-t{ display:flex; flex-direction:column; gap:2px; }
 .cs-prog-t b{ color:#f2f3f5; font-size:14px; }
 .cs-prog-chips{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
@@ -2644,7 +2650,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.43.0-nube';
+const APP_VER_NUM = 'v11.44.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);

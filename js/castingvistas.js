@@ -64,6 +64,7 @@ const CS_ICO = {
   traer:      '<path d="M7 7h11l-3-3"/><path d="M17 17H6l3 3"/>',
   buscar:     '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
   izquierda:  '<path d="M15 6l-6 6 6 6"/>',
+  hecho:      '<path d="M5 12l5 5L20 7"/>',
   fusionar:   '<path d="M7 4v5c0 3 2 5 5 5h5"/><path d="M7 20v-6"/><path d="M14 11l3 3-3 3"/>'
 };
 /** Un icono de trazo, en el mismo dibujo que los de Dubbipt. */
@@ -201,10 +202,39 @@ function csNumeroDe(nombre, programa){
 }
 
 /** Un programa, junte lo que junte: el de Dubbipt, el de DublajeCast, o los dos. */
+/* ── Programas completados ──────────────────────────────────────────────
+   Pedido de sala: «quiero poder marcar los programas que ya están
+   completados; asigna otro color a los que están en curso para que no se
+   confundan». Un programa de Dubbipt guarda su estado en la columna
+   `shows.estado` (sql/mejora-04-estado-programas.sql); mientras no exista, en
+   este equipo, y se dice. Uno de DublajeCast, allí. Completado si lo dice
+   cualquiera de los dos. */
+
+function csClaveEstados(){ return 'ddl-estados::' + ((typeof WORKSPACE !== 'undefined' && WORKSPACE && WORKSPACE.id) || 'sin-espacio'); }
+function csEstadosLocales(){
+  try{ const v = JSON.parse(localStorage.getItem(csClaveEstados()) || '{}'); return (v && typeof v === 'object') ? v : {}; }catch(e){ return {}; }
+}
+function csEstadoLocal(showId, estado){
+  const m = csEstadosLocales();
+  if(estado) m[String(showId)] = estado; else delete m[String(showId)];
+  try{ localStorage.setItem(csClaveEstados(), JSON.stringify(m)); }catch(e){ /* sin almacén: solo hasta recargar */ }
+}
+/** El estado de un programa de Dubbipt: su columna si la hay; si no, lo marcado en este equipo. */
+function csEstadoShow(show){
+  if(!show) return null;
+  if(typeof show.estado === 'string' && show.estado) return show.estado;
+  return csEstadosLocales()[String(show.id)] || null;
+}
+function csEstadoDe(show, serie){
+  const de = csEstadoShow(show), dc = serie ? (serie.status || 'en_curso') : null;
+  if(de === 'completo' || dc === 'completo') return 'completo';
+  return dc || de || 'en_curso';
+}
+
 function csProg(show, serie, eps, d){
   const dcEps = (serie && d) ? d.episodes.filter(e => String(e.series_id) === String(serie.id)) : [];
   return { clave: show ? 's:' + show.id : 'dc:' + serie.id, nombre: show ? show.name : serie.name, show: show || null, serie: serie || null,
-           estado: (serie && serie.status) || 'en_curso', cliente: (serie && serie.cliente) || '', director: (serie && serie.director) || '',
+           estado: csEstadoDe(show, serie), cliente: (serie && serie.cliente) || '', director: (serie && serie.director) || '',
            tipo: (serie && serie.type) || '', eps: eps || [], dcEps: dcEps };
 }
 
@@ -296,6 +326,10 @@ function csColor(nivel){
   return nivel === 'vencida' || nivel === 'vencido' ? 'mal' : (nivel === 'urgente' ? 'urge' : (nivel === 'pronto' || nivel === 'aviso' ? 'pronto' : (nivel === 'hecho' || nivel === 'ok' ? 'ok' : 'nada')));
 }
 function csChip(texto, nivel){ return '<span class="cs-chip cs-' + csColor(nivel) + '">' + csEsc(texto) + '</span>'; }
+/** El estado de un programa, con su color: en curso en ámbar, completado en verde. Antes los dos salían en verde. */
+function csChipEstado(estado){
+  return '<span class="cs-chip cs-estado cs-estado-' + csEsc(estado || 'en_curso') + '">' + (estado === 'completo' ? csIco('hecho', 11) : '') + csEsc(CS_ESTADO[estado] || estado || 'En curso') + '</span>';
+}
 
 /** La cabecera de una sección: su nombre, de dónde salen los datos y actualizar. */
 function csCabecera(titulo, sub, vivo){
@@ -552,6 +586,37 @@ async function csTalentoDub(p, personaje, nombre, e){
   castAviso(que);
   csRepintar();
   return 'guardado';
+}
+
+/**
+ * Marca un programa como completado o en curso: en Dubbipt (su columna o, si
+ * aún no existe, este equipo) y, para el administrador, en DublajeCast.
+ * Devuelve dónde quedó: 'nube', 'equipo', 'error' o 'nada'.
+ */
+async function csCambiarEstado(p, nuevo){
+  if(!p || (nuevo !== 'completo' && nuevo !== 'en_curso')) return 'nada';
+  let donde = 'nada';
+  if(p.show){
+    let r = null;
+    try{ r = await sb.from('shows').update({ estado: nuevo }).eq('id', p.show.id); }catch(e){ r = { error: e }; }
+    const err = r && r.error;
+    if(!err){ p.show.estado = nuevo; csEstadoLocal(p.show.id, null); donde = 'nube'; }
+    else if(/42703|column .*estado|estado.* does not exist|schema cache/i.test(String(err.code || '') + ' ' + String(err.message || ''))){
+      csEstadoLocal(p.show.id, nuevo); donde = 'equipo';
+    }
+    else { castAviso('No se pudo guardar el estado de «' + p.nombre + '»: ' + (err.message || err)); return 'error'; }
+  }
+  if(p.serie && prodPuede()){
+    const sid = p.serie.id;
+    const r = await csEditar(pl => dcxSerie(pl, sid, { status: nuevo }), null, csContexto(p, null));
+    if(r === 'guardado' || r === 'igual') donde = (donde === 'nada') ? 'nube' : donde;
+    else if(donde === 'nada') return 'error';
+  }
+  const que = (nuevo === 'completo' ? 'Programa completado: ' : 'Programa en curso: ') + p.nombre;
+  if(prodPuede()) try{ dcxRegistrar(dcxEntrada(que, csContexto(p, null))); }catch(e){ /* sin apuntar */ }
+  castAviso(que + (donde === 'equipo' ? ' · guardado solo en este equipo: para que lo vea todo el equipo, corre sql/mejora-04-estado-programas.sql una vez' : ''));
+  csRepintar();
+  return donde;
 }
 
 /** Fusiona `b` en `a`, preguntando antes. */
@@ -1342,12 +1407,14 @@ function csHtmlProgramas(lista, vivo){
         const n = csEpisodios(p).length;
         return '<div class="cs-prog' + (p.estado === 'completo' ? ' cs-prog-hecho' : '') + '">'
           + '<div class="cs-prog-t"><b>' + csEsc(p.nombre) + '</b>' + (p.tipo ? '<span class="cs-tenue">' + csEsc(p.tipo) + '</span>' : '') + '</div>'
-          + '<div class="cs-prog-chips">' + csChip(CS_ESTADO[p.estado] || p.estado, p.estado === 'completo' ? 'hecho' : 'ok')
+          + '<div class="cs-prog-chips">' + csChipEstado(p.estado)
           +   (p.cliente ? '<span class="cs-etq">' + csEsc(p.cliente) + '</span>' : '')
           +   (!p.show ? '<span class="cs-etq cs-etq-dc">Solo en DublajeCast</span>' : (!p.serie ? '<span class="cs-etq">Solo en Dubbipt</span>' : '')) + '</div>'
           + (p.director ? '<div class="cs-tenue">Dir: ' + csEsc(p.director) + '</div>' : '')
           + '<div class="cs-prog-n">' + n + ' episodio' + (n === 1 ? '' : 's') + '</div>'
-          + '<button class="cs-b cs-pri cs-prog-abrir" data-cs="abrirProg" data-v="' + csEsc(p.clave) + '">Abrir</button>'
+          + '<div class="cs-prog-bots"><button class="cs-b cs-pri cs-prog-abrir" data-cs="abrirProg" data-v="' + csEsc(p.clave) + '">Abrir</button>'
+          +   '<button class="cs-b cs-prog-marcar" data-cs="estadoCard" data-v="' + csEsc(p.clave) + '" title="' + (p.estado === 'completo' ? 'Volver a ponerlo en curso' : 'Marcarlo como completado') + '">'
+          +     (p.estado === 'completo' ? csIco('actualizar', 13) + '<span>Reabrir</span>' : csIco('hecho', 13) + '<span>Completar</span>') + '</button></div>'
           + '</div>';
       }).join('') + '</div>'
       : '<div class="cs-nada">' + (CS.buscarProg ? 'Ningún programa coincide con «' + csEsc(CS.buscarProg) + '».' : 'No hay programas.') + '</div>');
@@ -1397,10 +1464,10 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
     + csHtmlOtroIgual(p, csActual().lista)
     + '<div class="cs-prog-datos">'
     +   '<label>Nombre <input type="text" data-cs="progNombre" value="' + csEsc(p.nombre) + '" title="' + (p.show && p.serie ? 'Cambia en Dubbipt y en DublajeCast a la vez' : '') + '"></label>'
+    +   '<button class="cs-b" data-cs="estadoProg" title="' + (p.serie && p.show ? 'Cambia el estado en Dubbipt y en DublajeCast' : 'Cambiar el estado del programa') + '">' + csChipEstado(p.estado)
+    +     '<span>' + (p.estado === 'completo' ? 'Volver a En curso' : 'Marcar Completado') + '</span></button>'
     +   (p.serie
-          ? '<button class="cs-b" data-cs="estadoProg" title="Cambiar el estado del programa en DublajeCast">' + csChip(CS_ESTADO[p.estado] || p.estado, p.estado === 'completo' ? 'hecho' : 'ok')
-            + '<span>' + (p.estado === 'completo' ? 'Volver a En curso' : 'Marcar Completado') + '</span></button>'
-            + '<label>Cliente <input type="text" data-cs="progCampo" data-campo="cliente" value="' + csEsc(p.cliente) + '" placeholder="—"></label>'
+          ? '<label>Cliente <input type="text" data-cs="progCampo" data-campo="cliente" value="' + csEsc(p.cliente) + '" placeholder="—"></label>'
             + '<label>Director <input type="text" data-cs="progCampo" data-campo="director" value="' + csEsc(p.director) + '" placeholder="—"></label>'
           : '')
     + '</div>'
@@ -1797,9 +1864,12 @@ function csCablear(vista){
       csEditar(pl => dcxSerie(pl, sid, { [campo]: valor }), (campo === 'cliente' ? 'Cliente' : 'Director') + ': ' + (valor || '—'), ctxDe(x));
     };
     else if(que === 'estadoProg') el.onclick = () => {
-      const x = a(); if(!x.p || !x.p.serie) return;
-      const nuevo = x.p.estado === 'completo' ? 'en_curso' : 'completo', sid = x.p.serie.id;
-      csEditar(pl => dcxSerie(pl, sid, { status: nuevo }), nuevo === 'completo' ? 'Programa completado' : 'Programa en curso', ctxDe(x));
+      const x = a(); if(!x.p) return;
+      csCambiarEstado(x.p, x.p.estado === 'completo' ? 'en_curso' : 'completo').catch(err => fallo('csCambiarEstado · js/castingvistas.js', err, 'el estado no se ha podido guardar'));
+    };
+    else if(que === 'estadoCard') el.onclick = () => {
+      const p = a().lista.find(y => y.clave === v); if(!p) return;
+      csCambiarEstado(p, p.estado === 'completo' ? 'en_curso' : 'completo').catch(err => fallo('csCambiarEstado · js/castingvistas.js', err, 'el estado no se ha podido guardar'));
     };
     else if(que === 'talNuevo') el.onclick = () => {
       const i = document.getElementById('csTalNuevo'), nombre = i ? i.value.trim() : '';

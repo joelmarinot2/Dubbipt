@@ -77,7 +77,9 @@ function armar(o){
     } }) }),
     upsert: async (filas) => { sbInsertados.push([tabla + '*', filas]); return { error: null }; },
     delete: () => ({ eq: async (k, v) => { borrados.push(tabla + ':' + v); return { error: null }; } }),
-    update: (cambios) => ({ eq: async (k, v) => { sbInsertados.push([tabla + '~', cambios, v]); return { error: o.fallaUpdate ? { message: 'sin permiso' } : null }; } })
+    update: (cambios) => ({ eq: async (k, v) => { sbInsertados.push([tabla + '~', cambios, v]);
+      if(o.sinColumna && 'estado' in cambios) return { error: { code: '42703', message: 'column shows.estado does not exist' } };
+      return { error: o.fallaUpdate ? { message: 'sin permiso' } : null }; } })
   }), storage: { from: () => ({
     list: async (ruta) => ({ data: (archivos[ruta] || []).map(n => ({ name: n })), error: null }),
     move: async (de, a) => { if(o.fallaMover && a.indexOf(o.fallaMover) >= 0) return { error: { message: 'sin permiso para mover' } }; movidos.push(de + ' > ' + a); return { error: null }; }
@@ -86,10 +88,12 @@ function armar(o){
   const H = [], RELEVOS = [];
   const borrados = [];
   const COPIAS = o.copias || [], bajados = [];
+  const guardado = o.almacen || {};
+  const almacen = { getItem: (k) => (k in guardado ? guardado[k] : null), setItem: (k, v) => { guardado[k] = String(v); }, removeItem: (k) => { delete guardado[k]; } };
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
     ['CS', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
      'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS', 'csAsegurarDatos', 'csDevolverCopia', 'csBajarCopia', 'CS_TRAER',
-     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB'],
+     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado'],
     { castNorm: (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim(),
       document: { getElementById: (id) => campos[id] || null, querySelector: () => null, body: { classList: { contains: () => false, toggle: () => {}, remove: () => {} } } },
       prodPuede: () => true, PROD: PROD, PROD_ET: PR.PROD_ET, prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard,
@@ -115,13 +119,13 @@ function armar(o){
       dcPanel: () => diario.push('dcPanel'),
       DDL_UI: { confirmModal: async (cfg) => { diario.push('pregunta ' + cfg.title + ' · ' + cfg.body); return o.confirmar !== false; } },
       sb: sb, uid: () => 'u' + (sbInsertados.length + 1) + '-' + Math.random().toString(36).slice(2, 6), libFetchAll: async () => diario.push('libFetchAll'),
-      WORKSPACE: ('ws' in o) ? o.ws : { id: 'wsP' }, castSimil: SIM.castSimil,
+      WORKSPACE: ('ws' in o) ? o.ws : { id: 'wsP' }, castSimil: SIM.castSimil, localStorage: almacen,
       prodWs: () => 'wsP', prodPerdidoTexto: PR.prodPerdidoTexto, prodRecuperar: PR.prodRecuperar,
       prodCargar: async () => { diario.push('prodCargar'); PROD.cargado = true; PROD.ws = 'wsP'; },
       prodSincronizar: async () => { diario.push('prodSincronizar'); if(o.alSincronizar) o.alSincronizar(COPIAS); return !!o.trae; },
       prodCopias: async () => COPIAS.slice(), prodCopiaDevuelta: async (id, n) => { const c = COPIAS.find(x => String(x.id) === String(id)); if(c){ c.devuelta = 1; c.devueltos = n; } return !!c; },
       ioDescargar: (nombre, texto, tipo) => bajados.push([nombre, texto, tipo]) });
-  return { M, diario, avisos, PROD, LDB, campos, sbInsertados, H, RELEVOS, borrados, nube: () => P, COPIAS, bajados, movidos, regGuardados };
+  return { M, diario, avisos, PROD, LDB, campos, sbInsertados, H, RELEVOS, borrados, nube: () => P, COPIAS, bajados, movidos, regGuardados, guardado };
 }
 
 /** Los controles de una vista, ya enganchados. */
@@ -601,6 +605,47 @@ exports.pruebas = async function(t){
                                   characters: [], talents: [], castings: [], appearances: [] });
     const pd = A.M.csProgramas(DS, (id) => DE[id], d)[0];
     t.eq('con DublajeCast, cada uno con su pareja, aunque allí haya un Ep. 100', A.M.csEpisodios(pd).map(e => e.ep ? e.ep.id + '→' + (e.dcEp ? e.dcEp.id : '—') : 'dc:' + e.dcEp.id).join(' '), 'd1→71 d2→— d3→73 dc:700');
+  }
+
+  t.seccion('8f · marcar los programas completados (PRO-25)');
+  {
+    const { M } = armar();
+    t.eq('el estado: completado si lo dice Dubbipt o DublajeCast', [[{ estado: 'completo' }, null], [{ estado: 'en_curso' }, { status: 'completo' }], [{ estado: 'en_curso' }, { status: 'en_curso' }], [{ id: 1 }, null], [null, { status: 'pendiente' }]].map(x => M.csEstadoDe(x[0], x[1])).join(' '), 'completo completo en_curso en_curso pendiente');
+    const ZS = [{ id: 'sZ', name: 'ZOMBIES', estado: 'en_curso' }, { id: 'sY', name: 'YETI', estado: 'completo' }];
+    const A = armar({ shows: ZS, eps: { sZ: [], sY: [] } });
+    A.M.CS.vista = 'programas'; A.M.CS.filtro = 'todos'; A.M.CS.buscarProg = '';
+    let c = controles(A, 'programas');
+    t.ok('en curso en ámbar y completado en verde, con su marca', /<b>ZOMBIES<\/b>[\s\S]*?<span class="cs-chip cs-estado cs-estado-en_curso">En curso<\/span>/.test(c.html) && /class="cs-prog cs-prog-hecho"><div class="cs-prog-t"><b>YETI<\/b>[\s\S]*?<span class="cs-chip cs-estado cs-estado-completo"><svg [\s\S]*?Completado<\/span>/.test(c.html));
+    t.ok('cada tarjeta, con su botón para marcarla', /data-cs="estadoCard" data-v="s:sZ" title="Marcarlo como completado">[\s\S]*?<span>Completar<\/span>/.test(c.html) && /data-cs="estadoCard" data-v="s:sY" title="Volver a ponerlo en curso">[\s\S]*?<span>Reabrir<\/span>/.test(c.html));
+    c.de('estadoCard', { v: 's:sZ' }).onclick(); await espera(); await espera();
+    t.eq('marcar desde la tarjeta: se guarda en la columna del programa', JSON.stringify(A.sbInsertados.filter(x => x[0] === 'shows~').map(x => [x[2], x[1]])), '[["sZ",{"estado":"completo"}]]');
+    t.ok('y se ve ya, completado', ZS[0].estado === 'completo' && /<b>ZOMBIES<\/b>[\s\S]*?cs-estado-completo/.test(controles(A, 'programas').html) && /Programa completado: ZOMBIES$/.test(A.avisos[A.avisos.length - 1]));
+    t.eq('el filtro lo cuenta donde toca', A.M.CS.filtro = 'completo', 'completo');
+    t.eq('…en Completados', /<b>ZOMBIES<\/b>/.test(controles(A, 'programas').html) + ' ' + /<b>YETI<\/b>/.test(controles(A, 'programas').html), 'true true');
+  }
+  {
+    /* Sin la columna todavía: en este equipo, y se dice cómo compartirlo. */
+    const ZS = [{ id: 'sZ', name: 'ZOMBIES' }];
+    const A = armar({ shows: ZS, eps: { sZ: [] }, sinColumna: true });
+    const p = A.M.csActual().lista.find(x => x.clave === 's:sZ');
+    t.eq('se guarda en este equipo', await A.M.csCambiarEstado(p, 'completo'), 'equipo');
+    t.eq('apuntado por espacio de trabajo', A.guardado['ddl-estados::wsP'], '{"sZ":"completo"}');
+    t.ok('y se dice qué SQL correr para compartirlo', /guardado solo en este equipo: para que lo vea todo el equipo, corre sql\/mejora-04-estado-programas\.sql una vez/.test(A.avisos[A.avisos.length - 1]));
+    t.eq('al pintar, se ve completado', A.M.csActual().lista.find(x => x.clave === 's:sZ').estado, 'completo');
+    await A.M.csCambiarEstado(A.M.csActual().lista.find(x => x.clave === 's:sZ'), 'en_curso');
+    t.eq('y se puede volver a poner en curso', A.M.csActual().lista.find(x => x.clave === 's:sZ').estado + ' ' + A.guardado['ddl-estados::wsP'], 'en_curso {"sZ":"en_curso"}');
+    const B = armar({ shows: [{ id: 'sZ', name: 'ZOMBIES' }], eps: { sZ: [] }, fallaUpdate: true });
+    t.eq('otro error: se dice y no se finge', await B.M.csCambiarEstado(B.M.csActual().lista.find(x => x.clave === 's:sZ'), 'completo') + ' · ' + B.avisos[B.avisos.length - 1], 'error · No se pudo guardar el estado de «ZOMBIES»: sin permiso');
+    t.eq('un estado raro, nada', await B.M.csCambiarEstado(B.M.csActual().lista[0], 'roto'), 'nada');
+  }
+  {
+    /* En DublajeCast también, para el administrador. */
+    const A = armar();
+    const p = A.M.csActual().lista.find(x => x.clave === 's:s1');
+    t.eq('en los dos lados', await A.M.csCambiarEstado(p, 'completo') + ' · ' + A.nube().series[0].status + ' · ' + JSON.stringify(A.sbInsertados.filter(x => x[0] === 'shows~').map(x => x[1])), 'nube · completo · [{"estado":"completo"}]');
+    const D = armar({ sinSesion: true });
+    const pd = D.M.csActual().lista.find(x => x.clave === 'dc:2');
+    t.eq('uno solo de DublajeCast sin sesión: no se finge', await D.M.csCambiarEstado(pd, 'completo'), 'error');
   }
 
   t.seccion('9 · fusionar programas');
