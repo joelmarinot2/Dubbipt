@@ -1751,6 +1751,32 @@ body.ep-open #csNav, body.ep-open #csVista{ display:none !important; }
 .cs-talento{ color:#4ADE80; }
 .cs-falta .cs-talento{ color:#FB7185; font-style:italic; }
 .cs-talento small{ margin-left:6px; font-style:normal; }
+/* Editar: el talento de cada fila, los datos del programa y del episodio, las fichas y los tráilers */
+.cs-cuenta{ margin-left:4px; font-size:11px; color:#4ADE80; }
+.cs-tabs{ margin:4px 0 14px; }
+.cs-prog-datos{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; font-size:12px; color:#8b8f97; }
+.cs-prog-datos label{ display:inline-flex; align-items:center; gap:6px; }
+.cs-prog-datos input, .cs-ep-ficha select, .cs-ep-ficha input, .cs-tal-campos input, .cs-tal-campos select, .cs-nuevo input, .cs-nuevo select, .cs-linea select, .cs-linea input{ background:#0d0f12; border:1px solid #2b2f36; color:#f2f3f5; border-radius:8px; padding:6px 8px; font-family:'Inter',sans-serif; font-size:12.5px; outline:none; }
+.cs-prog-datos input:focus, .cs-ep-ficha select:focus, .cs-ep-ficha input:focus, .cs-tal-in:focus, .cs-tal-campos input:focus, .cs-nuevo input:focus{ border-color:#4ADE80; }
+.cs-ep-ficha i{ display:block; margin-top:3px; }
+.cs-tal-in{ width:100%; max-width:240px; background:#0d0f12; border:1px solid #2b2f36; color:#4ADE80; border-radius:8px; padding:5px 8px; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; outline:none; }
+.cs-falta .cs-tal-in{ color:#FB7185; }
+.cs-tal-in::placeholder{ color:#6b7079; font-weight:500; }
+.cs-cast-prog .cs-fila{ grid-template-columns:50px minmax(150px,1.3fr) 70px minmax(200px,1.6fr); min-width:520px; }
+.cs-reparto .cs-fila{ grid-template-columns:minmax(150px,1.2fr) minmax(200px,2fr) 50px 70px minmax(160px,1fr); min-width:700px; }
+.cs-tramos{ display:flex; gap:4px; flex-wrap:wrap; align-items:center; }
+.cs-tramos i{ font-style:normal; }
+.cs-prin-b{ background:transparent; border:none; color:#4b5563; cursor:pointer; padding:0 6px 0 0; vertical-align:-2px; }
+.cs-prin-b.on{ color:#FCD34D; }
+.cs-nuevo{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+.cs-nuevo input[type=text]{ flex:1 1 220px; }
+.cs-tal-ed{ margin-top:6px; }
+.cs-tal-ed summary{ cursor:pointer; color:#9CA3AF; font-size:12px; }
+.cs-tal-ed summary:hover{ color:#4ADE80; }
+.cs-tal-campos{ display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:8px; margin-top:8px; }
+.cs-tal-campos label{ display:flex; flex-direction:column; gap:4px; font-size:11px; color:#8b8f97; }
+.cs-linea select, .cs-linea input{ padding:4px 6px; font-size:12px; }
+.cs-b-icono{ padding:6px 8px; }
 @media (max-width:860px){
   body.cs-on:not(.ep-open) #lib{ display:block; padding:12px; }
   .cs-nav{ flex-direction:row; overflow-x:auto; position:static; margin-bottom:14px; padding:6px; scrollbar-width:none; }
@@ -2528,7 +2554,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.31.0-nube';
+const APP_VER_NUM = 'v11.32.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -22371,5 +22397,6 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/horapt.js"></script>
 <script src="./js/produccion.js"></script>
 <script src="./js/dublajecast.js"></script>
+<script src="./js/dcescribir.js"></script>
 <script src="./js/castingvistas.js"></script>
 <script src="./js/qcpdf.js"></script>

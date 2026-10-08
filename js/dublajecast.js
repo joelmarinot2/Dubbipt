@@ -188,6 +188,8 @@ function dcastAbrir(vista, serieId, epId){
 
 /** Los datos de DublajeCast: en vivo si su pantalla está abierta y con sesión; si no, lo traído a Producción. */
 function dcastDatos(){
+  /* Lo recién escrito desde aquí manda unos segundos: DublajeCast abierto lo recibe enseguida, pero no al instante. */
+  if(typeof DCX !== 'undefined' && DCX.escrito && Date.now() - DCX.escrito < 20000 && PROD.datos) return { datos: PROD.datos, vivo: false };
   try{
     const w = DCAST.marco && DCAST.marco.contentWindow;
     if(w && typeof w.__dcDatos === 'function'){
@@ -232,12 +234,12 @@ function dcastFilasCasting(d, dcEp, registro, nombreEp){
     const ix = prodIndices(d);
     for(const a of (ix.aparicionesPorEp[String(dcEp.id)] || [])){
       const ch = ix.char[String(a.character_id)]; if(!ch || !ch.name) continue;
-      const f = fila(ch.name); f.lineas = +a.line_count || 0; f.principal = ch.tipo === 'principal';
+      const f = fila(ch.name); f.lineas = +a.line_count || 0; f.principal = ch.tipo === 'principal'; f.charId = ch.id;
     }
     for(const c of (ix.castingsPorEp[String(dcEp.id)] || [])){
       const ch = ix.char[String(c.character_id)], tal = ix.talent[String(c.talent_id)];
       if(!ch || !ch.name) continue;
-      fila(ch.name).dc = tal ? tal.name : '';
+      const f = fila(ch.name); f.dc = tal ? tal.name : ''; f.charId = ch.id;
     }
   }
   const nEp = castNorm(nombreEp);

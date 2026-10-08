@@ -74,7 +74,14 @@ class El {
     if(this._botones && this._botones[sel]) return this._botones[sel];
     let out = [];
     if(sel === '.cs-nav-b') out = [...this._html.matchAll(/<button class="cs-nav-b[^"]*" data-v="([^"]+)"/g)].map(x => Object.assign(new El('button'), { dataset: { v: x[1] } }));
-    if(sel === '[data-cs]') out = [...this._html.matchAll(/<(input|button|select)\b[^>]*data-cs="([^"]+)"[^>]*>/g)].map(x => { const e = new El(x[1]); e.atrs['data-cs'] = x[2]; const v = x[0].match(/data-v="([^"]+)"/); if(v) e.atrs['data-v'] = v[1]; return e; });
+    if(sel === '[data-cs]') out = [...this._html.matchAll(/<(input|button|select)\b[^>]*data-cs="([^"]+)"[^>]*>/g)].map(x => {
+      const e = new El(x[1]);
+      for(const m of x[0].matchAll(/(data-[\w-]+)="([^"]*)"/g)) e.atrs[m[1]] = m[2].replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&amp;/g, '&');
+      const val = x[0].match(/ value="([^"]*)"/); e.value = val ? val[1] : '';
+      const cls = x[0].match(/ class="([^"]*)"/); e.className = cls ? cls[1] : '';
+      e.classList = { contains: (c) => e.className.split(/\s+/).includes(c) };
+      return e;
+    });
     if(sel === 'button[data-nombre]') out = [...this._html.matchAll(/<button class="cs-b" data-nombre="([^"]+)"/g)].map(x => Object.assign(new El('button'), { dataset: { nombre: x[1] } }));
     (this._botones = this._botones || {})[sel] = out;
     return out;
@@ -254,7 +261,7 @@ exports.pruebas = async function(t){
     t.eq('Casting: el episodio', A.M.CS.vista + ' ' + /<h2>Ep\. 1 · Episodio 1<\/h2>/.test(vista(A)), 'episodio true');
     t.ok('el principal, marcado con su estrella', /<i class="cs-prin" title="Principal">[\s\S]*?<\/i>ALLY<\/b>/.test(vista(A)) && !/<\/i>JANA<\/b>/.test(vista(A)));
     t.ok('con el botón «Realizar casting»', /<button class="cs-cta" data-cs="realizar">[\s\S]*?<span>Realizar casting<\/span><\/button>/.test(vista(A)));
-    t.ok('su ficha de DublajeCast y su tabla de casting', /<span>Fase<\/span><b>Preproducción<\/b>/.test(vista(A)) && /<span>Alertas<\/span>/.test(vista(A)) && /2 de 3 personajes con talento/.test(vista(A)) && /TITO BOY[\s\S]*?sin asignar/.test(vista(A)));
+    t.ok('su ficha de DublajeCast y su tabla de casting', /<span>Fase<\/span><select data-cs="epCampo" data-campo="fase">[\s\S]*?<option value="pre_produccion" selected>Preproducción<\/option>/.test(vista(A)) && /<span>Alertas<\/span>/.test(vista(A)) && /2 de 3 personajes con talento/.test(vista(A)) && /<div class="cs-fila cs-falta"><span><b>TITO BOY<\/b><\/span><span class="cs-tenue">12<\/span><span><input class="cs-tal-in" list="csListaTalentos" data-cs="talento" data-ep="11" data-ch="103" value="" placeholder="Asignar…">/.test(vista(A)));
     control(A, 'orden', 'personaje').onclick(); A.M.csPintar('shows', b.cab, b.grid);
     t.ok('la tabla, por personaje si se pide', vista(A).indexOf('>ALLY<') < vista(A).indexOf('>JANA<') && vista(A).indexOf('>JANA<') < vista(A).indexOf('>TITO BOY<') && /class="cs-pest on" data-cs="orden" data-v="personaje"/.test(vista(A)));
     A.LDB.showId = 'otro';
