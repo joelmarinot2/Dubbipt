@@ -462,6 +462,9 @@ async function csJuntarRegistro(deId, aId){
     for(const e of (Array.isArray(x.episodios) ? x.episodios : [])) if(eps.indexOf(e) < 0) eps.push(e);
     a.personajes[k] = Object.assign({}, y, { talent: y.talent || x.talent, episodios: eps });
   }
+  const fotos = (de && de.capitulos) || {};
+  a.capitulos = a.capitulos || {};
+  for(const nombreEp of Object.keys(fotos)) if(!a.capitulos[nombreEp]) a.capitulos[nombreEp] = fotos[nombreEp];
   await castRegGuardar(aId, a);
   delete CS.registros[String(aId)]; delete CS.registros[String(deId)];
   return { nuevos: nuevos, choques: choques };
@@ -483,6 +486,12 @@ async function csTalentoDub(p, personaje, nombre, e){
   const eps = (ya && Array.isArray(ya.episodios)) ? ya.episodios.slice() : [];
   if(e && e.ep && eps.indexOf(e.ep.name) < 0) eps.push(e.ep.name);
   reg.personajes[k] = Object.assign({ display: personaje, de: 'Dubbipt' }, ya || {}, { talent: limpio, episodios: eps, ts: Date.now() });
+  /* Y en la foto de los capítulos (de donde sale el Reparto): el de este episodio o, sin episodio, todos. */
+  for(const nombreEp of Object.keys(reg.capitulos || {})){
+    if(e && e.ep && castNorm(nombreEp) !== castNorm(e.ep.name)) continue;
+    const foto = reg.capitulos[nombreEp];
+    if(foto && foto.personajes && foto.personajes[k]){ foto.personajes[k] = Object.assign({}, foto.personajes[k], { talent: limpio }); foto.ts = Date.now(); }
+  }
   const ok = await castRegGuardar(p.show.id, reg);
   if(!ok){ castAviso('No se pudo guardar el registro de casting de «' + p.nombre + '»'); return 'error'; }
   CS.registros[String(p.show.id)] = reg;
@@ -674,9 +683,10 @@ function csReparto(p, d){
       const ch = ix.char[String(a.character_id)];
       if(!ch || !ch.name) continue;
       const k = String(ch.id);
-      const r = (por[k] = por[k] || { charId: ch.id, personaje: ch.name, principal: ch.tipo === 'principal', episodios: 0, lineas: 0, tramos: [] });
+      const r = (por[k] = por[k] || { charId: ch.id, personaje: ch.name, principal: ch.tipo === 'principal', episodios: 0, lineas: 0, tramos: [], porEp: [] });
       r.episodios++; r.lineas += (+a.line_count || 0);
       const t = tal[k] || null, nombre = t ? t.name : '';
+      r.porEp.push({ n: e.episode_number, talento: nombre, talentoId: t ? t.id : null, lineas: (+a.line_count || 0) });
       const ult = r.tramos[r.tramos.length - 1];
       if(ult && ult.talento === nombre){ ult.eps.push(e.episode_number); ult.lineas += (+a.line_count || 0); }
       else r.tramos.push({ talento: nombre, talentoId: t ? t.id : null, eps: [e.episode_number], lineas: (+a.line_count || 0) });
@@ -692,21 +702,66 @@ function csReparto(p, d){
  * guarda). Cada uno con `clave` para abrir su «Reasignar».
  */
 function csRepartoDe(p, d, registro){
-  const out = csReparto(p, d).map(r => Object.assign({ clave: 'ch:' + r.charId, de: 'dc' }, r));
-  const ya = new Set(out.map(r => castNorm(r.personaje)));
+  const por = new Map();
+  const nueva = (nombre) => ({ clave: 'per:' + castNorm(nombre), de: 'dubbipt', charId: null, personaje: nombre, principal: false, eps: new Map(), sinEps: '' });
+  const nEp = (nombre) => { const n = csNumeroDe(nombre); return isFinite(n) ? n : String(nombre); };
+  /* 1) DublajeCast, capítulo a capítulo. */
+  for(const r of csReparto(p, d))
+    por.set(castNorm(r.personaje), { clave: 'ch:' + r.charId, de: 'dc', charId: r.charId, personaje: r.personaje, principal: r.principal, sinEps: '',
+                                     eps: new Map((r.porEp || []).map(x => [String(x.n), Object.assign({}, x)])) });
+  /* 2) Las fotos de cada capítulo casteado en Dubbipt: todos sus personajes, con
+        sus intervenciones. Donde Dubbipt tiene talento, manda Dubbipt, como en
+        la tabla de casting. */
+  const caps = (registro && registro.capitulos) || {};
+  const conFoto = new Set();
+  for(const nombreEp of Object.keys(caps)){
+    conFoto.add(castNorm(nombreEp));
+    const n = nEp(nombreEp), pers = (caps[nombreEp] && caps[nombreEp].personajes) || {};
+    for(const k of Object.keys(pers)){
+      const x = pers[k] || {}, nombre = x.display || k, ck = castNorm(nombre);
+      if(!ck) continue;
+      let r = por.get(ck);
+      if(!r){ r = nueva(nombre); por.set(ck, r); }
+      if(r.de === 'dc' && x.talent) r.de = 'ambos';
+      const ya = r.eps.get(String(n));
+      if(ya){ if(x.talent) ya.talento = x.talent; if(!ya.lineas) ya.lineas = +x.lineas || 0; }
+      else r.eps.set(String(n), { n: n, talento: x.talent || '', talentoId: null, lineas: +x.lineas || 0 });
+    }
+  }
+  /* 3) Lo de antes de las fotos: el registro por personaje, en los capítulos sin foto. */
   const pers = (registro && registro.personajes) || {};
   for(const k of Object.keys(pers)){
     const x = pers[k];
     if(!x) continue;
-    const nombre = x.display || k;
-    if(ya.has(castNorm(nombre))) continue;
-    ya.add(castNorm(nombre));
-    const eps = (Array.isArray(x.episodios) ? x.episodios : []).map(csNumeroDe).filter(n => isFinite(n)).sort((a, b) => a - b);
-    out.push({ clave: 'per:' + castNorm(nombre), de: 'dubbipt', charId: null, personaje: nombre, principal: false,
-               episodios: (Array.isArray(x.episodios) ? x.episodios : []).length, lineas: 0,
-               tramos: [{ talento: x.talent || '', talentoId: null, eps: eps, lineas: 0 }] });
+    const nombre = x.display || k, ck = castNorm(nombre);
+    if(!ck) continue;
+    const eps = (Array.isArray(x.episodios) ? x.episodios : []).filter(en => !conFoto.has(castNorm(en)));
+    let r = por.get(ck);
+    if(!r){ r = nueva(nombre); por.set(ck, r); }
+    for(const en of eps){
+      const n = nEp(en), ya = r.eps.get(String(n));
+      if(ya){ if(x.talent) ya.talento = x.talent; }
+      else r.eps.set(String(n), { n: n, talento: x.talent || '', talentoId: null, lineas: 0 });
+    }
+    if(!r.eps.size) r.sinEps = x.talent || '';
   }
-  return out;
+  /* Cada personaje con su talento por tramos de episodios seguidos. */
+  const orden = (a, b) => (typeof a.n === 'number' && typeof b.n === 'number') ? a.n - b.n : (typeof a.n === 'number' ? -1 : (typeof b.n === 'number' ? 1 : String(a.n).localeCompare(String(b.n), 'es')));
+  const out = [];
+  for(const r of por.values()){
+    const lista = Array.from(r.eps.values()).sort(orden);
+    const tramos = [];
+    for(const x of lista){
+      const ult = tramos[tramos.length - 1];
+      if(ult && castNorm(ult.talento) === castNorm(x.talento)){ ult.eps.push(x.n); ult.lineas += x.lineas || 0; }
+      else tramos.push({ talento: x.talento, talentoId: x.talentoId || null, eps: [x.n], lineas: x.lineas || 0 });
+    }
+    if(!tramos.length) tramos.push({ talento: r.sinEps, talentoId: null, eps: [], lineas: 0 });
+    /* «de Dubbipt» solo dice algo si el programa está también en DublajeCast. */
+    out.push({ clave: r.clave, de: (p && p.serie) ? r.de : '', charId: r.charId, personaje: r.personaje, principal: r.principal,
+               episodios: lista.length, lineas: lista.reduce((s, x) => s + (x.lineas || 0), 0), tramos: tramos });
+  }
+  return out.sort((a, b) => (b.principal - a.principal) || (b.lineas - a.lineas) || a.personaje.localeCompare(b.personaje, 'es'));
 }
 
 /** La carga de un talento en el programa, como la dice DublajeCast: por cuántos personajes hace. */

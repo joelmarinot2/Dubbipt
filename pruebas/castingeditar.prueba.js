@@ -88,7 +88,7 @@ function armar(o){
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
     ['CS', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
      'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS', 'csAsegurarDatos', 'csDevolverCopia', 'csBajarCopia', 'CS_TRAER',
-     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro'],
+     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub'],
     { castNorm: (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim(),
       document: { getElementById: (id) => campos[id] || null, querySelector: () => null, body: { classList: { contains: () => false, toggle: () => {}, remove: () => {} } } },
       prodPuede: () => true, PROD: PROD, PROD_ET: PR.PROD_ET, prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard,
@@ -496,7 +496,7 @@ exports.pruebas = async function(t){
     A.M.CS.vista = 'programa'; A.M.CS.prog = 's:sZ'; A.M.CS.tab = 'reparto';
     controles(A, 'programa'); await espera();
     let c = controles(A, 'programa');
-    t.ok('el reparto de un programa sin DublajeCast, del registro de Dubbipt', /<b>LUZ MAR<\/b><div class="cs-tenue">1 pers\. · 2 apar\. · <b>0<\/b> lín\.<\/div>[\s\S]*?<b>Max<\/b><span class="cs-tenue">de Dubbipt<\/span><\/div><span class="cs-rep-eps"><span class="cs-rep-ep">Ep\.1<\/span><span class="cs-rep-ep">Ep\.2<\/span>/.test(c.html)
+    t.ok('el reparto de un programa sin DublajeCast, del registro de Dubbipt', /<b>LUZ MAR<\/b><div class="cs-tenue">1 pers\. · 2 apar\. · <b>0<\/b> lín\.<\/div>[\s\S]*?<b>Max<\/b><\/div><span class="cs-rep-eps"><span class="cs-rep-ep">Ep\.1<\/span><span class="cs-rep-ep">Ep\.2<\/span>/.test(c.html)
          && /Sin talento \(1\)[\s\S]*?<b>Rita<\/b>/.test(c.html));
     c.de('repAbrir', { v: 'per:MAX' }).onclick();
     c = controles(A, 'programa');
@@ -518,6 +518,59 @@ exports.pruebas = async function(t){
     t.eq('el mismo talento, nada que guardar', Object.keys(C.regGuardados).length + ' ' + C.H.length, '0 0');
     C.M.CS.vista = 'programa'; C.M.CS.tab = 'casting';
     t.ok('y en el casting de todo el programa, igual', /data-cs="talentoDub" data-e="e:z1" data-per="Max"/.test(controles(C, 'programa').html));
+  }
+
+  t.seccion('8c · el casting de cada capítulo llena el reparto (PRO-22)');
+  {
+    const ZS = [{ id: 'sZ', name: 'ZOMBIES' }], ZE = { sZ: [{ id: 'z1', show_id: 'sZ', name: 'Episodio 1' }, { id: 'z2', show_id: 'sZ', name: 'Episodio 2' }, { id: 'z3', show_id: 'sZ', name: 'Episodio 3' }] };
+    const REG = { personajes: { MAX: { display: 'Max', talent: 'ANA ROJAS', episodios: ['Episodio 1', 'Episodio 2', 'Episodio 3'] }, VIEJO: { display: 'Viejo', talent: 'PEPE', episodios: ['Episodio 3'] } },
+                  capitulos: { 'Episodio 1': { ts: 1, personajes: { MAX: { display: 'Max', talent: 'LUZ MAR', lineas: 40 }, RITA: { display: 'Rita', talent: '', lineas: 10 } } },
+                               'Episodio 2': { ts: 2, personajes: { MAX: { display: 'Max', talent: 'ANA ROJAS', lineas: 30 }, RITA: { display: 'Rita', talent: '', lineas: 5 } } } } };
+    const A = armar({ shows: ZS, eps: ZE });
+    const p = A.M.csProgramas(ZS, (id) => ZE[id], null).find(x => x.clave === 's:sZ');
+    const rep = A.M.csRepartoDe(p, null, REG);
+    const de = (n) => rep.find(r => r.personaje === n);
+    t.eq('cada personaje, con las intervenciones de cada capítulo casteado', rep.map(r => r.personaje + ' ' + r.episodios + 'ep ' + r.lineas + 'l').join(' | '), 'Max 3ep 70l | Rita 2ep 15l | Viejo 1ep 0l');
+    t.eq('y su talento por tramos: un relevo entre capítulos se ve', de('Max').tramos.map(x => x.talento + ' ' + A.M.csTramoTexto(x.eps) + ' ' + x.lineas).join(' → '), 'LUZ MAR 1 40 → ANA ROJAS 2–3 30');
+    t.eq('quien aún no tiene talento también está, con sus líneas', JSON.stringify(de('Rita').tramos), '[{"talento":"","talentoId":null,"eps":[1,2],"lineas":15}]');
+    t.eq('lo de antes de las fotos sigue contando en los capítulos sin foto, y no repite los que tienen', de('Viejo').tramos.map(x => x.talento + ' ' + x.eps.join(',')).join('') + ' · ' + de('Max').tramos.map(x => x.eps.join(',')).join('|'), 'PEPE 3 · 1|2,3');
+    A.M.CS.vista = 'programa'; A.M.CS.prog = 's:sZ'; A.M.CS.tab = 'reparto'; A.M.CS.registros = { sZ: REG };
+    const c = controles(A, 'programa');
+    t.ok('el Reparto lo enseña: líneas de verdad y «Sin talento» con quien falta', /<b>LUZ MAR<\/b><div class="cs-tenue">1 pers\. · 1 apar\. · <b>40<\/b> lín\.<\/div>/.test(c.html) && /Sin talento \(1\)[\s\S]*?<b>Rita<\/b><\/div><span class="cs-rep-lin">15 lín\.<\/span>/.test(c.html));
+  }
+  {
+    /* En un programa que también está en DublajeCast, lo casteado en Dubbipt manda. */
+    const A = armar();
+    const d = PR.prodNormalizar(A.nube());
+    const p = A.M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], d).find(x => x.clave === 's:s1');
+    const REG = { personajes: {}, capitulos: { 'Episodio 1': { ts: 1, personajes: { ALLY: { display: 'ALLY', talent: 'CARLA PAZ', lineas: 99 }, NUEVO: { display: 'NUEVO', talent: 'LUZ MAR', lineas: 7 } } } } };
+    const rep = A.M.csRepartoDe(p, d, REG);
+    const ally = rep.find(r => r.personaje === 'ALLY');
+    t.eq('el talento de Dubbipt en su capítulo; las líneas, las de DublajeCast', ally.tramos.map(x => x.talento + ' ' + A.M.csTramoTexto(x.eps) + ' ' + x.lineas).join(' → ') + ' · ' + ally.de, 'CARLA PAZ 1 186 → ANA ROJAS 2 90 → BEATRIZ SOL 3 30 · ambos');
+    t.eq('y el personaje que solo salió en Dubbipt, también, con su reasignar de Dubbipt', JSON.stringify(rep.filter(r => r.personaje === 'NUEVO').map(r => [r.clave, r.de, r.lineas])), '[["per:NUEVO","dubbipt",7]]');
+    t.eq('sin fotos, igual que antes', A.M.csRepartoDe(p, d, { personajes: {} }).find(r => r.personaje === 'ALLY').tramos.map(x => x.talento).join(','), 'ANA ROJAS,BEATRIZ SOL');
+  }
+  {
+    /* Cambiar el talento desde la vista de Casting cambia también la foto. */
+    const ZS = [{ id: 'sZ', name: 'ZOMBIES' }], ZE = { sZ: [{ id: 'z1', show_id: 'sZ', name: 'Episodio 1' }, { id: 'z2', show_id: 'sZ', name: 'Episodio 2' }] };
+    const REG = () => ({ sZ: { personajes: { MAX: { display: 'Max', talent: 'LUZ MAR', episodios: ['Episodio 1', 'Episodio 2'] } },
+                               capitulos: { 'Episodio 1': { ts: 1, personajes: { MAX: { display: 'Max', talent: 'LUZ MAR', lineas: 4 } } }, 'Episodio 2': { ts: 1, personajes: { MAX: { display: 'Max', talent: 'LUZ MAR', lineas: 6 } } } } } });
+    const A = armar({ shows: ZS, eps: ZE, registros: REG() });
+    const p = A.M.csProgramas(ZS, (id) => ZE[id], null)[0];
+    const e2 = A.M.csEpisodios(p).find(e => e.clave === 'e:z2');
+    await A.M.csTalentoDub(p, 'Max', 'Ana Rojas', e2);
+    const g = A.regGuardados.sZ.capitulos;
+    t.eq('en un episodio: solo su foto', g['Episodio 1'].personajes.MAX.talent + ' · ' + g['Episodio 2'].personajes.MAX.talent, 'LUZ MAR · Ana Rojas');
+    const B = armar({ shows: ZS, eps: ZE, registros: REG() });
+    await B.M.csTalentoDub(p, 'Max', 'Pepe', null);
+    const h = B.regGuardados.sZ.capitulos;
+    t.eq('«Reasignar» en todo el programa: todas las fotos', h['Episodio 1'].personajes.MAX.talent + ' · ' + h['Episodio 2'].personajes.MAX.talent, 'Pepe · Pepe');
+  }
+  {
+    const A = armar({ shows: [{ id: 'sA', name: 'A' }, { id: 'sC', name: 'C' }], eps: { sA: [], sC: [] },
+                      registros: { sA: { personajes: {}, capitulos: { 'Episodio 5': { ts: 1, personajes: {} }, 'Episodio 1': { ts: 1, personajes: { X: {} } } } }, sC: { personajes: {}, capitulos: { 'Episodio 1': { ts: 2, personajes: {} } } } } });
+    await A.M.csJuntarRegistro('sA', 'sC');
+    t.eq('al fusionar programas, las fotos de los capítulos pasan; las que ya tenía el que se queda, se quedan', Object.keys(A.regGuardados.sC.capitulos).sort().join(',') + ' · ' + Object.keys(A.regGuardados.sC.capitulos['Episodio 1'].personajes).length, 'Episodio 1,Episodio 5 · 0');
   }
 
   t.seccion('9 · fusionar programas');

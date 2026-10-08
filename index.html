@@ -2644,7 +2644,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.39.0-nube';
+const APP_VER_NUM = 'v11.40.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -9001,6 +9001,8 @@ function ponerModo(epId, m){
   // la tabla cambia de columnas según el modo: hay que repintarla
   try{ if(m === 'casting') plaOpen = true; renderPlanilla(); }catch(e){ fallo('renderPlanilla · index.html:6070', e); }
   try{ castPintarOcupacion(); }catch(e){}
+  // al abrir un capítulo en Casting, su foto va al Reparto del programa aunque aún no se asigne nada (PRO-22)
+  if(m === 'casting'){ try{ if(typeof chars !== 'undefined' && chars && chars.length) castRegAnotarPronto(); }catch(e){} }
   // continuidad: lo que ya se repartió en otros capítulos del programa
   if(m === 'casting'){
     try{ libTraducidoPintar(); }catch(e){ fallo('libTraducidoPintar · index.html', e); }
@@ -10503,11 +10505,49 @@ async function castRegGuardar(showId, reg){
   }catch(e){ return false; }
 }
 
-/** Apunta en el registro lo que hay ahora repartido. */
+/** El registro tal como está en la nube, sin la copia de este equipo. Nulo si no se puede leer. */
+async function castRegDeLaNube(showId){
+  try{
+    const r = await sb.storage.from('libretos').download(castRegPath(showId));
+    if(r && r.data) return JSON.parse(await r.data.text());
+  }catch(e){ /* sin nube: se queda lo de este equipo */ }
+  return null;
+}
+
+/**
+ * Junta el registro de este equipo con el de la nube: si dos personas
+ * castean capítulos distintos del mismo programa a la vez, ninguna pisa lo
+ * de la otra. De cada personaje y de cada capítulo manda el más reciente.
+ */
+function castRegFusionar(local, nube){
+  const out = Object.assign({}, nube || {}, local || {});
+  out.personajes = Object.assign({}, (nube && nube.personajes) || {});
+  for(const k in ((local && local.personajes) || {})){
+    const a = local.personajes[k], b = out.personajes[k];
+    if(!b || (+(a && a.ts) || 0) >= (+(b && b.ts) || 0)) out.personajes[k] = a;
+  }
+  out.capitulos = Object.assign({}, (nube && nube.capitulos) || {});
+  for(const k in ((local && local.capitulos) || {})){
+    const a = local.capitulos[k], b = out.capitulos[k];
+    if(!b || (+(a && a.ts) || 0) >= (+(b && b.ts) || 0)) out.capitulos[k] = a;
+  }
+  return out;
+}
+
+/**
+ * Apunta en el registro lo que hay ahora repartido: cada personaje con su
+ * talento, para que los capítulos siguientes lo hereden; y la FOTO de este
+ * capítulo -todos sus personajes, tengan o no talento, con sus
+ * intervenciones-, que es de donde sale el Reparto del programa (PRO-22).
+ * «Quiero que el casting que vaya haciendo vaya llenando la base del reparto
+ * de cada programa.»
+ */
 async function castRegAnotar(){
   const showId = LDB.showId || (currentEp && currentEp.showId);
   if(!showId) return 0;
-  const reg = await castRegCargar(showId);
+  const local = await castRegCargar(showId);
+  const nube = await castRegDeLaNube(showId);
+  const reg = nube ? castRegFusionar(local, nube) : local;
   reg.personajes = reg.personajes || {};
   const ep = (currentEp && currentEp.name) || '';
   let n = 0;
@@ -10523,7 +10563,21 @@ async function castRegAnotar(){
                               episodios: eps, ts: Date.now() };
     n++;
   }
+  if(ep){
+    const foto = {};
+    for(const k in charIdx){
+      const c = charIdx[k];
+      if(!c) continue;
+      const clave = castNorm(c.display || k);
+      if(!clave) continue;
+      foto[clave] = { display: c.display || k, talent: c.talent ? String(c.talent).trim() : '', lineas: +c.totalInts || 0 };
+    }
+    reg.capitulos = reg.capitulos || {};
+    reg.capitulos[ep] = { ts: Date.now(), personajes: foto };
+  }
   await castRegGuardar(showId, reg);
+  /* El Reparto de la vista de Casting lee esto: que lo vea ya, sin volver a pedirlo. */
+  try{ if(typeof CS !== 'undefined' && CS && CS.registros) CS.registros[String(showId)] = reg; }catch(e){ /* sin vista de Casting */ }
   return n;
 }
 
