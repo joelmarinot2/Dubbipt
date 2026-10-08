@@ -57,6 +57,8 @@ exports.pruebas = async function(t){
   t.seccion('1 · ids y nombres, como los hace DublajeCast');
   const a = M.dcxUid(), b = M.dcxUid();
   t.ok('los ids nuevos son números grandes y no se repiten aunque se pidan seguidos', b > a && a > Date.now() * 999 && Number.isInteger(a));
+  const muchos = Array.from({ length: 400 }, () => M.dcxUid());
+  t.ok('ni pidiendo cuatrocientos en el mismo instante: siempre crecen', muchos.every((x, i) => i === 0 || x > muchos[i - 1]));
   t.eq('los nombres de talento, en mayúsculas y sin espacios de más', M.dcxNombreTalento('  luz   mar '), 'LUZ MAR');
   const p0 = BASE();
   t.eq('buscar un talento: sin mayúsculas ni acentos', (M.dcxTalentoPorNombre(p0, 'ana rojas') || {}).id + ' ' + M.dcxTalentoPorNombre(p0, 'nadie'), '1 null');

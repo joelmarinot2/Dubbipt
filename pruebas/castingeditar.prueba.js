@@ -124,6 +124,9 @@ exports.pruebas = async function(t){
   t.eq('cada personaje: principales primero, luego por líneas', rep.map(r => r.personaje + ' ' + r.episodios + 'ep ' + r.lineas + 'l').join(' | '), 'ALLY 3ep 306l | JANA 1ep 54l | TITO BOY 1ep 12l');
   t.eq('con su talento por tramos: el relevo se ve', rep[0].tramos.map(x => x.talento + ' ' + M.csTramoTexto(x.eps)).join(' → '), 'ANA ROJAS 1–2 → BEATRIZ SOL 3');
   t.eq('y el que no tiene, vacío', JSON.stringify(rep[2].tramos), '[{"talento":"","talentoId":null,"eps":[1]}]');
+  const desordenado = PR.prodNormalizar(Object.assign(VOLCADO(), { episodes: VOLCADO().episodes.slice().reverse() }));
+  const pDes = M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], desordenado).find(p => p.clave === 's:s1');
+  t.eq('los tramos siguen el orden de los episodios, vengan como vengan', M.csReparto(pDes, desordenado)[0].tramos.map(x => x.talento + ' ' + M.csTramoTexto(x.eps)).join(' → '), 'ANA ROJAS 1–2 → BEATRIZ SOL 3');
   t.eq('un programa que no está en DublajeCast no tiene reparto', M.csReparto({ serie: null }, d).length + ' ' + M.csReparto(p1, null).length, '0 0');
 
   t.seccion('2 · el casting de todo un programa');
@@ -243,6 +246,9 @@ exports.pruebas = async function(t){
     c = controles(A, 'trailers');
     await c.de('trBorrar', { id: 7 }).onclick(); await espera();
     t.ok('y borrarlo, preguntando antes', !A.nube().trailers.some(x => x.id === 7) && A.diario.some(x => /^pregunta Borrar tráiler/.test(x)));
+    const N = armar({ confirmar: false });
+    await controles(N, 'trailers').de('trBorrar', { id: 7 }).onclick(); await espera();
+    t.ok('si se dice que no, no se borra ni se guarda nada', N.nube().trailers.some(x => x.id === 7) && !N.diario.some(x => /^guarda/.test(x)));
   }
   {
     const S = armar({ sinSesion: true });
