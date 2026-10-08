@@ -221,120 +221,36 @@ function dcastEpDeDc(nombre, dcEps){
 }
 
 /**
- * El casting de un capítulo de Dubbipt: los personajes que salen en él en
- * DublajeCast, con sus líneas y su talento, y lo que el registro del programa
- * en Dubbipt dice para ese capítulo. Si los dos dicen talentos distintos, se
- * marca (`choca`) y manda el de Dubbipt, como al traer (PRO-5).
+ * Las filas del casting de un capítulo: los personajes que salen en él en
+ * DublajeCast (`dcEp`), con sus líneas y su talento, y lo que el registro de
+ * Dubbipt dice para el capítulo que se llama `nombreEp`. Por líneas.
  */
-function dcastCastingDe(show, ep, d, registro){
-  const out = { serie: null, dcEp: null, filas: [] };
+function dcastFilasCasting(d, dcEp, registro, nombreEp){
   const filas = {};
   const fila = (nombre) => { const k = castNorm(nombre); return (filas[k] = filas[k] || { personaje: nombre, lineas: 0, dc: '', dubbipt: '', principal: false }); };
-  if(d){
-    out.serie = dcastSerieDe(show, d);
-    if(out.serie){
-      out.dcEp = dcastEpDeDc(ep.name, d.episodes.filter(e => String(e.series_id) === String(out.serie.id)));
-      if(out.dcEp){
-        const ix = prodIndices(d);
-        for(const a of (ix.aparicionesPorEp[String(out.dcEp.id)] || [])){
-          const ch = ix.char[String(a.character_id)]; if(!ch || !ch.name) continue;
-          const f = fila(ch.name); f.lineas = +a.line_count || 0; f.principal = ch.tipo === 'principal';
-        }
-        for(const c of (ix.castingsPorEp[String(out.dcEp.id)] || [])){
-          const ch = ix.char[String(c.character_id)], tal = ix.talent[String(c.talent_id)];
-          if(!ch || !ch.name) continue;
-          fila(ch.name).dc = tal ? tal.name : '';
-        }
-      }
+  if(d && dcEp){
+    const ix = prodIndices(d);
+    for(const a of (ix.aparicionesPorEp[String(dcEp.id)] || [])){
+      const ch = ix.char[String(a.character_id)]; if(!ch || !ch.name) continue;
+      const f = fila(ch.name); f.lineas = +a.line_count || 0; f.principal = ch.tipo === 'principal';
+    }
+    for(const c of (ix.castingsPorEp[String(dcEp.id)] || [])){
+      const ch = ix.char[String(c.character_id)], tal = ix.talent[String(c.talent_id)];
+      if(!ch || !ch.name) continue;
+      fila(ch.name).dc = tal ? tal.name : '';
     }
   }
-  const nEp = castNorm(ep.name);
-  const pers = (registro && registro.personajes) || {};
+  const nEp = castNorm(nombreEp);
+  const pers = (nEp && registro && registro.personajes) || {};
   for(const k in pers){
     const p = pers[k];
     if(!p || !(p.episodios || []).some(n => castNorm(n) === nEp)) continue;
     fila(p.display || k).dubbipt = p.talent || '';
   }
-  out.filas = Object.keys(filas).map(k => {
+  return Object.keys(filas).map(k => {
     const f = filas[k];
     return Object.assign(f, { talento: f.dubbipt || f.dc, choca: !!(f.dubbipt && f.dc && castNorm(f.dubbipt) !== castNorm(f.dc)) });
   }).sort((a, b) => (b.lineas - a.lineas) || a.personaje.localeCompare(b.personaje, 'es'));
-  return out;
-}
-
-/** La tabla del casting de un capítulo. */
-function dcastCastingHtml(c, vivo, cuando){
-  const e = (s) => (typeof esc === 'function') ? esc(String(s == null ? '' : s)) : String(s == null ? '' : s).replace(/</g, '&lt;');
-  if(!c.filas.length)
-    return '<div class="et-cast-vacio">' + (c.serie ? (c.dcEp ? 'Este capítulo no tiene personajes en DublajeCast todavía.' : 'No encuentro este capítulo en «' + e(c.serie.name) + '» de DublajeCast.') : 'Sin casting: este programa no está en lo traído de DublajeCast.') + '</div>';
-  const asignados = c.filas.filter(f => f.talento).length;
-  return '<div class="et-cast-cab">' + asignados + ' de ' + c.filas.length + ' personajes con talento'
-      + ' · <span class="et-cast-de">' + (vivo ? 'DublajeCast en vivo' : ('lo traído de DublajeCast' + (cuando ? ' el ' + e(new Date(cuando).toLocaleDateString('es')) : ''))) + '</span></div>'
-    + '<div class="et-cast-tabla">'
-    + c.filas.map(f => '<div class="et-cast-fila' + (f.talento ? '' : ' falta') + (f.choca ? ' choca' : '') + '">'
-        + '<span class="et-cast-per">' + (f.principal ? '<i class="et-cast-prin" title="Principal">' + (typeof csIco === 'function' ? csIco('estrella', 12) : '') + '</i>' : '') + e(f.personaje) + '</span>'
-        + '<span class="et-cast-lin">' + (f.lineas ? f.lineas + ' lín.' : '') + '</span>'
-        + '<span class="et-cast-tal">' + (f.talento ? e(f.talento) : 'sin asignar')
-        + (f.choca ? ' <small title="En DublajeCast pone otro talento: manda el de Dubbipt">' + (typeof csIco === 'function' ? csIco('aviso', 12) : '') + ' en DublajeCast: ' + e(f.dc) + '</small>' : '') + '</span>'
-        + '</div>').join('')
-    + '</div>';
-}
-
-/**
- * Dentro de un programa, con el perfil Casting: en cada capítulo, el botón
- * «🎭» con su casting, y en la cabecera, abrir el programa en DublajeCast.
- * Se pinta después de la lista, sin esperar: si la lista cambia mientras
- * tanto, lo que ya no está no se toca.
- */
-async function dcastPintarCastings(grid, sh, eps){
-  if(!grid || !sh || !prodPuede()) return 0;
-  try{ await prodCargar(); }catch(e){ /* sin nube, lo del equipo */ }
-  const { datos, vivo } = dcastDatos();
-  let registro = null;
-  try{ registro = await castRegCargar(sh.id); }catch(e){ registro = null; }
-  if(LDB.showId !== sh.id) return 0;                       // ya se está en otro programa
-  const serie = dcastSerieDe(sh, datos);
-  const cab = document.getElementById('epsHead');
-  if(cab && serie && !cab.querySelector('.dcast-prog')){
-    const b = document.createElement('button');
-    b.className = 'dcast-prog'; b.innerHTML = (typeof csIco === 'function' ? csIco('externo', 14) : '') + '<span>El programa en DublajeCast</span>';
-    b.title = 'Abre «' + serie.name + '» en DublajeCast, con todas sus herramientas';
-    b.onclick = () => dcastAbrir('series', serie.id);
-    cab.appendChild(b);
-  }
-  let n = 0;
-  for(const ep of (eps || [])){
-    const fila = grid.querySelector('.et-row[data-ep="' + String(ep.id).replace(/"/g, '') + '"]');
-    if(!fila || fila.querySelector('.et-castb')) continue;
-    const c = dcastCastingDe(sh, ep, datos, registro);
-    if(!c.filas.length && !c.dcEp) continue;
-    const asignados = c.filas.filter(f => f.talento).length;
-    const b = document.createElement('button');
-    b.className = 'et-castb' + (c.filas.some(f => f.choca) ? ' choca' : '');
-    b.innerHTML = (typeof csIco === 'function' ? csIco('talentos', 13) : '') + '<span>' + asignados + '/' + c.filas.length + '</span>';
-    b.title = 'El casting de este capítulo';
-    const celda = fila.querySelector('.et-chars') || fila;
-    celda.appendChild(b);
-    b.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      const abierta = fila.nextElementSibling && fila.nextElementSibling.classList && fila.nextElementSibling.classList.contains('et-cast');
-      if(abierta){ fila.nextElementSibling.remove(); b.classList.remove('on'); return; }
-      const panel = document.createElement('div');
-      panel.className = 'et-cast';
-      panel.innerHTML = dcastCastingHtml(c, vivo, PROD.cuando)
-        + '<div class="et-cast-btns">'
-        +   '<button class="et-cast-ir">' + (typeof csIco === 'function' ? csIco('entrar', 14) : '') + '<span>Entrar al capítulo · herramientas de Dubbipt</span></button>'
-        +   (c.dcEp ? '<button class="et-cast-dc">' + (typeof csIco === 'function' ? csIco('externo', 14) : '') + '<span>Casting en DublajeCast</span></button>' : '')
-        + '</div>';
-      fila.parentNode.insertBefore(panel, fila.nextSibling);
-      b.classList.add('on');
-      panel.querySelector('.et-cast-ir').onclick = () => openEpisode(ep.id);
-      const dc = panel.querySelector('.et-cast-dc');
-      if(dc) dc.onclick = () => dcastAbrir('casting', c.serie.id, c.dcEp.id);
-    });
-    n++;
-  }
-  return n;
 }
 
 /** Esconde DublajeCast sin cerrarlo: lo que se estaba haciendo allí sigue igual al volver. */

@@ -42,6 +42,16 @@ const VOLCADO = {
 const PR = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ PRODUCCIÓN · LO QUE VIENE DE DUBLAJECAST', '/* ═══ FIN DE PRODUCCIÓN']],
   ['prodNormalizar', 'prodIndices', 'prodCasarPrograma', 'prodAlertasEp', 'prodPlazo', 'prodFormatoDubcard', 'prodFichaTexto', 'PROD_ET'], { castNorm: undefined, console: { warn: () => {} } });
 
+/* Lo de DublajeCast entero que se usa aquí, de verdad. */
+const DC = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ DUBLAJECAST ENTERO', '/* ═══ FIN DE DUBLAJECAST ENTERO']],
+  ['dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting'],
+  { castNorm: undefined, prodCasarPrograma: PR.prodCasarPrograma, prodIndices: PR.prodIndices, window: { addEventListener: () => {} }, document: {}, location: { origin: '' } });
+
+/* En Dubbipt: un programa con tres capítulos, uno con libreto; y su registro de casting. */
+const SHOWS = [{ id: 's1', name: 'A FILIPINO CHRISTMAS' }];
+const EPS_DUB = { s1: [{ id: 'e1', show_id: 's1', name: 'Episodio 1' }, { id: 'e2', show_id: 's1', name: 'Episodio 2' }, { id: 'e9', show_id: 's1', name: 'Especial de Navidad' }] };
+const REGISTRO = { personajes: { JANA: { display: 'JANA', talent: 'LUZ MAR', episodios: ['Episodio 1'] } } };
+
 /* Lo justo del navegador. */
 class El {
   constructor(tag){ this.tag = tag; this.id = ''; this.className = ''; this.style = {}; this._html = ''; this.hijos = []; this.parentNode = null; this.dataset = {}; this.atrs = {}; this.onclick = null; }
@@ -53,6 +63,7 @@ class El {
   insertBefore(n, ref){ if(n.parentNode) n.remove(); n.parentNode = this; const i = ref ? this.hijos.indexOf(ref) : -1; if(i < 0) this.hijos.push(n); else this.hijos.splice(i, 0, n); return n; }
   remove(){ if(this.parentNode){ const h = this.parentNode.hijos; h.splice(h.indexOf(this), 1); this.parentNode = null; } }
   get nextSibling(){ if(!this.parentNode) return null; const h = this.parentNode.hijos; return h[h.indexOf(this) + 1] || null; }
+  get firstChild(){ return this.hijos[0] || null; }
   querySelector(sel){
     const m = sel.match(/^#([\w-]+)$/);
     for(const h of this.hijos){ if(m && h.id === m[1]) return h; const r = h.querySelector(sel); if(r) return r; }
@@ -74,13 +85,16 @@ function armar(o){
   o = o || {};
   const diario = [], avisos = [];
   const body = new El('body');
-  body.classList = { remove: (c) => diario.push('quita ' + c), contains: () => !!o.epAbierto };
+  const clases = new Set();
+  body.classList = { remove: (c) => { diario.push('quita ' + c); clases.delete(c); }, contains: (c) => c === 'ep-open' ? !!o.epAbierto : clases.has(c),
+                     toggle: (c, si) => { if(si) clases.add(c); else clases.delete(c); } };
   const doc = { body, createElement: (t) => new El(t), getElementById: (id) => body.querySelector('#' + id), querySelector: () => null };
   const PROD = { datos: ('datos' in o) ? o.datos : PR.prodNormalizar(VOLCADO), cuando: new Date(2026, 9, 6).getTime() };
-  const LDB = { showId: 's1', browse: false };
+  const LDB = { showId: ('showId' in o) ? o.showId : null, browse: false, dataEps: new Set(['e1']) };
   let vivo = !!o.vivo;
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
-    ['CS', 'CS_SECCIONES', 'CS_ICO', 'csIco', 'csResumen', 'csOcupacion', 'csTalentos', 'csProduccion', 'csSinPrograma', 'csHtml', 'csNavHtml', 'csPintar', 'csIr', 'csRepintar', 'csCablear', 'csActualizar', 'csPintarSinPrograma'],
+    ['CS', 'CS_SECCIONES', 'CS_ICO', 'csIco', 'csResumen', 'csOcupacion', 'csTalentos', 'csProduccion', 'csHtml', 'csNavHtml', 'csPintar', 'csIr', 'csRepintar', 'csCablear', 'csActualizar',
+     'csNumeroDe', 'csProgramas', 'csFiltrarProgramas', 'csEpisodios', 'csCastingDe', 'csActual', 'csRegistroDe', 'csRealizarCasting', 'csTablaCasting'],
     { castNorm: PR.prodCasarPrograma && ((t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim()),
       document: doc, prodPuede: () => (o.puede !== undefined ? o.puede : true), PROD: PROD, PROD_ET: PR.PROD_ET,
       prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard, prodFichaTexto: PR.prodFichaTexto, prodCasarPrograma: PR.prodCasarPrograma,
@@ -88,7 +102,11 @@ function armar(o){
       prodImportarDesdeDublajeCast: async () => { diario.push('importa'); return { r: 1 }; }, prodResumenTexto: () => 'Traído de DublajeCast: …',
       dcSesion: async () => (o.sesion ? { id: 'u' } : null),
       dcastDatos: () => ({ datos: PROD.datos, vivo: vivo }), dcastAbrir: (v) => { diario.push('dcastAbrir ' + v); return true; },
-      castAviso: (t) => avisos.push(t), sbShows: () => [{ id: 's1', name: 'A FILIPINO CHRISTMAS' }], LDB: LDB, libView: 'eps',
+      castAviso: (t) => avisos.push(t), sbShows: () => (o.shows || SHOWS), sbEps: (id) => EPS_DUB[id] || [], LDB: LDB, libView: 'eps',
+      dcastSerieDe: DC.dcastSerieDe, dcastEpDeDc: DC.dcastEpDeDc, dcastFilasCasting: DC.dcastFilasCasting,
+      castRegCargar: async (id) => { diario.push('registro ' + id); return o.registro !== undefined ? o.registro : REGISTRO; },
+      ponerModo: (ep, m) => diario.push('ponerModo ' + ep + ' ' + m), openEpisode: async (id) => diario.push('openEpisode ' + id),
+      newEpisodeModal: () => { body.appendChild(Object.assign(new El('input'), { id: 'neName', value: '' })); diario.push('newEpisodeModal ' + LDB.showId); },
       renderLibrary: () => diario.push('renderLibrary'), newShow: async () => { body.appendChild(Object.assign(new El('input'), { id: 'npName', value: '', focus: () => {} })); diario.push('newShow'); },
       esc: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), fallo: (d) => diario.push('fallo ' + d), _svgI: undefined });
   return { M, diario, avisos, doc, body, PROD, LDB };
@@ -151,9 +169,23 @@ exports.pruebas = async function(t){
   t.eq('con su fase, su cliente y su DUBCARD', [pr[0].fase, pr[0].cliente, pr[0].dubcard + ' ' + pr[0].fechaDubcard, pr[1].dubcard].join(' · '), 'Preproducción · Netflix · BACKLOT ' + dia(2) + ' · Excel');
   t.eq('solo los que tienen alertas', M.csProduccion(d, HOY, true).map(f => f.programa + ' ' + f.capitulo + ' ' + f.alertas.length).join(' | '), 'A Filipino Christmas 1 2 | Akka 1 1');
 
-  t.seccion('6 · Programas: los de DublajeCast que aún no están en Dubbipt');
-  t.eq('se nombran para crearlos', M.csSinPrograma(d, [{ id: 's1', name: 'A FILIPINO CHRISTMAS' }]).join(', '), 'Akka, Dofus');
-  t.eq('sin datos, ninguno', M.csSinPrograma(null, []).length, 0);
+  t.seccion('6 · Programas, programa y episodio, como en DublajeCast');
+  const progs = M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], d);
+  t.eq('todos los programas: los de Dubbipt con lo que sabe DublajeCast, y los que solo están allí', progs.map(p => p.clave + ' ' + p.nombre + ' ' + p.estado).join(' | '), 's:s1 A FILIPINO CHRISTMAS en_curso | dc:2 Akka en_curso | dc:3 Dofus completo');
+  t.eq('con su cliente, de DublajeCast', progs.map(p => p.cliente || '—').join(' '), 'Netflix Discovery —');
+  t.eq('uno de Dubbipt que DublajeCast no tiene, en curso y sin serie', JSON.stringify(M.csProgramas([{ id: 'x', name: 'Nuevo' }], () => [], d).find(p => p.clave === 's:x'), ['estado', 'serie']), '{"estado":"en_curso","serie":null}');
+  t.eq('sin datos de DublajeCast, solo los de Dubbipt', M.csProgramas(SHOWS, () => [], null).map(p => p.clave).join(','), 's:s1');
+  t.eq('filtrar por estado, como en DublajeCast', ['todos', 'en_curso', 'completo'].map(f => M.csFiltrarProgramas(progs, f, '').length).join(' '), '3 2 1');
+  t.eq('y buscar por nombre o cliente, sin mayúsculas', M.csFiltrarProgramas(progs, 'todos', 'netflix').map(p => p.nombre).join(',') + ' · ' + M.csFiltrarProgramas(progs, 'en_curso', 'dofus').length, 'A FILIPINO CHRISTMAS · 0');
+  const p1 = progs[0], eps1 = M.csEpisodios(p1);
+  t.eq('los episodios: los de Dubbipt con su pareja de DublajeCast, por número; sin número, al final', eps1.map(e => e.clave + ' ' + e.numero + ' ' + (e.dcEp ? e.dcEp.id : '—')).join(' | '), 'e:e1 1 11 | e:e2 2 12 | e:e9 null —');
+  t.eq('con el título de DublajeCast cuando es otro', eps1[0].dcTitulo, 'Boracay');
+  const epsAkka = M.csEpisodios(progs[1]);
+  t.eq('los de un programa que solo está en DublajeCast', epsAkka.map(e => e.clave + ' ' + e.titulo).join(' | '), 'd:21 Akka 1');
+  const mezcla = M.csEpisodios(M.csProgramas(SHOWS, () => [{ id: 'e1', name: 'Episodio 1' }], PR.prodNormalizar({ series: [{ id: 1, name: 'A Filipino Christmas' }], episodes: [{ id: 11, series_id: 1, episode_number: 1 }, { id: 13, series_id: 1, episode_number: 3, title: 'Año nuevo' }] }))[0]);
+  t.eq('y los que DublajeCast tiene y Dubbipt todavía no, en su sitio', mezcla.map(e => e.clave + ' ' + e.numero).join(' | '), 'e:e1 1 | d:13 3');
+  t.eq('el número de un nombre', [M.csNumeroDe('Episodio 12'), M.csNumeroDe('E02 Piloto'), M.csNumeroDe('Especial')].join(' '), '12 2 NaN');
+  t.eq('el casting de un episodio: DublajeCast y el registro de Dubbipt', M.csCastingDe(eps1[0], d, REGISTRO).map(f => f.personaje + '=' + f.talento + (f.choca ? '!' : '')).join(' '), 'ALLY=ANA ROJAS JANA=LUZ MAR! TITO BOY=');
 
   t.seccion('7 · lo que se pinta: con los datos, sin ellos, y sin emojis');
   const vistas = ['dashboard', 'talentos', 'ocupacion', 'trailers', 'produccion', 'dubcards', 'pegado', 'breakdowns'];
@@ -178,48 +210,89 @@ exports.pruebas = async function(t){
     t.ok('ni un capítulo con alertas, lo dice', /Ningún capítulo con alertas\./.test(B.M.csHtml('produccion', HOY)));
   }
 
-  t.seccion('8 · montarlo en la biblioteca');
+  t.seccion('8 · la distribución de DublajeCast, montada en la biblioteca');
+  const vista = (A) => A.doc.getElementById('csVista').innerHTML;
+  const control = (A, que, v) => A.doc.getElementById('csVista').querySelectorAll('[data-cs]').find(c => c.getAttribute('data-cs') === que && (v === undefined || c.getAttribute('data-v') === v));
+  const espera = () => new Promise(r => setTimeout(r, 0));
   {
     const A = armar();
     const b = biblioteca(A.doc);
-    t.eq('en Programas: la barra encima, la lista de Dubbipt a la vista', A.M.csPintar('shows', b.cab, b.grid) + ' ' + (b.lib.hijos[0].id) + ' ' + (b.grid.style.display || 'visible') + ' ' + A.doc.getElementById('csVista').style.display, 'true csNav visible none');
-    t.ok('la barra, con Programas activa', /class="cs-nav-b on" data-v="programas"/.test(A.doc.getElementById('csNav').innerHTML));
-    t.eq('y debajo, los programas que faltan', !!A.doc.getElementById('csSinProg') && A.doc.getElementById('csSinProg').innerText, 'En DublajeCast y todavía no en Dubbipt Akka Dofus');
-    const crear = A.doc.getElementById('csSinProg').querySelectorAll('button[data-nombre]')[0];
-    await crear.onclick();
-    t.eq('pulsar uno abre «Nuevo programa» con su nombre', A.doc.getElementById('npName').value, 'Akka');
-    A.M.CS.vista = 'ocupacion';
+    t.eq('con el perfil Casting: la barra a la izquierda, primera; la sección al lado; lo de siempre, tapado', A.M.csPintar('shows', b.cab, b.grid) + ' ' + b.lib.hijos.map(h => h.id).join(',') + ' ' + A.body.classList.contains('cs-on'), 'true csNav,csVista,dashHead,libGrid true');
+    t.ok('la barra con su título y Programas activa', /<div class="cs-nav-t">Casting<\/div>/.test(A.doc.getElementById('csNav').innerHTML) && /class="cs-nav-b on" data-v="programas"/.test(A.doc.getElementById('csNav').innerHTML));
+    t.ok('Programas: las tarjetas, en curso primero como en DublajeCast', /<h2>Programas<\/h2>/.test(vista(A)) && /2 de 3/.test(vista(A)) && /data-v="s:s1"/.test(vista(A)) && /data-v="dc:2"/.test(vista(A)) && !/data-v="dc:3"/.test(vista(A)));
+    t.ok('con sus pestañas y cuántos hay en cada una', /data-cs="filtro" data-v="todos">Todos <b>3<\/b>/.test(vista(A)) && /data-v="en_curso">En curso <b>2<\/b>/.test(vista(A)) && /data-v="completo">Completados <b>1<\/b>/.test(vista(A)));
+    t.ok('el que solo está en DublajeCast, dicho', /Akka[\s\S]*?Solo en DublajeCast/.test(vista(A)));
+    control(A, 'filtro', 'completo').onclick(); A.M.csPintar('shows', b.cab, b.grid);
+    t.ok('la pestaña Completados enseña los completados', /data-v="dc:3"/.test(vista(A)) && !/data-v="s:s1"/.test(vista(A)));
+    control(A, 'filtro', 'en_curso').onclick(); A.M.csPintar('shows', b.cab, b.grid);
+    control(A, 'abrirProg', 's:s1').onclick(); A.M.csPintar('shows', b.cab, b.grid);
+    t.eq('Abrir: el programa, con sus episodios', A.M.CS.vista + ' ' + /<h2>A FILIPINO CHRISTMAS<\/h2>/.test(vista(A)) + ' ' + /Episodios \(3\)/.test(vista(A)), 'programa true true');
+    t.ok('cada episodio con su estado en Dubbipt y su casting', /<b>Ep\. 1<\/b><span>Episodio 1<\/span>[\s\S]*?Con libreto[\s\S]*?<b>3<\/b> pers\.[\s\S]*?data-cs="abrirEp" data-v="e:e1"/.test(vista(A)) && /Episodio 2<\/span>[\s\S]*?Sin libreto/.test(vista(A)));
+    t.ok('la barra sigue con Programas activa', /class="cs-nav-b on" data-v="programas"/.test(A.doc.getElementById('csNav').innerHTML));
+    await espera(); A.M.csPintar('shows', b.cab, b.grid);
+    t.ok('al llegar el registro de Dubbipt, se avisa del talento distinto', A.diario.includes('registro s1') && /1 distinto en DublajeCast/.test(vista(A)));
+    control(A, 'nuevoEp').onclick();
+    t.ok('Nuevo episodio, en este programa', A.diario.includes('newEpisodeModal s1'));
+    control(A, 'dcSerie').onclick();
+    t.ok('y el programa en DublajeCast', A.diario.includes('dcastAbrir series'));
+    control(A, 'abrirEp', 'e:e1').onclick(); A.M.csPintar('shows', b.cab, b.grid);
+    t.eq('Casting: el episodio', A.M.CS.vista + ' ' + /<h2>Ep\. 1 · Episodio 1<\/h2>/.test(vista(A)), 'episodio true');
+    t.ok('con el botón «Realizar casting»', /<button class="cs-cta" data-cs="realizar">[\s\S]*?<span>Realizar casting<\/span><\/button>/.test(vista(A)));
+    t.ok('su ficha de DublajeCast y su tabla de casting', /<span>Fase<\/span><b>Preproducción<\/b>/.test(vista(A)) && /<span>Alertas<\/span>/.test(vista(A)) && /2 de 3 personajes con talento/.test(vista(A)) && /TITO BOY[\s\S]*?sin asignar/.test(vista(A)));
+    control(A, 'orden', 'personaje').onclick(); A.M.csPintar('shows', b.cab, b.grid);
+    t.ok('la tabla, por personaje si se pide', vista(A).indexOf('>ALLY<') < vista(A).indexOf('>JANA<') && vista(A).indexOf('>JANA<') < vista(A).indexOf('>TITO BOY<') && /class="cs-pest on" data-cs="orden" data-v="personaje"/.test(vista(A)));
+    await control(A, 'realizar').onclick(); await espera();
+    t.ok('Realizar casting: el capítulo de Dubbipt, abierto con el perfil Casting', A.diario.includes('ponerModo e1 casting') && A.diario.includes('openEpisode e1') && A.LDB.showId === 's1');
+    t.eq('y el registro se volverá a leer al volver', 's1' in A.M.CS.registros, false);
+    control(A, 'volver', 'programa').onclick();
+    t.eq('Volver: al programa', A.M.CS.vista + ' ' + A.M.CS.ep, 'programa null');
     A.M.csPintar('shows', b.cab, b.grid);
-    t.eq('en otra sección: la lista y su cabecera, tapadas; la sección, a la vista', [b.cab.style.display, b.grid.style.display, A.doc.getElementById('csVista').style.display].join(' '), 'none none ');
-    t.ok('con lo suyo dentro', /<h2>Ocupación<\/h2>/.test(A.doc.getElementById('csVista').innerHTML));
-    t.eq('y sin los programas que faltan, que solo van en Programas', A.doc.getElementById('csSinProg'), null);
+    control(A, 'volver', 'programas').onclick();
+    t.eq('y a Programas', A.M.CS.vista + ' ' + A.M.CS.prog, 'programas null');
+    A.M.CS.vista = 'ocupacion'; A.M.csPintar('shows', b.cab, b.grid);
+    t.ok('las demás secciones, en el mismo sitio', /<h2>Ocupación<\/h2>/.test(vista(A)) && /class="cs-nav-b on" data-v="ocupacion"/.test(A.doc.getElementById('csNav').innerHTML));
     t.eq('repintar no duplica nada', b.lib.hijos.filter(h => h.id === 'csNav').length + ' ' + b.lib.hijos.filter(h => h.id === 'csVista').length, '1 1');
-    const vi = A.doc.getElementById('csVista');
-    const ctl = vi.querySelectorAll('[data-cs]');
-    ctl.find(c => c.getAttribute('data-cs') === 'programa').value = '2';
-    ctl.find(c => c.getAttribute('data-cs') === 'programa').onchange();
-    t.eq('el selector de programa filtra y repinta', A.M.CS.programa + ' ' + A.diario.includes('renderLibrary'), '2 true');
+    control(A, 'programa').value = '2'; control(A, 'programa').onchange();
+    t.eq('el selector de programa de Ocupación filtra y repinta', A.M.CS.programa + ' ' + A.diario.includes('renderLibrary'), '2 true');
     A.M.CS.vista = 'pegado'; A.M.csPintar('shows', b.cab, b.grid);
-    A.doc.getElementById('csVista').querySelectorAll('[data-cs]').find(c => c.getAttribute('data-cs') === 'herramienta').onclick();
-    t.ok('la herramienta de DublajeCast se abre en su pantalla', A.diario.includes('dcastAbrir pegado'));
-    A.M.CS.vista = 'dashboard';
+    control(A, 'herramienta').onclick();
+    t.ok('las herramientas de DublajeCast se abren en su pantalla', A.diario.includes('dcastAbrir pegado'));
+    A.doc.getElementById('csNav').querySelectorAll('.cs-nav-b').find(x => x.dataset.v === 'talentos').onclick();
+    t.eq('pulsar una sección de la barra va a ella, desde donde sea', [A.M.CS.vista, String(A.M.CS.prog), String(A.LDB.showId), A.LDB.browse].join(' '), 'talentos null null true');
+  }
+  {
+    const A = armar();
+    const b = biblioteca(A.doc);
+    A.M.csPintar('shows', b.cab, b.grid);
+    control(A, 'filtro', 'todos').onclick();
+    control(A, 'abrirProg', 'dc:2').onclick(); A.M.csPintar('shows', b.cab, b.grid);
+    t.ok('un programa que solo está en DublajeCast se ofrece crear en Dubbipt', /data-cs="crearProg"/.test(vista(A)) && !/data-cs="nuevoEp"/.test(vista(A)) && /Solo en DublajeCast/.test(vista(A)));
+    control(A, 'abrirEp', 'd:21').onclick(); A.M.csPintar('shows', b.cab, b.grid);
+    t.ok('y su episodio no tiene «Realizar casting»: hay que crear el programa', !/data-cs="realizar"/.test(vista(A)) && /Crear el programa en Dubbipt/.test(vista(A)) && /MANJAYA/.test(vista(A)));
+    await control(A, 'crearProg').onclick(); await espera();
+    t.eq('crearlo abre «Nuevo programa» con su nombre', A.doc.getElementById('npName').value, 'Akka');
+  }
+  {
+    const A = armar({ showId: 's1' });
+    const b = biblioteca(A.doc);
     const cabEp = new El('div'); cabEp.id = 'epsHead'; b.lib.insertBefore(cabEp, b.grid);
     A.M.csPintar('eps', cabEp, b.grid);
-    t.eq('dentro de un programa: la barra con Programas activa y la lista a la vista', /class="cs-nav-b on" data-v="programas"/.test(A.doc.getElementById('csNav').innerHTML) + ' ' + (b.grid.style.display || 'visible') + ' ' + b.lib.hijos.indexOf(A.doc.getElementById('csNav')) + '<' + b.lib.hijos.indexOf(cabEp), 'true visible 1<2');
-    A.doc.getElementById('csNav').querySelectorAll('.cs-nav-b').find(x => x.dataset.v === 'talentos').onclick();
-    t.eq('y pulsar otra sección vuelve a la biblioteca en esa sección', [A.M.CS.vista, String(A.LDB.showId), A.LDB.browse].join(' '), 'talentos null true');
+    t.eq('si se entra en un programa por otro camino, se enseña ese programa', A.M.CS.vista + ' ' + A.M.CS.prog, 'programa s:s1');
+    A.M.CS.vista = 'episodio'; A.M.CS.ep = 'e:e1';
+    A.M.csPintar('eps', cabEp, b.grid);
+    t.eq('y al volver del capítulo, se vuelve al episodio', A.M.CS.vista + ' ' + A.M.CS.ep, 'episodio e:e1');
   }
   {
     const N = armar({ puede: false });
     const b = biblioteca(N.doc);
     const nav = new El('nav'); nav.id = 'csNav'; b.lib.insertBefore(nav, b.cab);
     const vi = new El('div'); vi.id = 'csVista'; b.lib.appendChild(vi);
-    b.grid.style.display = 'none';
-    t.eq('quien no es administrador en Casting: nada de esto, y la lista vuelve', N.M.csPintar('shows', b.cab, b.grid) + ' ' + N.doc.getElementById('csNav') + ' ' + N.doc.getElementById('csVista') + ' ' + (b.grid.style.display || 'visible'), 'false null null visible');
+    t.eq('quien no es administrador en Casting: nada de esto, y la biblioteca de siempre', N.M.csPintar('shows', b.cab, b.grid) + ' ' + N.doc.getElementById('csNav') + ' ' + N.doc.getElementById('csVista') + ' ' + N.body.classList.contains('cs-on'), 'false null null false');
   }
   {
     const A = armar();
     t.eq('una sección que no existe no se abre', A.M.csIr('borrar') + ' ' + A.diario.includes('renderLibrary'), 'false false');
+    t.eq('Realizar casting sin capítulo de Dubbipt no hace nada', await A.M.csRealizarCasting({ show: null }, { ep: null }), false);
     const E = armar({ epAbierto: true });
     E.M.csRepintar();
     t.eq('con un capítulo abierto, repintar no lo saca de él', E.diario.includes('renderLibrary'), false);

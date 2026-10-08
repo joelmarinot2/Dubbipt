@@ -1694,14 +1694,72 @@ body:not(.modo-casting) .gestbtn{ display:none; }
 .dcast-b:hover{ border-color:#4ADE80; }
 .dcast-volver{ background:#22C55E; color:#06210f; border-color:#22C55E; font-weight:700; }
 .dcast-marco{ flex:1; width:100%; border:0; background:#0b0d12; }
-/* Casting con la organización de DublajeCast, con la cara de Dubbipt */
-.cs-nav{ display:flex; gap:4px; overflow-x:auto; background:#101215; border:1px solid #23262b; border-radius:13px; padding:5px; margin:0 0 16px; scrollbar-width:none; }
-.cs-nav::-webkit-scrollbar{ display:none; }
-.cs-nav-b{ display:inline-flex; align-items:center; gap:7px; background:transparent; border:1px solid transparent; color:#9CA3AF; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; padding:8px 12px; border-radius:9px; cursor:pointer; white-space:nowrap; }
+/* Casting: la distribución de DublajeCast -barra a la izquierda, sección a la derecha- con la cara de Dubbipt.
+   Lo de siempre de la biblioteca (mosaico de programas, tabla de capítulos) queda tapado mientras tanto. */
+body.cs-on:not(.ep-open) #lib{ display:grid; grid-template-columns:212px minmax(0,1fr); gap:18px; align-items:start; padding:16px; }
+body.cs-on:not(.ep-open) #lib > *:not(#csNav):not(#csVista){ display:none !important; }
+body.cs-on:not(.ep-open) #progHeader{ display:none !important; }
+body.ep-open #csNav, body.ep-open #csVista{ display:none !important; }
+.cs-nav{ display:flex; flex-direction:column; gap:2px; background:#101215; border:1px solid #23262b; border-radius:16px; padding:12px 8px; position:sticky; top:12px; }
+.cs-nav-t{ font-family:'Inter',sans-serif; font-size:10.5px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#6b7079; padding:2px 12px 10px; }
+.cs-nav-b{ display:flex; align-items:center; gap:11px; width:100%; text-align:left; background:transparent; border:1px solid transparent; color:#9CA3AF; font-family:'Inter',sans-serif; font-size:13px; font-weight:600; padding:10px 12px; border-radius:10px; cursor:pointer; }
 .cs-nav-b:hover{ color:#f2f3f5; background:#16181c; }
-.cs-nav-b.on{ background:#22C55E; color:#06210f; }
+.cs-nav-b.on{ background:rgba(34,197,94,.12); color:#4ADE80; border-color:rgba(34,197,94,.28); }
 .cs-nav-b.cs-nav-dc{ color:#8b8f97; }
-.cs-nav-b.cs-nav-dc.on{ background:#2b2f36; color:#f2f3f5; }
+.cs-nav-b.cs-nav-dc.on{ background:#1c1f24; color:#f2f3f5; border-color:#2b2f36; }
+.cs-cab-btns{ margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+.cs-volver{ display:inline-flex; align-items:center; gap:6px; background:transparent; border:none; color:#9CA3AF; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; padding:4px 0; margin-bottom:8px; cursor:pointer; }
+.cs-volver:hover{ color:#4ADE80; }
+.cs-filtros{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+.cs-buscar-prog{ display:flex; align-items:center; gap:8px; flex:1 1 260px; max-width:420px; background:#101215; border:1px solid #23262b; border-radius:10px; padding:0 12px; color:#4ADE80; }
+.cs-buscar.cs-buscar-prog input{ margin:0; border:none; background:transparent; padding:9px 0; border-radius:0; }
+.cs-pests{ display:inline-flex; gap:4px; background:#101215; border:1px solid #23262b; border-radius:11px; padding:4px; }
+.cs-pest{ background:transparent; border:none; color:#9CA3AF; font-family:'Inter',sans-serif; font-size:12px; font-weight:600; padding:6px 11px; border-radius:8px; cursor:pointer; }
+.cs-pest b{ color:#6b7079; margin-left:3px; }
+.cs-pest.on{ background:#22C55E; color:#06210f; }
+.cs-pest.on b{ color:#06210f; }
+.cs-progs{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; }
+.cs-prog{ background:#101215; border:1px solid #23262b; border-top:3px solid #22C55E; border-radius:13px; padding:15px 16px; display:flex; flex-direction:column; gap:8px; }
+.cs-prog.cs-prog-hecho{ border-top-color:#4b5563; opacity:.8; }
+.cs-prog-t{ display:flex; flex-direction:column; gap:2px; }
+.cs-prog-t b{ color:#f2f3f5; font-size:14px; }
+.cs-prog-chips{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.cs-prog-n{ color:#d7dae0; font-size:12px; }
+.cs-prog-abrir{ justify-content:center; margin-top:auto; }
+.cs-etq{ font-size:11px; color:#9CA3AF; border:1px solid #2b2f36; border-radius:999px; padding:2px 8px; white-space:nowrap; }
+.cs-etq-dc{ color:#d7dae0; border-style:dashed; }
+.cs-eps{ display:flex; flex-direction:column; gap:8px; }
+.cs-ep{ display:flex; align-items:center; gap:12px; background:#101215; border:1px solid #23262b; border-left:3px solid #22C55E; border-radius:11px; padding:12px 16px; }
+.cs-ep-izq{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+.cs-ep-t{ display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; font-size:13px; color:#d7dae0; }
+.cs-ep-t b{ color:#4ADE80; font-weight:800; }
+.cs-ep-datos{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:11.5px; color:#8b8f97; }
+.cs-ep-datos b{ color:#d7dae0; }
+.cs-verde{ color:#4ADE80 !important; } .cs-rojo{ color:#FB7185 !important; }
+.cs-aviso{ display:inline-flex; align-items:center; gap:4px; color:#FBBF24; }
+.cs-ep-ficha{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-bottom:16px; }
+.cs-ep-ficha > div{ background:#101215; border:1px solid #23262b; border-radius:11px; padding:10px 12px; display:flex; flex-direction:column; gap:3px; }
+.cs-ep-ficha span{ font-size:11px; color:#8b8f97; text-transform:uppercase; letter-spacing:.05em; }
+.cs-ep-ficha b{ color:#f2f3f5; font-size:13px; }
+.cs-realizar{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; background:#101215; border:1px solid rgba(34,197,94,.3); border-radius:14px; padding:16px 18px; margin-bottom:18px; }
+.cs-realizar .cs-tenue{ flex:1 1 260px; font-size:12.5px; line-height:1.5; }
+.cs-cta{ display:inline-flex; align-items:center; gap:10px; background:#22C55E; color:#06210f; border:none; border-radius:12px; padding:13px 22px; font-family:'Inter',sans-serif; font-size:15px; font-weight:800; cursor:pointer; }
+.cs-cta:hover{ filter:brightness(1.08); }
+.cs-cast-cab{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; font-size:12.5px; color:#9CA3AF; margin-bottom:8px; }
+.cs-cast .cs-fila{ grid-template-columns:minmax(150px,1.4fr) 70px minmax(150px,1.6fr); min-width:420px; }
+.cs-prin{ display:inline-flex; vertical-align:-1px; margin-right:5px; color:#FCD34D; }
+.cs-talento{ color:#4ADE80; }
+.cs-falta .cs-talento{ color:#FB7185; font-style:italic; }
+.cs-talento small{ margin-left:6px; font-style:normal; }
+@media (max-width:860px){
+  body.cs-on:not(.ep-open) #lib{ display:block; padding:12px; }
+  .cs-nav{ flex-direction:row; overflow-x:auto; position:static; margin-bottom:14px; padding:6px; scrollbar-width:none; }
+  .cs-nav::-webkit-scrollbar{ display:none; }
+  .cs-nav-t{ display:none; }
+  .cs-nav-b{ width:auto; white-space:nowrap; }
+  .cs-ep{ flex-direction:column; align-items:stretch; }
+}
+/* Casting con la organización de DublajeCast, con la cara de Dubbipt */
 .cs-vista{ border:1px solid #23262b; border-radius:18px; padding:20px 22px; font-family:'Inter',sans-serif; color:#d7dae0; }
 .cs-cab{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px; }
 .cs-cab-t h2{ font-weight:700; color:#f2f3f5; font-size:20px; margin:0; }
@@ -1750,35 +1808,9 @@ span.cs-nada{ border-color:#3a3f47; }
 .cs-herr{ display:flex; gap:16px; align-items:flex-start; background:#101215; border:1px solid #23262b; border-radius:13px; padding:18px; font-size:13px; line-height:1.55; }
 .cs-herr p{ margin:0 0 10px; }
 .cs-herr-ic{ color:#4ADE80; flex-shrink:0; margin-top:2px; }
-.cs-sinprog{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:14px; padding:12px 14px; border:1px dashed #2b2f36; border-radius:13px; }
-.cs-sinprog-t{ font-family:'Inter',sans-serif; font-size:12px; font-weight:700; color:#9CA3AF; margin-right:4px; }
-body.ep-open #csNav, body.ep-open #csVista, body.ep-open #csSinProg{ display:none !important; }
-@media (max-width:640px){ .cs-vista{ padding:14px; } .cs-nav-b span{ display:none; } .cs-nav-b.on span{ display:inline; } }
-.dcast-prog{ display:inline-flex; align-items:center; gap:7px; background:#16181c; border:1px solid #2b2f36; color:#e5e7eb; border-radius:10px; padding:9px 13px; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; cursor:pointer; margin-left:8px; }
 /* El casting de cada capítulo */
-.et-cast-prin{ display:inline-flex; vertical-align:-1px; margin-right:5px; color:#FCD34D; }
 .dh-tools, .eps-opt{ display:inline-flex; align-items:center; gap:7px; }
 .dash-head .dh-search .fi{ display:inline-flex; }
-.et-castb{ display:inline-flex; align-items:center; gap:5px; margin-left:8px; background:#16181c; border:1px solid #2b2f36; color:#d7dae0; border-radius:999px; padding:2px 9px; font-family:'Inter',sans-serif; font-size:11.5px; font-weight:700; cursor:pointer; }
-.et-castb.on, .et-castb:hover{ border-color:#4ADE80; color:#f2f3f5; }
-.et-castb.choca{ border-color:rgba(245,158,11,.45); color:#FBBF24; }
-.et-cast{ margin:0; padding:12px 18px 14px; background:#0d0f12; border-top:1px solid #1c1f24; border-bottom:1px solid #1c1f24; font-family:'Inter',sans-serif; }
-.et-cast-cab{ font-size:12px; color:#9CA3AF; margin-bottom:8px; }
-.et-cast-de{ color:#6b7079; }
-.et-cast-tabla{ display:flex; flex-direction:column; gap:2px; max-height:320px; overflow:auto; }
-.et-cast-fila{ display:grid; grid-template-columns:minmax(120px,1.3fr) 70px minmax(120px,1.4fr); gap:10px; font-size:12.5px; padding:4px 6px; border-radius:6px; }
-.et-cast-fila:nth-child(odd){ background:rgba(255,255,255,.03); }
-.et-cast-per{ font-weight:700; color:#f2f3f5; }
-.et-cast-lin{ color:#8b8f97; text-align:right; }
-.et-cast-tal{ color:#4ADE80; }
-.et-cast-fila.falta .et-cast-tal{ color:#FB7185; font-style:italic; }
-.et-cast-fila.choca .et-cast-tal small{ color:#FCD34D; margin-left:4px; }
-.et-cast-vacio{ font-size:12.5px; color:#8b8f97; }
-.et-cast-btns{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
-.et-cast-btns button{ display:inline-flex; align-items:center; gap:7px; background:#22C55E; color:#06210f; border:none; border-radius:9px; padding:7px 12px; font-size:12px; font-weight:700; cursor:pointer; }
-.et-cast-btns .et-cast-dc{ background:#16181c; color:#e5e7eb; border:1px solid #2b2f36; }
-.dcast-prog:hover, .et-cast-btns .et-cast-dc:hover{ border-color:#4ADE80; }
-@media (max-width:640px){ .et-cast-fila{ grid-template-columns:1fr 54px 1fr; gap:6px; font-size:12px; } }
 body.dcast-abierto{ overflow:hidden; }
 
 /* Cambiar el libreto: «¿son el mismo personaje?», pareja por pareja */
@@ -2496,7 +2528,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.30.0-nube';
+const APP_VER_NUM = 'v11.31.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8288,8 +8320,6 @@ async function renderLibrary(silent){
           +'</div>';
       }).join('');
       grid.innerHTML = optBtn + '<div class="et-table">' + head + rows + '</div>';
-      /* Con el perfil Casting: el casting de cada capítulo, de DublajeCast y de Dubbipt. */
-      dcastPintarCastings(grid, sh, eps).catch(e => fallo('dcastPintarCastings · index.html:renderLibrary', e));
     }
     { const eo=document.getElementById('epsOpt'); if(eo) eo.addEventListener('click', ()=> optimizeProgram(LDB.showId)); }
 

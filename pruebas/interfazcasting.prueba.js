@@ -97,7 +97,7 @@ function armar(o){
   const PROD = { datos: ('datos' in o) ? o.datos : PR.prodNormalizar(VOLCADO), cuando: new Date(2026, 9, 6).getTime() };
   const LDB = { showId: ('showId' in o) ? o.showId : 's1' };
   const M = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ DUBLAJECAST ENTERO', '/* ═══ FIN DE DUBLAJECAST ENTERO']],
-    ['DCAST', 'dcastIr', 'dcastAbrir', 'dcastAtender', 'dcastDatos', 'dcastSerieDe', 'dcastEpDeDc', 'dcastCastingDe', 'dcastCastingHtml', 'dcastPintarCastings'],
+    ['DCAST', 'dcastIr', 'dcastAbrir', 'dcastAtender', 'dcastDatos', 'dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting'],
     { castNorm: undefined, document: doc, window: { addEventListener: () => {} }, location: { origin: 'https://dubbipt.vercel.app' },
       prodPuede: () => (o.puede !== undefined ? o.puede : true), PROD_SIN_PERMISO: '🔒 solo admin', prodPintarBoton: () => {},
       prodCasarPrograma: PR.prodCasarPrograma, prodNormalizar: PR.prodNormalizar, prodIndices: PR.prodIndices, PROD: PROD,
@@ -109,21 +109,6 @@ function armar(o){
       openEpisode: async (id) => diario.push('openEpisode ' + id), newShow: async () => {}, talPanel: () => {}, herramientasPanel: () => {},
       fallo: (d) => diario.push('fallo ' + d) });
   return { M, diario, avisos, doc, PROD, LDB };
-}
-
-/** Una lista de capítulos como la pinta Dubbipt. */
-function lista(doc){
-  const grid = new El('div'); grid.id = 'libGrid';
-  const tabla = new El('div'); tabla.className = 'et-table'; grid.appendChild(tabla);
-  for(const ep of EPS){
-    const fila = new El('div'); fila.className = 'et-row'; fila.dataset.ep = ep.id;
-    const celda = new El('span'); celda.className = 'et-chars'; fila.appendChild(celda);
-    fila.addEventListener('click', () => fila.abierta = true);         // en Dubbipt, pulsar la fila abre el capítulo
-    tabla.appendChild(fila);
-  }
-  const cab = new El('div'); cab.id = 'epsHead'; doc.body.appendChild(cab);
-  doc.body.appendChild(grid);
-  return { grid, cab, fila: (id) => tabla.hijos.find(f => f.dataset.ep === id) };
 }
 
 exports.pruebas = async function(t){
@@ -141,30 +126,21 @@ exports.pruebas = async function(t){
 
   t.seccion('2 · el casting de un capítulo');
   const d = PR.prodNormalizar(VOLCADO);
-  const c1 = M.dcastCastingDe(SH, EPS[0], d, REGISTRO);
-  t.eq('los personajes que salen, por líneas', c1.filas.map(f => f.personaje + ':' + f.lineas).join(' '), 'ALLY:186 JANA:54 TITO BOY:12');
-  t.eq('con su talento; sin talento, vacío', c1.filas.map(f => f.talento || '—').join(' | '), 'ANA ROJAS | LUZ MAR | —');
-  t.eq('el principal, marcado', c1.filas.map(f => f.principal).join(' '), 'true false false');
-  t.eq('si DublajeCast y Dubbipt dicen otra cosa, se marca y manda Dubbipt', JSON.stringify(c1.filas.filter(f => f.choca).map(f => [f.personaje, f.dubbipt, f.dc])), '[["JANA","LUZ MAR","BEATRIZ SOL"]]');
-  t.eq('si dicen lo mismo, no choca', c1.filas.find(f => f.personaje === 'ALLY').choca, false);
-  const c2 = M.dcastCastingDe(SH, EPS[1], d, REGISTRO);
-  t.eq('cada capítulo el suyo: el registro solo cuenta lo de ese capítulo', c2.filas.map(f => f.personaje + '=' + f.talento).join(' '), 'ALLY=ANA ROJAS NARRADOR=PEPE');
-  t.eq('lo que solo sabe Dubbipt también sale', c2.filas.find(f => f.personaje === 'NARRADOR').lineas, 0);
-  const c9 = M.dcastCastingDe(SH, EPS[2], d, REGISTRO);
-  t.eq('un capítulo que DublajeCast no tiene: solo lo de Dubbipt, y se sabe el programa', c9.filas.map(f => f.personaje).join(' ') + ' ' + c9.serie.name + ' ' + c9.dcEp, 'COROS A Filipino Christmas null');
-  t.eq('sin datos de DublajeCast, lo de Dubbipt', M.dcastCastingDe(SH, EPS[0], null, REGISTRO).filas.map(f => f.personaje).join(' '), 'ALLY JANA');
-  t.eq('sin nada, nada', M.dcastCastingDe(SH, EPS[0], null, null).filas.length, 0);
-
-  t.seccion('3 · cómo se enseña');
-  const h1 = M.dcastCastingHtml(c1, false, new Date(2026, 9, 6).getTime());
-  t.ok('cuántos tienen talento, y de dónde viene', /2 de 3 personajes con talento · <span class="et-cast-de">lo traído de DublajeCast el 6\/10\/2026<\/span>/.test(h1), h1.slice(0, 160));
-  t.ok('en vivo, lo dice', /DublajeCast en vivo/.test(M.dcastCastingHtml(c1, true, 0)));
-  t.ok('el que falta, marcado', /<div class="et-cast-fila falta"><span class="et-cast-per">TITO BOY<\/span><span class="et-cast-lin">12 lín\.<\/span><span class="et-cast-tal">sin asignar/.test(h1));
-  t.ok('el que choca, con lo que dice DublajeCast', /et-cast-fila choca"><span class="et-cast-per">JANA<\/span>[\s\S]*?LUZ MAR <small[^>]*>[\s\S]*? en DublajeCast: BEATRIZ SOL<\/small>/.test(h1));
-  t.ok('el principal, con su marca y sin emojis', /<span class="et-cast-per"><i class="et-cast-prin" title="Principal">[^<]*<\/i>ALLY<\/span>/.test(h1) || /<span class="et-cast-per"><i class="et-cast-prin" title="Principal"><\/i>ALLY<\/span>/.test(h1));
-  t.eq('sin filas, dice por qué', [M.dcastCastingHtml({ serie: { name: 'A Filipino Christmas' }, dcEp: null, filas: [] }, false, 0), M.dcastCastingHtml({ serie: { name: 'X' }, dcEp: { id: 1 }, filas: [] }, false, 0), M.dcastCastingHtml({ serie: null, dcEp: null, filas: [] }, false, 0)]
-       .map(x => x.replace(/<[^>]+>/g, '')).join(' | '),
-       'No encuentro este capítulo en «A Filipino Christmas» de DublajeCast. | Este capítulo no tiene personajes en DublajeCast todavía. | Sin casting: este programa no está en lo traído de DublajeCast.');
+  const ep = (id) => d.episodes.find(e => e.id === id);
+  const c1 = M.dcastFilasCasting(d, ep(11), REGISTRO, 'Episodio 1');
+  t.eq('los personajes que salen, por líneas', c1.map(f => f.personaje + ':' + f.lineas).join(' '), 'ALLY:186 JANA:54 TITO BOY:12');
+  t.eq('con su talento; sin talento, vacío', c1.map(f => f.talento || '—').join(' | '), 'ANA ROJAS | LUZ MAR | —');
+  t.eq('el principal, marcado', c1.map(f => f.principal).join(' '), 'true false false');
+  t.eq('si DublajeCast y Dubbipt dicen otra cosa, se marca y manda Dubbipt', JSON.stringify(c1.filter(f => f.choca).map(f => [f.personaje, f.dubbipt, f.dc])), '[["JANA","LUZ MAR","BEATRIZ SOL"]]');
+  t.eq('si dicen lo mismo, no choca', c1.find(f => f.personaje === 'ALLY').choca, false);
+  const c2 = M.dcastFilasCasting(d, ep(12), REGISTRO, 'Episodio 2');
+  t.eq('cada capítulo el suyo: el registro solo cuenta lo de ese capítulo', c2.map(f => f.personaje + '=' + f.talento).join(' '), 'ALLY=ANA ROJAS NARRADOR=PEPE');
+  t.eq('lo que solo sabe Dubbipt también sale', c2.find(f => f.personaje === 'NARRADOR').lineas, 0);
+  t.eq('un capítulo que DublajeCast no tiene: solo lo de Dubbipt', M.dcastFilasCasting(d, null, REGISTRO, 'Especial de Navidad').map(f => f.personaje).join(' '), 'COROS');
+  t.eq('uno que Dubbipt no tiene: solo lo de DublajeCast', M.dcastFilasCasting(d, ep(11), REGISTRO, '').map(f => f.personaje + '=' + (f.talento || '—')).join(' '), 'ALLY=ANA ROJAS JANA=BEATRIZ SOL TITO BOY=—');
+  t.eq('sin datos de DublajeCast, lo de Dubbipt', M.dcastFilasCasting(null, null, REGISTRO, 'Episodio 1').map(f => f.personaje).join(' '), 'ALLY JANA');
+  t.eq('sin nada, nada', M.dcastFilasCasting(null, null, null, 'Episodio 1').length, 0);
+  t.eq('y se encuentra el capítulo de DublajeCast desde el de Dubbipt', M.dcastEpDeDc('Episodio 1', d.episodes.filter(e => e.series_id === 1)).id + ' ' + M.dcastSerieDe(SH, d).name, '11 A Filipino Christmas');
 
   t.seccion('4 · los datos: en vivo si DublajeCast está abierto, si no lo traído');
   {
@@ -203,79 +179,13 @@ exports.pruebas = async function(t){
     t.eq('sin permiso no se abre aunque se pida una pantalla', N.avisos.join('') + ' ' + N.M.DCAST.ov, '🔒 solo admin null');
   }
 
-  t.seccion('6 · (la tira de herramientas pasó a ser la barra de secciones: castingvistas.prueba.js)');
-  if(false){
-  {
-    const A = armar();
-    const cab = new El('div'); A.doc.body.appendChild(cab);
-    A.M.DCAST.ov = { style: {} }; A.M.DCAST.marco = { contentWindow: {} };
-    A.M.dcastPintarTira(cab);
-    const tira = A.doc.getElementById('dcastTira');
-    t.eq('dentro de la cabecera, a la vista', !!tira && tira.parentNode === cab && tira.style.display, '');
-    t.eq('las ocho herramientas', tira.querySelectorAll('.dcast-tira-b').map(b => b.dataset.v).join(' '), 'dashboard talents ocupacion trailers produccion dubcards pegado breakdowns');
-    tira.querySelectorAll('.dcast-tira-b')[3].onclick();
-    t.eq('cada una abre la suya', A.M.DCAST.pendiente.vista, 'trailers');
-    A.M.dcastPintarTira(cab);
-    t.eq('repintar no la duplica', cab.hijos.filter(h => h.id === 'dcastTira').length, 1);
-  }
-  {
-    const N = armar({ puede: false });
-    const cab = new El('div'); N.doc.body.appendChild(cab);
-    N.M.dcastPintarTira(cab);
-    t.eq('sin permiso no se pinta', N.doc.getElementById('dcastTira'), null);
-  }
-  }
-
-  t.seccion('7 · dentro de un programa: el casting de cada capítulo');
-  {
-    const A = armar();
-    const L = lista(A.doc);
-    const n = await A.M.dcastPintarCastings(L.grid, SH, EPS);
-    const texto = (b) => b ? b.innerHTML.replace(/<[^>]+>/g, '') : '—';
-    t.eq('un botón en cada capítulo que tiene casting', n + ' ' + ['e1', 'e2', 'e9'].map(id => texto(L.fila(id).querySelector('.et-castb'))).join(' | '), '3 2/3 | 2/2 | 1/1');
-    t.ok('con su icono de trazo, sin emojis', /^<svg[^>]*stroke="currentColor"/.test(L.fila('e1').querySelector('.et-castb').innerHTML) || L.fila('e1').querySelector('.et-castb').innerHTML.indexOf('<span>2/3</span>') === 0);
-    t.ok('el que choca, marcado', L.fila('e1').querySelector('.et-castb').classList.contains('choca') && !L.fila('e2').querySelector('.et-castb').classList.contains('choca'));
-    const prog = L.cab.querySelector('.dcast-prog');
-    t.ok('y en la cabecera, el programa en DublajeCast', !!prog && /A Filipino Christmas/.test(prog.title));
-    A.M.DCAST.ov = { style: {} }; A.M.DCAST.marco = { contentWindow: {} };
-    prog.onclick();
-    t.eq('que abre su ficha allí', JSON.stringify(A.M.DCAST.pendiente), '{"vista":"series","serieId":1}');
-    const b1 = L.fila('e1').querySelector('.et-castb');
-    b1.click();
-    const panel = L.fila('e1').nextElementSibling;
-    t.ok('pulsar el botón enseña el casting debajo', panel && panel.classList.contains('et-cast') && /2 de 3 personajes con talento/.test(panel.innerHTML) && b1.classList.contains('on'));
-    t.eq('y NO abre el capítulo', !!L.fila('e1').abierta, false);
-    panel.querySelector('.et-cast-dc').onclick();
-    t.eq('desde ahí, su casting en DublajeCast', JSON.stringify(A.M.DCAST.pendiente), '{"vista":"casting","serieId":1,"epId":11}');
-    await panel.querySelector('.et-cast-ir').onclick();
-    t.ok('o entrar al capítulo, con las herramientas de Dubbipt', A.diario.includes('openEpisode e1'));
-    b1.click();
-    t.ok('otra vez, lo cierra', !(L.fila('e1').nextElementSibling && L.fila('e1').nextElementSibling.classList.contains('et-cast')) && !b1.classList.contains('on'));
-    await A.M.dcastPintarCastings(L.grid, SH, EPS);
-    t.eq('repintar no duplica los botones', L.fila('e1').hijos[0].hijos.filter(h => h.classList.contains('et-castb')).length, 1);
-    t.eq('un capítulo sin DublajeCast no lleva botón «ir a DublajeCast»', (() => { L.fila('e9').querySelector('.et-castb').click(); return !!L.fila('e9').nextElementSibling.querySelector('.et-cast-dc'); })(), false);
-  }
-  {
-    const A = armar({ datos: null, registro: null });
-    const L = lista(A.doc);
-    t.eq('sin datos de ningún lado, ningún botón', await A.M.dcastPintarCastings(L.grid, SH, EPS), 0);
-  }
-  {
-    const A = armar({ showId: 'otro' });
-    const L = lista(A.doc);
-    t.eq('si mientras tanto se cambió de programa, no se toca nada', await A.M.dcastPintarCastings(L.grid, SH, EPS) + ' ' + !!L.fila('e1').querySelector('.et-castb'), '0 false');
-  }
-  {
-    const N = armar({ puede: false });
-    const L = lista(N.doc);
-    t.eq('sin permiso, ni se mira', await N.M.dcastPintarCastings(L.grid, SH, EPS) + ' ' + N.diario.length, '0 0');
-  }
-
   t.seccion('8 · el recorrido entero');
   const HTML = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
   t.ok('1. al entrar se elige el perfil: QC, Grabación o Casting', /function perfilAlEntrar\(done\)\{[\s\S]{0,200}preguntarModo\('', modoUltimo\(\), \{\s+titulo: 'Dubbipt',\s+sub: '¿Qué vas a hacer\?'/.test(HTML));
   t.ok('2. Programas pinta las secciones de DublajeCast, y dentro de un programa también', /try\{ csPintar\('shows', head, grid\); \}catch\(e\)\{ fallo\('csPintar · index\.html:renderLibrary'/.test(HTML) && /try\{ csPintar\('eps', ehead, grid\); \}catch\(e\)\{ fallo\('csPintar · index\.html:renderLibrary'/.test(HTML));
-  t.ok('3. la lista de capítulos pinta su casting', /dcastPintarCastings\(grid, sh, eps\)\.catch\(e => fallo\('dcastPintarCastings · index\.html:renderLibrary'/.test(HTML));
+  const CV = fs.readFileSync(path.join(RAIZ, 'js', 'castingvistas.js'), 'utf8');
+  t.ok('3. en el episodio, «Realizar casting» abre el capítulo con el perfil Casting', /data-cs="realizar"/.test(CV) && /ponerModo\(e\.ep\.id, 'casting'\);[\s\S]{0,160}await openEpisode\(e\.ep\.id\);/.test(CV));
+  t.ok('y la tabla vieja de capítulos ya no pinta su casting aparte', !/dcastPintarCastings/.test(HTML));
   const PROD_JS = fs.readFileSync(path.join(RAIZ, 'js', 'produccion.js'), 'utf8');
   t.ok('cambiar de perfil pone o quita las secciones', /const nav = document\.getElementById\('csNav'\);\s+if\(!!nav !== prodPuede\(\) && typeof csRepintar === 'function'\) csRepintar\(\);/.test(PROD_JS));
   const COPIA = fs.readFileSync(path.join(RAIZ, 'dublajecast', 'index.html'), 'utf8');
