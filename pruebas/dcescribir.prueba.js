@@ -49,6 +49,7 @@ function armar(o){
       nube.payload = JSON.parse(JSON.stringify(p)); nube.rev++; diario.push('escribe ' + nube.rev); return nube.rev;
     },
     prodNormalizar: (p) => ({ normalizado: true, talents: p.talents }), prodGuardar: async () => diario.push('prodGuardar'), PROD: PROD,
+    prodConservarPropio: (n, v) => { for(const k in (v || {})) if(!(k in n)) n[k] = v[k]; return n; },
     sbUser: ('usuario' in o) ? o.usuario : { email: 'pamela@estudio.co', user_metadata: { full_name: 'Pamela Hernández' } }
   });
   return { M, nube, diario, PROD };
@@ -238,5 +239,11 @@ exports.pruebas = async function(t){
     try{ await A.M.dcxGuardar(p => A.M.dcxAsignar(p, 12, 102, 'ANA ROJAS')); }catch(e){ err = e.message; }
     await espera;
     t.eq('dos a la vez, no: el segundo espera su turno', err, 'ya se está guardando otro cambio: espera un momento');
+  }
+  {
+    const A = armar();
+    A.PROD.datos = { talents: [], notaDeDubbipt: 'algo que DublajeCast no conoce' };
+    A.M.dcxLocal({ talents: [{ id: 1, name: 'ANA' }] }, null);
+    t.eq('al escribir, lo que es solo de Dubbipt sigue ahí', A.PROD.datos.notaDeDubbipt + ' · ' + A.PROD.datos.talents.length, 'algo que DublajeCast no conoce · 1');
   }
 };

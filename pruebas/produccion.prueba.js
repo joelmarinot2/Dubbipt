@@ -249,6 +249,7 @@ exports.pruebas = async function(t){
     const viejo = M.prodNormalizar(VOLCADO());
     const nuevo = M.prodNormalizar(Object.assign(VOLCADO(), { series: VOLCADO().series.slice(0, 1), episodes: VOLCADO().episodes.filter(e => e.id !== 21), trash: [], clienteList: [] }));
     viejo.clienteList = ['Netflix', 'Discovery']; nuevo.clienteList = ['Netflix'];
+    viejo.trash = [{ id: 5, kind: 'episode' }]; viejo.studios = VOLCADO().studios.concat([{ name: 'sin id' }]);
     t.eq('lo que falta, por lista, sin contar la papelera', JSON.stringify(M.prodPerdido(viejo, nuevo)), '{"total":3,"por":{"series":1,"episodes":1,"clienteList":1}}');
     t.eq('y en palabras', M.prodPerdidoTexto({ series: 1, episodes: 14, clienteList: 1 }), '1 programa, 14 capítulos, 1 clienteList');
     t.eq('lo mismo, nada falta; y lo nuevo no cuenta', M.prodPerdido(viejo, M.prodNormalizar(Object.assign(VOLCADO(), { clienteList: ['Netflix', 'Discovery', 'HBO'], talents: VOLCADO().talents.concat([{ id: 9, name: 'Z' }]) }))).total, 0);
@@ -276,12 +277,13 @@ exports.pruebas = async function(t){
     for(let i = 0; i < A.M.PROD_COPIAS + 3; i++){ B.M.PROD.datos = B.M.prodNormalizar(VOLCADO()); B.M.PROD.cargado = true; B.M.PROD.ws = 'ws1'; await B.M.prodTomar(menos, 'x'); }
     t.eq('se guardan las últimas, no todas', B.idb['ddl-produccion-copias::ws1'].length + ' ' + JSON.parse(B.almacen['_diag/u1/produccion-copias.json'].x[0]).length, A.M.PROD_COPIAS + ' 3');
     const id = (await A.M.prodCopias())[0].id;
-    t.eq('se apunta que se devolvió', await A.M.prodCopiaDevuelta(id, 4) + ' ' + (await A.M.prodCopias())[0].devueltos + ' ' + await A.M.prodCopiaDevuelta('no', 1), 'true 4 false');
+    t.eq('se apunta que se devolvió', await A.M.prodCopiaDevuelta(id, 4) + ' ' + (await A.M.prodCopias())[0].devueltos + ' ' + ((await A.M.prodCopias())[0].devuelta > 0) + ' ' + await A.M.prodCopiaDevuelta('no', 1), 'true 4 true false');
   }
   {
     /* Devolver: solo añade. */
     const { M } = armar();
     const copia = M.prodNormalizar(VOLCADO());
+    copia.trash = [{ id: 8, kind: 'episode' }];
     const ahora = JSON.parse(JSON.stringify(VOLCADO()));
     ahora.series = ahora.series.slice(0, 1); ahora.episodes = ahora.episodes.filter(e => e.id !== 21);
     ahora.castings = ahora.castings.filter(c => c.id !== 3 && c.id !== 2).concat([{ id: 50, character_id: '102', talent_id: 3, episode_id: '11' }]);
@@ -289,6 +291,7 @@ exports.pruebas = async function(t){
     const n = M.prodRecuperar(ahora, copia);
     t.eq('vuelve lo que faltaba', n + ' ' + ahora.series.map(s => s.id).join(',') + ' ' + ahora.episodes.map(e => e.id).join(','), '3 1,2 11,12,21');
     t.eq('lo que hay ahora no se toca', ahora.series[0].name, 'Cambiado ahora');
+    t.eq('la papelera no vuelve: lo que se tiró a propósito se queda tirado', (ahora.trash || []).length, 0);
     t.eq('una asignación no vuelve si el personaje ya tiene otra en ese capítulo', ahora.castings.map(c => c.id).sort((a, b) => a - b).join(','), '1,3,4,50');
     t.eq('devolver otra vez no duplica nada', M.prodRecuperar(ahora, copia), 0);
     t.eq('sin copia, nada', M.prodRecuperar(ahora, null), 0);

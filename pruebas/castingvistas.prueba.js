@@ -96,7 +96,7 @@ function armar(o){
   body.classList = { remove: (c) => { diario.push('quita ' + c); clases.delete(c); }, contains: (c) => c === 'ep-open' ? !!o.epAbierto : clases.has(c),
                      toggle: (c, si) => { if(si) clases.add(c); else clases.delete(c); } };
   const doc = { body, createElement: (t) => new El(t), getElementById: (id) => body.querySelector('#' + id), querySelector: () => null };
-  const PROD = { datos: ('datos' in o) ? o.datos : PR.prodNormalizar(VOLCADO), cuando: new Date(2026, 9, 6).getTime() };
+  const PROD = { datos: ('datos' in o) ? o.datos : PR.prodNormalizar(VOLCADO), cuando: new Date(2026, 9, 6).getTime(), cargado: true, ws: 'w' };
   const LDB = { showId: ('showId' in o) ? o.showId : null, browse: false, dataEps: new Set(['e1']) };
   let vivo = !!o.vivo;
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
@@ -115,7 +115,7 @@ function armar(o){
       ponerModo: (ep, m) => diario.push('ponerModo ' + ep + ' ' + m), openEpisode: async (id) => diario.push('openEpisode ' + id),
       newEpisodeModal: () => { body.appendChild(Object.assign(new El('input'), { id: 'neName', value: '' })); diario.push('newEpisodeModal ' + LDB.showId); },
       renderLibrary: () => diario.push('renderLibrary'), newShow: async () => { body.appendChild(Object.assign(new El('input'), { id: 'npName', value: '', focus: () => {} })); diario.push('newShow'); },
-      esc: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), fallo: (d) => diario.push('fallo ' + d), _svgI: undefined,
+      esc: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), fallo: (d) => diario.push('fallo ' + d), _svgI: undefined, prodCargar: async () => { diario.push('carga'); }, prodWs: () => 'w', prodSincronizar: async () => { diario.push('asegura'); return false; }, prodCopias: async () => [],
       currentEp: o.epAbierto ? { id: 'e1' } : null,
       DDL_MODO: ('modo' in o) ? o.modo : 'casting', herramientasPanel: () => diario.push('herramientasPanel'),
       dcxHistorial: () => (PROD.datos && PROD.datos.historialDubbipt) || [], dcxEntrada: (que, ctx) => Object.assign({ cuando: '2026-10-08T10:00:00Z', quien: 'Pamela', que: que }, ctx || {}),
@@ -241,6 +241,7 @@ exports.pruebas = async function(t){
     const A = armar();
     const b = biblioteca(A.doc);
     t.eq('con el perfil Casting: la barra a la izquierda, primera; la sección al lado; lo de siempre, tapado', A.M.csPintar('shows', b.cab, b.grid) + ' ' + b.lib.hijos.map(h => h.id).join(',') + ' ' + A.body.classList.contains('cs-on'), 'true csNav,csVista,dashHead,libGrid true');
+    t.eq('y al pintar, se asegura de tener lo de DublajeCast', A.diario.filter(x => x === 'asegura').length, 1);
     t.ok('la barra con su título y Programas activa', /<div class="cs-nav-t">Casting<\/div>/.test(A.doc.getElementById('csNav').innerHTML) && /class="cs-nav-b on" data-v="programas"/.test(A.doc.getElementById('csNav').innerHTML));
     t.ok('Programas: las tarjetas, en curso primero como en DublajeCast', /<h2>Programas<\/h2>/.test(vista(A)) && /2 de 3/.test(vista(A)) && /data-v="s:s1"/.test(vista(A)) && /data-v="dc:2"/.test(vista(A)) && !/data-v="dc:3"/.test(vista(A)));
     t.ok('con sus pestañas y cuántos hay en cada una', /data-cs="filtro" data-v="todos">Todos <b>3<\/b>/.test(vista(A)) && /data-v="en_curso">En curso <b>2<\/b>/.test(vista(A)) && /data-v="completo">Completados <b>1<\/b>/.test(vista(A)));
