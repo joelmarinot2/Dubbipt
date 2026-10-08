@@ -194,7 +194,11 @@ function csProduccion(d, hoy, soloAlertas){
    la vida». */
 
 /** El número que lleva un nombre («Episodio 12» → 12), o NaN. */
-function csNumeroDe(nombre){ const m = String(nombre == null ? '' : nombre).match(/\d+/); return m ? parseInt(m[0], 10) : NaN; }
+/** El número de un capítulo por su nombre; sin contar los números del nombre del programa («100 Days of Deception 3» es el 3). */
+function csNumeroDe(nombre, programa){
+  const nums = (typeof dcastNumerosDe === 'function') ? dcastNumerosDe(nombre, programa) : (String(nombre == null ? '' : nombre).match(/\d+/g) || []).map(x => parseInt(x, 10));
+  return nums.length ? nums[0] : NaN;
+}
 
 /** Un programa, junte lo que junte: el de Dubbipt, el de DublajeCast, o los dos. */
 function csProg(show, serie, eps, d){
@@ -246,9 +250,9 @@ function csFiltrarProgramas(lista, filtro, buscar){
 function csEpisodios(p){
   const out = [], usados = new Set();
   for(const ep of p.eps){
-    const dc = dcastEpDeDc(ep.name, p.dcEps);
+    const dc = dcastEpDeDc(ep.name, p.dcEps, p.nombre);
     if(dc) usados.add(String(dc.id));
-    const n = dc ? parseInt(dc.episode_number, 10) : csNumeroDe(ep.name);
+    const n = dc ? parseInt(dc.episode_number, 10) : csNumeroDe(ep.name, p.nombre);
     out.push({ clave: 'e:' + ep.id, ep: ep, dcEp: dc || null, numero: isFinite(n) ? n : null, titulo: ep.name, dcTitulo: dc ? (dc.title || '') : '' });
   }
   for(const dc of p.dcEps){
@@ -752,7 +756,7 @@ function csReparto(p, d){
 function csRepartoDe(p, d, registro){
   const por = new Map();
   const nueva = (nombre) => ({ clave: 'per:' + castNorm(nombre), de: 'dubbipt', charId: null, personaje: nombre, principal: false, eps: new Map(), sinEps: '' });
-  const nEp = (nombre) => { const n = csNumeroDe(nombre); return isFinite(n) ? n : String(nombre); };
+  const nEp = (nombre) => { const n = csNumeroDe(nombre, p && p.nombre); return isFinite(n) ? n : String(nombre); };
   /* 1) DublajeCast, capítulo a capítulo. */
   for(const r of csReparto(p, d))
     por.set(castNorm(r.personaje), { clave: 'ch:' + r.charId, de: 'dc', charId: r.charId, personaje: r.personaje, principal: r.principal, sinEps: '',
@@ -1072,7 +1076,7 @@ function csRepetidosDub(p, hay){
   if(!p || !p.show) return [];
   const por = {};
   for(const ep of p.eps){
-    const n = csNumeroDe(ep.name);
+    const n = csNumeroDe(ep.name, p.nombre);
     if(!isFinite(n)) continue;
     (por[n] = por[n] || []).push(ep);
   }

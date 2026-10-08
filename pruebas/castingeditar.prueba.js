@@ -35,7 +35,7 @@ const EPS_DUB = { s1: [{ id: 'e1', show_id: 's1', name: 'Episodio 1' }, { id: 'e
 const PR = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ PRODUCCIÓN · LO QUE VIENE DE DUBLAJECAST', '/* ═══ FIN DE PRODUCCIÓN']],
   ['prodNormalizar', 'prodIndices', 'prodCasarPrograma', 'prodAlertasEp', 'prodPlazo', 'prodFormatoDubcard', 'prodFichaTexto', 'PROD_ET', 'prodPerdidoTexto', 'prodRecuperar'], { castNorm: undefined, console: { warn: () => {} } });
 const DC = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ DUBLAJECAST ENTERO', '/* ═══ FIN DE DUBLAJECAST ENTERO']],
-  ['dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting'],
+  ['dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting', 'dcastNumerosDe'],
   { castNorm: undefined, prodCasarPrograma: PR.prodCasarPrograma, prodIndices: PR.prodIndices, window: { addEventListener: () => {} }, document: {}, location: { origin: '' } });
 const SIM = montar([['function castSimil(a, b){', '/* ── El registro, guardado por programa']], ['castSimil'], {});
 const DX = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ EDITAR DUBLAJECAST DESDE DUBBIPT', '/* ═══ FIN DE EDITAR DUBLAJECAST DESDE DUBBIPT']],
@@ -95,7 +95,7 @@ function armar(o){
       prodPuede: () => true, PROD: PROD, PROD_ET: PR.PROD_ET, prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard,
       prodFichaTexto: PR.prodFichaTexto, prodCasarPrograma: PR.prodCasarPrograma, prodPanel: () => {}, prodVista: '',
       dcastDatos: () => ({ datos: PROD.datos, vivo: false }), dcastAbrir: (v) => diario.push('dcastAbrir ' + v),
-      dcastSerieDe: DC.dcastSerieDe, dcastEpDeDc: DC.dcastEpDeDc, dcastFilasCasting: DC.dcastFilasCasting,
+      dcastSerieDe: DC.dcastSerieDe, dcastEpDeDc: DC.dcastEpDeDc, dcastFilasCasting: DC.dcastFilasCasting, dcastNumerosDe: DC.dcastNumerosDe,
       sbShows: () => o.shows || SHOWS, sbEps: (id) => (o.eps || EPS_DUB)[id] || [], LDB: LDB, libView: 'shows',
       castRegCargar: async (id) => JSON.parse(JSON.stringify((o.registros || {})[id] || { personajes: {} })), castRegGuardar: async (id, r) => { regGuardados[id] = r; return true; }, castAviso: (t) => avisos.push(t), renderLibrary: () => diario.push('renderLibrary'),
       ponerModo: () => {}, openEpisode: async () => {}, newShow: async () => {}, newEpisodeModal: () => {},
@@ -586,6 +586,21 @@ exports.pruebas = async function(t){
     A.M.CS.vista = 'programas'; A.M.CS.filtro = 'todos';
     controles(A, 'programas').de('abrirProg').onclick(); await espera(); await espera();
     t.eq('abrir un programa lo trae', veces(), 3);
+  }
+
+  t.seccion('8e · programas con un número en el nombre: «100 Days of Deception»');
+  {
+    t.eq('los números del programa no son el del capítulo', [['100 Days of Deception 3', '100 DAYS OF DECEPTION'], ['100 DAYS OF DECEPTION 3_QC', '100 Days of Deception'], ['Episodio 100', '100 Days of Deception'], ['Episodio 101', 'FILIPINO'], ['102', ''], ['Sin número', 'X']].map(x => DC.dcastNumerosDe(x[0], x[1]).join('+') || '—').join(' | '), '3 | 3 | 100 | 101 | 102 | —');
+    const DS = [{ id: 'sD', name: '100 DAYS OF DECEPTION' }];
+    const DE = { sD: [{ id: 'd1', show_id: 'sD', name: '100 Days of Deception 1' }, { id: 'd3', show_id: 'sD', name: '100 Days of Deception 3_QC' }, { id: 'd2', show_id: 'sD', name: '100 Days of Deception 2' }] };
+    const A = armar({ shows: DS, eps: DE });
+    const p = A.M.csProgramas(DS, (id) => DE[id], null)[0];
+    t.eq('cada capítulo con su número de verdad, en orden', A.M.csEpisodios(p).map(e => e.numero + ':' + e.ep.id).join(' '), '1:d1 2:d2 3:d3');
+    t.eq('y no parecen repetidos', A.M.csRepetidosDub(p, () => true).length, 0);
+    const d = PR.prodNormalizar({ series: [{ id: 7, name: '100 Days of Deception' }], episodes: [{ id: 71, series_id: 7, episode_number: 1 }, { id: 73, series_id: 7, episode_number: 3 }, { id: 700, series_id: 7, episode_number: 100 }],
+                                  characters: [], talents: [], castings: [], appearances: [] });
+    const pd = A.M.csProgramas(DS, (id) => DE[id], d)[0];
+    t.eq('con DublajeCast, cada uno con su pareja, aunque allí haya un Ep. 100', A.M.csEpisodios(pd).map(e => e.ep ? e.ep.id + '→' + (e.dcEp ? e.dcEp.id : '—') : 'dc:' + e.dcEp.id).join(' '), 'd1→71 d2→— d3→73 dc:700');
   }
 
   t.seccion('9 · fusionar programas');

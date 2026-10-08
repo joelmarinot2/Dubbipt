@@ -242,14 +242,17 @@ function dcastSerieDe(show, d){
  * El capítulo de DublajeCast que corresponde a uno de Dubbipt, por su nombre:
  * título igual o, si no, el número que lleve el nombre, cuando solo uno casa.
  */
-function dcastEpDeDc(nombre, dcEps){
+function dcastEpDeDc(nombre, dcEps, programa){
   const lista = dcEps || [];
   const t = castNorm(nombre);
   if(t){
     const igual = lista.filter(e => castNorm(e.title) === t);
     if(igual.length === 1) return igual[0];
   }
-  const nums = (String(nombre == null ? '' : nombre).match(/\d+/g) || []).map(x => parseInt(x, 10));
+  /* Los números del nombre del programa no son el del capítulo: en «100 Days
+     of Deception 3» el capítulo es el 3, no el 100 (pedido de sala: «en 100
+     Days of Deception no me deja entrar a hacer el casting»). */
+  const nums = dcastNumerosDe(nombre, programa);
   const c = lista.filter(e => nums.indexOf(parseInt(e.episode_number, 10)) >= 0);
   return c.length === 1 ? c[0] : null;
 }
@@ -285,6 +288,20 @@ function dcastFilasCasting(d, dcEp, registro, nombreEp){
     const f = filas[k];
     return Object.assign(f, { talento: f.dubbipt || f.dc, choca: !!(f.dubbipt && f.dc && castNorm(f.dubbipt) !== castNorm(f.dc)) });
   }).sort((a, b) => (b.lineas - a.lineas) || a.personaje.localeCompare(b.personaje, 'es'));
+}
+
+/**
+ * Los números del nombre de un capítulo que pueden ser el suyo: todos, menos
+ * los que vienen del nombre del programa (cada uno, una vez). Si no queda
+ * ninguno, todos: «Episodio 100» de «100 Days of Deception» es el 100.
+ */
+function dcastNumerosDe(nombre, programa){
+  const todos = (String(nombre == null ? '' : nombre).match(/\d+/g) || []).map(x => parseInt(x, 10));
+  const delProg = (String(programa == null ? '' : programa).match(/\d+/g) || []).map(x => parseInt(x, 10));
+  if(!delProg.length) return todos;
+  const quedan = todos.slice();
+  for(const n of delProg){ const i = quedan.indexOf(n); if(i >= 0) quedan.splice(i, 1); }
+  return quedan.length ? quedan : todos;
 }
 
 /** Esconde DublajeCast sin cerrarlo: lo que se estaba haciendo allí sigue igual al volver. */

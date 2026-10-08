@@ -44,7 +44,7 @@ const PR = montar([['function castNorm(t){', 'async function castRegCargar(showI
 
 /* Lo de DublajeCast entero que se usa aquí, de verdad. */
 const DC = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ DUBLAJECAST ENTERO', '/* ═══ FIN DE DUBLAJECAST ENTERO']],
-  ['dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting'],
+  ['dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting', 'dcastNumerosDe'],
   { castNorm: undefined, prodCasarPrograma: PR.prodCasarPrograma, prodIndices: PR.prodIndices, window: { addEventListener: () => {} }, document: {}, location: { origin: '' } });
 
 /* En Dubbipt: un programa con tres capítulos, uno con libreto; y su registro de casting. */
@@ -110,7 +110,7 @@ function armar(o){
       dcSesion: async () => (o.sesion ? { id: 'u' } : null),
       dcastDatos: () => ({ datos: PROD.datos, vivo: vivo }), dcastAbrir: (v) => { diario.push('dcastAbrir ' + v); return true; },
       castAviso: (t) => avisos.push(t), sbShows: () => (o.shows || SHOWS), sbEps: (id) => EPS_DUB[id] || [], LDB: LDB, libView: 'eps',
-      dcastSerieDe: DC.dcastSerieDe, dcastEpDeDc: DC.dcastEpDeDc, dcastFilasCasting: DC.dcastFilasCasting,
+      dcastSerieDe: DC.dcastSerieDe, dcastEpDeDc: DC.dcastEpDeDc, dcastFilasCasting: DC.dcastFilasCasting, dcastNumerosDe: DC.dcastNumerosDe,
       castRegCargar: async (id) => { diario.push('registro ' + id); return o.registro !== undefined ? o.registro : REGISTRO; },
       ponerModo: (ep, m) => diario.push('ponerModo ' + ep + ' ' + m), openEpisode: async (id) => diario.push('openEpisode ' + id),
       newEpisodeModal: () => { body.appendChild(Object.assign(new El('input'), { id: 'neName', value: '' })); diario.push('newEpisodeModal ' + LDB.showId); },
