@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pegado de Casting · CENTAURO</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" crossorigin="anonymous"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#131022; --panel:#1b1730; --panel2:#251e3f; --line:#372c58; --line2:#4a3d75;
+  --text:#ece9f7; --dim:#a89fc9; --faint:#6f6596;
+  --purple:#8b5cf6; --purple2:#a78bfa; --purpleGlow:rgba(139,92,246,.35);
+  --green:#4ade80; --yellow:#facc15; --blue:#60a5fa; --red:#f87171;
+  --mono:'JetBrains Mono',monospace; --sans:'Inter',sans-serif; --disp:'Sora',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh;
+  background-image:radial-gradient(ellipse 900px 420px at 70% -10%, rgba(139,92,246,.12), transparent)}
+.wrap{max-width:1180px;margin:0 auto;padding:24px 20px 90px}
+
+header{display:flex;align-items:center;gap:16px;padding:6px 0 20px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.logo{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--purple),#6d28d9);
+  display:flex;align-items:center;justify-content:center;font-family:var(--disp);font-weight:800;font-size:18px;color:#fff;
+  box-shadow:0 4px 18px var(--purpleGlow);flex:none}
+h1{font-family:var(--disp);font-size:20px;font-weight:800;letter-spacing:.4px}
+h1 span{color:var(--purple2)}
+.sub{color:var(--dim);font-size:12px;margin-top:2px}
+.stepsbar{margin-left:auto;display:flex;gap:6px}
+.step{font-size:11px;color:var(--faint);border:1px solid var(--line);border-radius:20px;padding:4px 12px;font-family:var(--disp);font-weight:600}
+.step.on{color:var(--purple2);border-color:var(--purple);background:rgba(139,92,246,.1)}
+@media(max-width:760px){.stepsbar{display:none}}
+
+.grid{display:grid;grid-template-columns:305px 1fr;gap:18px}
+@media(max-width:880px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.card h2{font-family:var(--disp);font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--purple2);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.card h2::before{content:'';width:8px;height:8px;border-radius:2px;background:var(--purple);box-shadow:0 0 8px var(--purpleGlow)}
+
+label{display:block;font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.8px;margin:10px 0 4px}
+select,input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;color:var(--text);padding:8px 10px;font-family:var(--sans);font-size:13px}
+select:focus,input:focus{outline:2px solid var(--purple);outline-offset:-1px}
+
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--line2);color:var(--text);border-radius:9px;padding:9px 15px;font-family:var(--disp);font-weight:600;font-size:13px;cursor:pointer;transition:.15s}
+.btn:hover{border-color:var(--purple2);color:var(--purple2);box-shadow:0 0 12px rgba(139,92,246,.15)}
+.btn.primary{background:linear-gradient(135deg,var(--purple),#7c3aed);border-color:transparent;color:#fff;box-shadow:0 3px 14px var(--purpleGlow)}
+.btn.primary:hover{filter:brightness(1.12);color:#fff}
+.btn.green{background:var(--green);border-color:transparent;color:#0e1b12}
+.btn.green:hover{filter:brightness(1.08);box-shadow:0 3px 14px rgba(74,222,128,.3)}
+.btn.danger:hover{border-color:var(--red);color:var(--red);box-shadow:none}
+.btn:disabled{opacity:.35;cursor:not-allowed;filter:none;box-shadow:none}
+.btn.small{padding:5px 11px;font-size:12px}
+
+.dbstats{display:flex;gap:10px;margin:6px 0 4px}
+.stat{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center}
+.stat b{display:block;font-family:var(--disp);font-size:21px;color:var(--purple2)}
+.stat span{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.6px}
+
+.drop{border:2px dashed var(--line2);border-radius:14px;padding:38px 20px;text-align:center;color:var(--dim);cursor:pointer;transition:.2s;background:rgba(139,92,246,.03)}
+.drop:hover,.drop.over{border-color:var(--purple2);color:var(--purple2);background:rgba(139,92,246,.08);box-shadow:inset 0 0 30px rgba(139,92,246,.06)}
+.drop .ico{font-size:26px;display:block;margin-bottom:6px}
+.drop b{font-family:var(--disp);display:block;font-size:15px;margin-bottom:4px;color:var(--text)}
+.drop.over b{color:var(--purple2)}
+
+.filetag{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 13px;margin-top:12px;font-family:var(--mono);font-size:12px;flex-wrap:wrap}
+.filetag .x{margin-left:auto;color:var(--faint);cursor:pointer;font-size:16px;line-height:1}
+.filetag .x:hover{color:var(--red)}
+.filetag input{width:72px;padding:3px 8px}
+
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0 10px}
+.chip{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--line);color:var(--dim);cursor:pointer;user-select:none;transition:.15s;font-family:var(--disp);font-weight:600}
+.chip:hover{border-color:var(--purple2)}
+.chip.active{background:rgba(139,92,246,.15);border-color:var(--purple);color:var(--purple2)}
+.chip .n{opacity:.75;font-weight:400}
+.chip.g.active{background:rgba(74,222,128,.12);border-color:var(--green);color:var(--green)}
+.chip.y.active{background:rgba(250,204,21,.12);border-color:var(--yellow);color:var(--yellow)}
+.chip.b.active{background:rgba(96,165,250,.12);border-color:var(--blue);color:var(--blue)}
+.chip.a.active{background:rgba(167,139,250,.15);border-color:var(--purple2);color:var(--purple2)}
+.chip.r.active{background:rgba(248,113,113,.12);border-color:var(--red);color:var(--red)}
+
+table{width:100%;border-collapse:collapse;margin-top:4px}
+th{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--faint);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:8px 10px;border-bottom:1px solid #2a2245;vertical-align:middle}
+tr:hover td{background:rgba(139,92,246,.04)}
+tr.hiddenrow{display:none}
+.char{font-family:var(--mono);font-size:12.5px;font-weight:600}
+.tc{font-family:var(--mono);font-size:11px;color:var(--faint)}
+.eps{font-family:var(--mono);font-size:10px;color:var(--blue)}
+td input[type=text]{padding:6px 9px;font-family:var(--mono);font-size:12px}
+td input.pegado{border-color:var(--green);color:var(--green)}
+td input.gen{border-color:var(--yellow);color:var(--yellow)}
+td input.fzy{border-color:var(--blue);color:var(--blue)}
+
+.tag{font-size:10px;font-weight:700;padding:4px 9px;border-radius:6px;letter-spacing:.4px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;font-family:var(--disp)}
+.tag .sw{width:10px;height:10px;border-radius:3px;flex:none}
+.tag.match{background:rgba(74,222,128,.12);color:var(--green)}
+.tag.asig{background:rgba(167,139,250,.12);color:var(--purple2)}
+.tag.nuevo{background:rgba(236,233,247,.07);color:var(--dim)}
+.tag.dif{background:rgba(248,113,113,.12);color:var(--red)}
+.tag.na{background:rgba(255,255,255,.04);color:var(--faint)}
+.tag.gen{background:rgba(250,204,21,.12);color:var(--yellow)}
+.tag.fzy{background:rgba(96,165,250,.13);color:var(--blue)}
+.tag.recast{background:rgba(248,113,113,.14);color:var(--red)}
+.rowmeta{margin-top:5px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.minibtn{font-family:var(--disp);font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;border:1px solid var(--line2);background:var(--panel2);color:var(--dim);cursor:pointer;transition:.12s}
+.minibtn:hover{border-color:var(--purple2);color:var(--purple2)}
+.minibtn.keep:hover{border-color:var(--red);color:var(--red)}
+.minibtn.take:hover{border-color:var(--green);color:var(--green)}
+.sugg{margin-top:5px;font-size:11px;color:var(--faint);display:flex;align-items:center;gap:6px}
+.sugg b{color:var(--blue)}
+.sugg .apply{cursor:pointer;color:var(--blue);border:1px solid rgba(96,165,250,.4);border-radius:5px;padding:1px 7px;font-weight:600;font-family:var(--disp);font-size:10px}
+.sugg .apply:hover{background:rgba(96,165,250,.12)}
+.recastmark{color:var(--red);cursor:help;font-size:11px;margin-left:5px}
+
+.actionbar{position:sticky;bottom:0;margin-top:16px;background:linear-gradient(to top,var(--panel) 78%,transparent);padding:14px 0 4px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.hidden{display:none}
+.msg{margin-top:12px;padding:10px 14px;border-radius:10px;font-size:13px}
+.msg.ok{background:rgba(74,222,128,.08);color:var(--green);border:1px solid rgba(74,222,128,.3)}
+.msg.err{background:rgba(248,113,113,.08);color:var(--red);border:1px solid rgba(248,113,113,.3)}
+.dblist{max-height:360px;overflow:auto;margin-top:8px;border:1px solid var(--line);border-radius:10px}
+.dbempty{padding:12px;color:var(--faint);font-size:12px;text-align:center}
+.epgroup{border-bottom:1px solid var(--line)}
+.epgroup:last-child{border-bottom:none}
+.ephead{position:sticky;top:0;background:linear-gradient(90deg,rgba(139,92,246,.18),var(--panel2));padding:7px 10px;font-family:var(--disp);font-size:11px;font-weight:700;letter-spacing:.8px;color:var(--purple2);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);z-index:1}
+.epcount{background:rgba(139,92,246,.25);color:var(--purple2);border-radius:10px;padding:1px 8px;font-size:10px;font-weight:600}
+.subhead{padding:6px 10px 3px;font-size:9.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--faint);font-weight:700;font-family:var(--disp)}
+.subhead.sec{color:var(--yellow);opacity:.85}
+.dbrow{padding:5px 10px;font-family:var(--mono);font-size:11.5px;border-bottom:1px solid #241d3d;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.dbrow:last-child{border-bottom:none}
+.dbname{color:var(--text);display:flex;align-items:center;min-width:0}
+.dbrow .actor{color:var(--green);text-align:right;white-space:nowrap}
+.dot{width:8px;height:8px;border-radius:2px;background:var(--yellow);flex:none;display:inline-block;margin-right:5px}
+.check{width:16px;height:16px;accent-color:var(--purple);cursor:pointer}
+.note{font-size:11.5px;color:var(--faint);margin-top:10px;line-height:1.5}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--dim);margin-top:12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.legend .sw{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:6px}
+.preview{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:12px;font-size:12px}
+.preview .pvrow{font-family:var(--mono);font-size:11px;padding:3px 0;color:var(--dim)}
+.preview .pvrow b{color:var(--text)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="logo">C</div>
+  <div>
+    <h1>PEGADO DE CASTING <span>· CENTAURO</span></h1>
+    <div class="sub">Continuidad personaje → talento entre episodios, con verificación por colores</div>
+  </div>
+  <div class="stepsbar">
+    <span class="step on" id="step1">1 · Serie</span>
+    <span class="step" id="step2">2 · Desglose</span>
+    <span class="step" id="step3">3 · Revisar y descargar</span>
+  </div>
+</header>
+
+<div class="grid">
+  <!-- ==== PANEL BASE DE DATOS ==== -->
+  <div>
+    <div class="card">
+      <h2>Base de datos</h2>
+      <div class="dbstats">
+        <div class="stat"><b id="stSeries">0</b><span>Series</span></div>
+        <div class="stat"><b id="stChars">0</b><span>Personajes</span></div>
+      </div>
+      <label>Serie activa</label>
+      <select id="seriesSelect"></select>
+      <label>Nueva serie / renombrar</label>
+      <input type="text" id="seriesName" placeholder="Ej: AGENT KIM REACTIVATED">
+      <div class="actions">
+        <button class="btn small" id="btnNewSeries">Crear serie</button>
+        <button class="btn small danger" id="btnDelSeries">Borrar serie</button>
+      </div>
+      <div class="dblist hidden" id="dbList"></div>
+      <div class="actions">
+        <button class="btn small" id="btnToggleList">Ver personajes</button>
+      </div>
+
+      <h2 style="margin-top:24px">Base antigua</h2>
+      <div class="actions" style="margin-top:0">
+        <button class="btn small primary" id="btnLegacy">Importar base antigua (Excel)</button>
+        <input type="file" id="legacyFile" accept=".xlsx,.xlsm,.xls" class="hidden">
+      </div>
+      <div class="note">Formato: columna A personaje, columna B talento, con filas combinadas que indican el número de capítulo. Se registra en qué episodios salió cada personaje.</div>
+      <div id="legacyPreview"></div>
+
+      <div class="actions" style="margin-top:22px">
+        <button class="btn small" id="btnExport">Exportar JSON</button>
+        <button class="btn small" id="btnImport">Importar JSON</button>
+        <input type="file" id="importFile" accept=".json" class="hidden">
+      </div>
+      <div class="note">La base se guarda en este navegador. Exporta el JSON como respaldo.</div>
+    </div>
+  </div>
+
+  <!-- ==== PANEL ARCHIVO ==== -->
+  <div>
+    <div class="card">
+      <h2>Desglose del episodio</h2>
+      <div class="drop" id="drop">
+        <span class="ico">🎙️</span>
+        <b>Arrastra aquí el desglose .xlsm</b>
+        o haz clic para buscarlo · lee la hoja CASTING
+        <input type="file" id="fileInput" accept=".xlsm,.xlsx" class="hidden">
+      </div>
+      <div id="fileTag"></div>
+      <div id="epMsg"></div>
+
+      <div id="results" class="hidden">
+        <div class="chips" id="chips">
+          <span class="chip active" data-f="all">Todos <span class="n" id="nAll"></span></span>
+          <span class="chip g" data-f="match">✔ Se pegarán <span class="n" id="nMatch"></span></span>
+          <span class="chip y" data-f="gmatch">Secundarios <span class="n" id="nGen"></span></span>
+          <span class="chip b" data-f="fuzzy">Similares <span class="n" id="nFzy"></span></span>
+          <span class="chip a" data-f="asig">Ya asignados <span class="n" id="nAsig"></span></span>
+          <span class="chip r" data-f="recast">⚠ Recast <span class="n" id="nDif"></span></span>
+          <span class="chip" data-f="nuevo">Nuevos <span class="n" id="nNuevo"></span></span>
+        </div>
+        <table>
+          <thead><tr>
+            <th style="width:26px"><input type="checkbox" class="check" id="checkAll" checked title="Marcar todos"></th>
+            <th>Personaje</th>
+            <th>En el archivo</th>
+            <th>Actor a pegar / guardar</th>
+            <th>Estado</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="legend">
+          <span><span class="sw" style="background:#ffff00"></span><b style="color:var(--yellow)">Amarillo</b>&nbsp;en teléfono = secundario sin nombre propio (MALE / FEMALE / VOZ…): se pega la continuidad, verifica el actor</span>
+          <span><span class="sw" style="background:#6fa8dc"></span><b style="color:var(--blue)">Azul</b>&nbsp;en teléfono = nombre similar (TITUS ↔ TITIS, MIRA ↔ DOCTORA MIRA): se pega la continuidad, verifica el personaje</span>
+        </div>
+        <div class="actionbar">
+          <button class="btn green" id="btnDownload">⬇ Descargar Excel casteado</button>
+          <button class="btn primary" id="btnSaveDB">💾 Guardar casting en la base</button>
+          <span class="note" style="margin:0">Escribe solo NOMBRE DEL ACTOR y los colores de verificación. Macros, fórmulas y formato quedan intactos.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+/* ================= UTILIDADES ================= */
+const $=id=>document.getElementById(id);
+function norm(s){return (s||'').toString().normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();}
+function seriesFromTitle(t){return norm(t).replace(/[\s\-_]*(EP|EPISODIO|CAP|CAPITULO)?\.?\s*\d{1,4}\s*$/,'').trim();}
+function epFromTitle(t){const m=norm(t).match(/(\d{1,4})\s*$/);return m?m[1]:'';}
+function isGeneric(n){return /^(MALE|FEMALE|UNIDENTIFIED|UNIDENT\w*|VOICE|VOZ|MAN|WOMAN|BOY|GIRL|GUARD|SECURITY|SOLDIER|OFFICER|NURSE|DOCTOR VOICE|RADIO|PA |PA$|ADR|WALLA|CROWD|GROUP)\b/.test(n);}
+function lev(a,b){
+  const m=a.length,n=b.length;if(!m)return n;if(!n)return m;
+  let prev=Array.from({length:n+1},(_,i)=>i),cur=new Array(n+1);
+  for(let i=1;i<=m;i++){cur[0]=i;
+    for(let j=1;j<=n;j++)cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));
+    [prev,cur]=[cur,prev];
+  }
+  return prev[n];
+}
+function sim(a,b){const d=lev(a,b);return 1-d/Math.max(a.length,b.length);}
+function tokenContain(a,b){
+  const ta=a.split(' ').filter(Boolean),tb=b.split(' ').filter(Boolean);
+  const [small,big]=ta.length<=tb.length?[ta,tb]:[tb,ta];
+  if(!small.length||small.length===big.length)return false;
+  return small.every(t=>big.includes(t));
+}
+function fuzzyFind(nchar,chars){
+  if(isGeneric(nchar))return null;
+  let best=null;
+  for(const k in chars){
+    if(k===nchar||isGeneric(k))continue;
+    let score=0;
+    if(tokenContain(nchar,k))score=0.92;
+    else if(Math.min(nchar.length,k.length)>=4){const s=sim(nchar,k);if(s>=0.8)score=s;}
+    if(score&&(!best||score>best.score))best={key:k,entry:chars[k],score};
+  }
+  return best;
+}
+/* --- normalización de nombres de actor --- */
+function letters(s){return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z]/g,'');}
+function initialsMatch(a,b){ // "F BALLESTAS" ↔ "FELIPE BALLESTAS"
+  const ta=a.split(' ').filter(Boolean),tb=b.split(' ').filter(Boolean);
+  if(ta.length!==tb.length)return false;
+  let hasInitial=false;
+  for(let i=0;i<ta.length;i++){
+    const x=ta[i].replace(/\./g,''),y=tb[i].replace(/\./g,'');
+    if(x===y)continue;
+    if((x.length===1&&y.startsWith(x))||(y.length===1&&x.startsWith(y))){hasInitial=true;continue;}
+    return false;
+  }
+  return hasInitial;
+}
+function buildRoster(){ // mapa normKey -> {display, count} de todos los actores en todas las series
+  const map=new Map();
+  for(const sk in DB.series){
+    const cs=DB.series[sk].characters;
+    for(const c in cs){
+      const a=(cs[c].actor||'').trim();if(!a)continue;
+      const k=norm(a);if(!k||k==='X')continue;
+      const e=map.get(k)||{display:a,count:0};
+      e.count++;
+      if(letters(a).length>letters(e.display).length)e.display=a; // preferir el nombre más completo
+      map.set(k,e);
+    }
+  }
+  return map;
+}
+function suggestActor(typed,roster){ // sugiere un nombre existente parecido, o null
+  const nt=norm(typed);
+  if(!nt||nt==='X'||roster.has(nt))return null;
+  let best=null;
+  roster.forEach((info,nn)=>{
+    if(nn===nt)return;
+    let score=0;
+    if(initialsMatch(nt,nn))score=0.96;
+    else if(Math.min(nt.length,nn.length)>=4){const s=sim(nt,nn);if(s>=0.85)score=s;}
+    if(score&&(!best||score>best.score))best={key:nn,display:info.display,score};
+  });
+  return best;
+}
+function epsLabel(e){return e&&e.length?'EP '+e.slice().sort((a,b)=>(+a)-(+b)).join(','):'';}
+function addEp(entry,ep){if(!ep)return;entry.episodes=entry.episodes||[];if(!entry.episodes.includes(ep))entry.episodes.push(ep);}
+function colLetter(n){let s='';n++;while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;}
+function colNum(letters){let n=0;for(const ch of letters)n=n*26+(ch.charCodeAt(0)-64);return n;}
+function msg(id,cls,text){$(id).innerHTML=text?'<div class="msg '+cls+'">'+esc(String(text))+'</div>':'';}
+function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+function setStep(n){[1,2,3].forEach(i=>$('step'+i).classList.toggle('on',i<=n));}
+
+/* ================= BASE DE DATOS ================= */
+const DB_KEY='centauroCastingDB_v1';
+let DB={version:2,series:{}};
+function loadDB(){
+  try{const raw=localStorage.getItem(DB_KEY);if(raw)DB=JSON.parse(raw);}catch(e){}
+  DB.series=DB.series||{};
+  for(const k in DB.series)for(const c in DB.series[k].characters){
+    const e=DB.series[k].characters[c];
+    e.episodes=e.episodes||[];e.history=e.history||[];e.generic=isGeneric(c);
+  }
+  DB.version=2;
+}
+function saveDB(){try{localStorage.setItem(DB_KEY,JSON.stringify(DB));}catch(e){}}
+
+function refreshSeries(sel){
+  const s=$('seriesSelect');s.innerHTML='';
+  const keys=Object.keys(DB.series).sort();
+  keys.forEach(k=>{const o=document.createElement('option');o.value=k;o.textContent=DB.series[k].name;s.appendChild(o);});
+  if(!keys.length){const o=document.createElement('option');o.value='';o.textContent='— sin series —';s.appendChild(o);}
+  if(sel&&DB.series[sel])s.value=sel;
+  refreshStats();renderDBList();
+}
+function refreshStats(){
+  $('stSeries').textContent=Object.keys(DB.series).length;
+  const k=$('seriesSelect').value;
+  $('stChars').textContent=k&&DB.series[k]?Object.keys(DB.series[k].characters).length:0;
+}
+function currentSeries(){const k=$('seriesSelect').value;return k?DB.series[k]:null;}
+
+$('btnNewSeries').onclick=()=>{
+  const name=norm($('seriesName').value);if(!name)return;
+  if(!DB.series[name])DB.series[name]={name,characters:{}};
+  saveDB();refreshSeries(name);$('seriesName').value='';
+  setStep(2);
+  if(EP)matchAndRender();
+};
+$('btnDelSeries').onclick=()=>{
+  const k=$('seriesSelect').value;if(!k)return;
+  if(!confirm('¿Borrar la serie "'+DB.series[k].name+'" y todos sus personajes?'))return;
+  delete DB.series[k];saveDB();refreshSeries();if(EP)matchAndRender();
+};
+$('seriesSelect').onchange=()=>{refreshStats();renderDBList();if(EP)matchAndRender();};
+
+let listOpen=false;
+$('btnToggleList').onclick=()=>{listOpen=!listOpen;$('dbList').classList.toggle('hidden',!listOpen);$('btnToggleList').textContent=listOpen?'Ocultar personajes':'Ver personajes';renderDBList();};
+function renderDBList(){
+  if(!listOpen)return;
+  const s=currentSeries(),el=$('dbList');el.innerHTML='';
+  const chars=s?s.characters:{};
+  const keys=Object.keys(chars);
+  if(!keys.length){el.innerHTML='<div class="dbempty">— sin personajes en esta serie —</div>';return;}
+
+  // agrupar personajes por capítulo (un personaje aparece bajo cada episodio en el que salió)
+  const byEp={},noEp=[];
+  keys.forEach(c=>{
+    const eps=chars[c].episodes||[];
+    if(!eps.length){noEp.push(c);return;}
+    eps.forEach(ep=>{(byEp[ep]=byEp[ep]||[]).push(c);});
+  });
+  const epList=Object.keys(byEp).sort((a,b)=>(+a)-(+b)); // capítulos en orden numérico
+  const frag=document.createDocumentFragment();
+
+  const rowsHtml=arr=>arr.map(c=>{
+    const e=chars[c];
+    let mark='';
+    if(e.history&&e.history.length){
+      const tip=e.history.map(h=>h.from+' → '+h.to+(h.ep?' (cap '+h.ep+')':'')).join(' · ');
+      mark='<span class="recastmark" title="'+esc(tip)+'">↻</span>';
+    }
+    return '<div class="dbrow"><span class="dbname">'+
+      (e.generic?'<span class="dot" title="secundario"></span>':'')+esc(c)+mark+
+      '</span><span class="actor">'+esc(e.actor)+'</span></div>';
+  }).join('');
+
+  function section(title,names){
+    const main=names.filter(c=>!chars[c].generic).sort(); // principales A→Z
+    const sec=names.filter(c=>chars[c].generic).sort();    // secundarios (amarillos) A→Z
+    const wrap=document.createElement('div');wrap.className='epgroup';
+    let html='<div class="ephead">'+esc(String(title))+' <span class="epcount">'+names.length+'</span></div>';
+    if(main.length)html+='<div class="subhead">Principales</div>'+rowsHtml(main);
+    if(sec.length)html+='<div class="subhead sec">Secundarios</div>'+rowsHtml(sec);
+    wrap.innerHTML=html;return wrap;
+  }
+
+  epList.forEach(ep=>frag.appendChild(section('CAPÍTULO '+ep,byEp[ep])));
+  if(noEp.length)frag.appendChild(section('SIN CAPÍTULO ASIGNADO',noEp));
+  el.appendChild(frag);
+}
+
+/* ================= EXPORT / IMPORT JSON ================= */
+$('btnExport').onclick=()=>{
+  const blob=new Blob([JSON.stringify(DB,null,2)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download='casting_db_centauro.json';a.click();
+};
+$('btnImport').onclick=()=>$('importFile').click();
+$('importFile').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    const inc=JSON.parse(await f.text());
+    if(!inc.series)throw 0;
+    for(const k in inc.series){
+      if(!DB.series[k])DB.series[k]=inc.series[k];
+      else for(const c in inc.series[k].characters){
+        const cur=DB.series[k].characters[c],add=inc.series[k].characters[c];
+        if(!cur)DB.series[k].characters[c]=add;
+        else{(add.episodes||[]).forEach(ep=>addEp(cur,ep));if(!cur.phone&&add.phone)cur.phone=add.phone;}
+      }
+    }
+    loadDB();saveDB();refreshSeries();msg('epMsg','ok','Base importada y fusionada correctamente.');
+  }catch(_){msg('epMsg','err','El JSON no es válido.');}
+  e.target.value='';
+};
+
+/* ================= IMPORTAR BASE ANTIGUA (EXCEL) ================= */
+let LEGACY=null;
+$('btnLegacy').onclick=()=>$('legacyFile').click();
+$('legacyFile').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;e.target.value='';
+  try{
+    const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
+    let bestRecs=null,bestSheet='';
+    for(const name of wb.SheetNames){
+      const recs=parseLegacySheet(wb.Sheets[name]);
+      if(recs&&(!bestRecs||recs.length>bestRecs.length)){bestRecs=recs;bestSheet=name;}
+    }
+    if(!bestRecs||!bestRecs.length){$('legacyPreview').innerHTML='<div class="msg err">No encontré pares personaje/talento en ese archivo.</div>';return;}
+    LEGACY={recs:bestRecs,file:f.name,sheet:bestSheet};
+    const eps=[...new Set(bestRecs.map(r=>r.ep).filter(Boolean))];
+    const sample=bestRecs.slice(0,6).map(r=>'<div class="pvrow"><b>'+esc(r.char)+'</b> → '+esc(r.actor)+(r.ep?' <span class="eps">EP '+r.ep+'</span>':'')+'</div>').join('');
+    $('legacyPreview').innerHTML='<div class="preview">'+
+      '<b>'+esc(f.name)+'</b> · hoja '+esc(bestSheet)+'<br>'+
+      bestRecs.length+' registros · '+eps.length+' capítulos detectados'+(eps.length?' ('+eps.slice(0,12).join(', ')+(eps.length>12?'…':'')+')':'')+
+      '<div style="margin-top:8px">'+sample+(bestRecs.length>6?'<div class="pvrow">… y '+(bestRecs.length-6)+' más</div>':'')+'</div>'+
+      '<div class="actions"><button class="btn small green" id="btnLegacyOk">Fusionar con la serie activa</button>'+
+      '<button class="btn small danger" id="btnLegacyNo">Cancelar</button></div></div>';
+    $('btnLegacyOk').onclick=mergeLegacy;
+    $('btnLegacyNo').onclick=()=>{LEGACY=null;$('legacyPreview').innerHTML='';};
+  }catch(err){$('legacyPreview').innerHTML='<div class="msg err">No pude leer el archivo: '+esc(err.message)+'</div>';}
+};
+
+function parseLegacySheet(ws){
+  if(!ws||!ws['!ref'])return null;
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+  const HEADERS=new Set(['PERSONAJE','LOCUTOR','CASTING','TALENTO','ACTOR','NOMBRE DEL ACTOR','CHARACTER','NOMBRE']);
+  const recs=[];let curEp='';
+  for(const row of rows){
+    const a=(row[0]||'').toString().trim();
+    const b=(row[1]||'').toString().trim();
+    const na=norm(a);
+    let epFound='';
+    for(const cell of row){
+      const t=norm(cell);if(!t)continue;
+      let m=t.match(/^(?:CAPITULO|CAP|EPISODIO|EPIS|EP|CHAPTER)[\s.:#\-]*(\d{1,4})$/);
+      if(m){epFound=m[1];break;}
+    }
+    if(!epFound&&/^\d{1,4}$/.test(na)&&!b){epFound=na;}
+    if(epFound){curEp=epFound;continue;}
+    if(!a||!b)continue;
+    if(HEADERS.has(na)||HEADERS.has(norm(b)))continue;
+    let phone='';
+    const c=(row[2]||'').toString().trim();
+    if(/\d{7,}/.test(c.replace(/\D/g,'')))phone=c;
+    recs.push({char:a,actor:b,phone,ep:curEp});
+  }
+  return recs;
+}
+
+function mergeLegacy(){
+  const s=currentSeries();
+  if(!s){$('legacyPreview').insertAdjacentHTML('beforeend','<div class="msg err">Crea o selecciona una serie primero.</div>');return;}
+  let nNew=0,nEp=0,nConf=0;
+  for(const r of LEGACY.recs){
+    const nc=norm(r.char);if(!nc)continue;
+    const actor=r.actor.toUpperCase();
+    let e=s.characters[nc];
+    if(!e){
+      e=s.characters[nc]={actor,phone:r.phone||'',episodes:[],generic:isGeneric(nc),src:LEGACY.file,updated:new Date().toISOString().slice(0,10)};
+      nNew++;
+    }else{
+      if(norm(e.actor)!==norm(actor))nConf++;
+      if(!e.phone&&r.phone)e.phone=r.phone;
+    }
+    if(r.ep){addEp(e,r.ep);nEp++;}
+  }
+  saveDB();refreshStats();renderDBList();if(EP)matchAndRender();
+  $('legacyPreview').innerHTML='<div class="msg ok">Fusionado: '+nNew+' personajes nuevos, '+nEp+' registros de episodio'+(nConf?', '+nConf+' con actor distinto (se conservó el existente)':'')+'.</div>';
+  LEGACY=null;
+}
+
+/* ================= LECTURA DEL DESGLOSE ================= */
+let EP=null;
+const drop=$('drop');
+drop.onclick=()=>$('fileInput').click();
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{if(e.dataTransfer.files.length)handleFile(e.dataTransfer.files[0]);});
+$('fileInput').onchange=e=>{if(e.target.files.length)handleFile(e.target.files[0]);e.target.value='';};
+
+async function handleFile(file){
+  msg('epMsg','','');
+  try{
+    const buffer=await file.arrayBuffer();
+    const wb=XLSX.read(buffer,{type:'array'});
+    let target=null,headerRow=-1,colChar=-1,colActor=-1,colTel=-1;
+    const prefer=wb.SheetNames.filter(n=>norm(n).startsWith('CASTING')).concat(wb.SheetNames);
+    for(const name of prefer){
+      const ws=wb.Sheets[name];if(!ws||!ws['!ref'])continue;
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+      for(let r=0;r<Math.min(rows.length,40);r++){
+        const row=rows[r].map(v=>norm(v));
+        const ia=row.findIndex(v=>v.includes('NOMBRE DEL ACTOR')||v==='ACTOR');
+        if(ia>-1){
+          target=name;headerRow=r;colActor=ia;
+          const ic=row.findIndex(v=>v==='LOCUTOR'||v==='PERSONAJE');
+          colChar=ic>-1?ic:0;
+          colTel=row.findIndex(v=>v.includes('TELEFONO'));
+          break;
+        }
+      }
+      if(target)break;
+    }
+    if(!target){msg('epMsg','err','No encontré una hoja con la columna «NOMBRE DEL ACTOR». Verifica que el archivo tenga la hoja CASTING.');return;}
+
+    const ws=wb.Sheets[target];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+    const data=[],seen=new Set();
+    for(let r=headerRow+1;r<rows.length;r++){
+      const char=(rows[r][colChar]||'').toString().trim();
+      if(!char)continue;
+      const nc=norm(char);
+      if(!nc||seen.has(nc))continue;
+      seen.add(nc);
+      data.push({
+        row:r+1,char,nchar:nc,
+        tc:(rows[r][colChar+1]||'').toString().trim(),
+        fileActor:(rows[r][colActor]||'').toString().trim(),
+        filePhone:colTel>-1?(rows[r][colTel]||'').toString().trim():''
+      });
+    }
+    if(!data.length){msg('epMsg','err','La hoja '+target+' no tiene personajes.');return;}
+
+    let title='';
+    try{const wd=wb.Sheets['DESGLOCE'];if(wd&&wd['H9']&&wd['H9'].v)title=wd['H9'].v.toString();}catch(_){}
+    if(!title)title=file.name.replace(/\.(xlsm|xlsx)$/i,'');
+
+    EP={fileName:file.name,buffer,sheetName:target,title,colChar,colActor,colTel,data,epNum:epFromTitle(title)};
+
+    const sk=seriesFromTitle(title);
+    if(sk){
+      if(!DB.series[sk]){DB.series[sk]={name:sk,characters:{}};saveDB();}
+      refreshSeries(sk);
+    }
+
+    $('fileTag').innerHTML='<div class="filetag">📄 '+esc(file.name)+' · hoja '+esc(target)+' · '+data.length+' personajes'+
+      ' <span style="color:var(--faint)">Episodio:</span> <input type="text" id="epNum" value="'+esc(EP.epNum)+'">'+
+      '<span class="x" onclick="clearFile()">✕</span></div>';
+    $('epNum').oninput=e=>{EP.epNum=e.target.value.trim();};
+    setStep(3);
+    matchAndRender();
+  }catch(err){console.error(err);msg('epMsg','err','No pude leer el archivo: '+err.message);}
+}
+function clearFile(){EP=null;$('fileTag').innerHTML='';$('results').classList.add('hidden');setStep(2);msg('epMsg','','');}
+
+/* ================= CRUCE Y TABLA ================= */
+const SKIP=new Set(['X','']);
+let FILTER='all';
+$('chips').addEventListener('click',e=>{
+  const chip=e.target.closest('.chip');if(!chip)return;
+  FILTER=chip.dataset.f;
+  document.querySelectorAll('#chips .chip').forEach(c=>c.classList.toggle('active',c===chip));
+  applyFilter();
+});
+function applyFilter(){
+  document.querySelectorAll('#tbody tr').forEach(tr=>{
+    tr.classList.toggle('hiddenrow',FILTER!=='all'&&tr.dataset.state!==FILTER);
+  });
+}
+
+function matchAndRender(){
+  if(!EP)return;
+  const s=currentSeries();
+  const chars=s?s.characters:{};
+  const roster=buildRoster();
+  let nMatch=0,nAsig=0,nNuevo=0,nGen=0,nFzy=0,nRecast=0;
+  const tb=$('tbody');tb.innerHTML='';
+  EP.data.forEach((d,i)=>{
+    const dbEntry=chars[d.nchar];
+    const fileHas=!SKIP.has(norm(d.fileActor));
+    let state,suggest='',checked=false,tag,inputCls='',epsTxt='',meta='';
+    d.fuzzyFrom=null;d.recastFrom=null;
+    if(fileHas){
+      if(dbEntry&&norm(dbEntry.actor)!==norm(d.fileActor)){
+        state='recast';nRecast++;d.recastFrom=dbEntry.actor;
+        tag='<span class="tag recast"><span class="sw" style="background:#f87171"></span>RECAST · era '+esc(dbEntry.actor)+'</span>';
+        meta='<div class="rowmeta">'+
+          '<button class="minibtn take" data-act="take" data-i="'+i+'">✓ Usar '+esc(d.fileActor)+'</button>'+
+          '<button class="minibtn keep" data-act="keep" data-i="'+i+'">↩ Conservar '+esc(dbEntry.actor)+'</button>'+
+          '</div>';
+      }else{state='asig';nAsig++;tag='<span class="tag asig">YA ASIGNADO</span>';}
+      suggest=d.fileActor;
+      if(dbEntry)epsTxt=epsLabel(dbEntry.episodes);
+    }else if(dbEntry){
+      suggest=dbEntry.actor;checked=true;epsTxt=epsLabel(dbEntry.episodes);
+      if(isGeneric(d.nchar)){state='gmatch';nGen++;inputCls='gen';
+        tag='<span class="tag gen"><span class="sw" style="background:#ffff00"></span>SECUNDARIO · VERIFICAR</span>';}
+      else{state='match';nMatch++;inputCls='pegado';
+        tag='<span class="tag match">✔ CONTINUIDAD</span>';}
+    }else{
+      const fz=fuzzyFind(d.nchar,chars);
+      if(fz){
+        state='fuzzy';suggest=fz.entry.actor;checked=true;inputCls='fzy';nFzy++;
+        d.fuzzyFrom=fz.key;epsTxt=epsLabel(fz.entry.episodes);
+        tag='<span class="tag fzy"><span class="sw" style="background:#6fa8dc"></span>POSIBLE: '+esc(fz.key)+'</span>';
+      }else{
+        state='nuevo';nNuevo++;
+        tag=norm(d.fileActor)==='X'?'<span class="tag na">SIN DIÁLOGO (X)</span>':'<span class="tag nuevo">NUEVO</span>';
+        if(norm(d.fileActor)==='X')suggest='X';
+      }
+    }
+    d.state=state;
+    const disabled=(state==='asig'||norm(d.fileActor)==='X');
+    const tr=document.createElement('tr');
+    tr.dataset.state=state;
+    tr.innerHTML=
+      '<td><input type="checkbox" class="check rowcheck" data-i="'+i+'" '+(checked?'checked':'')+' '+(disabled?'disabled':'')+'></td>'+
+      '<td><div class="char">'+esc(d.char)+'</div><div class="tc">'+esc(d.tc)+(epsTxt?' · <span class="eps">'+epsTxt+'</span>':'')+'</div></td>'+
+      '<td class="tc">'+(esc(d.fileActor)||'—')+'</td>'+
+      '<td><input type="text" class="actorInput '+inputCls+'" data-i="'+i+'" value="'+esc(suggest)+'" placeholder="escribir actor…">'+meta+'<div class="sugg" data-i="'+i+'"></div></td>'+
+      '<td>'+tag+'</td>';
+    tb.appendChild(tr);
+  });
+  $('nAll').textContent='('+EP.data.length+')';
+  $('nMatch').textContent='('+nMatch+')';
+  $('nGen').textContent='('+nGen+')';
+  $('nFzy').textContent='('+nFzy+')';
+  $('nAsig').textContent='('+nAsig+')';
+  $('nDif').textContent='('+nRecast+')';
+  $('nNuevo').textContent='('+nNuevo+')';
+  $('results').classList.remove('hidden');
+  applyFilter();
+
+  function refreshSugg(i){
+    const inp=document.querySelector('.actorInput[data-i="'+i+'"]');
+    const box=document.querySelector('.sugg[data-i="'+i+'"]');
+    if(!inp||!box)return;
+    const sug=suggestActor(inp.value,roster);
+    if(sug&&norm(sug.display)!==norm(inp.value)){
+      box.innerHTML='¿Es <b>'+esc(sug.display)+'</b>? <span class="apply" data-i="'+i+'">usar este</span>';
+      box.querySelector('.apply').onclick=()=>{inp.value=sug.display;box.innerHTML='';const cb=document.querySelector('.rowcheck[data-i="'+i+'"]');if(cb&&!cb.disabled)cb.checked=true;};
+    }else box.innerHTML='';
+  }
+
+  document.querySelectorAll('.actorInput').forEach(inp=>{
+    const i=+inp.dataset.i;
+    let t=null;
+    inp.oninput=()=>{
+      const cb=document.querySelector('.rowcheck[data-i="'+i+'"]');
+      if(inp.value.trim()&&cb&&!cb.disabled)cb.checked=true;
+      clearTimeout(t);t=setTimeout(()=>refreshSugg(i),250);
+    };
+    inp.onblur=()=>refreshSugg(i);
+    refreshSugg(i); // sugerencia inicial (ej. recast con typo respecto a la base)
+  });
+
+  document.querySelectorAll('.minibtn[data-act]').forEach(btn=>{
+    btn.onclick=()=>{
+      const i=+btn.dataset.i,d=EP.data[i];
+      const inp=document.querySelector('.actorInput[data-i="'+i+'"]');
+      const cb=document.querySelector('.rowcheck[data-i="'+i+'"]');
+      inp.value=btn.dataset.act==='take'?d.fileActor:d.recastFrom;
+      if(cb)cb.checked=true;
+      btn.closest('.rowmeta').querySelectorAll('.minibtn').forEach(b=>b.style.opacity=b===btn?'1':'.4');
+    };
+  });
+
+  $('checkAll').onchange=e=>{document.querySelectorAll('.rowcheck:not(:disabled)').forEach(cb=>cb.checked=e.target.checked);};
+}
+
+/* ================= GUARDAR EN BASE ================= */
+$('btnSaveDB').onclick=()=>{
+  const s=currentSeries();
+  if(!s){msg('epMsg','err','Crea o selecciona una serie primero.');return;}
+  let n=0,recasts=0;
+  document.querySelectorAll('.actorInput').forEach(inp=>{
+    const i=+inp.dataset.i,d=EP.data[i];
+    const actor=inp.value.trim();
+    if(!actor||SKIP.has(norm(actor)))return;
+    const newActor=actor.toUpperCase();
+    let e=s.characters[d.nchar];
+    if(!e)e=s.characters[d.nchar]={actor:newActor,phone:'',episodes:[],generic:isGeneric(d.nchar),history:[],src:EP.title,updated:''};
+    if(e.actor&&norm(e.actor)!==norm(newActor)){ // recast confirmado: registrar cambio
+      e.history=e.history||[];
+      e.history.push({from:e.actor,to:newActor,ep:EP.epNum||'',date:new Date().toISOString().slice(0,10)});
+      recasts++;
+    }
+    e.actor=newActor;
+    if(d.filePhone)e.phone=d.filePhone;
+    e.updated=new Date().toISOString().slice(0,10);
+    addEp(e,EP.epNum);
+    n++;
+  });
+  saveDB();refreshStats();renderDBList();matchAndRender();
+  msg('epMsg','ok','Guardados '+n+' personajes en «'+s.name+'»'+(EP.epNum?' con registro del episodio '+EP.epNum:'')+(recasts?' · '+recasts+' recast registrado'+(recasts>1?'s':''):'')+'.');
+};
+
+/* ================= DESCARGA CON PEGADO Y COLORES ================= */
+const YELLOW='FFFFFF00', BLUE='FF6FA8DC';
+$('btnDownload').onclick=async()=>{
+  if(!EP)return;
+  const s=currentSeries();
+  const edits=[];
+  document.querySelectorAll('.rowcheck:checked:not(:disabled)').forEach(cb=>{
+    const i=+cb.dataset.i,d=EP.data[i];
+    const inp=document.querySelector('.actorInput[data-i="'+i+'"]');
+    const actor=inp.value.trim();
+    if(!actor)return;
+    edits.push({row:d.row,col:colLetter(EP.colActor),value:actor.toUpperCase()});
+    const markCol=EP.colTel>-1?colLetter(EP.colTel):colLetter(EP.colActor);
+    let color=null;
+    if(d.state==='gmatch')color=YELLOW;
+    else if(d.state==='fuzzy')color=BLUE;
+    let phoneVal=null;
+    if(EP.colTel>-1&&!d.filePhone&&s){
+      const key=d.fuzzyFrom||d.nchar;
+      const e=s.characters[key];
+      if(e&&e.phone&&norm(e.actor)===norm(actor))phoneVal=e.phone;
+    }
+    if(color||phoneVal!==null){
+      const ed={row:d.row,col:markCol};
+      if(phoneVal!==null&&markCol===colLetter(EP.colTel))ed.value=phoneVal;
+      if(color)ed.fillColor=color;
+      edits.push(ed);
+    }
+  });
+  if(!edits.length){msg('epMsg','err','No hay filas marcadas con actor para pegar.');return;}
+  try{
+    const blob=await writeIntoXlsm(EP.buffer,EP.sheetName,edits);
+    const ext=EP.fileName.toLowerCase().endsWith('.xlsx')?'xlsx':'xlsm';
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=EP.fileName.replace(/\.(xlsm|xlsx)$/i,'')+'_CASTEADO.'+ext;
+    a.click();
+    const nVal=edits.filter(e=>e.value&&!e.fillColor).length;
+    const nCol=edits.filter(e=>e.fillColor).length;
+    msg('epMsg','ok','Excel descargado: '+nVal+' actores pegados, '+nCol+' celdas marcadas con color para verificar (amarillo = secundario, azul = nombre similar).');
+  }catch(err){console.error(err);msg('epMsg','err','Error al escribir el Excel: '+err.message);}
+};
+
+async function writeIntoXlsm(buffer,sheetName,edits){
+  const zip=await JSZip.loadAsync(buffer);
+  const parser=new DOMParser(),ser=new XMLSerializer();
+  const RELNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+
+  const wbXml=parser.parseFromString(await zip.file('xl/workbook.xml').async('string'),'application/xml');
+  let rid=null;
+  wbXml.querySelectorAll('sheet').forEach(sh=>{
+    if(sh.getAttribute('name')===sheetName)rid=sh.getAttribute('r:id')||sh.getAttributeNS(RELNS,'id');
+  });
+  if(!rid)throw new Error('No encontré la hoja '+sheetName+' en el workbook.');
+  const relsXml=parser.parseFromString(await zip.file('xl/_rels/workbook.xml.rels').async('string'),'application/xml');
+  let targetPath=null;
+  relsXml.querySelectorAll('Relationship').forEach(rel=>{
+    if(rel.getAttribute('Id')===rid)targetPath=rel.getAttribute('Target');
+  });
+  if(!targetPath)throw new Error('Sin relación para la hoja.');
+  targetPath=targetPath.replace(/^\//,'');
+  if(!targetPath.startsWith('xl/'))targetPath='xl/'+targetPath;
+
+  const colors=[...new Set(edits.filter(e=>e.fillColor).map(e=>e.fillColor))];
+  let stylesDoc=null,fillIds={},xfCache={},cellXfsEl=null,SNS=null;
+  if(colors.length){
+    stylesDoc=parser.parseFromString(await zip.file('xl/styles.xml').async('string'),'application/xml');
+    SNS=stylesDoc.documentElement.namespaceURI;
+    const fillsEl=stylesDoc.getElementsByTagNameNS(SNS,'fills')[0];
+    let fillCount=fillsEl.getElementsByTagNameNS(SNS,'fill').length;
+    for(const color of colors){
+      const fill=stylesDoc.createElementNS(SNS,'fill');
+      const pf=stylesDoc.createElementNS(SNS,'patternFill');pf.setAttribute('patternType','solid');
+      const fg=stylesDoc.createElementNS(SNS,'fgColor');fg.setAttribute('rgb',color);
+      const bg=stylesDoc.createElementNS(SNS,'bgColor');bg.setAttribute('indexed','64');
+      pf.appendChild(fg);pf.appendChild(bg);fill.appendChild(pf);fillsEl.appendChild(fill);
+      fillIds[color]=fillCount++;
+    }
+    fillsEl.setAttribute('count',String(fillCount));
+    cellXfsEl=stylesDoc.getElementsByTagNameNS(SNS,'cellXfs')[0];
+  }
+  function styleWithFill(oldS,color){
+    const key=(oldS||'0')+'|'+color;
+    if(xfCache[key]!==undefined)return xfCache[key];
+    const xfs=[...cellXfsEl.getElementsByTagNameNS(SNS,'xf')];
+    const base=xfs[Math.min(+(oldS||0),xfs.length-1)]||xfs[0];
+    const clone=base.cloneNode(true);
+    clone.setAttribute('fillId',String(fillIds[color]));
+    clone.setAttribute('applyFill','1');
+    cellXfsEl.appendChild(clone);
+    const idx=xfs.length;
+    cellXfsEl.setAttribute('count',String(idx+1));
+    xfCache[key]=idx;
+    return idx;
+  }
+
+  const doc=parser.parseFromString(await zip.file(targetPath).async('string'),'application/xml');
+  const NS=doc.documentElement.namespaceURI;
+  const sheetData=doc.getElementsByTagNameNS(NS,'sheetData')[0];
+  const rowMap={};
+  for(const r of sheetData.getElementsByTagNameNS(NS,'row'))rowMap[r.getAttribute('r')]=r;
+
+  function ensureCell(rowN,colL){
+    let rowEl=rowMap[String(rowN)];
+    if(!rowEl){
+      rowEl=doc.createElementNS(NS,'row');rowEl.setAttribute('r',String(rowN));
+      let ins=false;
+      for(const r of sheetData.getElementsByTagNameNS(NS,'row'))
+        if(+r.getAttribute('r')>rowN){sheetData.insertBefore(rowEl,r);ins=true;break;}
+      if(!ins)sheetData.appendChild(rowEl);
+      rowMap[String(rowN)]=rowEl;
+    }
+    const ref=colL+rowN;
+    for(const c of rowEl.getElementsByTagNameNS(NS,'c'))if(c.getAttribute('r')===ref)return c;
+    const cell=doc.createElementNS(NS,'c');cell.setAttribute('r',ref);
+    let placed=false;
+    for(const c of rowEl.getElementsByTagNameNS(NS,'c')){
+      const m=c.getAttribute('r').match(/^([A-Z]+)/);
+      if(m&&colNum(m[1])>colNum(colL)){rowEl.insertBefore(cell,c);placed=true;break;}
+    }
+    if(!placed)rowEl.appendChild(cell);
+    const donor=rowMap[String(rowN-1)]||rowMap[String(rowN+1)];
+    if(donor)for(const c of donor.getElementsByTagNameNS(NS,'c')){
+      const m=c.getAttribute('r').match(/^([A-Z]+)/);
+      if(m&&m[1]===colL&&c.getAttribute('s')){cell.setAttribute('s',c.getAttribute('s'));break;}
+    }
+    return cell;
+  }
+
+  for(const ed of edits){
+    const cell=ensureCell(ed.row,ed.col);
+    if(ed.value!==undefined){
+      while(cell.firstChild)cell.removeChild(cell.firstChild);
+      cell.setAttribute('t','inlineStr');
+      const is=doc.createElementNS(NS,'is');
+      const t=doc.createElementNS(NS,'t');
+      t.setAttribute('xml:space','preserve');
+      t.textContent=ed.value;
+      is.appendChild(t);cell.appendChild(is);
+    }
+    if(ed.fillColor){
+      const news=styleWithFill(cell.getAttribute('s'),ed.fillColor);
+      cell.setAttribute('s',String(news));
+    }
+  }
+
+  zip.file(targetPath,ser.serializeToString(doc));
+  if(stylesDoc)zip.file('xl/styles.xml',ser.serializeToString(stylesDoc));
+  return zip.generateAsync({type:'blob',mimeType:'application/vnd.ms-excel.sheet.macroEnabled.12',compression:'DEFLATE'});
+}
+
+/* ================= INIT ================= */
+loadDB();refreshSeries(Object.keys(DB.series)[0]);
+setStep(currentSeries()?2:1);
+</script>
+</body>
+</html>

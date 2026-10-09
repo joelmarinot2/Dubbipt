@@ -203,11 +203,13 @@ exports.pruebas = async function(t){
   t.seccion('6 · la seguridad de Dubbipt no se afloja');
   const V = JSON.parse(fs.readFileSync(path.join(RAIZ, 'vercel.json'), 'utf8'));
   const regla = (src) => (V.headers.find(h => h.source === src) || { headers: [] }).headers.reduce((m, h) => (m[h.key] = h.value, m), {});
-  const dc = regla('/dublajecast(.*)'), gen = regla('/((?!dublajecast).*)');
+  const dc = regla('/dublajecast(.*)'), gen = regla('/((?!dublajecast|dctools).*)'), dct = regla('/dctools/(.*)');
   t.ok('DublajeCast se deja meter solo en Dubbipt', /frame-ancestors 'self'/.test(dc['Content-Security-Policy']) && dc['X-Frame-Options'] === 'SAMEORIGIN');
   t.ok('compilar en el navegador, solo en su carpeta', /'unsafe-eval'/.test(dc['Content-Security-Policy']) && !/'unsafe-eval'/.test(gen['Content-Security-Policy']) && !/unpkg\.com|sheetjs/.test((gen['Content-Security-Policy'].match(/script-src[^;]*/) || [''])[0]));
-  const re = new RegExp('^' + '/((?!dublajecast).*)' + '$'), reDc = new RegExp('^' + '/dublajecast(.*)' + '$');
+  const re = new RegExp('^' + '/((?!dublajecast|dctools).*)' + '$'), reDc = new RegExp('^' + '/dublajecast(.*)' + '$');
   t.eq('la regla general cubre todo lo demás y no su carpeta', [re.test('/index.html'), re.test('/js/dublajecast.js'), re.test('/dublajecast/index.html'), re.test('/dublajecast'), re.test('/api/llm')].join(' '), 'true true false false true');
+  t.ok('las herramientas copiadas de DublajeCast (dctools) tienen su regla: su SheetJS, sin compilar en el navegador ni nada de fuera más', re.test('/dctools/pegado-casting.html') === false && /cdn\.sheetjs\.com/.test(dct['Content-Security-Policy'] || '') && !/'unsafe-eval'/.test(dct['Content-Security-Policy'] || '') && /frame-ancestors 'self'/.test(dct['Content-Security-Policy'] || '') && /connect-src 'self';/.test(dct['Content-Security-Policy'] || ''));
+  t.ok('y Dubbipt puede hablar con Anthropic, para los breakdowns', /connect-src [^;]*https:\/\/api\.anthropic\.com/.test(gen['Content-Security-Policy']));
   t.eq('y la suya cubre también /dublajecast sin barra, que es como la sirve Vercel', [reDc.test('/dublajecast'), reDc.test('/dublajecast/puente.js'), reDc.test('/js/dublajecast.js')].join(' '), 'true true false');
   const SW = fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8');
   const pasa = (ruta) => { const m = SW.match(/if \(url\.origin === self\.location\.origin && (\/.+\/)\.test\(url\.pathname\)\) return;/); return !!m && eval(m[1]).test(ruta); };

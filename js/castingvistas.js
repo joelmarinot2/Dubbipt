@@ -1281,6 +1281,8 @@ function csHtmlProduccion(d, hoy, vivo){
 }
 
 function csHtmlHerramienta(sec){
+  /* DUBCARDs, Breakdowns y Pegado, dentro de Dubbipt (js/dctools.js, PRO-38). Sin ese archivo, como antes: abrir DublajeCast. */
+  if(typeof DCT !== 'undefined' && DCT && typeof DCT.html === 'function'){ const h = DCT.html(sec.v); if(h) return h; }
   return '<div class="cs-cab"><div class="cs-cab-t"><h2>' + csEsc(sec.t) + '</h2><div class="cs-cab-sub">Herramienta de DublajeCast</div></div></div>'
     + '<div class="cs-herr"><span class="cs-herr-ic">' + csIco(sec.v, 26) + '</span><div><p>' + csEsc(sec.dice) + '</p>'
     + '<p class="cs-tenue">Esta herramienta procesa archivos y todavía es la de DublajeCast: se abre con todas sus funciones, y al volver sigues aquí.</p>'
@@ -2615,6 +2617,8 @@ function csCablear(vista){
     };
     else if(typeof csCablearMas === 'function') csCablearMas(el, que, v, at, id, a);
   });
+  /* Las herramientas que antes eran de DublajeCast se enganchan aparte (data-dct). */
+  try{ if(typeof DCT !== 'undefined' && DCT && typeof DCT.cablear === 'function') DCT.cablear(vista, CS.vista); }catch(e){ fallo('DCT.cablear · js/castingvistas.js', e); }
 }
 
 /** Actualizar: si DublajeCast está abierto con sesión, ya es en vivo; si no, se trae con la sesión del puente. */
