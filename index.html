@@ -1918,6 +1918,10 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-act-no{ background:#16181c; color:#9aa3ad; border:1px dashed #3a3f48; }
 .cs-b.cs-ep-estado{ color:#FBBF24; border-color:rgba(251,191,36,.45); }
 .cs-b.cs-ep-estado.cs-ep-hecho{ color:#4ADE80; border-color:rgba(74,222,128,.45); }
+.cs-tal-modos{ margin:0 0 12px; }
+.cs-per-papeles{ display:flex; flex-direction:column; gap:6px; margin-top:6px; }
+.cs-per-papel{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; font-size:12.5px; background:#0f1115; border:1px solid #20242a; border-radius:9px; padding:6px 10px; }
+.cs-per-prog{ font-weight:700; color:#f2f3f5; }
 .cs-b.cs-borrar{ color:#FB7185; }
 .cs-b.cs-borrar:hover{ border-color:#FB7185; background:rgba(251,113,133,.08); }
 .cs-kpis{ display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin-bottom:16px; }
@@ -2681,7 +2685,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.52.0-nube';
+const APP_VER_NUM = 'v11.53.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
