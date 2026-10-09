@@ -90,8 +90,14 @@ exports.pruebas = async function(t){
     const ana = fh.find(f => f.clave === 'ANA ROJAS'), beto = fh.find(f => f.clave === 'BETO LUNA');
     const resumen = (f) => f.historial.map(pg => pg.programa + (pg.este ? '*' : '') + ' ' + pg.lineas + ' [' + pg.episodios.map(e => e.n + ':' + e.personajes.map(x => x.nombre + ' ' + x.lineas).join('+')).join(' ') + ']').join(' | ');
     t.eq('cada programa con sus episodios, personajes y líneas; el que se castea primero y los demás por líneas', resumen(ana),
-         'AKKA* 12 [1:JANA 12] | Dofus 50 [1:DOFUS 40+REY 10 2:REY 0] | Ninjago 5 [1:KAI 5] | Rex 0 [1:REX 0]');
-    t.ok('también los terminados: el historial no es la ocupación', /Viejo 0 \[1:ABUELO 0\]/.test(resumen(beto)));
+         'AKKA* 12 [1:JANA 12] | Dofus 50 [1:DOFUS 40+REY 10] | Ninjago 5 [1:KAI 5] | Rex 0 [1:REX 0]');
+    t.ok('solo los episodios activos: ni el episodio completado (Dofus 2) ni los de un programa completado (Viejo)', !/Viejo/.test(resumen(beto)) && !/2:REY/.test(resumen(ana)));
+    const fin = M.dispFilas({ base: [], d: d, serie: d.series[0], registro: REG2, enCap: [], showId: 's1', programa: 'AKKA',
+                              registros: [{ showId: 's1', programa: 'AKKA', serieId: 1, reg: REG2, finNombres: ['Episodio 1'], finNums: [1] }] });
+    t.eq('un episodio completado en Dubbipt tampoco, aunque DublajeCast lo tenga en curso', resumen(fin.find(f => f.clave === 'ANA ROJAS')).split(' | ')[0], 'Dofus 50 [1:DOFUS 40+REY 10]');
+    const finP = M.dispFilas({ base: [], d: null, serie: null, registro: null, enCap: [],
+                               registros: [{ showId: 's9', programa: 'Otro 3', completo: true, reg: { capitulos: { 'Otro 3 Ep 4': { personajes: { X: { display: 'Pirata', talent: 'Luz', lineas: 7 } } } } } }] });
+    t.eq('ni nada de un programa completado de Dubbipt', finP[0].historial.length, 0);
     t.eq('lo que dicen DublajeCast y Dubbipt del mismo episodio se cuenta una vez, y el programa con el nombre de Dubbipt', ana.historial[0].episodios[0].personajes.length + ' ' + ana.historial[0].programa, '1 AKKA');
     t.ok('los capítulos de antes de las fotos también cuentan, sin líneas', /AKKA\* 0 \[2:Ally 0\]/.test(resumen(beto)));
     t.ok('un personaje sin talento no es de nadie', !fh.some(f => f.historial.some(pg => pg.episodios.some(e => e.personajes.some(x => x.nombre === 'Nadie')))));

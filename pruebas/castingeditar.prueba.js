@@ -77,9 +77,12 @@ function armar(o){
     } }) }),
     upsert: async (filas) => { sbInsertados.push([tabla + '*', filas]); return { error: null }; },
     delete: () => ({ eq: async (k, v) => { borrados.push(tabla + ':' + v); return { error: null }; } }),
-    update: (cambios) => ({ eq: async (k, v) => { sbInsertados.push([tabla + '~', cambios, v]);
-      if(o.sinColumna && 'estado' in cambios) return { error: { code: '42703', message: 'column shows.estado does not exist' } };
-      return { error: o.fallaUpdate ? { message: 'sin permiso' } : null }; } })
+    update: (cambios) => {
+      const hecho = async (v) => { sbInsertados.push([tabla + '~', cambios, v]);
+        if(o.sinColumna && 'estado' in cambios) return { error: { code: '42703', message: 'column ' + tabla + '.estado does not exist' } };
+        return { error: o.fallaUpdate ? { message: 'sin permiso' } : null }; };
+      return { eq: async (k, v) => hecho(v), in: async (k, v) => hecho(v) };
+    }
   }), storage: { from: () => ({
     list: async (ruta) => ({ data: (archivos[ruta] || []).map(n => ({ name: n })), error: null }),
     move: async (de, a) => { if(o.fallaMover && a.indexOf(o.fallaMover) >= 0) return { error: { message: 'sin permiso para mover' } }; movidos.push(de + ' > ' + a); return { error: null }; }
@@ -93,7 +96,7 @@ function armar(o){
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
     ['CS', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
      'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS', 'csAsegurarDatos', 'csDevolverCopia', 'csBajarCopia', 'CS_TRAER',
-     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado', 'csBorrarPrograma', 'csBorrarEpisodio', 'csBorrarDeBiblioteca'],
+     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado', 'csBorrarPrograma', 'csBorrarEpisodio', 'csBorrarDeBiblioteca', 'csEstadoEp', 'csCambiarEstadoEp', 'csLeerActivos', 'csAplicarActivos', 'csNumeroDeLinea', 'csProgramaDeLinea'],
     { castNorm: (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim(),
       document: { getElementById: (id) => campos[id] || null, querySelector: () => null, body: { classList: { contains: () => false, toggle: () => {}, remove: () => {} } } },
       prodPuede: () => true, PROD: PROD, PROD_ET: PR.PROD_ET, prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard,
@@ -791,5 +794,37 @@ exports.pruebas = async function(t){
     t.ok('sin sesión en DublajeCast: lo de Dubbipt se borra y se dice cómo terminar', S.diario.includes('borraProg s1 true') && S.avisos.some(a => /Entra en DublajeCast y vuelve a pulsar «Eliminar»/.test(a)));
     const B = armar();
     t.eq('la papelera de la biblioteca también borra su pareja de DublajeCast', (await B.M.csBorrarDeBiblioteca(null, EPS_DUB.s1[1])) + ' ' + B.diario.includes('borraEp e2 true') + ' ' + B.nube().episodes.some(e => e.id === 12), 'true true false');
+  }
+
+  t.seccion('11 · cada episodio, en producción o completado; y la lista de activos (PRO-31)');
+  {
+    const A = armar();
+    const p = A.M.csActual().lista.find(x => x.clave === 's:s1');
+    const e1 = A.M.csEpisodios(p).find(x => x.ep && x.ep.id === 'e1');
+    t.eq('por omisión, en producción', A.M.csEstadoEp(e1), 'en_curso');
+    t.eq('completado en DublajeCast o en Dubbipt, completado', A.M.csEstadoEp({ ep: { id: 'x', estado: 'completo' }, dcEp: { status: 'en_curso' } }) + ' ' + A.M.csEstadoEp({ ep: { id: 'x' }, dcEp: { status: 'completo' } }), 'completo completo');
+    const r = await A.M.csCambiarEstadoEp(p, e1, 'completo');
+    t.eq('marcarlo completado: en Dubbipt, en una petición', r + ' ' + JSON.stringify(A.sbInsertados.find(x => /^episodes/.test(x[0])) || null), 'nube ["episodes~",{"estado":"completo"},["e1"]]');
+    t.eq('y en DublajeCast, su status', A.nube().episodes.find(x => x.id === 11).status, 'completo');
+    t.ok('apuntado y dicho', A.H.some(h => /^Episodio completado: /.test(h.que)) && A.avisos.some(a => /^Episodio completado: /.test(a)));
+    A.M.CS.vista = 'programa'; A.M.CS.prog = 's:s1'; A.M.CS.tab = 'episodios';
+    const v = controles(A, 'programa');
+    t.ok('cada episodio dice su estado y tiene su botón', /cs-estado-completo/.test(v.html) && !!v.de('estadoEp', { v: 'e:e1' }));
+    for(const x of EPS_DUB.s1) delete x.estado;            // lo compartido, como estaba
+  }
+  {
+    t.eq('el número de cada línea, como venga', ['Always on Call: Season 1 - EP4', 'DSC - In The Eye of the Storm S3 Ep. 303 H#638706 (DUBBING)', 'HHL - Brain Doctors: Inside Neurosurgery S1 EP101 H#660225 (DUBBING) - SCREENER', 'The Wayans Bros Season 2 EP 14', '100 Days of Deception EP6']
+      .map(l => armar().M.csNumeroDeLinea(l, '')).join(','), '4,303,101,14,6');
+    const A = armar();
+    const lista = A.M.csActual().lista;
+    t.eq('el programa: el de nombre más largo cuyas palabras están todas', (A.M.csProgramaDeLinea('A Filipino Christmas: Season 1 - EP2', lista) || {}).clave, 's:s1');
+    const plan = A.M.csLeerActivos('A Filipino Christmas: Season 1 - EP2\n\nA Filipino Christmas: Season 1 - EP2\nFinal Table: Season 1 - EP3', lista);
+    t.eq('cada línea casa con su episodio, sin repetir; lo que no casa se dice', plan.activos.map(x => x.e.clave).join(',') + ' · ' + plan.sinCasar.join(','), 'e:e2 · Final Table: Season 1 - EP3');
+    t.ok('los demás en producción, para pasarlos a completados', plan.resto.some(x => x.e.clave === 'e:e1') && !plan.resto.some(x => x.e.clave === 'e:e2'));
+    const r = await A.M.csAplicarActivos(plan, true);
+    const p = A.M.csActual().lista.find(x => x.clave === 's:s1');
+    const est = (c) => A.M.csEstadoEp(A.M.csEpisodios(p).find(x => x.clave === c));
+    t.eq('al aplicar: los de la lista en producción y los demás completados', est('e:e2') + ' ' + est('e:e1') + ' ' + r.r1 + ' ' + r.r2, 'en_curso completo nube nube');
+    t.ok('y se dice cuántos', A.avisos.some(a => /^Episodios activos: 1 en producción, \d+ completados/.test(a)));
   }
 };
