@@ -206,6 +206,13 @@ exports.pruebas = async function(t){
   t.eq('un episodio que casa por título lleva el número de DublajeCast', porTitulo.map(e => e.clave + ' ' + e.numero).join(' | '), 'e:f 3');
   t.eq('el número de un nombre', [M.csNumeroDe('Episodio 12'), M.csNumeroDe('E02 Piloto'), M.csNumeroDe('Especial')].join(' '), '12 2 NaN');
   t.eq('un episodio que solo está en DublajeCast no recoge nada del registro, ni lo apuntado sin capítulo', DC.dcastFilasCasting(d, d.episodes.find(e => e.id === 21), { personajes: { X: { display: 'X', talent: 'Y', episodios: [''] } } }, '').map(f => f.personaje).join(','), 'MANJAYA');
+  {
+    /* «Los episodios que no estén creados en DublajeCast, crea el casting y el reparto.» */
+    const reg = { personajes: { ALLY: { display: 'Ally', talent: 'VIEJA', episodios: ['Episodio 7'] } },
+                  capitulos: { 'Episodio 7': { personajes: { ALLY: { display: 'Ally', talent: 'BETO LUNA', lineas: 40 }, TITO: { display: 'Tito', talent: '', lineas: 6 } } } } };
+    const fl = DC.dcastFilasCasting(null, null, reg, 'episodio 7');
+    t.eq('uno solo de Dubbipt: todos sus personajes, con líneas y su talento (o sin él), de su foto', fl.map(f => f.personaje + ':' + (f.talento || '-') + ':' + f.lineas).join(' '), 'Ally:BETO LUNA:40 Tito:-:6');
+  }
   t.eq('el casting de un episodio: DublajeCast y el registro de Dubbipt', M.csCastingDe(eps1[0], d, REGISTRO).map(f => f.personaje + '=' + f.talento + (f.choca ? '!' : '')).join(' '), 'ALLY=ANA ROJAS JANA=LUZ MAR! TITO BOY=');
 
   t.seccion('7 · lo que se pinta: con los datos, sin ellos, y sin emojis');

@@ -128,4 +128,27 @@ exports.pruebas = async function(t){
          'true s1 Ep 1 Boracay · Ep 1 Boracay+Episodio 2');
     t.eq('el mismo nombre, nada', await M.castRegRenombrarEp('s1', 'X', 'X'), false);
   }
+
+  t.seccion('7 · el casting de los episodios que solo están en Dubbipt, de su desglose');
+  {
+    const reg = { personajes: { ALLY: { display: 'Ally', talent: 'ANA', episodios: ['Episodio 1'], ts: 9 } },
+                  capitulos: { 'Episodio 1': { ts: 9, personajes: { ALLY: { display: 'Ally', talent: 'ANA', lineas: 3 } } } } };
+    let guardado = null, pedidos = 0, pintadas = 0;
+    const filas = [{ ep_id: 'e1', updated_at: '2026-10-01T00:00:00Z', chars: [{ display: 'Ally', talent: 'OTRA', totalInts: 99 }] },
+                   { ep_id: 'e2', updated_at: '2026-10-02T00:00:00Z', chars: [{ display: 'Ally', talent: 'Ana', totalInts: 12 }, { key: 'TITO', display: 'Tito', talent: '', totalInts: 4 }, { display: 'Rey', talent: ' Pepe ', totalInts: 7 }] },
+                   { ep_id: 'e3', updated_at: '2026-10-03T00:00:00Z', chars: null }];
+    const CS = { registros: {} };
+    const M = montar([['/* Los programas a los que ya se les completó el casting', '/** El programa y el episodio que se están mirando. */']], ['csCompletarFotos', 'CS_FOTOS'],
+      { CS: CS, window: {}, castNorm: (t) => String(t == null ? '' : t).toUpperCase().trim(), csRepintar: () => { pintadas++; },
+        sbEps: () => [{ id: 'e1', name: 'Episodio 1' }, { id: 'e2', name: 'Episodio 2' }, { id: 'e3', name: 'Episodio 3' }],
+        sb: { from: (tabla) => ({ select: (cols) => ({ eq: async (k, v) => { pedidos++; return { data: tabla === 'episode_data' && /data->chars/.test(cols) && v === 's1' ? filas : [] }; } }) }) },
+        castRegCargar: async () => JSON.parse(JSON.stringify(reg)), castRegGuardar: async (id, r) => { guardado = r; return true; } });
+    const n = await M.csCompletarFotos({ id: 's1' }, reg);
+    t.eq('se crea el de los que no lo tenían, con el desglose guardado (solo sus personajes)', n + ' ' + Object.keys(guardado.capitulos).sort().join(','), '1 Episodio 1,Episodio 2');
+    t.eq('con todos sus personajes, su talento o sin él, y sus líneas', JSON.stringify(guardado.capitulos['Episodio 2'].personajes), '{"ALLY":{"display":"Ally","talent":"Ana","lineas":12},"TITO":{"display":"Tito","talent":"","lineas":4},"REY":{"display":"Rey","talent":"Pepe","lineas":7}}');
+    t.eq('lo casteado en Casting manda: el que ya tenía no se toca', guardado.capitulos['Episodio 1'].personajes.ALLY.talent + ' ' + guardado.capitulos['Episodio 1'].personajes.ALLY.lineas, 'ANA 3');
+    t.eq('y quién hace a quién, para heredar: se suma el episodio, sin cambiar el talento', guardado.personajes.ALLY.talent + ' · ' + guardado.personajes.ALLY.episodios.join('+') + ' · ' + guardado.personajes.REY.talent, 'ANA · Episodio 1+Episodio 2 · Pepe');
+    t.ok('la vista lo tiene ya y se repinta', CS.registros.s1 === guardado && pintadas === 1);
+    t.eq('una vez por programa y sesión', (await M.csCompletarFotos({ id: 's1' }, reg)) + ' ' + pedidos, '0 1');
+  }
 };

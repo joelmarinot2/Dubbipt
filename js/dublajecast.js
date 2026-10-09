@@ -278,11 +278,27 @@ function dcastFilasCasting(d, dcEp, registro, nombreEp){
     }
   }
   const nEp = castNorm(nombreEp);
+  /* La foto del capítulo casteado en Dubbipt: TODOS sus personajes, con sus
+     líneas y su talento (o sin él). En uno que no está en DublajeCast es
+     todo su casting. */
+  const caps = (nEp && registro && registro.capitulos) || {};
+  for(const nombre of Object.keys(caps)){
+    if(castNorm(nombre) !== nEp) continue;
+    const fp = (caps[nombre] && caps[nombre].personajes) || {};
+    for(const k in fp){
+      const x = fp[k];
+      if(!x) continue;
+      const f = fila(x.display || k);
+      if(!f.lineas) f.lineas = +x.lineas || 0;
+      if(x.talent) f.dubbipt = x.talent;
+    }
+  }
   const pers = (nEp && registro && registro.personajes) || {};
   for(const k in pers){
     const p = pers[k];
     if(!p || !(p.episodios || []).some(n => castNorm(n) === nEp)) continue;
-    fila(p.display || k).dubbipt = p.talent || '';
+    const f = fila(p.display || k);
+    if(!f.dubbipt) f.dubbipt = p.talent || '';
   }
   return Object.keys(filas).map(k => {
     const f = filas[k];
