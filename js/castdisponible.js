@@ -16,8 +16,9 @@
  *   · su HISTORIAL: en qué programas y episodios ha estado, con qué
  *     personajes y cuántas líneas, en cápsulas (PRO-29). De DublajeCast
  *     (administrador) y del casting guardado en Dubbipt de todos los programas.
- *     Solo los episodios ACTIVOS: los completados -o de programas completados-
- *     no salen (PRO-31).
+ *     Por omisión solo los episodios ACTIVOS: los completados -o de programas
+ *     completados- no salen (PRO-31). El botón «Solo en curso» lo quita y los
+ *     enseña también, atenuados (PRO-32).
  * Se busca por nombre, se puede quedar en los que han estado en el programa,
  * y se ordena: los del programa primero y, entre ellos, los menos ocupados.
  *
@@ -30,7 +31,7 @@
 
 /* ═══ DISPONIBILIDAD DE LOS TALENTOS ═════════════════════════════════════ */
 
-const DISP = { buscar: '', soloPrograma: false, orden: 'programa', filas: [], nota: '' };
+const DISP = { buscar: '', soloPrograma: false, orden: 'programa', filas: [], nota: '', soloEnCurso: true };
 
 /** Cuán ocupado está, por los programas en curso donde tiene papel. */
 function dispNivel(n){
@@ -172,13 +173,16 @@ function dispFilas(o){
   const out = Array.from(por.values());
   for(const f of out){
     f.nivel = d ? dispNivel(f.programas.length) : null;
-    f.historial = Array.from(f._h.values()).map(pg => {
-      const eps = Array.from(pg.eps.values()).filter(ep => !ep.fin).map(ep => {
+    /* Dos historiales: el de lo que está en curso (el que se ve por omisión) y el de todo. */
+    const armar = (soloActivos) => Array.from(f._h.values()).map(pg => {
+      const eps = Array.from(pg.eps.values()).filter(ep => !soloActivos || !ep.fin).map(ep => {
         const pers = Array.from(ep.pers.values()).sort((a, b) => b.lineas - a.lineas || a.nombre.localeCompare(b.nombre, 'es'));
-        return { n: ep.n, titulo: ep.titulo, personajes: pers, lineas: pers.reduce((t, x) => t + x.lineas, 0) };
+        return { n: ep.n, titulo: ep.titulo, personajes: pers, lineas: pers.reduce((t, x) => t + x.lineas, 0), fin: !!ep.fin };
       }).sort((a, b) => ((a.n == null) - (b.n == null)) || ((a.n || 0) - (b.n || 0)) || a.titulo.localeCompare(b.titulo, 'es'));
-      return { clave: pg.clave, programa: pg.programa, este: pg.este, episodios: eps, lineas: eps.reduce((t, x) => t + x.lineas, 0) };
-    }).filter(pg => pg.episodios.length).sort((a, b) => (b.este - a.este) || (b.lineas - a.lineas) || a.programa.localeCompare(b.programa, 'es'));
+      return { clave: pg.clave, programa: pg.programa, este: pg.este, episodios: eps, lineas: eps.reduce((t, x) => t + x.lineas, 0), fin: eps.length > 0 && eps.every(x => x.fin) };
+    }).filter(pg => pg.episodios.length).sort((a, b) => (b.este - a.este) || (a.fin - b.fin) || (b.lineas - a.lineas) || a.programa.localeCompare(b.programa, 'es'));
+    f.historial = armar(true);
+    f.historialTodo = armar(false);
     delete f._h;
   }
   return out;
@@ -189,7 +193,7 @@ function dispVisibles(filas, buscar, soloPrograma, orden){
   const q = castNorm(buscar);
   const l = filas.filter(f => (!soloPrograma || f.enPrograma.length)
     && (!q || f.clave.indexOf(q) >= 0 || f.enPrograma.some(x => castNorm(x.personaje).indexOf(q) >= 0)
-        || (f.historial || []).some(pg => castNorm(pg.programa).indexOf(q) >= 0 || pg.episodios.some(e => e.personajes.some(x => castNorm(x.nombre).indexOf(q) >= 0)))));
+        || ((DISP.soloEnCurso ? f.historial : f.historialTodo) || []).some(pg => castNorm(pg.programa).indexOf(q) >= 0 || pg.episodios.some(e => e.personajes.some(x => castNorm(x.nombre).indexOf(q) >= 0)))));
   const nom = (a, b) => a.nombre.localeCompare(b.nombre, 'es');
   const carga = (a, b) => (a.programas.length - b.programas.length) || (a.lineas - b.lineas);
   if(orden === 'libres') l.sort((a, b) => carga(a, b) || nom(a, b));
@@ -203,15 +207,16 @@ function dispVisibles(filas, buscar, soloPrograma, orden){
  * al abrirla, una por episodio con sus personajes y líneas. El programa que
  * se castea va primero, abierto y en verde.
  */
-function dispHtmlHistorial(f){
-  const h = f.historial || [];
+function dispHtmlHistorial(f, todo){
+  const h = (todo ? f.historialTodo : f.historial) || [];
   if(!h.length) return '';
   const lin = (n) => n + ' línea' + (n === 1 ? '' : 's');
-  return '<div class="disp-hist">' + h.map(pg => '<details class="disp-pg' + (pg.este ? ' disp-pg-este' : '') + '"' + (pg.este ? ' open' : '') + '>'
+  return '<div class="disp-hist">' + h.map(pg => '<details class="disp-pg' + (pg.este ? ' disp-pg-este' : '') + (pg.fin ? ' disp-pg-fin' : '') + '"' + (pg.este ? ' open' : '') + '>'
       + '<summary class="disp-cap-p"><span class="disp-cap-n">' + dispEsc(pg.programa) + '</span>'
+      +   (pg.fin ? '<span class="disp-cap-c disp-cap-fin">Completado</span>' : '')
       +   '<span class="disp-cap-c">' + pg.episodios.length + ' ep.</span>'
       +   (pg.lineas ? '<span class="disp-cap-c">' + lin(pg.lineas) + '</span>' : '') + '</summary>'
-      + '<div class="disp-eps">' + pg.episodios.map(e => '<span class="disp-ep" title="' + dispEsc((e.titulo ? e.titulo + ' · ' : '') + e.personajes.map(x => x.nombre + (x.lineas ? ' (' + lin(x.lineas) + ')' : '')).join(', ')) + '">'
+      + '<div class="disp-eps">' + pg.episodios.map(e => '<span class="disp-ep' + (e.fin && !pg.fin ? ' disp-ep-fin' : '') + '" title="' + dispEsc((e.titulo ? e.titulo + ' · ' : '') + e.personajes.map(x => x.nombre + (x.lineas ? ' (' + lin(x.lineas) + ')' : '')).join(', ')) + '">'
           + '<b>' + (e.n != null ? 'Ep. ' + e.n : dispEsc(e.titulo || 'Ep.')) + '</b>'
           + e.personajes.map(x => '<span class="disp-ep-p">' + dispEsc(x.nombre) + (x.lineas ? ' <i>' + x.lineas + '</i>' : '') + '</span>').join('')
           + '</span>').join('') + '</div>'
@@ -239,9 +244,11 @@ function dispHtml(filas, programa, conDc, o){
     + '<div class="disp-filtros">'
     +   '<input type="text" id="dispBuscar" placeholder="Buscar talento, personaje o programa…" value="' + dispEsc(DISP.buscar) + '" autocomplete="off">'
     +   '<label class="disp-solo"><input type="checkbox" id="dispSolo"' + (DISP.soloPrograma ? ' checked' : '') + '> Solo los que han estado en este programa</label>'
+    +   '<button class="disp-b disp-encurso' + (DISP.soloEnCurso ? ' on' : '') + '" id="dispEnCurso" aria-pressed="' + (DISP.soloEnCurso ? 'true' : 'false') + '" title="' + (DISP.soloEnCurso ? 'Ahora: solo programas y episodios en curso. Pulsa para ver también los completados' : 'Ahora: todo, también lo completado. Pulsa para ver solo lo que está en curso') + '">'
+    +     '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Solo en curso</span></button>'
     +   '<select id="dispOrden">' + op('programa', 'Los del programa primero') + op('libres', 'Los más libres primero') + op('nombre', 'Por nombre') + '</select>'
     + '</div>'
-    + '<div class="meta-nota">Dónde ha estado cada talento: solo los episodios en producción; los completados no salen.</div>'
+    + '<div class="meta-nota">' + (DISP.soloEnCurso ? 'Dónde ha estado cada talento: solo programas y episodios en curso.' : 'Dónde ha estado cada talento: todo, también lo completado (atenuado).') + '</div>'
     + (conDc ? '' : '<div class="meta-nota">La ocupación en otros programas viene de DublajeCast y solo la ve el administrador. Aquí, lo que sabe Dubbipt: quién ha estado en este programa y lo de este capítulo.</div>')
     + (l.length ? '<div class="disp-lista">' + l.map(f => '<div class="disp-fila' + (f.enPrograma.length ? ' disp-del' : '') + '">'
         + '<div class="disp-nom"><b>' + dispEsc(f.nombre) + '</b>' + (f.ficha ? '<span class="disp-ficha">' + dispEsc(f.ficha) + '</span>' : '') + '</div>'
@@ -250,7 +257,7 @@ function dispHtml(filas, programa, conDc, o){
         +   (f.enPrograma.length ? '<span class="disp-prog">Ya en este programa: ' + dispEsc(f.enPrograma.map(x => x.personaje).join(', ')) + '</span>' : '<span class="disp-tenue">Nunca en este programa</span>')
         +   (f.enCap.length ? '<span class="disp-cap">En este capítulo: ' + dispEsc(f.enCap.join(', ')) + ' · ' + f.lineasCap + ' int.</span>' : '')
         +   (f.programas.length ? '<span class="disp-tenue">En curso: ' + dispEsc(f.programas.slice(0, 4).join(', ')) + (f.programas.length > 4 ? '…' : '') + ' · ' + f.personajes + ' pers. · ' + f.lineas + ' líneas</span>' : '')
-        + '</div>' + dispHtmlHistorial(f) + '</div>').join('') + '</div>'
+        + '</div>' + dispHtmlHistorial(f, !DISP.soloEnCurso) + '</div>').join('') + '</div>'
       : '<div class="disp-nada">' + (filas.length ? 'Ningún talento coincide.' : 'Todavía no hay talentos: ni base en Dubbipt ni datos de DublajeCast.') + '</div>');
 }
 
@@ -294,6 +301,8 @@ const DISP_CSS = "body{ margin:0; background:#0b0d10; color:#e7ebf3; font:14px/1
   + ".disp-ep{ display:inline-flex; align-items:center; gap:5px; background:#0f1218; border:1px solid #262b36; border-radius:999px; padding:2px 9px 2px 3px; font-size:11.5px; color:#cbd5e1; }"
   + ".disp-ep > b{ background:#1f2430; color:#f3f4f6; border-radius:999px; padding:1px 7px; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; }"
   + ".disp-ep-p + .disp-ep-p::before{ content:'·'; margin-right:5px; color:#5b6474; } .disp-ep-p i{ font-style:normal; color:#8b93a1; font-variant-numeric:tabular-nums; }"
+  + ".disp-encurso.on{ background:rgba(251,191,36,.12); border-color:rgba(251,191,36,.5); color:#FBBF24; }"
+  + ".disp-pg-fin .disp-cap-p, .disp-ep-fin{ opacity:.55; } .disp-cap-fin{ color:#4ADE80 !important; }"
   + ".disp-prog{ color:#4ADE80; font-weight:600; } .disp-cap{ color:#e5e7eb; } .disp-tenue{ color:#8b93a1; } .disp-nada{ color:#8b93a1; font-size:13px; padding:12px 0; }";
 
 /** El programa y el capítulo abiertos, y lo que lleva cada talento en él. Sin servidor: todo de memoria. */
@@ -376,6 +385,7 @@ function dispPintarEn(raiz, datos, o){
     if(activo){ try{ b.focus(); b.setSelectionRange(pos, pos); }catch(e){ /* sin cursor */ } }
   }
   const s = raiz.querySelector('#dispSolo'); if(s) s.onchange = () => { DISP.soloPrograma = s.checked; repintar(); };
+  const ec = raiz.querySelector('#dispEnCurso'); if(ec) ec.onclick = () => { DISP.soloEnCurso = !DISP.soloEnCurso; repintar(); };
   const or = raiz.querySelector('#dispOrden'); if(or) or.onchange = () => { DISP.orden = or.value; repintar(); };
   const x = raiz.querySelector('#dispCerrar'); if(x) x.onclick = () => { if(o && o.cerrar) o.cerrar(); };
   const a = raiz.querySelector('#dispActualizar'); if(a) a.onclick = () => { if(o && o.actualizar) o.actualizar(); };
