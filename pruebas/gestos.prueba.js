@@ -173,7 +173,7 @@ exports.pruebas = function(t){
   t.eq('verificar al de wallas le pone TODOS, no ORIGINAL', charIdx.CORO.talent, G.GEST_TODOS);
   /* Y el camino de entrada: antes de avisar de los gestos. */
   const FUENTE = fuentes().map(f => f.src).join('\n');
-  const iBloque = FUENTE.indexOf("if(m === 'casting'){");
+  const iBloque = FUENTE.indexOf("if(m === 'casting' && esteEp){");
   const iMarcar = FUENTE.indexOf('const td = gestMarcarTodos();', iBloque), iAvisar = FUENTE.indexOf("try{ gestAvisar(); }catch(e){}", iBloque);
   t.ok('al entrar en casting se marca el bullicio antes de avisar de los gestos', iBloque > 0 && iMarcar > iBloque && iAvisar > iMarcar && iAvisar - iMarcar < 1500,
        'si se avisara antes, la multitud saldría como pendiente de mirar');

@@ -65,8 +65,38 @@ exports.pruebas = async function(t){
     t.ok('sin nube, se sigue con lo de este equipo', S.guardados.length === 1 && !!S.guardados[0][1].capitulos['Episodio 9'] && !!S.guardados[0][1].capitulos['Episodio 1']);
   }
 
-  t.seccion('3 · cuándo se hace la foto');
+  t.seccion('3 · lo casteado en otros capítulos llega a los nuevos');
+  {
+    const cargar = (o) => {
+      const idb = {}, bajadas = [];
+      if(o.local) idb['ddl-registro::s1'] = { reg: o.local, ts: 1 };
+      const M = montar([['function castNorm(t){', 'let _regT = 0;']],
+        ['castRegCargar', '_regNubeVisto'],
+        { LDB: { showId: 'otro' }, currentEp: { id: 'e9', name: 'Episodio 9', showId: 's1' }, window: {},
+          idbGet: async (k) => idb[k], idbSet: async (k, v) => { idb[k] = v; },
+          sb: { storage: { from: () => ({ download: async (ruta) => {
+            bajadas.push(ruta);
+            return o.nube ? { data: { text: async () => JSON.stringify(o.nube) } } : { data: null, error: { message: 'no existe' } };
+          } }) } } });
+      return { M, idb, bajadas };
+    };
+    const local = { personajes: { ANA: { display: 'Ana', talent: 'LUZ MAR', episodios: ['Episodio 1'], ts: 1 } } };
+    const nube = { personajes: { LEO: { display: 'Leo', talent: 'PEPE', episodios: ['Episodio 2'], ts: 5 } } };
+    const A = cargar({ local: local, nube: nube });
+    const reg = await A.M.castRegCargar();
+    t.eq('con copia en este equipo se mira igual la nube, y se juntan', Object.keys(reg.personajes).sort().join(',') + ' · ' + A.bajadas.join(','), 'ANA,LEO · s1/casting-registro.json');
+    t.ok('y lo junto se queda en este equipo', !!A.idb['ddl-registro::s1'].reg.personajes.LEO);
+    await A.M.castRegCargar();
+    t.eq('pero no en cada llamada: una vez cada poco', A.bajadas.length, 1);
+    const B = cargar({ local: local });
+    t.eq('sin nube, lo de este equipo', Object.keys((await B.M.castRegCargar()).personajes).join(','), 'ANA');
+    t.eq('el programa es el del capítulo abierto, no el que se mira en la biblioteca', A.bajadas[0], 's1/casting-registro.json');
+  }
+
+  t.seccion('4 · cuándo se hace la foto');
   const HTML = fs.readFileSync(INDEX, 'utf8');
-  t.ok('al abrir un capítulo en Casting, aunque aún no se asigne nada', /if\(m === 'casting'\)\{ try\{ if\(typeof chars !== 'undefined' && chars && chars\.length\) castRegAnotarPronto\(\); \}catch\(e\)\{\} \}/.test(HTML));
+  t.ok('al abrir un capítulo en Casting, aunque aún no se asigne nada', /if\(m === 'casting' && esteEp\)\{ try\{ if\(typeof chars !== 'undefined' && chars && chars\.length\) castRegAnotarPronto\(\); \}catch\(e\)\{\} \}/.test(HTML));
+  t.ok('desde la vista de Casting el perfil se pone antes de abrir el capítulo: solo se hereda y se fotografía el capítulo abierto',
+       /const esteEp = !epId \|\| \(typeof currentEp !== 'undefined' && currentEp && currentEp\.id === epId\);/.test(HTML));
   t.ok('y al asignar o quitar un talento, como siempre', (HTML.match(/try\{ castRegAnotarPronto\(\); \}catch\(e\)\{\}/g) || []).length >= 2);
 };
