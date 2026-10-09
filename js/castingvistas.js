@@ -664,6 +664,180 @@ async function csTalentoDub(p, personaje, nombre, e){
  * aún no existe, este equipo) y, para el administrador, en DublajeCast.
  * Devuelve dónde quedó: 'nube', 'equipo', 'error' o 'nada'.
  */
+/* ── El estado de cada episodio: en producción o completado ──────────────────
+   Pedido de sala: «agrega la función a cada uno de los episodios de si está en
+   producción o completado», y «en la disponibilidad solo los capítulos que
+   están activos». En Dubbipt va en episodes.estado
+   (sql/mejora-05-estado-episodios.sql); sin la columna, en este equipo. En
+   DublajeCast, su status. Completado en cualquiera de los dos, completado. */
+
+/** El estado de un episodio: 'completo' o 'en_curso' (en producción). */
+function csEstadoEp(e){
+  if(!e) return 'en_curso';
+  const de = e.ep ? ((typeof e.ep.estado === 'string' && e.ep.estado) ? e.ep.estado : (csEstadosLocales()['ep:' + e.ep.id] || null)) : null;
+  const dc = e.dcEp ? (e.dcEp.status || 'en_curso') : null;
+  return (de === 'completo' || dc === 'completo') ? 'completo' : 'en_curso';
+}
+const CS_ESTADO_EP = { en_curso: 'En producción', completo: 'Completado' };
+function csChipEstadoEp(estado){
+  return '<span class="cs-chip cs-estado cs-estado-' + csEsc(estado) + '">' + (estado === 'completo' ? csIco('hecho', 11) : '') + csEsc(CS_ESTADO_EP[estado] || 'En producción') + '</span>';
+}
+
+/**
+ * Pone el estado de varios episodios a la vez: los de Dubbipt en una sola
+ * petición, los de DublajeCast en una sola escritura. `lista`: [{ e }].
+ * Devuelve dónde quedó: 'nube', 'equipo' (sin la columna) o 'error'.
+ */
+async function csGuardarEstadosEps(lista, nuevo, que, ctx){
+  if(nuevo !== 'completo' && nuevo !== 'en_curso') return 'error';
+  const eps = (lista || []).map(x => x && x.e).filter(Boolean);
+  const ids = eps.filter(e => e.ep).map(e => e.ep.id);
+  const dcIds = eps.filter(e => e.dcEp).map(e => e.dcEp.id);
+  let donde = 'nube';
+  if(ids.length){
+    let r = null;
+    try{ r = await sb.from('episodes').update({ estado: nuevo }).in('id', ids); }catch(err){ r = { error: err }; }
+    const err = r && r.error;
+    if(!err){
+      for(const e of eps) if(e.ep){ e.ep.estado = nuevo; csEstadoLocal('ep:' + e.ep.id, null); }
+      try{ for(const x of (LDB.epsAll || [])) if(ids.indexOf(x.id) >= 0) x.estado = nuevo; }catch(x){ /* se verá al recargar */ }
+    }
+    else if(/42703|estado/i.test(String(err.code || '') + ' ' + String(err.message || ''))){
+      for(const e of eps) if(e.ep) csEstadoLocal('ep:' + e.ep.id, nuevo);
+      donde = 'equipo';
+    }
+    else { castAviso('No se pudo guardar el estado: ' + (err.message || err)); return 'error'; }
+  }
+  if(dcIds.length && typeof prodPuede === 'function' && prodPuede()){
+    const r = await csEditar(pl => { let hubo = false; for(const id of dcIds) hubo = dcxEpisodio(pl, id, { status: nuevo }) || hubo; return hubo; }, null, ctx || null);
+    if(r !== 'guardado' && r !== 'igual' && !ids.length) return 'error';
+  }
+  if(que){
+    if(typeof prodPuede === 'function' && prodPuede()) try{ dcxRegistrar(dcxEntrada(que, ctx || null)); }catch(x){ /* sin apuntar */ }
+    castAviso(que + (donde === 'equipo' ? ' · guardado solo en este equipo: para que lo vea todo el equipo, corre sql/mejora-05-estado-episodios.sql una vez' : ''));
+  }
+  csRepintar();
+  return donde;
+}
+
+async function csCambiarEstadoEp(p, e, nuevo){
+  if(!e) return 'nada';
+  const nombre = (e.numero != null ? 'Ep. ' + e.numero + ' · ' : '') + e.titulo;
+  return csGuardarEstadosEps([{ e: e }], nuevo, (nuevo === 'completo' ? 'Episodio completado: ' : 'Episodio en producción: ') + (p ? p.nombre + ' · ' : '') + nombre, csContexto(p, e));
+}
+
+/* ── Pegar la lista de episodios activos ─────────────────────────────────────
+   Pedido de sala, con la lista: «estos son los programas y episodios que
+   están activos». Se pega tal cual («Always on Call: Season 1 - EP4», «DSC -
+   In The Eye of the Storm S3 Ep. 303 H#638706 (DUBBING)»…); cada línea se
+   casa con su programa (las palabras de su nombre) y su episodio (el número
+   de «EP»/«Ep.»). Esos quedan en producción y, si se pide, los demás
+   completados. Se enseña antes lo que se va a hacer y lo que no casó. */
+
+/** Las palabras que cuentan de un nombre. */
+function csPalabras(t){ return castNorm(t).split(' ').filter(w => w && !CS_VACIAS.has(w)); }
+
+/** El número de episodio de una línea: el de «EP 4», «Ep. 303», «EP101»; si no, el último que no sea del programa ni un H#. */
+function csNumeroDeLinea(linea, programa){
+  const m = String(linea).match(/\bEP(?:ISODE|ISODIO)?\.?\s*#?\s*(\d+)/i);
+  if(m) return parseInt(m[1], 10);
+  const limpio = String(linea).replace(/H#\s*\d+/gi, ' ').replace(/\b(?:SEASON|TEMPORADA|S)\s*\d+/gi, ' ');
+  const nums = (typeof dcastNumerosDe === 'function') ? dcastNumerosDe(limpio, programa) : (limpio.match(/\d+/g) || []).map(Number);
+  return nums.length ? nums[nums.length - 1] : null;
+}
+
+/** El programa de una línea: el de nombre más largo cuyas palabras están todas en ella. */
+function csProgramaDeLinea(linea, lista){
+  const en = new Set(csPalabras(linea));
+  let mejor = null, largo = 0;
+  for(const p of lista){
+    const ws = csPalabras(p.nombre);
+    if(!ws.length || !ws.every(w => en.has(w))) continue;
+    if(ws.length > largo){ mejor = p; largo = ws.length; }
+  }
+  return mejor;
+}
+
+/**
+ * Lee la lista pegada. Devuelve { activos: [{ p, e, linea }], sinCasar: [linea],
+ * resto: [{ p, e }] } — resto: los episodios en producción que no están en la lista.
+ */
+function csLeerActivos(texto, lista){
+  const activos = [], sinCasar = [], claves = new Set();
+  for(const bruta of String(texto || '').split(/\r?\n/)){
+    const linea = bruta.replace(/\s+/g, ' ').trim();
+    if(!linea) continue;
+    const p = csProgramaDeLinea(linea, lista);
+    const n = p ? csNumeroDeLinea(linea, p.nombre) : null;
+    const e = (p && n != null) ? csEpisodios(p).find(x => x.numero === n) : null;
+    if(!e){ sinCasar.push(linea); continue; }
+    const k = p.clave + '|' + e.clave;
+    if(claves.has(k)) continue;
+    claves.add(k); activos.push({ p: p, e: e, linea: linea });
+  }
+  const resto = [];
+  for(const p of lista) for(const e of csEpisodios(p))
+    if(!claves.has(p.clave + '|' + e.clave) && csEstadoEp(e) !== 'completo') resto.push({ p: p, e: e });
+  return { activos: activos, sinCasar: sinCasar, resto: resto };
+}
+
+/** Lo que se va a hacer, antes de hacerlo. */
+function csHtmlActivosPlan(plan, demas){
+  const nom = (x) => csEsc(x.p.nombre) + ' · ' + (x.e.numero != null ? 'Ep. ' + x.e.numero : csEsc(x.e.titulo));
+  return '<div class="cs-act-plan">'
+    + '<div><b class="cs-verde">' + plan.activos.length + '</b> en producción</div>'
+    + (plan.activos.length ? '<div class="cs-act-l">' + plan.activos.map(x => '<span class="cs-act-ok" title="' + csEsc(x.linea) + '">' + nom(x) + '</span>').join('') + '</div>' : '')
+    + (demas ? '<div><b>' + plan.resto.length + '</b> que ahora están en producción pasan a completados</div>' : '')
+    + (plan.sinCasar.length ? '<div class="cs-aviso">' + csIco('aviso', 12) + plan.sinCasar.length + ' línea' + (plan.sinCasar.length === 1 ? '' : 's') + ' sin casar (no se toca nada por ellas):</div>'
+        + '<div class="cs-act-l">' + plan.sinCasar.map(l => '<span class="cs-act-no">' + csEsc(l) + '</span>').join('') + '</div>' : '')
+    + '</div>';
+}
+
+/** La ventana para pegar la lista. */
+function csActivosAbrir(){
+  const viejo = document.getElementById('csActOv'); if(viejo) viejo.remove();
+  const ov = document.createElement('div');
+  ov.id = 'csActOv'; ov.className = 'modo-cap';
+  ov.innerHTML = '<div class="modo-caja cs-act-caja">'
+    + '<div class="modo-tit">Episodios activos</div>'
+    + '<div class="modo-sub">Pega la lista de los episodios que están en producción, uno por línea, como venga.</div>'
+    + '<textarea id="csActTexto" rows="9" placeholder="Always on Call: Season 1 - EP4&#10;100 Days of Deception EP6&#10;…"></textarea>'
+    + '<label class="cs-act-demas"><input type="checkbox" id="csActDemas" checked> Marcar los demás como completados</label>'
+    + '<div id="csActPlan"></div>'
+    + '<div class="cs-fusion-bots"><button class="cs-b" id="csActNo">Cancelar</button><button class="cs-b cs-pri" id="csActSi" disabled>Aplicar</button></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  const tx = ov.querySelector('#csActTexto'), dm = ov.querySelector('#csActDemas'), pl = ov.querySelector('#csActPlan'), si = ov.querySelector('#csActSi');
+  let plan = null;
+  const ver = () => {
+    plan = tx.value.trim() ? csLeerActivos(tx.value, csActual().lista) : null;
+    pl.innerHTML = plan ? csHtmlActivosPlan(plan, dm.checked) : '';
+    si.disabled = !plan || (!plan.activos.length && !(dm.checked && plan.resto.length));
+  };
+  tx.oninput = ver; dm.onchange = ver;
+  ov.querySelector('#csActNo').onclick = () => ov.remove();
+  ov.addEventListener('click', (ev) => { if(ev.target === ov) ov.remove(); });
+  si.onclick = async () => {
+    if(!plan) return;
+    si.disabled = true; si.textContent = 'Guardando…';
+    try{ await csAplicarActivos(plan, dm.checked); ov.remove(); }
+    catch(err){ fallo('csAplicarActivos · js/castingvistas.js', err, 'los estados no se han podido guardar'); si.disabled = false; si.textContent = 'Aplicar'; }
+  };
+  try{ tx.focus(); }catch(e){ /* sin foco se escribe igual */ }
+  return ov;
+}
+
+/** Aplica la lista: los activos en producción y, si se pide, los demás completados. */
+async function csAplicarActivos(plan, demas){
+  const r1 = plan.activos.length ? await csGuardarEstadosEps(plan.activos, 'en_curso', null, null) : 'nube';
+  const r2 = (demas && plan.resto.length) ? await csGuardarEstadosEps(plan.resto, 'completo', null, null) : 'nube';
+  const que = 'Episodios activos: ' + plan.activos.length + ' en producción' + (demas ? ', ' + plan.resto.length + ' completados' : '');
+  if(typeof prodPuede === 'function' && prodPuede()) try{ dcxRegistrar(dcxEntrada(que, null)); }catch(x){ /* sin apuntar */ }
+  castAviso(que + ((r1 === 'equipo' || r2 === 'equipo') ? ' · guardado solo en este equipo: para que lo vea todo el equipo, corre sql/mejora-05-estado-episodios.sql una vez' : ''));
+  csRepintar();
+  return { r1: r1, r2: r2 };
+}
+
 async function csCambiarEstado(p, nuevo){
   if(!p || (nuevo !== 'completo' && nuevo !== 'en_curso')) return 'nada';
   let donde = 'nada';
@@ -1486,6 +1660,7 @@ function csHtmlProgramas(lista, vivo){
     + '<div class="cs-cab-btns">'
     +   (nProg || nEps ? '<button class="cs-b" data-cs="importarTodo" title="Crea en Dubbipt los programas y episodios que solo están en DublajeCast">' + csIco('bajar', 14)
           + '<span>Importar de DublajeCast</span><b class="cs-cuenta">' + (nProg ? nProg + ' prog. · ' : '') + nEps + ' ep.</b></button>' : '')
+    +   '<button class="cs-b" data-cs="activos" title="Pega la lista de episodios en producción: esos quedan activos y los demás, completados">' + csIco('hecho', 14) + '<span>Episodios activos</span></button>'
     +   '<button class="cs-b" data-cs="herramientas" title="Herramientas que no dependen de ningún capítulo">' + csIco('dubcards', 14) + '<span>Herramientas</span></button>'
     +   '<button class="cs-b cs-pri" data-cs="nuevoPrograma">' + csIco('mas', 14) + '<span>Nuevo</span></button>'
     + '</div></div>'
@@ -1530,6 +1705,7 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
         + '<div class="cs-ep-izq"><div class="cs-ep-t"><b>' + (e.numero != null ? 'Ep. ' + e.numero : 'Ep.') + '</b><span>' + csEsc(e.titulo) + '</span>'
         +   (e.dcTitulo && castNorm(e.dcTitulo) !== castNorm(e.titulo) ? '<span class="cs-tenue">' + csEsc(e.dcTitulo) + '</span>' : '') + '</div>'
         + '<div class="cs-ep-datos">'
+        +   csChipEstadoEp(csEstadoEp(e))
         +   (e.ep ? csChip(hayLibreto(e.ep.id) ? 'Con libreto' : 'Sin libreto', hayLibreto(e.ep.id) ? 'ok' : 'nada') : '<span class="cs-etq cs-etq-dc">Solo en DublajeCast</span>')
         +   (fase ? '<span class="cs-etq">' + csEsc(fase) + '</span>' : '')
         +   '<span><b>' + c.length + '</b> pers.</span><span><b class="cs-verde">' + con + '</b> con talento</span>'
@@ -1538,7 +1714,9 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
         + '</div></div>'
         /* «Casting» abre el casting de Dubbipt directamente; la ficha, aparte. Uno que solo está
            en DublajeCast no se puede castear todavía: su ficha dice cómo crearlo. */
-        + '<div class="cs-ep-bots"><button class="cs-b" data-cs="abrirEp" data-v="' + csEsc(e.clave) + '">Ficha</button>'
+        + '<div class="cs-ep-bots">'
+        +   (e.ep || (e.dcEp && prodPuede()) ? '<button class="cs-b cs-b-icono" data-cs="estadoEp" data-v="' + csEsc(e.clave) + '" title="' + (csEstadoEp(e) === 'completo' ? 'Volver a ponerlo en producción' : 'Marcarlo como completado') + '">' + csIco(csEstadoEp(e) === 'completo' ? 'actualizar' : 'hecho', 14) + '</button>' : '')
+        +   '<button class="cs-b" data-cs="abrirEp" data-v="' + csEsc(e.clave) + '">Ficha</button>'
         +   (e.ep ? '<button class="cs-b cs-pri" data-cs="castear" data-v="' + csEsc(e.clave) + '" title="Abre el capítulo con el perfil Casting: la interfaz de castear de Dubbipt">' + csIco('entrar', 14) + '<span>Casting</span></button>'
               : '')
         +   (e.ep || (e.dcEp && csPuedeBorrarDc()) ? '<button class="cs-b cs-b-icono" data-cs="renEp" data-v="' + csEsc(e.clave) + '" title="Cambiar el nombre del episodio" aria-label="Cambiar el nombre de ' + csEsc(e.titulo) + '">' + csIco('editar', 14) + '</button>' : '')
@@ -1706,6 +1884,7 @@ function csHtmlEpisodio(p, e, d, registro, hoy){
     + '<div class="cs-cab"><div class="cs-cab-t"><h2>' + (e.numero != null ? 'Ep. ' + e.numero + ' · ' : '') + csEsc(e.titulo) + '</h2>'
     +   '<div class="cs-cab-sub">' + csEsc(p.nombre) + (e.dcTitulo && castNorm(e.dcTitulo) !== castNorm(e.titulo) ? ' · en DublajeCast: ' + csEsc(e.dcTitulo) : '') + '</div></div>'
     +   (dc && p.serie ? '<button class="cs-b" data-cs="dcEp">' + csIco('externo', 14) + '<span>En DublajeCast</span></button>' : '')
+    +   (e.ep || (dc && prodPuede()) ? '<button class="cs-b" data-cs="estadoEp" data-v="' + csEsc(e.clave) + '">' + csChipEstadoEp(csEstadoEp(e)) + '<span>' + (csEstadoEp(e) === 'completo' ? 'Volver a En producción' : 'Marcar Completado') + '</span></button>' : '')
     +   (e.ep || (dc && csPuedeBorrarDc()) ? '<button class="cs-b cs-borrar" data-cs="borrarEp" data-v="' + csEsc(e.clave) + '" title="Eliminar el episodio por completo, con su libreto">' + csIco('borrar', 14) + '<span>Eliminar</span></button>' : '') + '</div>'
     + ficha
     + '<div class="cs-realizar">'
@@ -2042,6 +2221,11 @@ function csCablear(vista){
     else if(que === 'estadoProg') el.onclick = () => {
       const x = a(); if(!x.p) return;
       csCambiarEstado(x.p, x.p.estado === 'completo' ? 'en_curso' : 'completo').catch(err => fallo('csCambiarEstado · js/castingvistas.js', err, 'el estado no se ha podido guardar'));
+    };
+    else if(que === 'activos') el.onclick = () => csActivosAbrir();
+    else if(que === 'estadoEp') el.onclick = () => {
+      const x = a(), e = (x.eps || []).find(y => y.clave === v) || x.e; if(!e) return;
+      csCambiarEstadoEp(x.p, e, csEstadoEp(e) === 'completo' ? 'en_curso' : 'completo').catch(err => fallo('csCambiarEstadoEp · js/castingvistas.js', err, 'el estado no se ha podido guardar'));
     };
     else if(que === 'renProg') el.onclick = () => {
       const p = a().lista.find(y => y.clave === v) || a().p; if(!p) return;

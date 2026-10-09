@@ -1903,6 +1903,14 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-b{ display:inline-flex; align-items:center; gap:7px; background:#16181c; border:1px solid #2b2f36; color:#e5e7eb; font-family:'Inter',sans-serif; font-size:12.5px; font-weight:600; padding:8px 12px; border-radius:10px; cursor:pointer; }
 .cs-b:hover{ border-color:#4ADE80; }
 .cs-b.cs-pri{ background:#22C55E; border-color:#22C55E; color:#06210f; }
+.cs-act-caja{ max-width:720px; width:min(720px, calc(100vw - 32px)); text-align:left; display:flex; flex-direction:column; gap:10px; max-height:88vh; overflow:auto; }
+.cs-act-caja textarea{ background:#0b0d10; color:#e5e7eb; border:1px solid #2a2e35; border-radius:10px; padding:10px; font:inherit; font-size:12.5px; resize:vertical; }
+.cs-act-demas{ display:flex; gap:7px; align-items:center; font-size:13px; color:#cbd5e1; cursor:pointer; }
+.cs-act-plan{ display:flex; flex-direction:column; gap:6px; font-size:12.5px; color:#cbd5e1; }
+.cs-act-l{ display:flex; flex-wrap:wrap; gap:5px; }
+.cs-act-ok, .cs-act-no{ border-radius:999px; padding:2px 9px; font-size:11.5px; }
+.cs-act-ok{ background:rgba(251,191,36,.10); color:#FBBF24; border:1px solid rgba(251,191,36,.35); }
+.cs-act-no{ background:#16181c; color:#9aa3ad; border:1px dashed #3a3f48; }
 .cs-b.cs-borrar{ color:#FB7185; }
 .cs-b.cs-borrar:hover{ border-color:#FB7185; background:rgba(251,113,133,.08); }
 .cs-kpis{ display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin-bottom:16px; }
@@ -2666,7 +2674,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.49.0-nube';
+const APP_VER_NUM = 'v11.50.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8108,6 +8116,11 @@ function taskHide(){ const p = document.getElementById('taskPanel'); if(p) p.cla
 /* biblioteca en memoria + caché del dispositivo: la lista abre al instante
    y se refresca en segundo plano (antes: 1 consulta POR programa, en serie) */
 let _libLoaded = false, _libLastBg = 0;
+/* Las columnas de los capítulos. `estado` (en producción o completado) existe
+   cuando se corre sql/mejora-05-estado-episodios.sql; si no, se piden sin ella. */
+let _libSinEstadoEp = false;
+function libColsEps(){ return 'id,show_id,name,xls_name,pdf_name,json_path,updated_at' + (_libSinEstadoEp ? '' : ',estado'); }
+function libFaltaEstado(err){ return !!err && /42703|estado/i.test(String(err.code || '') + ' ' + String(err.message || '')); }
 async function libFetchAll(){
   if(window.OFFLINE){   // modo local: la biblioteca sale solo de la caché IndexedDB
     const c = await idbGet('library');
@@ -8117,16 +8130,20 @@ async function libFetchAll(){
   }
   let [sh, ep] = await Promise.all([
     sb.from('shows').select('*').order('name'),
-    sb.from('episodes').select('id,show_id,name,xls_name,pdf_name,json_path,updated_at').order('name')
+    sb.from('episodes').select(libColsEps()).order('name')
   ]);
   if((sh.error && authErr(sh.error)) || (ep.error && authErr(ep.error))){
     const ok = await reAuth();                      // la sesión estaba rota: repararla…
     if(ok){
       [sh, ep] = await Promise.all([                // …y reintentar
         sb.from('shows').select('*').order('name'),
-        sb.from('episodes').select('id,show_id,name,xls_name,pdf_name,json_path,updated_at').order('name')
+        sb.from('episodes').select(libColsEps()).order('name')
       ]);
     }
+  }
+  if(ep.error && !_libSinEstadoEp && libFaltaEstado(ep.error)){
+    _libSinEstadoEp = true;                         // sin la columna `estado`: como antes
+    ep = await sb.from('episodes').select(libColsEps()).order('name');
   }
   if(!sh.error) LDB.shows = sh.data || [];
   if(!ep.error) LDB.epsAll = ep.data || [];
