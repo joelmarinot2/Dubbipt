@@ -1916,6 +1916,8 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-act-ok, .cs-act-no{ border-radius:999px; padding:2px 9px; font-size:11.5px; }
 .cs-act-ok{ background:rgba(251,191,36,.10); color:#FBBF24; border:1px solid rgba(251,191,36,.35); }
 .cs-act-no{ background:#16181c; color:#9aa3ad; border:1px dashed #3a3f48; }
+.cs-b.cs-ep-estado{ color:#FBBF24; border-color:rgba(251,191,36,.45); }
+.cs-b.cs-ep-estado.cs-ep-hecho{ color:#4ADE80; border-color:rgba(74,222,128,.45); }
 .cs-b.cs-borrar{ color:#FB7185; }
 .cs-b.cs-borrar:hover{ border-color:#FB7185; background:rgba(251,113,133,.08); }
 .cs-kpis{ display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin-bottom:16px; }
@@ -2679,7 +2681,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.51.0-nube';
+const APP_VER_NUM = 'v11.52.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
