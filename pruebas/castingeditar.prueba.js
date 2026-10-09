@@ -213,7 +213,7 @@ exports.pruebas = async function(t){
     t.ok('Reparto en cajas, por talento: su carga, sus personajes con líneas y episodios', /<b>ANA ROJAS<\/b><div class="cs-tenue">1 pers\. · 2 apar\. · <b>276<\/b> lín\.<\/div><\/div><span class="cs-carga cs-carga-bajo">Bajo<\/span>[\s\S]*?<b>ALLY<\/b><\/div><span class="cs-rep-lin">276 lín\.<\/span><span class="cs-rep-eps"><span class="cs-rep-ep">Ep\.1<\/span><span class="cs-rep-ep">Ep\.2<\/span><\/span>/.test(c.html)
          && /<b>BEATRIZ SOL<\/b><div class="cs-tenue">2 pers\. · 2 apar\. · <b>84<\/b> lín\.<\/div><\/div><span class="cs-carga cs-carga-medio">Medio<\/span>/.test(c.html) && c.de('principal', { ch: 101 }).classList.contains('on'));
     t.ok('los principales aparte, y quien aún no tiene talento, también', /<div class="cs-rep-sec">Principales \(2\)<\/div>/.test(c.html) && /<div class="cs-rep-sec">Sin talento \(1\)<\/div>[\s\S]*?<b>TITO BOY<\/b><\/div><span class="cs-rep-lin">12 lín\.<\/span>/.test(c.html));
-    t.ok('«Reasignar» abre dónde escribir el talento nuevo', !c.de('reasignar', { ch: 101 }) && (c.de('repAbrir', { v: 'ch:101' }).onclick(), !!controles(A, 'programa').de('reasignar', { ch: 101 })));
+    t.ok('«Reasignar» abre dónde escribir el talento nuevo, con su «Guardar»', !c.de('repNuevo') && (c.de('repAbrir', { v: 'ch:101' }).onclick(), !!controles(A, 'programa').de('repNuevo') && !!controles(A, 'programa').de('repGuardar', { v: 'ch:101' })));
     controles(A, 'programa').de('repCerrar').onclick();
     t.eq('y Cancelar lo cierra', A.M.CS.repAbierto, null);
     c.de('repVista', { v: 'personaje' }).onclick();
@@ -258,7 +258,8 @@ exports.pruebas = async function(t){
     let c = controles(A, 'programa');
     c.de('repAbrir', { v: 'ch:101' }).onclick();
     c = controles(A, 'programa');
-    const re = c.de('reasignar', { ch: 101 }); re.value = 'Carla Paz'; re.onchange(); await espera();
+    A.campos.csRepNuevo = { value: 'Carla Paz' };
+    c.de('repGuardar', { v: 'ch:101' }).onclick(); await espera(); await espera();
     t.eq('cambiar el talento de un personaje en todos sus episodios', A.nube().castings.filter(x => x.character_id === 101).map(x => A.nube().talents.find(y => y.id === x.talent_id).name).join(','), 'CARLA PAZ,CARLA PAZ,CARLA PAZ');
     c = controles(A, 'programa');
     c.de('principal', { ch: 102 }).onclick(); await espera();
@@ -519,7 +520,8 @@ exports.pruebas = async function(t){
          && /Sin talento \(1\)[\s\S]*?<b>Rita<\/b>/.test(c.html));
     c.de('repAbrir', { v: 'per:MAX' }).onclick();
     c = controles(A, 'programa');
-    const re = c.de('reasignarDub', { per: 'Max' }); re.value = 'Ana Rojas'; re.onchange(); await espera();
+    A.campos.csRepNuevo = { value: 'Ana Rojas' };
+    c.de('repGuardar', { v: 'per:MAX' }).onclick(); await espera(); await espera();
     t.eq('«Reasignar» lo cambia en el registro del programa, y se apunta', A.regGuardados.sZ.personajes.MAX.talent + ' · ' + A.regGuardados.sZ.personajes.MAX.episodios.join('+') + ' · ' + A.H[0].que + ' · ' + A.M.CS.repAbierto,
          'Ana Rojas · Episodio 1+Episodio 2 · Max: Ana Rojas (antes: LUZ MAR) · null');
     const B = armar({ shows: ZS, eps: ZE, registros: ZR() });
@@ -809,7 +811,8 @@ exports.pruebas = async function(t){
     t.ok('apuntado y dicho', A.H.some(h => /^Episodio completado: /.test(h.que)) && A.avisos.some(a => /^Episodio completado: /.test(a)));
     A.M.CS.vista = 'programa'; A.M.CS.prog = 's:s1'; A.M.CS.tab = 'episodios';
     const v = controles(A, 'programa');
-    t.ok('cada episodio dice su estado y tiene su botón', /cs-estado-completo/.test(v.html) && !!v.de('estadoEp', { v: 'e:e1' }));
+    t.ok('cada episodio dice su estado y tiene su botón con nombre: «Reabrir» si está completado', /cs-estado-completo/.test(v.html) && !!v.de('estadoEp', { v: 'e:e1' }) && /data-cs="estadoEp" data-v="e:e1"[^>]*>[\s\S]*?<span>Reabrir<\/span>/.test(v.html));
+    t.ok('y «Completar» si está en curso, también en los que solo están en DublajeCast', /data-cs="estadoEp" data-v="e:e2"[^>]*>[\s\S]*?<span>Completar<\/span>/.test(v.html) && !!v.de('estadoEp', { v: 'd:13' }));
     for(const x of EPS_DUB.s1) delete x.estado;            // lo compartido, como estaba
   }
   {
@@ -825,6 +828,39 @@ exports.pruebas = async function(t){
     const p = A.M.csActual().lista.find(x => x.clave === 's:s1');
     const est = (c) => A.M.csEstadoEp(A.M.csEpisodios(p).find(x => x.clave === c));
     t.eq('al aplicar: los de la lista en producción y los demás completados', est('e:e2') + ' ' + est('e:e1') + ' ' + r.r1 + ' ' + r.r2, 'en_curso completo nube nube');
-    t.ok('y se dice cuántos', A.avisos.some(a => /^Episodios activos: 1 en producción, \d+ completados/.test(a)));
+    t.ok('y se dice cuántos', A.avisos.some(a => /^Episodios activos: 1 en curso, \d+ completados/.test(a)));
+  }
+
+  t.seccion('12 · «Reasignar» del Reparto, en los dos lados');
+  {
+    /* Un programa de los dos lados con ALLY casteado también en Dubbipt: manda Dubbipt en el Reparto. */
+    const REGS = { s1: { personajes: { ALLY: { display: 'ALLY', talent: 'ANA ROJAS', episodios: ['Episodio 1', 'Episodio 2'], ts: 1 } },
+                         capitulos: { 'Episodio 1': { ts: 1, personajes: { ALLY: { display: 'ALLY', talent: 'ANA ROJAS', lineas: 186 } } },
+                                      'Episodio 2': { ts: 1, personajes: { ALLY: { display: 'ALLY', talent: 'BEATRIZ SOL', lineas: 90 } } } } } };
+    const A = armar({ registros: REGS });
+    A.M.CS.vista = 'programa'; A.M.CS.prog = 's:s1'; A.M.CS.tab = 'reparto';
+    controles(A, 'programa'); await espera();
+    controles(A, 'programa').de('repAbrir', { v: 'ch:101' }).onclick();
+    A.campos.csRepNuevo = { value: 'Carla Paz' };
+    controles(A, 'programa').de('repGuardar', { v: 'ch:101' }).onclick(); await espera(); await espera(); await espera();
+    t.eq('cambia en DublajeCast', A.nube().castings.filter(x => x.character_id === 101).map(x => A.nube().talents.find(y => y.id === x.talent_id).name).join(','), 'CARLA PAZ,CARLA PAZ,CARLA PAZ');
+    const g = A.regGuardados.s1;
+    t.eq('y en Dubbipt, en todos sus episodios: si no, el Reparto seguía con el viejo', g && (g.personajes.ALLY.talent + ' · ' + g.capitulos['Episodio 1'].personajes.ALLY.talent + ' · ' + g.capitulos['Episodio 2'].personajes.ALLY.talent), 'Carla Paz · Carla Paz · Carla Paz');
+    t.ok('y se cierra', A.M.CS.repAbierto === null);
+    /* Un relevo: el último tramo ya es el nuevo, los anteriores no. */
+    const R = { sZ: { personajes: { MAX: { display: 'Max', talent: 'Ana Rojas', episodios: ['Episodio 1', 'Episodio 2'], ts: 1 } },
+                      capitulos: { 'Episodio 1': { ts: 1, personajes: { MAX: { display: 'Max', talent: 'LUZ MAR', lineas: 3 } } }, 'Episodio 2': { ts: 1, personajes: { MAX: { display: 'Max', talent: 'Ana Rojas', lineas: 4 } } } } } };
+    const B = armar({ shows: [{ id: 'sZ', name: 'SOLO DUBBIPT' }], eps: { sZ: [{ id: 'z1', show_id: 'sZ', name: 'Episodio 1' }, { id: 'z2', show_id: 'sZ', name: 'Episodio 2' }] }, registros: R });
+    B.M.CS.vista = 'programa'; B.M.CS.prog = 's:sZ'; B.M.CS.tab = 'reparto';
+    controles(B, 'programa'); await espera();
+    B.M.CS.repAbierto = 'per:MAX';
+    B.campos.csRepNuevo = { value: 'Ana Rojas' };
+    controles(B, 'programa').de('repGuardar', { v: 'per:MAX' }).onclick(); await espera(); await espera();
+    t.eq('en un relevo, el mismo talento que el último tramo cambia también los anteriores', B.regGuardados.sZ && B.regGuardados.sZ.capitulos['Episodio 1'].personajes.MAX.talent, 'Ana Rojas');
+    const C = armar();
+    C.M.CS.vista = 'programa'; C.M.CS.prog = 's:s1'; C.M.CS.tab = 'reparto'; C.M.CS.repAbierto = 'ch:101';
+    C.campos.csRepNuevo = { value: '  ' };
+    controles(C, 'programa').de('repGuardar', { v: 'ch:101' }).onclick(); await espera();
+    t.ok('vacío: se pide el nombre y no se toca nada', C.avisos.includes('Escribe el talento nuevo') && C.M.CS.repAbierto === 'ch:101');
   }
 };
