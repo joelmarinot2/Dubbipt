@@ -98,6 +98,18 @@ exports.pruebas = async function(t){
     const finP = M.dispFilas({ base: [], d: null, serie: null, registro: null, enCap: [],
                                registros: [{ showId: 's9', programa: 'Otro 3', completo: true, reg: { capitulos: { 'Otro 3 Ep 4': { personajes: { X: { display: 'Pirata', talent: 'Luz', lineas: 7 } } } } } }] });
     t.eq('ni nada de un programa completado de Dubbipt', finP[0].historial.length, 0);
+    t.eq('pero sí en el historial de todo, marcado', finP[0].historialTodo.map(pg => pg.programa + ':' + pg.fin).join(','), 'Otro 3:true');
+    const conTodo = resumen(Object.assign({}, ana, { historial: ana.historialTodo }));
+    t.ok('«todo» trae también el episodio completado', /2:REY 0/.test(conTodo));
+    M.DISP.soloEnCurso = true;
+    const h1 = M.dispHtml(fh, 'AKKA', true);
+    t.ok('el botón «Solo en curso», encendido por omisión', /<button class="disp-b disp-encurso on" id="dispEnCurso" aria-pressed="true"[^>]*><svg[\s\S]*?<span>Solo en curso<\/span><\/button>/.test(h1) && !/Viejo/.test(h1));
+    M.DISP.soloEnCurso = false;
+    const h2 = M.dispHtml(fh, 'AKKA', true);
+    t.ok('apagado: también lo completado, atenuado y dicho', /aria-pressed="false"/.test(h2) && /<details class="disp-pg disp-pg-fin"><summary class="disp-cap-p"><span class="disp-cap-n">Viejo<\/span><span class="disp-cap-c disp-cap-fin">Completado<\/span>/.test(h2) && /class="disp-ep disp-ep-fin"/.test(h2));
+    t.eq('y se busca en lo que se ve', M.dispVisibles(fh, 'viejo', false, 'nombre').map(f => f.clave).join(','), 'BETO LUNA');
+    M.DISP.soloEnCurso = true;
+    t.eq('con «Solo en curso», un programa completado no se encuentra', M.dispVisibles(fh, 'viejo', false, 'nombre').length, 0);
     t.eq('lo que dicen DublajeCast y Dubbipt del mismo episodio se cuenta una vez, y el programa con el nombre de Dubbipt', ana.historial[0].episodios[0].personajes.length + ' ' + ana.historial[0].programa, '1 AKKA');
     t.ok('los capítulos de antes de las fotos también cuentan, sin líneas', /AKKA\* 0 \[2:Ally 0\]/.test(resumen(beto)));
     t.ok('un personaje sin talento no es de nadie', !fh.some(f => f.historial.some(pg => pg.episodios.some(e => e.personajes.some(x => x.nombre === 'Nadie')))));

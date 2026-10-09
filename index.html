@@ -1807,6 +1807,11 @@ body.cs-on #progHeader{ display:none !important; }
 .disp-ep > b{ background:#1f2430; color:#f3f4f6; border-radius:999px; padding:1px 7px; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; }
 .disp-ep-p + .disp-ep-p::before{ content:'·'; margin-right:5px; color:#5b6474; }
 .disp-ep-p i{ font-style:normal; color:#8b93a1; font-variant-numeric:tabular-nums; }
+.disp-b{ background:none; border:1px solid #2b3040; border-radius:8px; color:#cbd5e1; padding:5px 8px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; font:inherit; font-size:12.5px; }
+.disp-b:hover{ border-color:#22C55E; color:#fff; }
+.disp-encurso.on{ background:rgba(251,191,36,.12); border-color:rgba(251,191,36,.5); color:#FBBF24; }
+.disp-pg-fin .disp-cap-p, .disp-ep-fin{ opacity:.55; }
+.disp-cap-fin{ color:#4ADE80 !important; }
 .disp-prog{ color:#4ADE80; font-weight:600; }
 .disp-cap{ color:#e5e7eb; }
 .disp-tenue{ color:#8b93a1; }
@@ -2674,7 +2679,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.50.0-nube';
+const APP_VER_NUM = 'v11.51.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
