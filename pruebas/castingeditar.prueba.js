@@ -96,7 +96,7 @@ function armar(o){
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
     ['CS', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
      'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS', 'csAsegurarDatos', 'csDevolverCopia', 'csBajarCopia', 'CS_TRAER',
-     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado', 'csBorrarPrograma', 'csBorrarEpisodio', 'csBorrarDeBiblioteca', 'csEstadoEp', 'csCambiarEstadoEp', 'csLeerActivos', 'csAplicarActivos', 'csNumeroDeLinea', 'csProgramaDeLinea', 'csParecidoPersonaje', 'csIndicePapeles', 'csBuscarPersonajes', 'CS_REGS'],
+     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado', 'csBorrarPrograma', 'csBorrarEpisodio', 'csBorrarDeBiblioteca', 'csEstadoEp', 'csCambiarEstadoEp', 'csLeerActivos', 'csAplicarActivos', 'csNumeroDeLinea', 'csProgramaDeLinea', 'csParecidoPersonaje', 'csIndicePapeles', 'csBuscarPersonajes', 'CS_REGS', 'csFichasTalentos', 'csCargaTalento'],
     { castNorm: (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim(),
       document: { getElementById: (id) => campos[id] || null, querySelector: () => null, body: { classList: { contains: () => false, toggle: () => {}, remove: () => {} } } },
       prodPuede: () => true, PROD: PROD, PROD_ET: PR.PROD_ET, prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard,
@@ -279,8 +279,14 @@ exports.pruebas = async function(t){
     c.de('talNuevo').onclick(); await espera();
     t.ok('un talento nuevo desde Talentos', A.nube().talents.some(x => x.name === 'NORA DÍAZ') && A.avisos.includes('Talento añadido: NORA DÍAZ'));
     c = controles(A, 'talentos');
+    t.ok('Talentos en tarjetas: cada una abre la ficha del talento', /<button class="cs-tcard" data-cs="talAbrir" data-v="BEATRIZ SOL"/.test(c.html) && !c.de('talCampo', { id: 2, campo: 'genero' }));
+    c.de('talAbrir', { v: 'BEATRIZ SOL' }).onclick();
+    c = controles(A, 'talentos');
+    t.ok('dentro, sus cifras y el desglose por programa', /<div class="cs-tkpis">/.test(c.html) && /Desglose por programa/.test(c.html) && !!c.de('talCerrar'));
     const gen = c.de('talCampo', { id: 2, campo: 'genero' }); gen.value = 'femenino'; gen.onchange(); await espera();
-    t.eq('y su ficha', A.nube().talents.find(x => x.id === 2).genero, 'femenino');
+    t.eq('y su ficha, que se edita dentro', A.nube().talents.find(x => x.id === 2).genero, 'femenino');
+    controles(A, 'talentos').de('talCerrar').onclick();
+    t.eq('«Talentos» vuelve a las tarjetas', A.M.CS.talAbierto, null);
     A.campos.csTalNuevo = { value: '' };
     c = controles(A, 'talentos'); c.de('talNuevo').onclick();
     t.ok('sin nombre, se pide', A.avisos.includes('Escribe el nombre del talento'));
@@ -892,5 +898,36 @@ exports.pruebas = async function(t){
     t.ok('en Talentos, la pestaña «Buscar personaje» con su buscador y los resultados', !!v.de('talModo', { v: 'personajes' }) && !!v.de('buscarPer')
          && /<b>ALLY<\/b><span class="cs-tenue">parecido \d+%<\/span>[\s\S]*?<span class="cs-per-prog">A FILIPINO CHRISTMAS<\/span><span class="cs-talento">ANA ROJAS<\/span>/.test(v.html));
     M.CS.talModo = 'talentos';
+  }
+
+  t.seccion('14 · Talentos como en DublajeCast: tarjetas y la ficha de cada uno (PRO-37)');
+  {
+    for(const sh of SHOWS) delete sh.estado;               // lo compartido, como estaba
+    const A = armar();
+    const M = A.M;
+    const d = PR.prodNormalizar(A.nube());
+    const regs = [{ showId: 's1', programa: 'A FILIPINO CHRISTMAS', serieId: 1, reg: { personajes: {}, capitulos: { 'Episodio 2': { personajes: { REY: { display: 'REY', talent: 'Ana Rojas', lineas: 7 } } } } } }];
+    const lista = M.csActual().lista;
+    const fichas = M.csFichasTalentos(d, regs, lista);
+    const ana = fichas.find(f => f.clave === 'ANA ROJAS');
+    t.eq('cada talento con sus cifras: programas, episodios, personajes y líneas', [ana.nProg, ana.nEps, ana.nPer, ana.lineas].join(' '), '1 2 2 283');
+    t.eq('el desglose por programa: cada personaje con sus episodios y líneas, de DublajeCast y de Dubbipt', ana.programas.map(g => g.programa + ' [' + g.eps.join(',') + '] ' + g.personajes.map(y => y.nombre + ':' + y.eps.join('+') + ':' + y.lineas + (y.principal ? '*' : '')).join(' ')).join(' | '),
+         'A FILIPINO CHRISTMAS [1,2] ALLY:1+2:276* REY:2:7');
+    t.ok('también los talentos sin papeles, de la base de DublajeCast', fichas.length >= d.talents.length);
+    t.eq('la carga, por programas en curso', [0, 2, 3, 5].map(n => M.csCargaTalento(n).texto).join(','), 'Bajo,Bajo,Medio,Alto');
+    M.CS_REGS.lista = regs; M.CS_REGS.ts = Date.now();
+    M.CS.vista = 'talentos'; M.CS.talModo = 'talentos'; M.CS.talAbierto = null; M.CS.buscar = '';
+    let v = controles(A, 'talentos');
+    t.ok('cada tarjeta: nombre, cifras, ficha, carga y sus programas en cápsulas', /<div class="cs-tcard-n">ANA ROJAS<\/div><div class="cs-tenue">1 programa · 2 ep\. · 283 líneas<\/div>[\s\S]*?<span class="cs-carga cs-carga-bajo">Bajo<\/span><div class="cs-tprogs"><span class="cs-tprog">A FILIPINO CHRISTMAS<\/span>/.test(v.html));
+    M.CS.buscar = 'filipino';
+    t.ok('se busca por talento o por programa', /data-v="ANA ROJAS"/.test(controles(A, 'talentos').html));
+    M.CS.buscar = '';
+    M.CS.talAbierto = 'ANA ROJAS';
+    v = controles(A, 'talentos');
+    t.ok('la ficha: cifras en cuatro cajas', /<b>1<\/b><span>Programas<\/span>[\s\S]*?<b>2<\/b><span>Episodios<\/span>[\s\S]*?<b>2<\/b><span>Personajes<\/span>[\s\S]*?<b>283<\/b><span>Líneas<\/span>/.test(v.html));
+    t.ok('y por programa: estado, episodios y cada personaje con el tramo de episodios y sus líneas, el principal marcado',
+         /<div class="cs-tdprog-cab"><b>A FILIPINO CHRISTMAS<\/b><span class="cs-chip cs-estado cs-estado-en_curso">/.test(v.html) && /<span class="cs-tdep">Ep\.1<\/span><span class="cs-tdep">Ep\.2<\/span>/.test(v.html)
+         && /<b>ALLY <i class="cs-tdest"><svg[\s\S]*?<\/i><\/b><span class="cs-tenue">Ep\. 1–2<\/span><span class="cs-tdlin">276 lín\.<\/span>/.test(v.html));
+    M.CS.talAbierto = null;
   }
 };
