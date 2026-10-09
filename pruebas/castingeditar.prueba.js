@@ -113,6 +113,7 @@ function armar(o){
       },
       dcxNombreTalento: DX.dcxNombreTalento, dcxAsignar: DX.dcxAsignar, dcxReasignar: DX.dcxReasignar, dcxEpisodio: DX.dcxEpisodio, dcxSerie: DX.dcxSerie, dcxPersonaje: DX.dcxPersonaje,
       dcxTalento: DX.dcxTalento, dcxTalentoNuevo: DX.dcxTalentoNuevo, dcxTrailerNuevo: DX.dcxTrailerNuevo, dcxTrailer: DX.dcxTrailer, dcxTrailerBorrar: DX.dcxTrailerBorrar, dcxCambiarTalento: DX.dcxCambiarTalento, dcxConflictosFusion: DX.dcxConflictosFusion, dcxFusionarEpisodios: DX.dcxFusionarEpisodios, dcxFusionarSeries: DX.dcxFusionarSeries, dcxBorrarSerie: DX.dcxBorrarSerie, dcxBorrarEpisodios: DX.dcxBorrarEpisodios,
+      castRegRenombrarEp: async (id, de, a) => { diario.push('registro ' + id + ' ' + de + ' → ' + a); return true; },
       libBorrarPrograma: async (sh, ya) => { diario.push('borraProg ' + sh.id + ' ' + !!ya); return o.fallaBorrar !== true; },
       libBorrarCapitulo: async (ep, ya) => { diario.push('borraEp ' + ep.id + ' ' + !!ya); return o.fallaBorrar !== true; },
       dcxRelevosAceptados: () => RELEVOS, dcxAceptarRelevo: (k) => { if(RELEVOS.includes(k)) return false; RELEVOS.push(k); return true; },
@@ -335,6 +336,14 @@ exports.pruebas = async function(t){
     t.eq('renombrar un episodio en Dubbipt', await A.M.csRenombrarEpisodio(p1, e1, 'Episodio 1 · Boracay') + ' ' + JSON.stringify(A.sbInsertados[0]), 'guardado ["episodes~",{"name":"Episodio 1 · Boracay"},"e1"]');
     t.eq('apuntado en su episodio', JSON.stringify(A.H[0], ['que', 'episodio', 'epId', 'dcEpId']), '{"que":"Episodio renombrado en Dubbipt: «Episodio 1» → «Episodio 1 · Boracay»","episodio":"Ep. 1 · Episodio 1","epId":"e1","dcEpId":11}');
     t.eq('sin episodio de Dubbipt, nada', await A.M.csRenombrarEpisodio(p1, { ep: null }, 'X'), 'igual');
+    t.ok('y su casting guardado se va con el nombre nuevo', A.diario.includes('registro s1 Episodio 1 → Episodio 1 · Boracay'));
+    const soloDc = A.M.csEpisodios(p1).find(e => !e.ep && e.dcEp && e.dcEp.id === 13);
+    t.eq('uno que solo está en DublajeCast cambia su título allí', await A.M.csRenombrarEpisodio(p1, soloDc, 'Año nuevo 2') + ' ' + A.nube().episodes.find(e => e.id === 13).title, 'guardado Año nuevo 2');
+    A.M.CS.vista = 'programa'; A.M.CS.prog = 's:s1'; A.M.CS.tab = 'episodios';
+    const cp = controles(A, 'programa');
+    t.ok('cada episodio tiene su lápiz para cambiarle el nombre', !!cp.de('renEp', { v: 'e:e1' }) && !!cp.de('renEp', { v: 'd:13' }));
+    A.M.CS.vista = 'programas'; A.M.CS.filtro = 'todos';
+    t.ok('y cada programa, en su tarjeta', !!controles(A, 'programas').de('renProg', { v: 's:s1' }));
     A.M.CS.vista = 'episodio'; A.M.CS.prog = 's:s1'; A.M.CS.ep = 'e:e1';
     const c = controles(A, 'episodio');
     t.ok('en el episodio: su nombre en Dubbipt y su título en DublajeCast, para cambiarlos', c.de('epNombre').value === 'Episodio 1' && c.de('epCampo', { campo: 'title' }).value === 'Boracay');

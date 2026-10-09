@@ -66,6 +66,7 @@ const CS_ICO = {
   izquierda:  '<path d="M15 6l-6 6 6 6"/>',
   hecho:      '<path d="M5 12l5 5L20 7"/>',
   fusionar:   '<path d="M7 4v5c0 3 2 5 5 5h5"/><path d="M7 20v-6"/><path d="M14 11l3 3-3 3"/>',
+  editar:     '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
   borrar:     '<path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/>'
 };
 /** Un icono de trazo, en el mismo dibujo que los de Dubbipt. */
@@ -1098,18 +1099,37 @@ async function csRenombrarPrograma(p, nombre){
   return 'guardado';
 }
 
-/** Renombrar un episodio en Dubbipt. Se apunta. */
+/**
+ * Renombrar un episodio. El de Dubbipt cambia de nombre y su casting guardado
+ * va con él (el registro va por nombre); uno que solo está en DublajeCast
+ * cambia su título allí. Se apunta.
+ */
 async function csRenombrarEpisodio(p, e, nombre){
   nombre = String(nombre == null ? '' : nombre).replace(/\s+/g, ' ').trim();
-  if(!e || !e.ep || !nombre || nombre === e.ep.name) return 'igual';
+  if(!e || !nombre) return 'igual';
+  if(!e.ep){
+    if(!e.dcEp || nombre === (e.dcEp.title || '') || !(typeof prodPuede === 'function' && prodPuede())) return 'igual';
+    return csEditar(pl => dcxEpisodio(pl, e.dcEp.id, { title: nombre }), 'Título en DublajeCast: ' + nombre, csContexto(p, e));
+  }
+  if(nombre === e.ep.name) return 'igual';
   const { error } = await sb.from('episodes').update({ name: nombre }).eq('id', e.ep.id);
   if(error){ castAviso('No se pudo renombrar el episodio: ' + error.message); return 'error'; }
-  const que = 'Episodio renombrado en Dubbipt: «' + e.ep.name + '» → «' + nombre + '»';
+  const viejo = e.ep.name;
+  try{ if(typeof currentEp !== 'undefined' && currentEp && currentEp.id === e.ep.id) currentEp.name = nombre; }catch(x){ /* sin capítulo abierto */ }
+  try{ if(typeof castRegRenombrarEp === 'function') await castRegRenombrarEp(e.ep.show_id || (p && p.show && p.show.id), viejo, nombre); }
+  catch(x){ fallo('castRegRenombrarEp · js/castingvistas.js', x, 'el Reparto puede seguir contándolo con el nombre viejo'); }
+  const que = 'Episodio renombrado en Dubbipt: «' + viejo + '» → «' + nombre + '»';
   dcxRegistrar(dcxEntrada(que, csContexto(p, e)));
   castAviso(que);
   try{ await libFetchAll(); }catch(x){ /* se verá al recargar */ }
   csRepintar();
   return 'guardado';
+}
+
+/** Pide el nombre nuevo, con el de ahora escrito. Nulo si se cancela. */
+function csPedirNombre(titulo, actual){
+  const r = (typeof prompt === 'function') ? prompt(titulo, actual || '') : null;
+  return (r == null) ? null : String(r);
 }
 
 /* ── Capítulos repetidos y personajes con dos talentos: lo que se pregunta ──
@@ -1416,6 +1436,7 @@ function csHtmlProgramas(lista, vivo){
           + '<div class="cs-prog-bots"><button class="cs-b cs-pri cs-prog-abrir" data-cs="abrirProg" data-v="' + csEsc(p.clave) + '">Abrir</button>'
           +   '<button class="cs-b cs-prog-marcar" data-cs="estadoCard" data-v="' + csEsc(p.clave) + '" title="' + (p.estado === 'completo' ? 'Volver a ponerlo en curso' : 'Marcarlo como completado') + '">'
           +     (p.estado === 'completo' ? csIco('actualizar', 13) + '<span>Reabrir</span>' : csIco('hecho', 13) + '<span>Completar</span>') + '</button>'
+          +   '<button class="cs-b cs-b-icono" data-cs="renProg" data-v="' + csEsc(p.clave) + '" title="Cambiar el nombre del programa" aria-label="Cambiar el nombre de ' + csEsc(p.nombre) + '">' + csIco('editar', 13) + '</button>'
           +   (p.show || (p.serie && csPuedeBorrarDc()) ? '<button class="cs-b cs-b-icono cs-borrar" data-cs="borrarProg" data-v="' + csEsc(p.clave) + '" title="Eliminar el programa por completo" aria-label="Eliminar el programa ' + csEsc(p.nombre) + '">' + csIco('borrar', 13) + '</button>' : '')
           + '</div>'
           + '</div>';
@@ -1451,6 +1472,7 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
         + '<div class="cs-ep-bots"><button class="cs-b" data-cs="abrirEp" data-v="' + csEsc(e.clave) + '">Ficha</button>'
         +   (e.ep ? '<button class="cs-b cs-pri" data-cs="castear" data-v="' + csEsc(e.clave) + '" title="Abre el capítulo con el perfil Casting: la interfaz de castear de Dubbipt">' + csIco('entrar', 14) + '<span>Casting</span></button>'
               : '')
+        +   (e.ep || (e.dcEp && csPuedeBorrarDc()) ? '<button class="cs-b cs-b-icono" data-cs="renEp" data-v="' + csEsc(e.clave) + '" title="Cambiar el nombre del episodio" aria-label="Cambiar el nombre de ' + csEsc(e.titulo) + '">' + csIco('editar', 14) + '</button>' : '')
         +   (e.ep || (e.dcEp && csPuedeBorrarDc()) ? '<button class="cs-b cs-b-icono cs-borrar" data-cs="borrarEp" data-v="' + csEsc(e.clave) + '" title="Eliminar el episodio por completo" aria-label="Eliminar ' + csEsc(e.titulo) + '">' + csIco('borrar', 14) + '</button>' : '')
         + '</div>'
         + '</div>';
@@ -1951,6 +1973,16 @@ function csCablear(vista){
     else if(que === 'estadoProg') el.onclick = () => {
       const x = a(); if(!x.p) return;
       csCambiarEstado(x.p, x.p.estado === 'completo' ? 'en_curso' : 'completo').catch(err => fallo('csCambiarEstado · js/castingvistas.js', err, 'el estado no se ha podido guardar'));
+    };
+    else if(que === 'renProg') el.onclick = () => {
+      const p = a().lista.find(y => y.clave === v) || a().p; if(!p) return;
+      const n = csPedirNombre('Nuevo nombre del programa:', p.nombre); if(n == null) return;
+      csRenombrarPrograma(p, n).catch(err => fallo('csRenombrarPrograma · js/castingvistas.js', err, 'el programa no se ha podido renombrar'));
+    };
+    else if(que === 'renEp') el.onclick = () => {
+      const x = a(), e = (x.eps || []).find(y => y.clave === v) || x.e; if(!e) return;
+      const n = csPedirNombre('Nuevo nombre del episodio:', e.ep ? e.ep.name : (e.dcEp && e.dcEp.title) || e.titulo); if(n == null) return;
+      csRenombrarEpisodio(x.p, e, n).catch(err => fallo('csRenombrarEpisodio · js/castingvistas.js', err, 'el episodio no se ha podido renombrar'));
     };
     else if(que === 'borrarProg') el.onclick = () => {
       const p = a().lista.find(y => y.clave === v) || a().p;
