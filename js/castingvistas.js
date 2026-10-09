@@ -1900,17 +1900,20 @@ function csHtmlProgramas(lista, vivo){
     + (vistos.length ? '<div class="cs-progs">' + vistos.map(p => {
         const n = csEpisodios(p).length;
         return '<div class="cs-prog' + (p.estado === 'completo' ? ' cs-prog-hecho' : '') + '">'
-          + '<div class="cs-prog-t"><b>' + csEsc(p.nombre) + '</b>' + (p.tipo ? '<span class="cs-tenue">' + csEsc(p.tipo) + '</span>' : '') + '</div>'
+          /* Arriba, el nombre y, en su esquina, renombrar y eliminar; abajo, solo «Abrir» y el estado:
+             los cuatro botones en una fila no cabían en la tarjeta y se salían. */
+          + '<div class="cs-prog-arriba"><div class="cs-prog-t"><b>' + csEsc(p.nombre) + '</b>' + (p.tipo ? '<span class="cs-tenue">' + csEsc(p.tipo) + '</span>' : '') + '</div>'
+          +   '<div class="cs-prog-acc"><button class="cs-b cs-b-icono" data-cs="renProg" data-v="' + csEsc(p.clave) + '" title="Cambiar el nombre del programa" aria-label="Cambiar el nombre de ' + csEsc(p.nombre) + '">' + csIco('editar', 13) + '</button>'
+          +   (p.show || (p.serie && csPuedeBorrarDc()) ? '<button class="cs-b cs-b-icono cs-borrar" data-cs="borrarProg" data-v="' + csEsc(p.clave) + '" title="Eliminar el programa por completo" aria-label="Eliminar el programa ' + csEsc(p.nombre) + '">' + csIco('borrar', 13) + '</button>' : '')
+          +   '</div></div>'
           + '<div class="cs-prog-chips">' + csChipEstado(p.estado)
           +   (p.cliente ? '<span class="cs-etq">' + csEsc(p.cliente) + '</span>' : '')
           +   (!p.show ? '<span class="cs-etq cs-etq-dc">Solo en DublajeCast</span>' : (!p.serie ? '<span class="cs-etq">Solo en Dubbipt</span>' : '')) + '</div>'
           + (p.director ? '<div class="cs-tenue">Dir: ' + csEsc(p.director) + '</div>' : '')
           + '<div class="cs-prog-n">' + n + ' episodio' + (n === 1 ? '' : 's') + '</div>'
-          + '<div class="cs-prog-bots"><button class="cs-b cs-pri cs-prog-abrir" data-cs="abrirProg" data-v="' + csEsc(p.clave) + '">Abrir</button>'
+          + '<div class="cs-prog-bots"><button class="cs-b cs-pri cs-prog-abrir' + (p.estado === 'completo' ? '' : ' cs-prog-abrir-curso') + '" data-cs="abrirProg" data-v="' + csEsc(p.clave) + '">Abrir</button>'
           +   '<button class="cs-b cs-prog-marcar" data-cs="estadoCard" data-v="' + csEsc(p.clave) + '" title="' + (p.estado === 'completo' ? 'Volver a ponerlo en curso' : 'Marcarlo como completado') + '">'
           +     (p.estado === 'completo' ? csIco('actualizar', 13) + '<span>Reabrir</span>' : csIco('hecho', 13) + '<span>Completar</span>') + '</button>'
-          +   '<button class="cs-b cs-b-icono" data-cs="renProg" data-v="' + csEsc(p.clave) + '" title="Cambiar el nombre del programa" aria-label="Cambiar el nombre de ' + csEsc(p.nombre) + '">' + csIco('editar', 13) + '</button>'
-          +   (p.show || (p.serie && csPuedeBorrarDc()) ? '<button class="cs-b cs-b-icono cs-borrar" data-cs="borrarProg" data-v="' + csEsc(p.clave) + '" title="Eliminar el programa por completo" aria-label="Eliminar el programa ' + csEsc(p.nombre) + '">' + csIco('borrar', 13) + '</button>' : '')
           + '</div>'
           + '</div>';
       }).join('') + '</div>'

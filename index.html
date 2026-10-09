@@ -1724,14 +1724,23 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-pest.on b{ color:#06210f; }
 .cs-progs{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; }
 /* En curso en ámbar y completado en verde: que no se confundan (PRO-25). */
-.cs-prog{ background:#101215; border:1px solid #23262b; border-top:3px solid #FBBF24; border-radius:13px; padding:15px 16px; display:flex; flex-direction:column; gap:8px; }
+.cs-prog{ background:#101215; border:1px solid #23262b; border-top:3px solid #FBBF24; border-radius:13px; padding:15px 16px; display:flex; flex-direction:column; gap:8px; min-width:0; overflow:hidden; }
+.cs-prog-arriba{ display:flex; align-items:flex-start; justify-content:space-between; gap:8px; min-width:0; }
+.cs-prog-acc{ display:flex; gap:4px; flex-shrink:0; margin:-4px -6px 0 0; }
+.cs-prog-acc .cs-b-icono{ padding:5px 6px; background:transparent; border-color:transparent; color:#9aa3ad; }
+.cs-prog-acc .cs-b-icono:hover{ border-color:#2b2f36; color:#f2f3f5; }
+.cs-prog-acc .cs-borrar{ color:#FB7185; }
+.cs-prog-acc .cs-borrar:hover{ border-color:#FB7185; }
 .cs-prog.cs-prog-hecho{ border-top-color:#22C55E; background:#0e1411; opacity:.82; }
-.cs-prog-bots{ display:flex; gap:6px; margin-top:auto; }
-.cs-prog-bots .cs-prog-abrir{ flex:1; margin-top:0; }
+.cs-prog-bots{ display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:auto; }
+.cs-prog-bots .cs-b{ justify-content:center; min-width:0; }
+.cs-prog-bots .cs-prog-abrir{ margin-top:0; }
 .cs-prog-marcar{ padding:6px 10px; font-size:12px; }
+.cs-b.cs-pri.cs-prog-abrir-curso{ background:#FBBF24; border-color:#FBBF24; color:#231a02; }
+.cs-b.cs-pri.cs-prog-abrir-curso:hover{ background:#FCD34D; border-color:#FCD34D; }
 .cs-estado{ display:inline-flex; align-items:center; gap:4px; }
 .cs-estado-en_curso{ color:#FBBF24; } .cs-estado-completo{ color:#4ADE80; } .cs-estado-pendiente{ color:#93C5FD; }
-.cs-prog-t{ display:flex; flex-direction:column; gap:2px; }
+.cs-prog-t{ display:flex; flex-direction:column; gap:2px; min-width:0; overflow-wrap:anywhere; }
 .cs-prog-t b{ color:#f2f3f5; font-size:14px; }
 .cs-prog-chips{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
 .cs-prog-n{ color:#d7dae0; font-size:12px; }
@@ -2685,7 +2694,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.53.0-nube';
+const APP_VER_NUM = 'v11.54.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);

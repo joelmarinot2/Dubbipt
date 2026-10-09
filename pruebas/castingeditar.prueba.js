@@ -631,8 +631,10 @@ exports.pruebas = async function(t){
     const A = armar({ shows: ZS, eps: { sZ: [], sY: [] } });
     A.M.CS.vista = 'programas'; A.M.CS.filtro = 'todos'; A.M.CS.buscarProg = '';
     let c = controles(A, 'programas');
-    t.ok('en curso en ámbar y completado en verde, con su marca', /<b>ZOMBIES<\/b>[\s\S]*?<span class="cs-chip cs-estado cs-estado-en_curso">En curso<\/span>/.test(c.html) && /class="cs-prog cs-prog-hecho"><div class="cs-prog-t"><b>YETI<\/b>[\s\S]*?<span class="cs-chip cs-estado cs-estado-completo"><svg [\s\S]*?Completado<\/span>/.test(c.html));
+    t.ok('en curso en ámbar y completado en verde, con su marca', /<b>ZOMBIES<\/b>[\s\S]*?<span class="cs-chip cs-estado cs-estado-en_curso">En curso<\/span>/.test(c.html) && /class="cs-prog cs-prog-hecho"><div class="cs-prog-arriba"><div class="cs-prog-t"><b>YETI<\/b>[\s\S]*?<span class="cs-chip cs-estado cs-estado-completo"><svg [\s\S]*?Completado<\/span>/.test(c.html));
     t.ok('cada tarjeta, con su botón para marcarla', /data-cs="estadoCard" data-v="s:sZ" title="Marcarlo como completado">[\s\S]*?<span>Completar<\/span>/.test(c.html) && /data-cs="estadoCard" data-v="s:sY" title="Volver a ponerlo en curso">[\s\S]*?<span>Reabrir<\/span>/.test(c.html));
+    t.ok('«Abrir» en amarillo si está en curso y en verde si está completado', /class="cs-b cs-pri cs-prog-abrir cs-prog-abrir-curso" data-cs="abrirProg" data-v="s:sZ"/.test(c.html) && /class="cs-b cs-pri cs-prog-abrir" data-cs="abrirProg" data-v="s:sY"/.test(c.html));
+    t.ok('renombrar y eliminar, arriba en la esquina; abajo solo «Abrir» y el estado', /<div class="cs-prog-acc"><button class="cs-b cs-b-icono" data-cs="renProg" data-v="s:sZ"/.test(c.html) && !/<div class="cs-prog-bots">(?:(?!<\/div>)[\s\S])*data-cs="renProg"/.test(c.html));
     c.de('estadoCard', { v: 's:sZ' }).onclick(); await espera(); await espera();
     t.eq('marcar desde la tarjeta: se guarda en la columna del programa', JSON.stringify(A.sbInsertados.filter(x => x[0] === 'shows~').map(x => [x[2], x[1]])), '[["sZ",{"estado":"completo"}]]');
     t.ok('y se ve ya, completado', ZS[0].estado === 'completo' && /<b>ZOMBIES<\/b>[\s\S]*?cs-estado-completo/.test(controles(A, 'programas').html) && /Programa completado: ZOMBIES$/.test(A.avisos[A.avisos.length - 1]));
