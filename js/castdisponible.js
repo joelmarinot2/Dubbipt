@@ -13,6 +13,9 @@
  *   · lo ocupado que está: en cuántos programas EN CURSO más tiene papel, con
  *     cuántos personajes y líneas (la «Ocupación» de DublajeCast). Eso viene
  *     de DublajeCast, y solo lo ve el administrador (PRO-8).
+ *   · su HISTORIAL: en qué programas y episodios ha estado, con qué
+ *     personajes y cuántas líneas, en cápsulas (PRO-29). De DublajeCast
+ *     (administrador) y del casting guardado en Dubbipt de todos los programas.
  * Se busca por nombre, se puede quedar en los que han estado en el programa,
  * y se ordena: los del programa primero y, entre ellos, los menos ocupados.
  *
@@ -41,6 +44,9 @@ function dispNivel(n){
  *   serie     el programa de DublajeCast que se está casteando (o nulo)
  *   registro  el registro de casting del programa en Dubbipt
  *   enCap     lo que lleva cada talento en este capítulo (castOcupacion())
+ *   showId    el programa de Dubbipt que se está casteando
+ *   registros los registros de casting de TODOS los programas de Dubbipt:
+ *             [{ showId, programa, serieId, reg }] (serieId: su pareja en DublajeCast)
  */
 function dispFilas(o){
   const d = o.d || null, serie = o.serie || null, reg = (o.registro && o.registro.personajes) || {};
@@ -49,8 +55,34 @@ function dispFilas(o){
     const k = castNorm(nombre);
     if(!k) return null;
     let f = por.get(k);
-    if(!f){ f = { nombre: String(nombre).replace(/\s+/g, ' ').trim(), clave: k, ficha: '', enPrograma: [], enCap: [], lineasCap: 0, programas: [], personajes: 0, lineas: 0, nivel: null }; por.set(k, f); }
+    if(!f){ f = { nombre: String(nombre).replace(/\s+/g, ' ').trim(), clave: k, ficha: '', enPrograma: [], enCap: [], lineasCap: 0, programas: [], personajes: 0, lineas: 0, nivel: null, historial: [], _h: new Map() }; por.set(k, f); }
     return f;
+  };
+  /* El historial: programa → episodio → personaje, con sus líneas. Lo mismo
+     dicho por DublajeCast y por Dubbipt se cuenta una vez (las líneas, las mayores). */
+  const registros = Array.isArray(o.registros) ? o.registros.slice() : [];
+  if(o.showId && o.registro && !registros.some(r => String(r.showId) === String(o.showId)))
+    registros.push({ showId: o.showId, programa: o.programa || '', serieId: serie ? serie.id : null, reg: o.registro });
+  const showDeSerie = {};
+  for(const r of registros) if(r && r.serieId != null) showDeSerie[String(r.serieId)] = r;
+  const esEste = (clave) => (o.showId && clave === 's:' + o.showId) || (serie && clave === 'dc:' + serie.id);
+  const numDe = (nombreEp, programa) => {
+    let n = NaN;
+    try{ if(typeof csNumeroDe === 'function') n = csNumeroDe(nombreEp, programa); }catch(e){ n = NaN; }
+    if(!isFinite(n)){ const m = String(nombreEp || '').match(/(\d+)\s*$/); n = m ? +m[1] : NaN; }
+    return isFinite(n) ? n : null;
+  };
+  const anotar = (f, progClave, programa, n, titulo, personaje, lineas) => {
+    if(!f || !personaje) return;
+    let pg = f._h.get(progClave);
+    if(!pg){ pg = { clave: progClave, programa: programa, este: !!esEste(progClave), eps: new Map() }; f._h.set(progClave, pg); }
+    const ek = n != null ? 'n' + n : 't' + castNorm(titulo);
+    let ep = pg.eps.get(ek);
+    if(!ep){ ep = { n: n, titulo: titulo || '', pers: new Map() }; pg.eps.set(ek, ep); }
+    const pk = castNorm(personaje);
+    const ya = ep.pers.get(pk);
+    if(!ya) ep.pers.set(pk, { nombre: personaje, lineas: +lineas || 0 });
+    else ya.lineas = Math.max(ya.lineas, +lineas || 0);
   };
   for(const n of (o.base || [])) fila(n);
   if(d){
@@ -70,6 +102,12 @@ function dispFilas(o){
       if(!f || !s) continue;
       const ch = per[String(c.character_id)];
       const nomCh = ch ? (ch.name || ch.canonical_name || '') : '';
+      {
+        const pareja = showDeSerie[String(s.id)];
+        const n = parseInt(e.episode_number, 10);
+        anotar(f, pareja ? 's:' + pareja.showId : 'dc:' + s.id, pareja && pareja.programa ? pareja.programa : s.name,
+               isFinite(n) ? n : null, e.title || '', nomCh, lin[String(c.character_id) + '|' + String(c.episode_id)] || 0);
+      }
       if(serie && String(s.id) === String(serie.id)){
         if(nomCh && !f.enPrograma.some(x => castNorm(x.personaje) === castNorm(nomCh))) f.enPrograma.push({ personaje: nomCh, de: 'DublajeCast' });
         continue;
@@ -95,6 +133,27 @@ function dispFilas(o){
     const nomCh = r.display || k;
     if(f && !f.enPrograma.some(x => castNorm(x.personaje) === castNorm(nomCh))) f.enPrograma.push({ personaje: nomCh, de: 'Dubbipt', episodios: Array.isArray(r.episodios) ? r.episodios.length : 0 });
   }
+  for(const r of registros){
+    const reg2 = (r && r.reg) || {}, progClave = 's:' + r.showId, conFoto = new Set();
+    const caps = reg2.capitulos || {};
+    for(const nombreEp of Object.keys(caps)){
+      conFoto.add(castNorm(nombreEp));
+      const pers = (caps[nombreEp] && caps[nombreEp].personajes) || {};
+      for(const pk of Object.keys(pers)){
+        const x = pers[pk];
+        if(!x || !x.talent) continue;
+        anotar(fila(x.talent), progClave, r.programa, numDe(nombreEp, r.programa), nombreEp, x.display || pk, x.lineas);
+      }
+    }
+    /* Los capítulos de antes de las fotos: sin líneas, pero sí dónde estuvo. */
+    const P = reg2.personajes || {};
+    for(const pk of Object.keys(P)){
+      const x = P[pk];
+      if(!x || !x.talent) continue;
+      for(const nombreEp of (Array.isArray(x.episodios) ? x.episodios : []))
+        if(!conFoto.has(castNorm(nombreEp))) anotar(fila(x.talent), progClave, r.programa, numDe(nombreEp, r.programa), nombreEp, x.display || pk, 0);
+    }
+  }
   for(const e of (o.enCap || [])){
     const f = fila(e.talento);
     if(!f) continue;
@@ -102,7 +161,17 @@ function dispFilas(o){
     f.lineasCap = e.ints || 0;
   }
   const out = Array.from(por.values());
-  for(const f of out) f.nivel = d ? dispNivel(f.programas.length) : null;
+  for(const f of out){
+    f.nivel = d ? dispNivel(f.programas.length) : null;
+    f.historial = Array.from(f._h.values()).map(pg => {
+      const eps = Array.from(pg.eps.values()).map(ep => {
+        const pers = Array.from(ep.pers.values()).sort((a, b) => b.lineas - a.lineas || a.nombre.localeCompare(b.nombre, 'es'));
+        return { n: ep.n, titulo: ep.titulo, personajes: pers, lineas: pers.reduce((t, x) => t + x.lineas, 0) };
+      }).sort((a, b) => ((a.n == null) - (b.n == null)) || ((a.n || 0) - (b.n || 0)) || a.titulo.localeCompare(b.titulo, 'es'));
+      return { clave: pg.clave, programa: pg.programa, este: pg.este, episodios: eps, lineas: eps.reduce((t, x) => t + x.lineas, 0) };
+    }).sort((a, b) => (b.este - a.este) || (b.lineas - a.lineas) || a.programa.localeCompare(b.programa, 'es'));
+    delete f._h;
+  }
   return out;
 }
 
@@ -110,13 +179,34 @@ function dispFilas(o){
 function dispVisibles(filas, buscar, soloPrograma, orden){
   const q = castNorm(buscar);
   const l = filas.filter(f => (!soloPrograma || f.enPrograma.length)
-    && (!q || f.clave.indexOf(q) >= 0 || f.enPrograma.some(x => castNorm(x.personaje).indexOf(q) >= 0)));
+    && (!q || f.clave.indexOf(q) >= 0 || f.enPrograma.some(x => castNorm(x.personaje).indexOf(q) >= 0)
+        || (f.historial || []).some(pg => castNorm(pg.programa).indexOf(q) >= 0 || pg.episodios.some(e => e.personajes.some(x => castNorm(x.nombre).indexOf(q) >= 0)))));
   const nom = (a, b) => a.nombre.localeCompare(b.nombre, 'es');
   const carga = (a, b) => (a.programas.length - b.programas.length) || (a.lineas - b.lineas);
   if(orden === 'libres') l.sort((a, b) => carga(a, b) || nom(a, b));
   else if(orden === 'nombre') l.sort(nom);
   else l.sort((a, b) => ((b.enPrograma.length ? 1 : 0) - (a.enPrograma.length ? 1 : 0)) || carga(a, b) || nom(a, b));
   return l;
+}
+
+/**
+ * El historial en cápsulas: una por programa (cuántos episodios y líneas) y,
+ * al abrirla, una por episodio con sus personajes y líneas. El programa que
+ * se castea va primero, abierto y en verde.
+ */
+function dispHtmlHistorial(f){
+  const h = f.historial || [];
+  if(!h.length) return '';
+  const lin = (n) => n + ' línea' + (n === 1 ? '' : 's');
+  return '<div class="disp-hist">' + h.map(pg => '<details class="disp-pg' + (pg.este ? ' disp-pg-este' : '') + '"' + (pg.este ? ' open' : '') + '>'
+      + '<summary class="disp-cap-p"><span class="disp-cap-n">' + dispEsc(pg.programa) + '</span>'
+      +   '<span class="disp-cap-c">' + pg.episodios.length + ' ep.</span>'
+      +   (pg.lineas ? '<span class="disp-cap-c">' + lin(pg.lineas) + '</span>' : '') + '</summary>'
+      + '<div class="disp-eps">' + pg.episodios.map(e => '<span class="disp-ep" title="' + dispEsc((e.titulo ? e.titulo + ' · ' : '') + e.personajes.map(x => x.nombre + (x.lineas ? ' (' + lin(x.lineas) + ')' : '')).join(', ')) + '">'
+          + '<b>' + (e.n != null ? 'Ep. ' + e.n : dispEsc(e.titulo || 'Ep.')) + '</b>'
+          + e.personajes.map(x => '<span class="disp-ep-p">' + dispEsc(x.nombre) + (x.lineas ? ' <i>' + x.lineas + '</i>' : '') + '</span>').join('')
+          + '</span>').join('') + '</div>'
+      + '</details>').join('') + '</div>';
 }
 
 function dispEsc(s){ return (typeof esc === 'function') ? esc(String(s == null ? '' : s)) : String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
@@ -138,7 +228,7 @@ function dispHtml(filas, programa, conDc, o){
     + '</div></div>'
     + (o.nota ? '<div class="meta-nota disp-aviso">' + dispEsc(o.nota) + '</div>' : '')
     + '<div class="disp-filtros">'
-    +   '<input type="text" id="dispBuscar" placeholder="Buscar talento o personaje…" value="' + dispEsc(DISP.buscar) + '" autocomplete="off">'
+    +   '<input type="text" id="dispBuscar" placeholder="Buscar talento, personaje o programa…" value="' + dispEsc(DISP.buscar) + '" autocomplete="off">'
     +   '<label class="disp-solo"><input type="checkbox" id="dispSolo"' + (DISP.soloPrograma ? ' checked' : '') + '> Solo los que han estado en este programa</label>'
     +   '<select id="dispOrden">' + op('programa', 'Los del programa primero') + op('libres', 'Los más libres primero') + op('nombre', 'Por nombre') + '</select>'
     + '</div>'
@@ -150,7 +240,7 @@ function dispHtml(filas, programa, conDc, o){
         +   (f.enPrograma.length ? '<span class="disp-prog">Ya en este programa: ' + dispEsc(f.enPrograma.map(x => x.personaje).join(', ')) + '</span>' : '<span class="disp-tenue">Nunca en este programa</span>')
         +   (f.enCap.length ? '<span class="disp-cap">En este capítulo: ' + dispEsc(f.enCap.join(', ')) + ' · ' + f.lineasCap + ' int.</span>' : '')
         +   (f.programas.length ? '<span class="disp-tenue">En curso: ' + dispEsc(f.programas.slice(0, 4).join(', ')) + (f.programas.length > 4 ? '…' : '') + ' · ' + f.personajes + ' pers. · ' + f.lineas + ' líneas</span>' : '')
-        + '</div></div>').join('') + '</div>'
+        + '</div>' + dispHtmlHistorial(f) + '</div>').join('') + '</div>'
       : '<div class="disp-nada">' + (filas.length ? 'Ningún talento coincide.' : 'Todavía no hay talentos: ni base en Dubbipt ni datos de DublajeCast.') + '</div>');
 }
 
@@ -184,6 +274,16 @@ const DISP_CSS = "body{ margin:0; background:#0b0d10; color:#e7ebf3; font:14px/1
   + ".disp-datos{ display:flex; flex-wrap:wrap; gap:6px 12px; align-items:center; font-size:12px; }"
   + ".disp-nivel{ font-size:11px; font-weight:700; border-radius:999px; padding:2px 9px; }"
   + ".disp-libre{ background:rgba(34,197,94,.12); color:#4ADE80; } .disp-algo{ background:rgba(251,191,36,.12); color:#FBBF24; } .disp-mucho{ background:rgba(248,113,113,.12); color:#F87171; }"
+  + ".disp-hist{ display:flex; flex-direction:column; gap:6px; margin-top:4px; }"
+  + ".disp-pg > summary{ list-style:none; cursor:pointer; } .disp-pg > summary::-webkit-details-marker{ display:none; }"
+  + ".disp-cap-p{ display:inline-flex; align-items:center; gap:6px; background:#161a22; border:1px solid #2b3040; border-radius:999px; padding:3px 4px 3px 11px; font-size:12px; color:#e7ebf3; max-width:100%; }"
+  + ".disp-cap-p:hover{ border-color:#4b5568; } .disp-cap-n{ font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }"
+  + ".disp-cap-c{ background:#0b0d10; border-radius:999px; padding:1px 8px; font-size:11px; color:#aab3c2; font-variant-numeric:tabular-nums; }"
+  + ".disp-pg-este .disp-cap-p{ background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.45); color:#4ADE80; } .disp-pg-este .disp-cap-c{ color:#86EFAC; }"
+  + ".disp-eps{ display:flex; flex-wrap:wrap; gap:5px; padding:6px 0 2px 10px; }"
+  + ".disp-ep{ display:inline-flex; align-items:center; gap:5px; background:#0f1218; border:1px solid #262b36; border-radius:999px; padding:2px 9px 2px 3px; font-size:11.5px; color:#cbd5e1; }"
+  + ".disp-ep > b{ background:#1f2430; color:#f3f4f6; border-radius:999px; padding:1px 7px; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; }"
+  + ".disp-ep-p + .disp-ep-p::before{ content:'·'; margin-right:5px; color:#5b6474; } .disp-ep-p i{ font-style:normal; color:#8b93a1; font-variant-numeric:tabular-nums; }"
   + ".disp-prog{ color:#4ADE80; font-weight:600; } .disp-cap{ color:#e5e7eb; } .disp-tenue{ color:#8b93a1; } .disp-nada{ color:#8b93a1; font-size:13px; padding:12px 0; }";
 
 /** El programa y el capítulo abiertos, y lo que lleva cada talento en él. Sin servidor: todo de memoria. */
@@ -204,12 +304,39 @@ function dispFirma(q){
   return String(q.showId) + '|' + q.capitulo + '|' + (q.enCap || []).map(e => castNorm(e.talento) + ':' + (e.personajes || []).map(p => p.display).join(',')).sort().join(';');
 }
 
-/** Junta los datos: lo de memoria y el registro del programa (este, sí, del servidor o de la caché). */
+/* Los registros de los demás programas, para el historial: se piden como mucho una vez por minuto. */
+const DISP_REGS = { de: {}, cada: 60000 };
+
+/** Los registros de casting de todos los programas de Dubbipt, con su pareja de DublajeCast. */
+async function dispRegistros(q, actual){
+  const shows = (typeof sbShows === 'function') ? (sbShows() || []) : [];
+  const ahora = Date.now();
+  return Promise.all(shows.map(async (sh) => {
+    let reg = null;
+    if(q.showId && sh.id === q.showId){ reg = actual; DISP_REGS.de[sh.id] = { reg: reg, ts: ahora }; }
+    else{
+      const ya = DISP_REGS.de[sh.id];
+      if(ya && ahora - ya.ts < DISP_REGS.cada) reg = ya.reg;
+      else{
+        try{ reg = await castRegCargar(sh.id); }catch(e){ reg = null; }
+        DISP_REGS.de[sh.id] = { reg: reg, ts: ahora };
+      }
+    }
+    let serie = null;
+    try{ serie = (q.d && typeof dcastSerieDe === 'function') ? dcastSerieDe(sh, q.d) : null; }catch(e){ serie = null; }
+    return { showId: sh.id, programa: sh.name, serieId: serie ? serie.id : null, reg: reg || { personajes: {} } };
+  }));
+}
+
+/** Junta los datos: lo de memoria y los registros de los programas (del servidor o de la caché). */
 async function dispDatos(registroDe){
   const q = dispQueHay();
   let registro = { personajes: {} };
   try{ if(q.showId) registro = (registroDe && registroDe.showId === q.showId) ? registroDe.reg : await castRegCargar(q.showId); }catch(e){ fallo('castRegCargar · js/castdisponible.js:dispDatos', e); }
-  DISP.filas = dispFilas({ base: (typeof TAL !== 'undefined' && TAL.nombres) || [], d: q.d, serie: q.serie, registro: registro, enCap: q.enCap });
+  let registros = [];
+  try{ registros = await dispRegistros(q, registro); }catch(e){ fallo('dispRegistros · js/castdisponible.js:dispDatos', e); }
+  DISP.filas = dispFilas({ base: (typeof TAL !== 'undefined' && TAL.nombres) || [], d: q.d, serie: q.serie, registro: registro, enCap: q.enCap,
+                           showId: q.showId, programa: q.programa, registros: registros });
   return { q: q, registro: registro };
 }
 
