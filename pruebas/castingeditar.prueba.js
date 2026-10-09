@@ -96,7 +96,7 @@ function armar(o){
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
     ['CS', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
      'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS', 'csAsegurarDatos', 'csDevolverCopia', 'csBajarCopia', 'CS_TRAER',
-     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado', 'csBorrarPrograma', 'csBorrarEpisodio', 'csBorrarDeBiblioteca', 'csEstadoEp', 'csCambiarEstadoEp', 'csLeerActivos', 'csAplicarActivos', 'csNumeroDeLinea', 'csProgramaDeLinea'],
+     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado', 'csBorrarPrograma', 'csBorrarEpisodio', 'csBorrarDeBiblioteca', 'csEstadoEp', 'csCambiarEstadoEp', 'csLeerActivos', 'csAplicarActivos', 'csNumeroDeLinea', 'csProgramaDeLinea', 'csParecidoPersonaje', 'csIndicePapeles', 'csBuscarPersonajes', 'CS_REGS'],
     { castNorm: (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim(),
       document: { getElementById: (id) => campos[id] || null, querySelector: () => null, body: { classList: { contains: () => false, toggle: () => {}, remove: () => {} } } },
       prodPuede: () => true, PROD: PROD, PROD_ET: PR.PROD_ET, prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard,
@@ -862,5 +862,33 @@ exports.pruebas = async function(t){
     C.campos.csRepNuevo = { value: '  ' };
     controles(C, 'programa').de('repGuardar', { v: 'ch:101' }).onclick(); await espera();
     t.ok('vacío: se pide el nombre y no se toca nada', C.avisos.includes('Escribe el talento nuevo') && C.M.CS.repAbierto === 'ch:101');
+  }
+
+  t.seccion('13 · buscar un personaje en Talentos: qué programa y qué talento, aunque esté mal escrito');
+  {
+    const A = armar();
+    const M = A.M;
+    const casos = [['anantip', 'ANANTHIP'], ['cristofer', 'CHRISTOPHER'], ['kristopher', 'CHRISTOPHER'], ['josefin', 'JOSEPHINE'], ['doctor viyalobos', 'DOCTOR VILLALOBOS'],
+                   ['villa lobos', 'DOCTOR VILLALOBOS'], ['titoboi', 'TITO BOY'], ['narador', 'NARRADOR'], ['ali', 'ALLY'], ['betriz', 'BEATRIZ']];
+    t.eq('mal escrito, junto o separado, por cómo suena: se encuentra', casos.filter(([q, n]) => M.csParecidoPersonaje(q, n) >= 0.7).length, casos.length);
+    t.ok('lo que no se parece, no', M.csParecidoPersonaje('soldado', 'NARRADOR') < 0.7 && M.csParecidoPersonaje('kai', 'JOSEPHINE') < 0.7);
+    const d = PR.prodNormalizar(A.nube());
+    const regs = [{ showId: 's1', programa: 'A FILIPINO CHRISTMAS', serieId: 1, reg: { personajes: {}, capitulos: { 'Episodio 2': { personajes: { ALLY: { display: 'ALLY', talent: 'Luz Mar', lineas: 95 } } } } } },
+                  { showId: 'sZ', programa: 'SOLO DUBBIPT', serieId: null, reg: { personajes: { MAX: { display: 'Max', talent: 'Pepe', episodios: ['Episodio 4'] } } } }];
+    const papeles = M.csIndicePapeles(d, regs);
+    const ally = M.csBuscarPersonajes(papeles, 'aly');
+    t.eq('cada papel: programa (el nombre de Dubbipt si es de los dos), talento, episodios y líneas, y de dónde sale; por líneas',
+         ally[0].personaje + ' · ' + ally[0].papeles.map(x => x.programa + ' / ' + x.talento + ' / ' + x.eps.join('+') + ' / ' + x.lineas + ' / ' + x.de).join(' | '),
+         'ALLY · A FILIPINO CHRISTMAS / ANA ROJAS / 1+2 / 276 / DublajeCast | A FILIPINO CHRISTMAS / Luz Mar / 2 / 95 / Dubbipt | A FILIPINO CHRISTMAS / BEATRIZ SOL / 3 / 30 / DublajeCast');
+    t.eq('también lo que solo está en Dubbipt', M.csBuscarPersonajes(papeles, 'macs').map(g => g.personaje + ' · ' + g.papeles[0].programa + ' / ' + g.papeles[0].talento + ' / ' + g.papeles[0].eps.join('+')).join(), 'Max · SOLO DUBBIPT / Pepe / 4');
+    t.eq('quien aún no tiene talento también sale', M.csBuscarPersonajes(papeles, 'tito boy')[0].papeles[0].talento, '');
+    t.eq('lo escrito tal cual va primero', M.csBuscarPersonajes([{ personaje: 'JANAS', programa: 'P', talento: 'T', eps: [], lineas: 0, de: 'x' }, { personaje: 'JANA', programa: 'P', talento: 'T', eps: [], lineas: 0, de: 'x' }], 'jana').map(g => g.personaje).join(','), 'JANA,JANAS');
+    t.eq('sin escribir nada, nada', M.csBuscarPersonajes(papeles, '  ').length, 0);
+    M.CS_REGS.lista = regs; M.CS_REGS.ts = Date.now();
+    M.CS.vista = 'talentos'; M.CS.talModo = 'personajes'; M.CS.buscarPer = 'aly';
+    const v = controles(A, 'talentos');
+    t.ok('en Talentos, la pestaña «Buscar personaje» con su buscador y los resultados', !!v.de('talModo', { v: 'personajes' }) && !!v.de('buscarPer')
+         && /<b>ALLY<\/b><span class="cs-tenue">parecido \d+%<\/span>[\s\S]*?<span class="cs-per-prog">A FILIPINO CHRISTMAS<\/span><span class="cs-talento">ANA ROJAS<\/span>/.test(v.html));
+    M.CS.talModo = 'talentos';
   }
 };

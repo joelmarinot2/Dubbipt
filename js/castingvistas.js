@@ -37,7 +37,8 @@
 const CS = { vista: 'programas', buscar: '', soloAlertas: false, programa: '',
              prog: null, ep: null, filtro: 'en_curso', buscarProg: '', orden: 'lineas', registros: {},
              tab: 'episodios', buscarCast: '', ordenCast: 'episodio', fusion: null, elegidos: {}, copias: [], fusionProg: null,
-             repVista: 'talento', repBuscar: '', repOrden: 'lineas', repGenero: '', repAbierto: null };
+             repVista: 'talento', repBuscar: '', repOrden: 'lineas', repGenero: '', repAbierto: null,
+             talModo: 'talentos', buscarPer: '' };
 
 /* Iconos de trazo, como los de Dubbipt (ICO). Ningún emoji. */
 const CS_ICO = {
@@ -913,9 +914,200 @@ async function csFusionarProgramas(a, b){
   return 'hecho';
 }
 
+/* ── Buscar un personaje: qué programa y qué talento lo hizo ─────────────────
+   Pedido de sala: «agrega en Talentos un botón de búsqueda de personajes
+   donde me indique qué programa y qué talento lo hizo, y que sea una búsqueda
+   que pueda ser un nombre similar o escrito con mala ortografía». Busca en
+   DublajeCast y en el casting guardado en Dubbipt de todos los programas. Lo
+   escrito se compara entero y palabra a palabra, sin tildes ni mayúsculas, por
+   cómo se escribe (distancia de edición) y por cómo suena (B/V, C/S/Z, H
+   muda, letras dobles…). */
+
+/** Cómo suena un nombre, más o menos: lo que suele escribirse mal se iguala. */
+function csFonetica(t){
+  return castNorm(t)
+    .replace(/PH/g, 'F').replace(/QU/g, 'K').replace(/C([EI])/g, 'S$1').replace(/C/g, 'K').replace(/Q/g, 'K')
+    .replace(/Z/g, 'S').replace(/V/g, 'B').replace(/W/g, 'U').replace(/Y/g, 'I')
+    .replace(/X/g, 'KS').replace(/H/g, '').replace(/([A-Z])\1+/g, '$1');
+}
+
+/** Parecido 0..1 entre dos textos ya normalizados, por la distancia de edición. */
+function csSimil(a, b){
+  if(typeof castSimil === 'function') return castSimil(a, b);
+  if(a === b) return 1;
+  if(!a || !b) return 0;
+  const m = a.length, n = b.length; let prev = []; for(let j = 0; j <= n; j++) prev[j] = j;
+  for(let i = 1; i <= m; i++){ const f = [i]; for(let j = 1; j <= n; j++) f[j] = Math.min(prev[j] + 1, f[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = f; }
+  return 1 - prev[n] / Math.max(m, n);
+}
+
+/**
+ * Cuánto se parece lo buscado a un nombre de personaje: 1 si está dentro tal
+ * cual; si no, lo mejor entre comparar entero, por cómo suena, y palabra a
+ * palabra (cada palabra buscada con la más parecida del nombre).
+ */
+function csParecidoPersonaje(q, nombre){
+  const a = castNorm(q), b = castNorm(nombre);
+  if(!a || !b) return 0;
+  if(b.indexOf(a) >= 0) return 1;
+  const fa = csFonetica(q), fb = csFonetica(nombre);
+  if(fa && fb.indexOf(fa) >= 0) return 0.95;
+  /* Con o sin espacios: «villa lobos» es «VILLALOBOS», «titoboy» es «TITO BOY». */
+  const ja = fa.replace(/ /g, ''), jb = fb.replace(/ /g, '');
+  if(ja.length >= 3 && jb.indexOf(ja) >= 0) return 0.93;
+  let mejor = Math.max(csSimil(a, b), csSimil(fa, fb) * 0.97);
+  const wa = a.split(' '), wb = b.split(' ');
+  if(wa.length && wb.length){
+    let suma = 0;
+    for(const w of wa){
+      let m = 0;
+      for(const x of wb) m = Math.max(m, csSimil(w, x), csSimil(csFonetica(w), csFonetica(x)) * 0.97, (x.indexOf(w) === 0 && w.length >= 3) ? 0.9 : 0);
+      suma += m;
+    }
+    mejor = Math.max(mejor, suma / wa.length * (wa.length <= wb.length ? 1 : wb.length / wa.length));
+  }
+  return mejor;
+}
+
+/**
+ * Todos los papeles conocidos: [{ personaje, programa, talento, eps:[n], lineas, de }],
+ * uno por personaje, programa y talento. De DublajeCast (`d`) y de los registros
+ * de Dubbipt (`regs`: [{ showId, programa, serieId, reg }]).
+ */
+function csIndicePapeles(d, regs){
+  const por = new Map();
+  const showDeSerie = {};
+  for(const r of (regs || [])) if(r && r.serieId != null) showDeSerie[String(r.serieId)] = r;
+  const anotar = (personaje, progClave, programa, talento, n, lineas, de) => {
+    const nombre = String(personaje || '').trim();
+    if(!castNorm(nombre)) return;
+    const k = castNorm(nombre) + '|' + progClave + '|' + castNorm(talento);
+    let x = por.get(k);
+    if(!x){ x = { personaje: nombre, programa: programa, progClave: progClave, talento: String(talento || '').trim(), eps: new Map(), de: new Set() }; por.set(k, x); }
+    const ek = n != null ? String(n) : '?';
+    x.eps.set(ek, Math.max(x.eps.get(ek) || 0, +lineas || 0));
+    x.de.add(de);
+  };
+  if(d){
+    const ix = prodIndices(d);
+    for(const e of (d.episodes || [])){
+      const s = ix.serie[String(e.series_id)];
+      if(!s) continue;
+      const pareja = showDeSerie[String(s.id)];
+      const progClave = pareja ? 's:' + pareja.showId : 'dc:' + s.id, programa = pareja ? pareja.programa : s.name;
+      const n = parseInt(e.episode_number, 10);
+      const lin = {};
+      for(const a of (ix.aparicionesPorEp[String(e.id)] || [])) lin[String(a.character_id)] = +a.line_count || 0;
+      const conTal = new Set();
+      for(const c of (ix.castingsPorEp[String(e.id)] || [])){
+        const ch = ix.char[String(c.character_id)], t = ix.talent[String(c.talent_id)];
+        if(!ch || !ch.name) continue;
+        conTal.add(String(c.character_id));
+        anotar(ch.name, progClave, programa, t ? t.name : '', isFinite(n) ? n : null, lin[String(c.character_id)], 'DublajeCast');
+      }
+      for(const a of (ix.aparicionesPorEp[String(e.id)] || [])){
+        if(conTal.has(String(a.character_id))) continue;
+        const ch = ix.char[String(a.character_id)];
+        if(ch && ch.name) anotar(ch.name, progClave, programa, '', isFinite(n) ? n : null, a.line_count, 'DublajeCast');
+      }
+    }
+  }
+  for(const r of (regs || [])){
+    const reg = (r && r.reg) || {}, progClave = 's:' + r.showId, conFoto = new Set();
+    const num = (nombreEp) => { const v = csNumeroDe(nombreEp, r.programa); return isFinite(v) ? v : null; };
+    for(const nombreEp of Object.keys(reg.capitulos || {})){
+      conFoto.add(castNorm(nombreEp));
+      const fp = (reg.capitulos[nombreEp] && reg.capitulos[nombreEp].personajes) || {};
+      for(const k of Object.keys(fp)){ const x = fp[k]; if(x) anotar(x.display || k, progClave, r.programa, x.talent || '', num(nombreEp), x.lineas, 'Dubbipt'); }
+    }
+    for(const k of Object.keys(reg.personajes || {})){
+      const x = reg.personajes[k];
+      if(!x) continue;
+      const eps = (Array.isArray(x.episodios) ? x.episodios : []).filter(en => !conFoto.has(castNorm(en)));
+      for(const en of eps) anotar(x.display || k, progClave, r.programa, x.talent || '', num(en), 0, 'Dubbipt');
+      if(!eps.length && !Array.from(por.values()).some(y => y.progClave === progClave && castNorm(y.personaje) === castNorm(x.display || k)))
+        anotar(x.display || k, progClave, r.programa, x.talent || '', null, 0, 'Dubbipt');
+    }
+  }
+  return Array.from(por.values()).map(x => {
+    const eps = Array.from(x.eps.keys()).filter(k => k !== '?').map(Number).sort((a, b) => a - b);
+    return { personaje: x.personaje, programa: x.programa, progClave: x.progClave, talento: x.talento, eps: eps,
+             lineas: Array.from(x.eps.values()).reduce((t, v) => t + v, 0), de: Array.from(x.de).sort().join(' y ') };
+  });
+}
+
+/**
+ * Busca un personaje en los papeles: los más parecidos primero. Devuelve
+ * [{ personaje, parecido, exacto, papeles: [{ programa, talento, eps, lineas, de }] }].
+ */
+function csBuscarPersonajes(papeles, q, umbral){
+  const lim = umbral == null ? 0.7 : umbral;
+  if(!castNorm(q)) return [];
+  const por = new Map();
+  for(const x of (papeles || [])){
+    const k = castNorm(x.personaje);
+    let g = por.get(k);
+    if(!g){
+      const par = csParecidoPersonaje(q, x.personaje);
+      if(par < lim){ por.set(k, null); continue; }
+      g = { personaje: x.personaje, parecido: par, exacto: castNorm(q) === k, papeles: [] }; por.set(k, g);
+    }
+    if(g) g.papeles.push({ programa: x.programa, talento: x.talento, eps: x.eps, lineas: x.lineas, de: x.de });
+  }
+  return Array.from(por.values()).filter(Boolean)
+    .map(g => Object.assign(g, { papeles: g.papeles.sort((a, b) => a.programa.localeCompare(b.programa, 'es') || (b.lineas - a.lineas)) }))
+    .sort((a, b) => (b.exacto - a.exacto) || (b.parecido - a.parecido) || a.personaje.localeCompare(b.personaje, 'es'))
+    .slice(0, 60);
+}
+
+/* Los registros de todos los programas de Dubbipt, para buscar: se piden al entrar y como mucho una vez por minuto. */
+const CS_REGS = { lista: null, ts: 0, yendo: false, cada: 60000 };
+function csRegistrosTodos(d){
+  if(CS_REGS.lista && Date.now() - CS_REGS.ts < CS_REGS.cada) return CS_REGS.lista;
+  if(!CS_REGS.yendo && typeof sbShows === 'function'){
+    CS_REGS.yendo = true;
+    const shows = sbShows() || [];
+    Promise.all(shows.map(async (sh) => {
+      let reg = null;
+      try{ reg = await castRegCargar(sh.id); }catch(e){ reg = null; }
+      let serie = null;
+      try{ serie = (d && typeof dcastSerieDe === 'function') ? dcastSerieDe(sh, d) : null; }catch(e){ serie = null; }
+      return { showId: sh.id, programa: sh.name, serieId: serie ? serie.id : null, reg: reg || { personajes: {} } };
+    })).then(l => { CS_REGS.lista = l; CS_REGS.ts = Date.now(); CS_REGS.yendo = false; csRepintar(); })
+      .catch(() => { CS_REGS.yendo = false; });
+  }
+  return CS_REGS.lista || [];
+}
+
+/** La búsqueda de personajes, en Talentos. */
+function csHtmlBuscarPersonaje(d){
+  const q = CS.buscarPer;
+  const regs = csRegistrosTodos(d);
+  const res = q ? csBuscarPersonajes(csIndicePapeles(d, regs), q) : [];
+  const lin = (n) => n + ' lín.';
+  return '<label class="cs-buscar">' + csIco('buscar', 14) + '<input type="text" data-cs="buscarPer" placeholder="Nombre del personaje (aunque esté mal escrito)…" value="' + csEsc(q) + '" autocomplete="off"></label>'
+    + (CS_REGS.yendo && !CS_REGS.lista ? '<div class="cs-tenue">Leyendo el casting de los programas de Dubbipt…</div>' : '')
+    + (!q ? '<div class="cs-nada">Escribe el nombre de un personaje: sale en qué programa estuvo, qué talento lo hizo, en qué episodios y con cuántas líneas. Vale un nombre parecido o mal escrito.</div>'
+      : (res.length ? '<div class="cs-lista cs-per-lista">' + res.map(g => '<div class="cs-tal cs-per">'
+          + '<div class="cs-tal-cab"><b>' + csEsc(g.personaje) + '</b>' + (g.exacto ? '' : '<span class="cs-tenue">parecido ' + Math.round(g.parecido * 100) + '%</span>') + '</div>'
+          + '<div class="cs-per-papeles">' + g.papeles.map(x => '<div class="cs-per-papel">'
+              + '<span class="cs-per-prog">' + csEsc(x.programa) + '</span>'
+              + (x.talento ? '<span class="cs-talento">' + csEsc(x.talento) + '</span>' : '<span class="cs-rojo">sin talento</span>')
+              + (x.eps.length ? '<span class="cs-rep-eps">' + x.eps.map(n => '<span class="cs-rep-ep">Ep.' + csEsc(n) + '</span>').join('') + '</span>' : '')
+              + (x.lineas ? '<span class="cs-rep-lin">' + lin(x.lineas) + '</span>' : '')
+              + '<span class="cs-tenue">' + csEsc(x.de) + '</span>'
+              + '</div>').join('') + '</div>'
+          + '</div>').join('') + '</div>'
+        : '<div class="cs-nada">Ningún personaje se parece a «' + csEsc(q) + '».</div>'));
+}
+
 function csHtmlTalentos(d, vivo){
   const lista = csTalentos(d, CS.buscar);
-  return csCabecera('Talentos', (d ? d.talents.length : 0) + ' talentos con su ficha y sus papeles', vivo)
+  const modo = (k, t, ico) => '<button class="cs-pest' + (CS.talModo === k ? ' on' : '') + '" data-cs="talModo" data-v="' + k + '">' + csIco(ico, 13) + ' ' + t + '</button>';
+  const pests = '<div class="cs-pests cs-tal-modos">' + modo('talentos', 'Talentos', 'talentos') + modo('personajes', 'Buscar personaje', 'buscar') + '</div>';
+  if(CS.talModo === 'personajes')
+    return csCabecera('Talentos', 'Qué programa y qué talento hizo cada personaje', vivo) + pests + csHtmlBuscarPersonaje(d);
+  return csCabecera('Talentos', (d ? d.talents.length : 0) + ' talentos con su ficha y sus papeles', vivo) + pests
     + (d ? '<div class="cs-nuevo"><input type="text" id="csTalNuevo" placeholder="Nombre del talento nuevo"><button class="cs-b cs-pri" data-cs="talNuevo">' + csIco('mas', 14) + '<span>Añadir talento</span></button></div>'
       + '<label class="cs-buscar">' + '<input type="text" data-cs="buscar" placeholder="Buscar talento…" value="' + csEsc(CS.buscar) + '"></label>'
       + (lista.length ? '<div class="cs-lista">' + lista.map(t => '<div class="cs-tal">'
@@ -2171,6 +2363,8 @@ function csCablear(vista){
     else if(que === 'traer') el.onclick = () => { prodVista = 'datos'; prodPanel(); };
     else if(que === 'herramienta') el.onclick = () => dcastAbrir(v);
     else if(que === 'buscar') el.oninput = () => escribir('buscar');
+    else if(que === 'buscarPer') el.oninput = () => escribir('buscarPer');
+    else if(que === 'talModo') el.onclick = () => { CS.talModo = v; csRepintar(); const i = document.querySelector('#csVista [data-cs="buscarPer"]'); if(i) try{ i.focus(); }catch(err){ /* sin foco */ } };
     else if(que === 'buscarProg') el.oninput = () => escribir('buscarProg');
     else if(que === 'buscarCast') el.oninput = () => escribir('buscarCast');
     else if(que === 'programa') el.onchange = () => { CS.programa = el.value; csRepintar(); };
