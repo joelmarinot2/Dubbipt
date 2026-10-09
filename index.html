@@ -2652,7 +2652,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.46.0-nube';
+const APP_VER_NUM = 'v11.47.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8580,6 +8580,7 @@ async function renderLibrary(silent){
           if(nn && nn.trim() && nn.trim()!==ep.name){
             await sb.from('episodes').update({ name:nn.trim() }).eq('id', ep.id);
             if(currentEp && currentEp.id===ep.id) currentEp.name=nn.trim();
+            try{ await castRegRenombrarEp(ep.show_id, ep.name, nn.trim()); }catch(e){ /* el Reparto lo contará con el nombre viejo */ }
             await libFetchAll(); renderLibrary(true);
             if(typeof libPing==='function') libPing('ep', ep.id, ep.show_id);
             if(typeof DDL_UI!=='undefined') DDL_UI.toast('Capítulo renombrado a «'+nn.trim()+'»');
@@ -10701,6 +10702,36 @@ async function castRegAnotar(){
   /* El Reparto de la vista de Casting lee esto: que lo vea ya, sin volver a pedirlo. */
   try{ if(typeof CS !== 'undefined' && CS && CS.registros) CS.registros[String(showId)] = reg; }catch(e){ /* sin vista de Casting */ }
   return n;
+}
+
+/**
+ * Un capítulo cambia de nombre: su foto y su rastro en el registro del programa
+ * van con él. El registro va por NOMBRE de capítulo; sin esto, renombrar dejaba
+ * su casting colgado del nombre viejo (el Reparto lo contaba dos veces).
+ */
+async function castRegRenombrarEp(showId, viejo, nuevo){
+  if(!showId || !viejo || !nuevo || viejo === nuevo) return false;
+  const reg = await castRegCargar(showId), k = castNorm(viejo);
+  let tocado = false;
+  for(const nombreEp of Object.keys(reg.capitulos || {})){
+    if(castNorm(nombreEp) !== k) continue;
+    const foto = reg.capitulos[nombreEp];
+    delete reg.capitulos[nombreEp];
+    reg.capitulos[nuevo] = Object.assign({}, foto, { ts: Date.now() });
+    tocado = true;
+  }
+  for(const clave of Object.keys(reg.personajes || {})){
+    const x = reg.personajes[clave];
+    if(!x || !Array.isArray(x.episodios) || !x.episodios.some(en => castNorm(en) === k)) continue;
+    const eps = [];
+    for(const en of x.episodios){ const n = castNorm(en) === k ? nuevo : en; if(eps.indexOf(n) < 0) eps.push(n); }
+    reg.personajes[clave] = Object.assign({}, x, { episodios: eps, ts: Date.now() });
+    tocado = true;
+  }
+  if(!tocado) return false;
+  await castRegGuardar(showId, reg);
+  try{ if(typeof CS !== 'undefined' && CS && CS.registros) CS.registros[String(showId)] = reg; }catch(e){ /* sin vista de Casting */ }
+  return true;
 }
 
 let _regT = 0;

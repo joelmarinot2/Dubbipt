@@ -116,4 +116,16 @@ exports.pruebas = async function(t){
     await M.libOlvidarLocal(['s1', 'e1']);
     t.eq('y lo que este equipo guardaba de él, sin tocar lo demás', Object.keys(idb).join(',') + ' · ' + Object.keys(ls).join(','), 'ep:e9 · ddl_density');
   }
+
+  t.seccion('6 · renombrar un capítulo: su casting va con él');
+  {
+    const reg = { personajes: { ANA: { display: 'Ana', talent: 'LUZ', episodios: ['Episodio 1', 'Episodio 2'], ts: 1 } },
+                  capitulos: { 'Episodio 1': { ts: 1, personajes: { ANA: { display: 'Ana', talent: 'LUZ', lineas: 4 } } } } };
+    let guardado = null;
+    const M = montar([['async function castRegRenombrarEp(', 'let _regT = 0;']], ['castRegRenombrarEp'],
+      { castNorm: (t) => String(t).toUpperCase().trim(), castRegCargar: async () => JSON.parse(JSON.stringify(reg)), castRegGuardar: async (id, r) => { guardado = [id, r]; return true; }, CS: { registros: {} } });
+    t.eq('la foto y los episodios del registro cambian de nombre', (await M.castRegRenombrarEp('s1', 'Episodio 1', 'Ep 1 Boracay')) + ' ' + guardado[0] + ' ' + Object.keys(guardado[1].capitulos).join(',') + ' · ' + guardado[1].personajes.ANA.episodios.join('+'),
+         'true s1 Ep 1 Boracay · Ep 1 Boracay+Episodio 2');
+    t.eq('el mismo nombre, nada', await M.castRegRenombrarEp('s1', 'X', 'X'), false);
+  }
 };
