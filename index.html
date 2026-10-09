@@ -1793,6 +1793,20 @@ body.cs-on #progHeader{ display:none !important; }
 .disp-libre{ background:rgba(34,197,94,.12); color:#4ADE80; }
 .disp-algo{ background:rgba(251,191,36,.12); color:#FBBF24; }
 .disp-mucho{ background:rgba(248,113,113,.12); color:#F87171; }
+.disp-hist{ display:flex; flex-direction:column; gap:6px; margin-top:4px; }
+.disp-pg > summary{ list-style:none; cursor:pointer; }
+.disp-pg > summary::-webkit-details-marker{ display:none; }
+.disp-cap-p{ display:inline-flex; align-items:center; gap:6px; background:#161a22; border:1px solid #2b3040; border-radius:999px; padding:3px 4px 3px 11px; font-size:12px; color:#e7ebf3; max-width:100%; }
+.disp-cap-p:hover{ border-color:#4b5568; }
+.disp-cap-n{ font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.disp-cap-c{ background:#0b0d10; border-radius:999px; padding:1px 8px; font-size:11px; color:#aab3c2; font-variant-numeric:tabular-nums; }
+.disp-pg-este .disp-cap-p{ background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.45); color:#4ADE80; }
+.disp-pg-este .disp-cap-c{ color:#86EFAC; }
+.disp-eps{ display:flex; flex-wrap:wrap; gap:5px; padding:6px 0 2px 10px; }
+.disp-ep{ display:inline-flex; align-items:center; gap:5px; background:#0f1218; border:1px solid #262b36; border-radius:999px; padding:2px 9px 2px 3px; font-size:11.5px; color:#cbd5e1; }
+.disp-ep > b{ background:#1f2430; color:#f3f4f6; border-radius:999px; padding:1px 7px; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; }
+.disp-ep-p + .disp-ep-p::before{ content:'·'; margin-right:5px; color:#5b6474; }
+.disp-ep-p i{ font-style:normal; color:#8b93a1; font-variant-numeric:tabular-nums; }
 .disp-prog{ color:#4ADE80; font-weight:600; }
 .disp-cap{ color:#e5e7eb; }
 .disp-tenue{ color:#8b93a1; }
@@ -2652,7 +2666,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.47.0-nube';
+const APP_VER_NUM = 'v11.48.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);

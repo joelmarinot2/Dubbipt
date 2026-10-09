@@ -82,6 +82,29 @@ exports.pruebas = async function(t){
   t.ok('sale solo con el perfil Casting, como los demás del casting', /for\(const id of \[[^\]]*'btnDisp'[^\]]*\]\)\{\s+const b = document\.getElementById\(id\);\s+if\(b\) b\.style\.display = \(m === 'casting'\) \? '' : 'none';/.test(HTML));
   t.ok('el archivo, cargado y en la caché', /<script src="\.\/js\/castdisponible\.js"><\/script>/.test(HTML) && /'\.\/js\/castdisponible\.js'/.test(SW));
 
+  t.seccion('4b · en qué programas y episodios ha estado, con sus líneas, en cápsulas (PRO-29)');
+  {
+    const REG2 = { personajes: REG.personajes, capitulos: { 'Episodio 1': { ts: 1, personajes: { JANA: { display: 'Jana', talent: 'Ana Rojas', lineas: 12 }, NN: { display: 'Nadie', talent: '', lineas: 3 } } } } };
+    const fh = M.dispFilas({ base: [], d: d, serie: d.series[0], registro: REG2, enCap: [], showId: 's1', programa: 'AKKA',
+                             registros: [{ showId: 's1', programa: 'AKKA', serieId: 1, reg: REG2 }] });
+    const ana = fh.find(f => f.clave === 'ANA ROJAS'), beto = fh.find(f => f.clave === 'BETO LUNA');
+    const resumen = (f) => f.historial.map(pg => pg.programa + (pg.este ? '*' : '') + ' ' + pg.lineas + ' [' + pg.episodios.map(e => e.n + ':' + e.personajes.map(x => x.nombre + ' ' + x.lineas).join('+')).join(' ') + ']').join(' | ');
+    t.eq('cada programa con sus episodios, personajes y líneas; el que se castea primero y los demás por líneas', resumen(ana),
+         'AKKA* 12 [1:JANA 12] | Dofus 50 [1:DOFUS 40+REY 10 2:REY 0] | Ninjago 5 [1:KAI 5] | Rex 0 [1:REX 0]');
+    t.ok('también los terminados: el historial no es la ocupación', /Viejo 0 \[1:ABUELO 0\]/.test(resumen(beto)));
+    t.eq('lo que dicen DublajeCast y Dubbipt del mismo episodio se cuenta una vez, y el programa con el nombre de Dubbipt', ana.historial[0].episodios[0].personajes.length + ' ' + ana.historial[0].programa, '1 AKKA');
+    t.ok('los capítulos de antes de las fotos también cuentan, sin líneas', /AKKA\* 0 \[2:Ally 0\]/.test(resumen(beto)));
+    t.ok('un personaje sin talento no es de nadie', !fh.some(f => f.historial.some(pg => pg.episodios.some(e => e.personajes.some(x => x.nombre === 'Nadie')))));
+    const sinDc2 = M.dispFilas({ base: [], d: null, serie: null, registro: null, enCap: [],
+                                 registros: [{ showId: 's9', programa: 'Otro programa 3', reg: { capitulos: { 'Otro programa 3 Ep 4': { personajes: { X: { display: 'Pirata', talent: 'Luz', lineas: 7 } } } } } }] });
+    t.eq('sin DublajeCast, lo que sabe Dubbipt de todos sus programas', resumen(sinDc2[0]), 'Otro programa 3 7 [4:Pirata 7]');
+    t.eq('buscar por un programa en el que ha estado', M.dispVisibles(fh, 'ninjago', false, 'nombre').map(f => f.clave).join(','), 'ANA ROJAS');
+    const hh = M.dispHtml(fh.filter(f => f.clave === 'ANA ROJAS'), 'AKKA', true);
+    t.ok('en cápsulas: una por programa, con sus episodios y líneas', /<details class="disp-pg disp-pg-este" open><summary class="disp-cap-p"><span class="disp-cap-n">AKKA<\/span><span class="disp-cap-c">1 ep\.<\/span><span class="disp-cap-c">12 líneas<\/span><\/summary>/.test(hh));
+    t.ok('y una por episodio, con cada personaje y sus líneas', /<span class="disp-ep"[^>]*><b>Ep\. 1<\/b><span class="disp-ep-p">DOFUS <i>40<\/i><\/span><span class="disp-ep-p">REY <i>10<\/i><\/span><\/span>/.test(hh));
+    t.ok('los otros programas, cerrados hasta que se abren', /<details class="disp-pg"><summary class="disp-cap-p"><span class="disp-cap-n">Dofus<\/span>/.test(hh));
+  }
+
   t.seccion('5 · en una ventana aparte, para otra pantalla');
   {
     const V = ventanas();
@@ -91,16 +114,16 @@ exports.pruebas = async function(t){
     t.ok('con su título, los colores de Dubbipt y sin nada de la página', ab === V.w && /<title>Disponibilidad · Dubbipt<\/title><style>body\{ margin:0; background:#0b0d10;/.test(V.w.document.escrito) && /\.disp-mucho\{/.test(V.w.document.escrito) && V.w.focos === 1);
     t.ok('dentro, el programa, el capítulo, «Actualizar» y la lista', /<div class="modo-sub">AKKA · Episodio 1 · 1 talento ya ha estado en él<\/div>/.test(V.raiz.innerHTML) && /id="dispActualizar"/.test(V.raiz.innerHTML) && /<b>ANA ROJAS<\/b>/.test(V.raiz.innerHTML));
     t.eq('el título de la ventana dice el programa', V.w.document.title, 'Disponibilidad · AKKA');
-    t.eq('el registro del programa, una vez', V.registros.join(','), 's1');
+    t.eq('el registro de este programa y, para el historial, el de los demás: una vez', V.registros.join(','), 's1,s2');
     t.eq('y se vigila cada 2 s, de memoria', V.intervalos.map(x => x[1]).join(','), '2000');
     V.intervalos[0][0]();
-    t.eq('si nada cambia, ni se repinta ni se pide nada', V.pintadas + ' ' + V.registros.length, '1 1');
+    t.eq('si nada cambia, ni se repinta ni se pide nada', V.pintadas + ' ' + V.registros.length, '1 2');
     V.enCap = [{ talento: 'BETO LUNA', personajes: [{ display: 'Narrador' }], ints: 3 }];
     V.intervalos[0][0](); await espera();
-    t.ok('al asignar un talento aquí, la ventana lo refleja sola, sin volver a pedir el registro', V.pintadas === 2 && V.registros.length === 1 && /<b>BETO LUNA<\/b>[\s\S]*?En este capítulo: Narrador · 3 int\./.test(V.raiz.innerHTML));
+    t.ok('al asignar un talento aquí, la ventana lo refleja sola, sin volver a pedir el registro', V.pintadas === 2 && V.registros.length === 2 && /<b>BETO LUNA<\/b>[\s\S]*?En este capítulo: Narrador · 3 int\./.test(V.raiz.innerHTML));
     Object.assign(V.ep, { id: 'e9', name: 'Episodio 9', showId: 's2' });
     V.intervalos[0][0](); await espera();
-    t.eq('al cambiar de programa, pide el registro del nuevo', V.registros.join(',') + ' · ' + /Episodio 9/.test(V.raiz.innerHTML), 's1,s2 · true');
+    t.eq('al cambiar de programa, pide el registro del nuevo', V.registros.join(',') + ' · ' + /Episodio 9/.test(V.raiz.innerHTML), 's1,s2,s2 · true');
     await V.M.dispAbrir();
     t.eq('pulsar otra vez la trae delante sin abrir otra ni otro vigía', V.w.document.escritos + ' ' + V.intervalos.length + ' ' + V.w.focos, '1 1 2');
     V.w.closed = true;
