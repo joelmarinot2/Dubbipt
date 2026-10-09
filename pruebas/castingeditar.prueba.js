@@ -39,7 +39,7 @@ const DC = montar([['function castNorm(t){', 'async function castRegCargar(showI
   { castNorm: undefined, prodCasarPrograma: PR.prodCasarPrograma, prodIndices: PR.prodIndices, window: { addEventListener: () => {} }, document: {}, location: { origin: '' } });
 const SIM = montar([['function castSimil(a, b){', '/* ── El registro, guardado por programa']], ['castSimil'], {});
 const DX = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ EDITAR DUBLAJECAST DESDE DUBBIPT', '/* ═══ FIN DE EDITAR DUBLAJECAST DESDE DUBBIPT']],
-  ['dcxNombreTalento', 'dcxAsignar', 'dcxReasignar', 'dcxEpisodio', 'dcxSerie', 'dcxPersonaje', 'dcxTalento', 'dcxTalentoNuevo', 'dcxTrailerNuevo', 'dcxTrailer', 'dcxTrailerBorrar', 'dcxCambiarTalento', 'dcxConflictosFusion', 'dcxFusionarEpisodios', 'dcxFusionarSeries'],
+  ['dcxNombreTalento', 'dcxAsignar', 'dcxReasignar', 'dcxEpisodio', 'dcxSerie', 'dcxPersonaje', 'dcxTalento', 'dcxTalentoNuevo', 'dcxTrailerNuevo', 'dcxTrailer', 'dcxTrailerBorrar', 'dcxCambiarTalento', 'dcxConflictosFusion', 'dcxFusionarEpisodios', 'dcxFusionarSeries', 'dcxBorrarSerie', 'dcxBorrarEpisodios'],
   { castNorm: undefined, dcSesion: null, dcLeer: null, dcEscribir: null, prodNormalizar: null, prodGuardar: null, PROD: {} });
 
 /* Lo justo del navegador: controles con sus atributos, sacados del HTML escrito. */
@@ -93,7 +93,7 @@ function armar(o){
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
     ['CS', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
      'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS', 'csAsegurarDatos', 'csDevolverCopia', 'csBajarCopia', 'CS_TRAER',
-     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado'],
+     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado', 'csBorrarPrograma', 'csBorrarEpisodio', 'csBorrarDeBiblioteca'],
     { castNorm: (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim(),
       document: { getElementById: (id) => campos[id] || null, querySelector: () => null, body: { classList: { contains: () => false, toggle: () => {}, remove: () => {} } } },
       prodPuede: () => true, PROD: PROD, PROD_ET: PR.PROD_ET, prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard,
@@ -112,7 +112,9 @@ function armar(o){
         diario.push('guarda ' + !!hubo); return { cambiado: !!hubo };
       },
       dcxNombreTalento: DX.dcxNombreTalento, dcxAsignar: DX.dcxAsignar, dcxReasignar: DX.dcxReasignar, dcxEpisodio: DX.dcxEpisodio, dcxSerie: DX.dcxSerie, dcxPersonaje: DX.dcxPersonaje,
-      dcxTalento: DX.dcxTalento, dcxTalentoNuevo: DX.dcxTalentoNuevo, dcxTrailerNuevo: DX.dcxTrailerNuevo, dcxTrailer: DX.dcxTrailer, dcxTrailerBorrar: DX.dcxTrailerBorrar, dcxCambiarTalento: DX.dcxCambiarTalento, dcxConflictosFusion: DX.dcxConflictosFusion, dcxFusionarEpisodios: DX.dcxFusionarEpisodios, dcxFusionarSeries: DX.dcxFusionarSeries,
+      dcxTalento: DX.dcxTalento, dcxTalentoNuevo: DX.dcxTalentoNuevo, dcxTrailerNuevo: DX.dcxTrailerNuevo, dcxTrailer: DX.dcxTrailer, dcxTrailerBorrar: DX.dcxTrailerBorrar, dcxCambiarTalento: DX.dcxCambiarTalento, dcxConflictosFusion: DX.dcxConflictosFusion, dcxFusionarEpisodios: DX.dcxFusionarEpisodios, dcxFusionarSeries: DX.dcxFusionarSeries, dcxBorrarSerie: DX.dcxBorrarSerie, dcxBorrarEpisodios: DX.dcxBorrarEpisodios,
+      libBorrarPrograma: async (sh, ya) => { diario.push('borraProg ' + sh.id + ' ' + !!ya); return o.fallaBorrar !== true; },
+      libBorrarCapitulo: async (ep, ya) => { diario.push('borraEp ' + ep.id + ' ' + !!ya); return o.fallaBorrar !== true; },
       dcxRelevosAceptados: () => RELEVOS, dcxAceptarRelevo: (k) => { if(RELEVOS.includes(k)) return false; RELEVOS.push(k); return true; },
       dcxHistorial: () => H, dcxEntrada: (que, ctx) => Object.assign({ cuando: '2026-10-08T10:05:00Z', quien: 'Pamela', que: que }, ctx || {}), dcxRegistrar: (e) => { H.unshift(e); return true; },
       DDL_MODO: 'casting', currentEp: null, herramientasPanel: () => {},
@@ -739,5 +741,46 @@ exports.pruebas = async function(t){
     const lb = B.M.csActual().lista;
     await B.M.csFusionarProgramas(lb.find(x => x.clave === 's:sP'), lb.find(x => x.clave === 'dc:3'));
     t.eq('se queda el de Dubbipt: el de DublajeCast se llama como él', B.nube().series.find(s => s.id === 3).name, 'LA PELI DOBLADA');
+  }
+
+  t.seccion('10 · eliminar por completo: Dubbipt y DublajeCast');
+  {
+    const P0 = VOLCADO();
+    const P1 = JSON.parse(JSON.stringify(P0));
+    t.eq('borrar un episodio de DublajeCast quita sus personajes y castings', DX.dcxBorrarEpisodios(P1, [11]) + ' ' + P1.episodes.some(e => e.id === 11) + ' ' + P1.appearances.some(a => a.episode_id === 11) + ' ' + P1.castings.some(c => c.episode_id === 11), 'true false false false');
+    t.eq('y lo deja en su papelera, con todo, para poder restaurarlo', P1.trash[0].kind + ' ' + P1.trash[0].data.episodes.length + ' ' + P1.trash[0].data.castings.length, 'episode 1 2');
+    t.eq('los demás no se tocan', P1.episodes.length + ' ' + P1.castings.length, (P0.episodes.length - 1) + ' ' + (P0.castings.length - 2));
+    t.eq('uno que no existe no cambia nada', DX.dcxBorrarEpisodios(JSON.parse(JSON.stringify(P0)), [999]), false);
+    const P2 = Object.assign(JSON.parse(JSON.stringify(P0)), { produccion: [{ programa: 'A Filipino Christmas', capitulo: 1 }, { programa: 'Akka', capitulo: 1 }] });
+    t.eq('borrar un programa de DublajeCast quita sus episodios, castings, tráilers y producción', DX.dcxBorrarSerie(P2, 1) + ' ' + P2.series.map(x => x.id).join(',') + ' · ' + P2.episodes.filter(e => e.series_id === 1).length + ' ' + P2.castings.length + ' ' + P2.trailers.length + ' ' + P2.produccion.map(r => r.programa).join(','), 'true 2,3 · 0 0 0 Akka');
+    t.eq('y va entero a la papelera', P2.trash[0].kind + ' ' + P2.trash[0].data.series[0].name, 'series A Filipino Christmas');
+    t.ok('los talentos y los personajes, que son de todos, se quedan', P2.talents.length === P0.talents.length && P2.characters.length === P0.characters.length);
+  }
+  {
+    /* «Eliminé este episodio, se borró el casting de Dubbipt pero se quedó el ep»: tenía pareja en DublajeCast. */
+    const A = armar();
+    const p = A.M.csActual().lista.find(x => x.clave === 's:s1');
+    const e1 = A.M.csEpisodios(p).find(x => x.ep && x.ep.id === 'e1');
+    t.ok('el Episodio 1 de Dubbipt tiene su pareja en DublajeCast', !!(e1 && e1.dcEp && e1.dcEp.id === 11));
+    t.eq('eliminarlo lo borra de Dubbipt y de DublajeCast, preguntando una vez', (await A.M.csBorrarEpisodio(p, e1)) + ' ' + A.diario.filter(x => /^borra|^pregunta/.test(x)).length + ' ' + A.diario.includes('borraEp e1 true') + ' ' + A.nube().episodes.some(e => e.id === 11), 'true 2 true false');
+    t.ok('la pregunta dice que es de los dos sitios', A.diario.some(x => /^pregunta Eliminar episodio .*de Dubbipt y de DublajeCast/.test(x)));
+    t.ok('y queda apuntado quién lo eliminó', A.H.some(h => /^Episodio eliminado/.test(h.que)));
+    const p2 = A.M.csActual().lista.find(x => x.clave === 's:s1');
+    const solo = A.M.csEpisodios(p2).find(x => !x.ep && x.dcEp && x.dcEp.id === 13);
+    t.eq('uno que ya solo está en DublajeCast también se puede eliminar', (await A.M.csBorrarEpisodio(p2, solo)) + ' ' + A.nube().episodes.some(e => e.id === 13), 'true false');
+  }
+  {
+    const A = armar();
+    const p = A.M.csActual().lista.find(x => x.clave === 's:s1');
+    t.eq('eliminar el programa lo borra de Dubbipt y de DublajeCast', (await A.M.csBorrarPrograma(p)) + ' ' + A.diario.includes('borraProg s1 true') + ' ' + A.nube().series.some(s => s.id === 1) + ' ' + A.M.CS.vista, 'true true false programas');
+    const N = armar({ confirmar: false });
+    const pn = N.M.csActual().lista.find(x => x.clave === 's:s1');
+    t.eq('si se cancela, nada', (await N.M.csBorrarPrograma(pn)) + ' ' + N.diario.filter(x => /^borra/.test(x)).length + ' ' + N.nube().series.some(s => s.id === 1), 'false 0 true');
+    const S = armar({ sinSesion: true });
+    const ps = S.M.csActual().lista.find(x => x.clave === 's:s1');
+    await S.M.csBorrarPrograma(ps);
+    t.ok('sin sesión en DublajeCast: lo de Dubbipt se borra y se dice cómo terminar', S.diario.includes('borraProg s1 true') && S.avisos.some(a => /Entra en DublajeCast y vuelve a pulsar «Eliminar»/.test(a)));
+    const B = armar();
+    t.eq('la papelera de la biblioteca también borra su pareja de DublajeCast', (await B.M.csBorrarDeBiblioteca(null, EPS_DUB.s1[1])) + ' ' + B.diario.includes('borraEp e2 true') + ' ' + B.nube().episodes.some(e => e.id === 12), 'true true false');
   }
 };

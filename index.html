@@ -2652,7 +2652,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.45.0-nube';
+const APP_VER_NUM = 'v11.46.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8238,37 +8238,79 @@ function otherWsNote(){
       + ' · <b>cambiar</b></div>';
   }catch(e){ return ''; }
 }
+/** Borra todo lo que hay bajo una carpeta de un bucket, subcarpetas incluidas. */
+async function libBorrarCarpeta(bucket, carpeta){
+  const rutas = [];
+  const recorrer = async (dir, hondo) => {
+    if(hondo > 6) return;
+    let desde = 0;
+    for(;;){
+      const { data, error } = await sb.storage.from(bucket).list(dir, { limit: 1000, offset: desde });
+      if(error || !data || !data.length) return;
+      for(const f of data){
+        const ruta = dir + '/' + f.name;
+        if(f.id == null && !f.metadata) await recorrer(ruta, hondo + 1);   // una carpeta
+        else rutas.push(ruta);
+      }
+      if(data.length < 1000) return;
+      desde += data.length;
+    }
+  };
+  try{ await recorrer(carpeta, 0); }catch(err){ fallo('sb.storage.list · index.html:libBorrarCarpeta', err); }
+  for(let i = 0; i < rutas.length; i += 100){
+    try{ await sb.storage.from(bucket).remove(rutas.slice(i, i + 100)); }
+    catch(err){ fallo('sb.storage.remove · index.html:libBorrarCarpeta', err, 'algún archivo puede haberse quedado en la nube'); }
+  }
+  return rutas.length;
+}
+
+/** Lo que este equipo guarda de un programa o un capítulo (sus copias y sus preferencias), fuera. */
+async function libOlvidarLocal(ids){
+  const lista = (ids || []).filter(Boolean).map(String);
+  if(!lista.length) return;
+  const tiene = (k) => lista.some(id => String(k).indexOf(id) >= 0);
+  try{
+    const db = await idbOpen();
+    const claves = await new Promise(res => {
+      const t = db.transaction('eps').objectStore('eps').getAllKeys();
+      t.onsuccess = () => res(t.result || []); t.onerror = () => res([]);
+    });
+    for(const k of claves) if(tiene(k)) await idbDel(k);
+  }catch(err){ /* sin caché local */ }
+  try{
+    const ls = [];
+    for(let i = 0; i < localStorage.length; i++){ const k = localStorage.key(i); if(k && tiene(k)) ls.push(k); }
+    for(const k of ls) localStorage.removeItem(k);
+    if(lista.indexOf(localStorage.getItem('ddl_last_ep')) >= 0) localStorage.removeItem('ddl_last_ep');
+  }catch(err){ /* sin almacén local */ }
+}
+
 /**
- * Elimina un programa con sus capítulos, sus libretos y su registro de casting.
- * Lo usan la biblioteca y la vista de Casting. Pregunta antes; devuelve si se borró.
+ * Elimina un programa POR COMPLETO de Dubbipt: sus capítulos y sus datos, todos
+ * sus archivos en la nube (libretos, audios, formatos, registro de casting,
+ * portadas) y lo que este equipo guardaba de él. Lo usan la biblioteca y la
+ * vista de Casting. Pregunta antes, salvo `yaPreguntado`; devuelve si se borró.
  * No repinta: eso lo hace quien llama, que sabe dónde se queda.
  */
-async function libBorrarPrograma(sh){
+async function libBorrarPrograma(sh, yaPreguntado){
   if(!sh || !sh.id) return false;
   const deEps = sbEps(sh.id), n = deEps.length;
-  const ok = (typeof DDL_UI!=='undefined')
+  const ok = yaPreguntado || ((typeof DDL_UI!=='undefined')
     ? await DDL_UI.confirmModal({ title:'Eliminar programa',
-        body:'Se eliminará «'+sh.name+'» y sus '+n+' capítulo'+(n===1?'':'s')+', incluidos sus libretos y su casting. Esta acción no se puede deshacer.',
+        body:'Se eliminará «'+sh.name+'» por completo: sus '+n+' capítulo'+(n===1?'':'s')+', sus libretos y su casting. Esta acción no se puede deshacer.',
         confirmLabel:'Eliminar', cancelLabel:'Cancelar', danger:true })
-    : confirm('¿Eliminar el programa "'+sh.name+'" y sus capítulos?');
+    : confirm('¿Eliminar el programa "'+sh.name+'" y sus capítulos?'));
   if(!ok) return false;
-  try{
-    for(const oe of deEps){ try{ await sb.from('episode_data').delete().eq('ep_id', oe.id); }catch(err){ fallo('sb.from · index.html:libBorrarPrograma', err, 'puede que esto no se haya guardado en la nube'); } }
-    await sb.from('episodes').delete().eq('show_id', sh.id);
-    for(const oe of deEps){
-      try{
-        const { data:fl } = await sb.storage.from('libretos').list(sh.id+'/'+oe.id);
-        if(fl && fl.length) await sb.storage.from('libretos').remove(fl.map(f=> sh.id+'/'+oe.id+'/'+f.name));
-      }catch(err){ fallo('sb.storage.from · index.html:libBorrarPrograma', err); }
-    }
-  }catch(err){ fallo('sb.storage.from · index.html:libBorrarPrograma', err); }
-  /* El registro de casting del programa: sin programa, no lo hereda nadie. */
-  try{ await sb.storage.from('libretos').remove([castRegPath(sh.id)]); }catch(err){ /* sin registro que borrar */ }
-  try{ await idbDel('ddl-registro::' + sh.id); }catch(err){ /* sin copia en este equipo */ }
+  for(const oe of deEps){ try{ await sb.from('episode_data').delete().eq('ep_id', oe.id); }catch(err){ fallo('sb.from · index.html:libBorrarPrograma', err, 'puede que esto no se haya guardado en la nube'); } }
+  try{ await sb.from('episodes').delete().eq('show_id', sh.id); }catch(err){ fallo('sb.from · index.html:libBorrarPrograma', err); }
+  await libBorrarCarpeta('libretos', String(sh.id));
+  try{ await libBorrarCarpeta('portadas', 'covers/' + sh.id); }catch(err){ /* sin portadas */ }
   const r = await sb.from('shows').delete().eq('id', sh.id);
   if(r && r.error){ castAviso('No se pudo eliminar «'+sh.name+'»: '+(r.error.message || r.error)); return false; }
-  if(currentEp && currentEp.showId===sh.id) currentEp=null;
+  if(currentEp && (currentEp.showId===sh.id || deEps.some(e => e.id===currentEp.id))) currentEp=null;
   if(LDB.showId===sh.id) LDB.showId=null;
+  await libOlvidarLocal([sh.id].concat(deEps.map(e => e.id)));
+  try{ if(typeof CS !== 'undefined' && CS && CS.registros) delete CS.registros[String(sh.id)]; }catch(e){ /* sin vista de Casting */ }
   await libFetchAll();
   if(typeof libPing==='function') libPing('show', sh.id);
   if(typeof DDL_UI!=='undefined') DDL_UI.toast('Programa «'+sh.name+'» eliminado');
@@ -8276,30 +8318,34 @@ async function libBorrarPrograma(sh){
 }
 
 /**
- * Elimina un capítulo con su libreto, y su foto del registro de casting del
- * programa (para que no siga saliendo en el Reparto). Lo repartido en él se
- * queda en el registro: los capítulos siguientes lo siguen heredando.
+ * Elimina un capítulo POR COMPLETO de Dubbipt: sus datos, todos sus archivos,
+ * su foto y su rastro en el registro de casting del programa, y lo que este
+ * equipo guardaba de él. Lo que el programa sabe de quién hace a quién se
+ * queda: los capítulos siguientes lo siguen heredando.
  */
-async function libBorrarCapitulo(ep){
+async function libBorrarCapitulo(ep, yaPreguntado){
   if(!ep || !ep.id) return false;
-  const ok = (typeof DDL_UI!=='undefined')
-    ? await DDL_UI.confirmModal({ title:'Eliminar capítulo', body:'Se eliminará «'+ep.name+'» y su libreto. No se puede deshacer.', confirmLabel:'Eliminar', cancelLabel:'Cancelar', danger:true })
-    : confirm('¿Eliminar el capítulo "'+ep.name+'"?');
+  const ok = yaPreguntado || ((typeof DDL_UI!=='undefined')
+    ? await DDL_UI.confirmModal({ title:'Eliminar capítulo', body:'Se eliminará «'+ep.name+'» por completo, con su libreto y su casting. No se puede deshacer.', confirmLabel:'Eliminar', cancelLabel:'Cancelar', danger:true })
+    : confirm('¿Eliminar el capítulo "'+ep.name+'"?'));
   if(!ok) return false;
   if(currentEp && currentEp.id===ep.id) currentEp=null;
   try{ await sb.from('episode_data').delete().eq('ep_id', ep.id); }catch(err){ fallo('sb.from · index.html:libBorrarCapitulo', err, 'puede que esto no se haya guardado en la nube'); }
   const r = await sb.from('episodes').delete().eq('id', ep.id);
   if(r && r.error){ castAviso('No se pudo eliminar «'+ep.name+'»: '+(r.error.message || r.error)); return false; }
   if(ep.show_id){
-    try{
-      const { data:fl } = await sb.storage.from('libretos').list(ep.show_id+'/'+ep.id);
-      if(fl && fl.length) await sb.storage.from('libretos').remove(fl.map(f=> ep.show_id+'/'+ep.id+'/'+f.name));
-    }catch(err){ fallo('sb.storage.from · index.html:libBorrarCapitulo', err); }
+    await libBorrarCarpeta('libretos', ep.show_id + '/' + ep.id);
     try{
       const reg = await castRegCargar(ep.show_id), k = castNorm(ep.name);
       let tocado = false;
       for(const nombreEp of Object.keys(reg.capitulos || {})){
         if(castNorm(nombreEp) === k){ delete reg.capitulos[nombreEp]; tocado = true; }
+      }
+      for(const clave of Object.keys(reg.personajes || {})){
+        const x = reg.personajes[clave];
+        if(x && Array.isArray(x.episodios) && x.episodios.some(en => castNorm(en) === k)){
+          x.episodios = x.episodios.filter(en => castNorm(en) !== k); tocado = true;
+        }
       }
       if(tocado){
         await castRegGuardar(ep.show_id, reg);
@@ -8307,7 +8353,7 @@ async function libBorrarCapitulo(ep){
       }
     }catch(err){ /* el Reparto lo seguirá enseñando, nada más */ }
   }
-  try{ await idbDel('ep:'+ep.id); }catch(err){ /* sin copia en este equipo */ }
+  await libOlvidarLocal([ep.id]);
   await libFetchAll();
   if(typeof libPing==='function') libPing('ep', ep.id, ep.show_id);
   if(typeof DDL_UI!=='undefined') DDL_UI.toast('Capítulo «'+ep.name+'» eliminado');
@@ -8430,7 +8476,7 @@ async function renderLibrary(silent){
             return;
           }
           if(ev.target.closest('.ldel')){
-            if(await libBorrarPrograma(sh)) renderLibrary(true);
+            if(await (typeof csBorrarDeBiblioteca==='function' ? csBorrarDeBiblioteca(sh, null) : libBorrarPrograma(sh))) renderLibrary(true);
             return;
           }
           LDB.showId = sh.id; libView='eps'; renderLibrary();
@@ -8541,7 +8587,7 @@ async function renderLibrary(silent){
         }
         if(target && target.closest('.lupd')){ forceRefreshEpisode(ep); return; }
         if(target && target.closest('.ldel')){
-          if(await libBorrarCapitulo(ep)) renderLibrary(true);
+          if(await (typeof csBorrarDeBiblioteca==='function' ? csBorrarDeBiblioteca(null, ep) : libBorrarCapitulo(ep))) renderLibrary(true);
           return;
         }
         openEpisode(ep.id);

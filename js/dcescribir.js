@@ -304,6 +304,53 @@ function dcxFusionarSeries(p, keepId, dupId){
   return true;
 }
 
+/* ── Eliminar ───────────────────────────────────────────────────────────────
+   Pedido de sala: «quiero que cuando elimine programa o episodio se elimine
+   por completo». Borrar solo en Dubbipt dejaba el de DublajeCast, que seguía
+   saliendo como «Solo en DublajeCast» y volvía con «Importar». Va a la
+   papelera de DublajeCast, como cuando se borra allí: se puede restaurar. */
+
+/** Quita de todas las listas lo que cumpla `fuera`; devuelve lo quitado, por lista. */
+function dcxQuitarDonde(p, fuera){
+  const quitado = {};
+  for(const k of Object.keys(p)){
+    if(k === 'trash' || !Array.isArray(p[k])) continue;
+    const se = p[k].filter(x => x && typeof x === 'object' && fuera(x, k));
+    if(!se.length) continue;
+    quitado[k] = se;
+    p[k] = p[k].filter(x => se.indexOf(x) < 0);
+  }
+  return quitado;
+}
+
+/** Capítulos de DublajeCast, con sus personajes, castings y todo lo que cuelgue de ellos. */
+function dcxBorrarEpisodios(p, epIds, etiqueta){
+  const ids = new Set((epIds || []).map(String));
+  const eps = dcxLista(p, 'episodes').filter(e => ids.has(String(e.id)));
+  if(!eps.length) return false;
+  const quitado = dcxQuitarDonde(p, (x, k) => (k === 'episodes' && ids.has(String(x.id))) || (k !== 'episodes' && x.episode_id != null && ids.has(String(x.episode_id))));
+  p.trash = [{ kind: 'episode', at: Date.now(), label: etiqueta || ('Eliminado desde Dubbipt: ' + eps.map(e => e.title || ('Ep. ' + e.episode_number)).join(', ')), data: quitado }]
+    .concat(Array.isArray(p.trash) ? p.trash : []).slice(0, 50);
+  return true;
+}
+
+/** Un programa de DublajeCast entero: sus capítulos (con lo suyo), sus tráilers, su producción. */
+function dcxBorrarSerie(p, serieId){
+  const serie = dcxLista(p, 'series').find(s => dcxMismo(s.id, serieId));
+  if(!serie) return false;
+  const nom = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+  const eps = new Set(dcxLista(p, 'episodes').filter(e => dcxMismo(e.series_id, serieId)).map(e => String(e.id)));
+  const quitado = dcxQuitarDonde(p, (x, k) =>
+    (k === 'series' && dcxMismo(x.id, serieId))
+    || (k !== 'series' && dcxMismo(x.series_id, serieId))
+    || (k === 'episodes' && eps.has(String(x.id)))
+    || (k !== 'episodes' && x.episode_id != null && eps.has(String(x.episode_id)))
+    || (k === 'produccion' && nom(x.programa) === nom(serie.name)));
+  p.trash = [{ kind: 'series', at: Date.now(), label: 'Eliminado desde Dubbipt: ' + serie.name, data: quitado }]
+    .concat(Array.isArray(p.trash) ? p.trash : []).slice(0, 50);
+  return true;
+}
+
 /** Los relevos que alguien ya dijo que son a propósito: no se vuelven a preguntar. */
 function dcxRelevosAceptados(){
   const l = PROD.datos && PROD.datos.relevosAceptados;
