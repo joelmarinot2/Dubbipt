@@ -1940,6 +1940,42 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-b.cs-ep-estado{ color:#FBBF24; border-color:rgba(251,191,36,.45); }
 .cs-b.cs-ep-estado.cs-ep-hecho{ color:#4ADE80; border-color:rgba(74,222,128,.45); }
 .cs-tal-modos{ margin:0 0 12px; }
+/* Talentos como en DublajeCast: tarjetas y la ficha de cada uno (PRO-37). */
+.cs-tgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; margin-top:12px; }
+.cs-tcard{ text-align:left; background:#101215; border:1px solid #23262b; border-radius:14px; padding:14px 15px; display:flex; flex-direction:column; align-items:flex-start; gap:7px; cursor:pointer; color:#e5e7eb; font-family:'Inter',sans-serif; min-width:0; }
+.cs-tcard:hover{ border-color:#4ADE80; background:#12161a; }
+.cs-tcard-n{ font-size:15px; font-weight:800; color:#f2f3f5; text-transform:uppercase; letter-spacing:.2px; overflow-wrap:anywhere; }
+.cs-tchips{ display:flex; flex-wrap:wrap; gap:5px; }
+.cs-tchip{ font-size:11px; font-weight:700; border-radius:999px; padding:2px 9px; background:#1a1d22; }
+.cs-tchip-genero{ color:#A78BFA; background:rgba(167,139,250,.12); }
+.cs-tchip-edad{ color:#2DD4BF; background:rgba(45,212,191,.12); }
+.cs-tchip-tono{ color:#FB923C; background:rgba(251,146,60,.12); }
+.cs-tprogs{ display:flex; flex-wrap:wrap; gap:5px; }
+.cs-tprog{ font-size:10.5px; font-weight:600; letter-spacing:.2px; text-transform:uppercase; color:#cbd5e1; background:#181b20; border:1px solid #2a2e35; border-radius:6px; padding:3px 7px; }
+.cs-tprog.cs-tprog-fin{ opacity:.55; }
+.cs-talerta{ display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700; color:#FB7185; background:rgba(251,113,133,.08); border:1px solid rgba(251,113,133,.35); border-radius:8px; padding:4px 9px; }
+.cs-tficha-cab{ display:flex; align-items:flex-start; gap:14px; margin-bottom:14px; flex-wrap:wrap; }
+.cs-tficha-cab .cs-volver{ margin:0; }
+.cs-tficha-t h2{ margin:0 0 6px; font-size:22px; font-weight:800; color:#f2f3f5; text-transform:uppercase; }
+.cs-tkpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:14px; }
+.cs-tkpi{ background:#101215; border:1px solid #23262b; border-left:3px solid #A78BFA; border-radius:13px; padding:14px 16px; display:flex; flex-direction:column; gap:3px; }
+.cs-tkpi b{ font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; }
+.cs-tkpi span{ font-size:10.5px; letter-spacing:1px; text-transform:uppercase; color:#8b8f97; }
+.cs-tkpi-a{ border-left-color:#A78BFA; } .cs-tkpi-a b{ color:#A78BFA; }
+.cs-tkpi-b{ border-left-color:#2DD4BF; } .cs-tkpi-b b{ color:#2DD4BF; }
+.cs-tkpi-c{ border-left-color:#FBBF24; } .cs-tkpi-c b{ color:#FBBF24; }
+.cs-tkpi-d{ border-left-color:#F472B6; } .cs-tkpi-d b{ color:#F472B6; }
+.cs-tdesg{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; margin-top:8px; }
+.cs-tdprog{ background:#101215; border:1px solid #23262b; border-top:3px solid #2DD4BF; border-radius:13px; padding:13px 14px; display:flex; flex-direction:column; gap:7px; min-width:0; }
+.cs-tdprog-cab{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; }
+.cs-tdprog-cab b{ font-size:14.5px; font-weight:800; color:#f2f3f5; text-transform:uppercase; overflow-wrap:anywhere; }
+.cs-tdeps{ display:flex; flex-wrap:wrap; gap:4px; }
+.cs-tdep{ font-size:10.5px; font-weight:700; color:#A5B4FC; background:rgba(99,102,241,.14); border:1px solid rgba(99,102,241,.3); border-radius:5px; padding:1px 6px; font-variant-numeric:tabular-nums; }
+.cs-tdpers{ display:flex; flex-direction:column; gap:5px; margin-top:2px; }
+.cs-tdper{ display:flex; align-items:center; gap:10px; background:#0c0e11; border:1px solid #1d2026; border-radius:8px; padding:7px 10px; font-size:12px; }
+.cs-tdper b{ flex:1; min-width:0; color:#f2f3f5; text-transform:uppercase; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cs-tdest{ font-style:normal; color:#FBBF24; }
+.cs-tdlin{ color:#F472B6; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
 .cs-per-papeles{ display:flex; flex-direction:column; gap:6px; margin-top:6px; }
 .cs-per-papel{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; font-size:12.5px; background:#0f1115; border:1px solid #20242a; border-radius:9px; padding:6px 10px; }
 .cs-per-prog{ font-weight:700; color:#f2f3f5; }
@@ -2707,7 +2743,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.55.0-nube';
+const APP_VER_NUM = 'v11.56.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);

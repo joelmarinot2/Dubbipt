@@ -38,7 +38,7 @@ const CS = { vista: 'programas', buscar: '', soloAlertas: false, programa: '',
              prog: null, ep: null, filtro: 'en_curso', buscarProg: '', orden: 'lineas', registros: {},
              tab: 'episodios', buscarCast: '', ordenCast: 'episodio', fusion: null, elegidos: {}, copias: [], fusionProg: null,
              repVista: 'talento', repBuscar: '', repOrden: 'lineas', repGenero: '', repAbierto: null,
-             talModo: 'talentos', buscarPer: '' };
+             talModo: 'talentos', buscarPer: '', talAbierto: null };
 
 /* Iconos de trazo, como los de Dubbipt (ICO). Ningún emoji. */
 const CS_ICO = {
@@ -978,12 +978,13 @@ function csIndicePapeles(d, regs){
   const por = new Map();
   const showDeSerie = {};
   for(const r of (regs || [])) if(r && r.serieId != null) showDeSerie[String(r.serieId)] = r;
-  const anotar = (personaje, progClave, programa, talento, n, lineas, de) => {
+  const anotar = (personaje, progClave, programa, talento, n, lineas, de, principal) => {
     const nombre = String(personaje || '').trim();
     if(!castNorm(nombre)) return;
     const k = castNorm(nombre) + '|' + progClave + '|' + castNorm(talento);
     let x = por.get(k);
-    if(!x){ x = { personaje: nombre, programa: programa, progClave: progClave, talento: String(talento || '').trim(), eps: new Map(), de: new Set() }; por.set(k, x); }
+    if(!x){ x = { personaje: nombre, programa: programa, progClave: progClave, talento: String(talento || '').trim(), eps: new Map(), de: new Set(), principal: false }; por.set(k, x); }
+    if(principal) x.principal = true;
     const ek = n != null ? String(n) : '?';
     x.eps.set(ek, Math.max(x.eps.get(ek) || 0, +lineas || 0));
     x.de.add(de);
@@ -1003,12 +1004,12 @@ function csIndicePapeles(d, regs){
         const ch = ix.char[String(c.character_id)], t = ix.talent[String(c.talent_id)];
         if(!ch || !ch.name) continue;
         conTal.add(String(c.character_id));
-        anotar(ch.name, progClave, programa, t ? t.name : '', isFinite(n) ? n : null, lin[String(c.character_id)], 'DublajeCast');
+        anotar(ch.name, progClave, programa, t ? t.name : '', isFinite(n) ? n : null, lin[String(c.character_id)], 'DublajeCast', ch.tipo === 'principal');
       }
       for(const a of (ix.aparicionesPorEp[String(e.id)] || [])){
         if(conTal.has(String(a.character_id))) continue;
         const ch = ix.char[String(a.character_id)];
-        if(ch && ch.name) anotar(ch.name, progClave, programa, '', isFinite(n) ? n : null, a.line_count, 'DublajeCast');
+        if(ch && ch.name) anotar(ch.name, progClave, programa, '', isFinite(n) ? n : null, a.line_count, 'DublajeCast', ch.tipo === 'principal');
       }
     }
   }
@@ -1031,7 +1032,7 @@ function csIndicePapeles(d, regs){
   }
   return Array.from(por.values()).map(x => {
     const eps = Array.from(x.eps.keys()).filter(k => k !== '?').map(Number).sort((a, b) => a - b);
-    return { personaje: x.personaje, programa: x.programa, progClave: x.progClave, talento: x.talento, eps: eps,
+    return { personaje: x.personaje, programa: x.programa, progClave: x.progClave, talento: x.talento, eps: eps, principal: x.principal,
              lineas: Array.from(x.eps.values()).reduce((t, v) => t + v, 0), de: Array.from(x.de).sort().join(' y ') };
   });
 }
@@ -1101,30 +1102,128 @@ function csHtmlBuscarPersonaje(d){
         : '<div class="cs-nada">Ningún personaje se parece a «' + csEsc(q) + '».</div>'));
 }
 
+/* ── Talentos como en DublajeCast: tarjetas, y la ficha de cada uno ──────────
+   Pedido de sala, con dos capturas de DublajeCast: «quiero que la sección de
+   talento se vea más como la captura, y que pueda ingresar a los talentos y
+   ver más detalles de las series que han estado». Una tarjeta por talento
+   (ficha, carga, sus programas en cápsulas) y, al entrar, sus cifras y el
+   desglose por programa: estado, episodios y cada personaje con sus
+   episodios y líneas. De DublajeCast y del casting guardado en Dubbipt. */
+
+/**
+ * Cada talento con todo lo que ha hecho. `lista`: los programas de la vista
+ * (para su estado y su tipo). Devuelve [{ clave, nombre, t (su ficha de
+ * DublajeCast o nulo), programas: [{ clave, programa, estado, tipo, eps,
+ * personajes: [{ nombre, eps, lineas, principal }], lineas }], nProg, nEps,
+ * nPer, lineas, activos }], por nombre.
+ */
+function csFichasTalentos(d, regs, lista){
+  const fichas = {};
+  if(d) for(const t of d.talents) if(t && t.name) fichas[castNorm(t.name)] = t;
+  const progDe = {};
+  for(const p of (lista || [])) progDe[p.clave] = p;
+  const por = new Map();
+  const talento = (nombre) => {
+    const k = castNorm(nombre);
+    if(!k) return null;
+    let x = por.get(k);
+    if(!x){ x = { clave: k, nombre: (fichas[k] && fichas[k].name) || String(nombre).trim(), t: fichas[k] || null, progs: new Map() }; por.set(k, x); }
+    return x;
+  };
+  for(const k of Object.keys(fichas)) talento(fichas[k].name);
+  for(const pp of csIndicePapeles(d, regs)){
+    if(!pp.talento) continue;
+    const x = talento(pp.talento);
+    if(!x) continue;
+    let g = x.progs.get(pp.progClave);
+    if(!g){ g = { clave: pp.progClave, programa: pp.programa, pers: new Map() }; x.progs.set(pp.progClave, g); }
+    const pk = castNorm(pp.personaje);
+    const ya = g.pers.get(pk);
+    if(!ya) g.pers.set(pk, { nombre: pp.personaje, eps: pp.eps.slice(), lineas: pp.lineas, principal: !!pp.principal });
+    else { for(const n of pp.eps) if(ya.eps.indexOf(n) < 0) ya.eps.push(n); ya.lineas += pp.lineas; ya.principal = ya.principal || !!pp.principal; }
+  }
+  return Array.from(por.values()).map(x => {
+    const programas = Array.from(x.progs.values()).map(g => {
+      const pr = progDe[g.clave] || null;
+      const personajes = Array.from(g.pers.values()).map(y => Object.assign(y, { eps: y.eps.sort((a, b) => a - b) }))
+        .sort((a, b) => (b.lineas - a.lineas) || a.nombre.localeCompare(b.nombre, 'es'));
+      const eps = Array.from(new Set([].concat.apply([], personajes.map(y => y.eps)))).sort((a, b) => a - b);
+      return { clave: g.clave, programa: pr ? pr.nombre : g.programa, estado: pr ? pr.estado : 'en_curso', tipo: pr ? pr.tipo : '',
+               eps: eps, personajes: personajes, lineas: personajes.reduce((t, y) => t + y.lineas, 0) };
+    }).sort((a, b) => ((a.estado === 'completo') - (b.estado === 'completo')) || (b.lineas - a.lineas) || a.programa.localeCompare(b.programa, 'es'));
+    return { clave: x.clave, nombre: x.nombre, t: x.t, programas: programas, nProg: programas.length,
+             nEps: programas.reduce((t, g) => t + g.eps.length, 0), nPer: programas.reduce((t, g) => t + g.personajes.length, 0),
+             lineas: programas.reduce((t, g) => t + g.lineas, 0), activos: programas.filter(g => g.estado !== 'completo').length };
+  }).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
+/** La carga, por cuántos programas en curso tiene: hasta 2 baja, hasta 4 media, más, alta. */
+function csCargaTalento(activos){ return activos <= 2 ? { clave: 'bajo', texto: 'Bajo' } : (activos <= 4 ? { clave: 'medio', texto: 'Medio' } : { clave: 'alto', texto: 'Alto' }); }
+
+/** Las etiquetas de la ficha: género, edad, tono. */
+function csChipsFicha(t){
+  if(!t) return '';
+  const ch = (cls, txt) => txt ? '<span class="cs-tchip cs-tchip-' + cls + '">' + csEsc(txt) + '</span>' : '';
+  return ch('genero', PROD_ET.genero[t.genero] || t.genero) + ch('edad', PROD_ET.edad[t.edad_aparente] || t.edad_aparente) + ch('tono', (PROD_ET.tono && PROD_ET.tono[t.tono_de_voz]) || t.tono_de_voz);
+}
+
+function csHtmlTarjetaTalento(f){
+  const c = csCargaTalento(f.activos);
+  return '<button class="cs-tcard" data-cs="talAbrir" data-v="' + csEsc(f.clave) + '" title="Ver todo lo que ha hecho ' + csEsc(f.nombre) + '">'
+    + '<div class="cs-tcard-n">' + csEsc(f.nombre) + '</div>'
+    + '<div class="cs-tenue">' + f.nProg + ' programa' + (f.nProg === 1 ? '' : 's') + ' · ' + f.nEps + ' ep. · ' + f.lineas + ' líneas</div>'
+    + '<div class="cs-tchips">' + csChipsFicha(f.t) + '</div>'
+    + '<span class="cs-carga cs-carga-' + c.clave + '">' + c.texto + '</span>'
+    + (f.programas.length ? '<div class="cs-tprogs">' + f.programas.map(g => '<span class="cs-tprog' + (g.estado === 'completo' ? ' cs-tprog-fin' : '') + '">' + csEsc(g.programa) + '</span>').join('') + '</div>' : '<div class="cs-tenue">Sin papeles todavía</div>')
+    + (c.clave === 'alto' ? '<div class="cs-talerta">' + csIco('aviso', 12) + 'Alta carga: ' + f.activos + ' programas en curso</div>' : '')
+    + '</button>';
+}
+
+/* Un color por programa, como en DublajeCast: el borde de arriba de su tarjeta. */
+const CS_TCOLORES = ['#2DD4BF', '#38BDF8', '#A78BFA', '#FB923C', '#F472B6', '#FBBF24', '#4ADE80', '#60A5FA'];
+
+function csHtmlFichaTalento(f, d){
+  const kpi = (n, t, cls) => '<div class="cs-tkpi cs-tkpi-' + cls + '"><b>' + n + '</b><span>' + t + '</span></div>';
+  const t = f.t;
+  return '<div class="cs-tficha-cab"><button class="cs-volver" data-cs="talCerrar">' + csIco('izquierda', 14) + '<span>Talentos</span></button>'
+    + '<div class="cs-tficha-t"><h2>' + csEsc(f.nombre) + '</h2><div class="cs-tchips">' + csChipsFicha(t) + '<span class="cs-carga cs-carga-' + csCargaTalento(f.activos).clave + '">' + csCargaTalento(f.activos).texto + '</span></div></div></div>'
+    + '<div class="cs-tkpis">' + kpi(f.nProg, 'Programas', 'a') + kpi(f.nEps, 'Episodios', 'b') + kpi(f.nPer, 'Personajes', 'c') + kpi(f.lineas, 'Líneas', 'd') + '</div>'
+    + (t ? '<details class="cs-tal-ed"><summary>Editar ficha</summary><div class="cs-tal-campos">'
+          +   '<label>Nombre <input type="text" data-cs="talCampo" data-id="' + csEsc(t.id) + '" data-campo="name" value="' + csEsc(t.name) + '"></label>'
+          +   '<label>Género ' + csSelect('genero', t.genero || '', CS_OP_GENERO, { cs: 'talCampo', id: t.id }) + '</label>'
+          +   '<label>Edad ' + csSelect('edad_aparente', t.edad_aparente || '', CS_OP_EDAD, { cs: 'talCampo', id: t.id }) + '</label>'
+          +   '<label>Tono ' + csSelect('tono_de_voz', t.tono_de_voz || '', CS_OP_TONO, { cs: 'talCampo', id: t.id }) + '</label>'
+          +   '<label>Registro <input type="text" data-cs="talCampo" data-id="' + csEsc(t.id) + '" data-campo="registro" value="' + csEsc(t.registro || '') + '"></label>'
+          +   '<label>Correo <input type="email" data-cs="talCampo" data-id="' + csEsc(t.id) + '" data-campo="email" value="' + csEsc(t.email || '') + '"></label>'
+          + '</div></details>' : '')
+    + '<div class="cs-rep-sec">Desglose por programa</div>'
+    + (f.programas.length ? '<div class="cs-tdesg">' + f.programas.map((g, i) => '<div class="cs-tdprog" style="border-top-color:' + CS_TCOLORES[i % CS_TCOLORES.length] + '">'
+        + '<div class="cs-tdprog-cab"><b>' + csEsc(g.programa) + '</b>' + csChipEstado(g.estado) + '</div>'
+        + '<div class="cs-tenue">' + (g.tipo ? csEsc(g.tipo) + ' · ' : '') + '<b>' + g.eps.length + '</b> ep. · <b>' + g.personajes.length + '</b> personaje' + (g.personajes.length === 1 ? '' : 's') + ' · <b>' + g.lineas + '</b> líneas</div>'
+        + (g.eps.length ? '<div class="cs-tdeps">' + g.eps.map(n => '<span class="cs-tdep">Ep.' + csEsc(n) + '</span>').join('') + '</div>' : '')
+        + '<div class="cs-tdpers">' + g.personajes.map(y => '<div class="cs-tdper"><b>' + csEsc(y.nombre) + (y.principal ? ' <i class="cs-tdest">' + csIco('estrella', 11) + '</i>' : '') + '</b>'
+            + (y.eps.length ? '<span class="cs-tenue">Ep. ' + csEsc(csTramoTexto(y.eps)) + '</span>' : '') + (y.lineas ? '<span class="cs-tdlin">' + y.lineas + ' lín.</span>' : '') + '</div>').join('') + '</div>'
+        + '</div>').join('') + '</div>'
+      : '<div class="cs-nada">Todavía no tiene papeles en ningún programa.</div>');
+}
+
 function csHtmlTalentos(d, vivo){
-  const lista = csTalentos(d, CS.buscar);
   const modo = (k, t, ico) => '<button class="cs-pest' + (CS.talModo === k ? ' on' : '') + '" data-cs="talModo" data-v="' + k + '">' + csIco(ico, 13) + ' ' + t + '</button>';
   const pests = '<div class="cs-pests cs-tal-modos">' + modo('talentos', 'Talentos', 'talentos') + modo('personajes', 'Buscar personaje', 'buscar') + '</div>';
   if(CS.talModo === 'personajes')
     return csCabecera('Talentos', 'Qué programa y qué talento hizo cada personaje', vivo) + pests + csHtmlBuscarPersonaje(d);
-  return csCabecera('Talentos', (d ? d.talents.length : 0) + ' talentos con su ficha y sus papeles', vivo) + pests
-    + (d ? '<div class="cs-nuevo"><input type="text" id="csTalNuevo" placeholder="Nombre del talento nuevo"><button class="cs-b cs-pri" data-cs="talNuevo">' + csIco('mas', 14) + '<span>Añadir talento</span></button></div>'
-      + '<label class="cs-buscar">' + '<input type="text" data-cs="buscar" placeholder="Buscar talento…" value="' + csEsc(CS.buscar) + '"></label>'
-      + (lista.length ? '<div class="cs-lista">' + lista.map(t => '<div class="cs-tal">'
-          + '<div class="cs-tal-cab"><b>' + csEsc(t.nombre) + '</b>' + (t.ficha ? '<span class="cs-ficha">' + csEsc(t.ficha) + '</span>' : '<span class="cs-ficha cs-tenue">sin ficha</span>')
-          + (t.correo ? '<span class="cs-tenue">' + csEsc(t.correo) + '</span>' : '') + '</div>'
-          + (t.programas.length ? '<div class="cs-papeles">' + t.programas.map(p => '<span><b>' + csEsc(p.programa) + '</b>: ' + csEsc(p.personajes.slice(0, 6).join(', ')) + (p.personajes.length > 6 ? '…' : '') + '</span>').join('') + '</div>' : '')
-          + '<details class="cs-tal-ed"><summary>Editar ficha</summary><div class="cs-tal-campos">'
-          +   '<label>Nombre <input type="text" data-cs="talCampo" data-id="' + csEsc(t.id) + '" data-campo="name" value="' + csEsc(t.nombre) + '"></label>'
-          +   '<label>Género ' + csSelect('genero', t.genero, CS_OP_GENERO, { cs: 'talCampo', id: t.id }) + '</label>'
-          +   '<label>Edad ' + csSelect('edad_aparente', t.edad, CS_OP_EDAD, { cs: 'talCampo', id: t.id }) + '</label>'
-          +   '<label>Tono ' + csSelect('tono_de_voz', t.tono, CS_OP_TONO, { cs: 'talCampo', id: t.id }) + '</label>'
-          +   '<label>Registro <input type="text" data-cs="talCampo" data-id="' + csEsc(t.id) + '" data-campo="registro" value="' + csEsc(t.registro) + '"></label>'
-          +   '<label>Correo <input type="email" data-cs="talCampo" data-id="' + csEsc(t.id) + '" data-campo="email" value="' + csEsc(t.correo) + '"></label>'
-          + '</div></details>'
-          + '</div>').join('') + '</div>'
-        : '<div class="cs-nada">Ningún talento' + (CS.buscar ? ' con «' + csEsc(CS.buscar) + '»' : '') + '.</div>')
-      : csVacio());
+  const regs = csRegistrosTodos(d);
+  const fichas = csFichasTalentos(d, regs, csActual().lista);
+  const abierta = CS.talAbierto ? fichas.find(f => f.clave === CS.talAbierto) : null;
+  if(abierta) return csHtmlFichaTalento(abierta, d);
+  const q = castNorm(CS.buscar);
+  const vistos = fichas.filter(f => !q || f.clave.indexOf(q) >= 0 || f.programas.some(g => castNorm(g.programa).indexOf(q) >= 0));
+  return csCabecera('Talentos', fichas.length + ' talentos con su ficha y sus papeles', vivo) + pests
+    + (d ? '<div class="cs-nuevo"><input type="text" id="csTalNuevo" placeholder="Nombre del talento nuevo"><button class="cs-b cs-pri" data-cs="talNuevo">' + csIco('mas', 14) + '<span>Añadir talento</span></button></div>' : '')
+    + '<label class="cs-buscar">' + csIco('buscar', 14) + '<input type="text" data-cs="buscar" placeholder="Buscar talento o programa…" value="' + csEsc(CS.buscar) + '"></label>'
+    + (CS_REGS.yendo && !CS_REGS.lista ? '<div class="cs-tenue">Leyendo el casting de los programas de Dubbipt…</div>' : '')
+    + (vistos.length ? '<div class="cs-tgrid">' + vistos.map(csHtmlTarjetaTalento).join('') + '</div>'
+      : (fichas.length ? '<div class="cs-nada">Ningún talento con «' + csEsc(CS.buscar) + '».</div>' : (d ? '<div class="cs-nada">Todavía no hay talentos.</div>' : csVacio())));
 }
 
 function csHtmlOcupacion(d, vivo){
@@ -2367,6 +2466,8 @@ function csCablear(vista){
     else if(que === 'herramienta') el.onclick = () => dcastAbrir(v);
     else if(que === 'buscar') el.oninput = () => escribir('buscar');
     else if(que === 'buscarPer') el.oninput = () => escribir('buscarPer');
+    else if(que === 'talAbrir') el.onclick = () => { CS.talAbierto = v; csRepintar(); try{ window.scrollTo(0, 0); }catch(err){ /* sin desplazar */ } };
+    else if(que === 'talCerrar') el.onclick = () => { CS.talAbierto = null; csRepintar(); };
     else if(que === 'talModo') el.onclick = () => { CS.talModo = v; csRepintar(); const i = document.querySelector('#csVista [data-cs="buscarPer"]'); if(i) try{ i.focus(); }catch(err){ /* sin foco */ } };
     else if(que === 'buscarProg') el.oninput = () => escribir('buscarProg');
     else if(que === 'buscarCast') el.oninput = () => escribir('buscarCast');
