@@ -307,9 +307,78 @@ function csRegistroDe(show){
   if(k in CS.registros) return CS.registros[k];
   CS.registros[k] = null;
   Promise.resolve().then(() => castRegCargar(show.id))
-    .then(r => { CS.registros[k] = r || { personajes: {} }; csRepintar(); })
-    .catch(() => { CS.registros[k] = { personajes: {} }; });
+    .then(r => {
+      CS.registros[k] = r || { personajes: {} }; csRepintar();
+      return csCompletarFotos(show, CS.registros[k]);
+    })
+    .catch(() => { if(!CS.registros[k]) CS.registros[k] = { personajes: {} }; });
   return null;
+}
+
+/* Los programas a los que ya se les completó el casting en esta sesión. */
+const CS_FOTOS = { hechos: new Set() };
+
+/**
+ * El casting de los episodios que solo se castearon en Dubbipt. Pedido de
+ * sala: «los episodios que no estén creados en DublajeCast, crea el casting y
+ * el reparto». El Reparto y la tabla de casting salen de la foto de cada
+ * capítulo, que se hace al abrirlo en Casting (PRO-22); los casteados antes,
+ * o nunca abiertos así, no la tenían y salían vacíos o sin líneas. Se hace
+ * aquí con el desglose que ya está guardado en la nube (solo sus personajes:
+ * nombre, talento e intervenciones, sin bajar el libreto). Solo se crean las
+ * que faltan: lo casteado en Casting manda. Una vez por programa y sesión.
+ */
+async function csCompletarFotos(show, reg){
+  if(!show || !show.id || CS_FOTOS.hechos.has(String(show.id))) return 0;
+  if(typeof sb === 'undefined' || !sb || (typeof window !== 'undefined' && window.OFFLINE)) return 0;
+  CS_FOTOS.hechos.add(String(show.id));
+  const eps = (typeof sbEps === 'function') ? (sbEps(show.id) || []) : [];
+  const conFoto = new Set(Object.keys((reg && reg.capitulos) || {}).map(castNorm));
+  const faltan = eps.filter(e => e && e.name && !conFoto.has(castNorm(e.name)));
+  if(!faltan.length) return 0;
+  const { data, error } = await sb.from('episode_data').select('ep_id, updated_at, chars:data->chars').eq('show_id', show.id);
+  if(error || !Array.isArray(data)) return 0;
+  const porEp = {};
+  for(const r of data) if(r && Array.isArray(r.chars) && r.chars.length) porEp[String(r.ep_id)] = r;
+  const nuevas = {};
+  for(const e of faltan){
+    const r = porEp[String(e.id)];
+    if(!r) continue;
+    const foto = {};
+    for(const c of r.chars){
+      if(!c) continue;
+      const nombre = c.display || c.key || '', clave = castNorm(nombre);
+      if(!clave) continue;
+      foto[clave] = { display: nombre, talent: c.talent ? String(c.talent).trim() : '', lineas: +c.totalInts || 0 };
+    }
+    if(Object.keys(foto).length) nuevas[e.name] = { ts: Date.parse(r.updated_at) || 1, personajes: foto, de: 'desglose' };
+  }
+  const n = Object.keys(nuevas).length;
+  if(!n) return 0;
+  /* Sobre el registro de ahora, por si alguien casteó mientras tanto. */
+  const actual = await castRegCargar(show.id);
+  actual.personajes = actual.personajes || {};
+  actual.capitulos = actual.capitulos || {};
+  const ya = new Set(Object.keys(actual.capitulos).map(castNorm));
+  let hechas = 0;
+  for(const nombreEp of Object.keys(nuevas)){
+    if(ya.has(castNorm(nombreEp))) continue;
+    actual.capitulos[nombreEp] = nuevas[nombreEp];
+    hechas++;
+    /* Y quién hace a quién, para que los capítulos siguientes lo hereden; lo que ya había, manda. */
+    for(const clave of Object.keys(nuevas[nombreEp].personajes)){
+      const x = nuevas[nombreEp].personajes[clave];
+      if(!x.talent) continue;
+      const p = actual.personajes[clave];
+      if(!p) actual.personajes[clave] = { display: x.display, talent: x.talent, episodios: [nombreEp], ts: nuevas[nombreEp].ts };
+      else if(Array.isArray(p.episodios) && !p.episodios.some(en => castNorm(en) === castNorm(nombreEp))) p.episodios = p.episodios.concat([nombreEp]);
+    }
+  }
+  if(!hechas) return 0;
+  await castRegGuardar(show.id, actual);
+  CS.registros[String(show.id)] = actual;
+  csRepintar();
+  return hechas;
 }
 
 /** El programa y el episodio que se están mirando. */
