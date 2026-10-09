@@ -223,7 +223,7 @@ exports.pruebas = async function(t){
   t.ok('el botón está en la barra y solo se enseña en casting',
        /id="btnLibTrad" style="display:none" onclick="libTraducidoCambiar\(\)"/.test(fuentesHtml())
        && /\['btnImpDes','btnImpPla','btnDcast','btnMeta','btnGestos','btnBaseTal','btnLibTrad'[,\]]/.test(F));
-  t.ok('y al entrar en casting se pone al día', /if\(m === 'casting'\)\{\s+try\{ libTraducidoPintar\(\); \}/.test(F));
+  t.ok('y al entrar en casting se pone al día', /if\(m === 'casting' && esteEp\)\{\s+try\{ libTraducidoPintar\(\); \}/.test(F));
   t.ok('guardar un capítulo que sale de la lista no pregunta por el PDF: ya trae su libreto',
        /if\(esNuevo && !lastPdfBuf && lastXlsBuf && !\(script && script\.length\)\)\{/.test(F));
   t.ok('y las hojas impresas dicen que el casting va adelantado',

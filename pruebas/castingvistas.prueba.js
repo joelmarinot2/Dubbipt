@@ -101,7 +101,7 @@ function armar(o){
   let vivo = !!o.vivo;
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
     ['CS', 'CS_SECCIONES', 'CS_ICO', 'csIco', 'csResumen', 'csOcupacion', 'csTalentos', 'csProduccion', 'csHtml', 'csNavHtml', 'csPintar', 'csIr', 'csRepintar', 'csCablear', 'csActualizar',
-     'csNumeroDe', 'csProgramas', 'csFiltrarProgramas', 'csEpisodios', 'csCastingDe', 'csActual', 'csRegistroDe', 'csRealizarCasting', 'csTablaCasting'],
+     'csNumeroDe', 'csProgramas', 'csFiltrarProgramas', 'csEpisodios', 'csCastingDe', 'csActual', 'csRegistroDe', 'csRealizarCasting', 'csTablaCasting', 'csBorrarPrograma', 'csBorrarEpisodio'],
     { castNorm: PR.prodCasarPrograma && ((t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim()),
       document: doc, prodPuede: () => (o.puede !== undefined ? o.puede : true), PROD: PROD, PROD_ET: PR.PROD_ET,
       prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard, prodFichaTexto: PR.prodFichaTexto, prodCasarPrograma: PR.prodCasarPrograma,
@@ -113,6 +113,8 @@ function armar(o){
       dcastSerieDe: DC.dcastSerieDe, dcastEpDeDc: DC.dcastEpDeDc, dcastFilasCasting: DC.dcastFilasCasting, dcastNumerosDe: DC.dcastNumerosDe,
       castRegCargar: async (id) => { diario.push('registro ' + id); return o.registro !== undefined ? o.registro : REGISTRO; },
       ponerModo: (ep, m) => diario.push('ponerModo ' + ep + ' ' + m), openEpisode: async (id) => diario.push('openEpisode ' + id),
+      libBorrarPrograma: async (sh) => { diario.push('borraProg ' + sh.id); return o.borrar !== false; },
+      libBorrarCapitulo: async (ep) => { diario.push('borraEp ' + ep.id); return o.borrar !== false; },
       newEpisodeModal: () => { body.appendChild(Object.assign(new El('input'), { id: 'neName', value: '' })); diario.push('newEpisodeModal ' + LDB.showId); },
       renderLibrary: () => diario.push('renderLibrary'), newShow: async () => { body.appendChild(Object.assign(new El('input'), { id: 'npName', value: '', focus: () => {} })); diario.push('newShow'); },
       esc: (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), fallo: (d) => diario.push('fallo ' + d), _svgI: undefined, prodCargar: async () => { diario.push('carga'); }, prodWs: () => 'w', prodSincronizar: async () => { diario.push('asegura'); return false; }, prodCopias: async () => [],
@@ -359,6 +361,32 @@ exports.pruebas = async function(t){
     t.eq('«Casting» no pasa por la ficha: abre el capítulo con el perfil Casting', (control(A, 'castear', 'e:e1').onclick(), await espera(), A.diario.filter(x => /^ponerModo|^openEpisode/.test(x)).join(',') + ' ' + A.LDB.showId + ' ' + A.M.CS.vista), 'ponerModo e1 casting,openEpisode e1 s1 programa');
     A.M.CS.prog = 'dc:2'; A.M.csPintar('shows', b.cab, b.grid);
     t.ok('uno que solo está en DublajeCast no se puede castear todavía: solo su ficha', /data-cs="abrirEp" data-v="d:/.test(vista(A)) && !/data-cs="castear"/.test(vista(A)));
+  }
+
+  {
+    /* Eliminar programas y episodios desde Casting: lo de Dubbipt, nada de DublajeCast. */
+    const A = armar();
+    const b = biblioteca(A.doc);
+    A.M.csPintar('shows', b.cab, b.grid);
+    t.ok('cada programa de Dubbipt tiene su botón de eliminar en la tarjeta', !!control(A, 'borrarProg', 's:s1'));
+    t.ok('uno que solo está en DublajeCast, no', !/data-cs="borrarProg" data-v="dc:/.test(vista(A)));
+    control(A, 'abrirProg', 's:s1').onclick(); A.M.csPintar('shows', b.cab, b.grid);
+    t.ok('dentro del programa, también', !!control(A, 'borrarProg', 's:s1'));
+    t.ok('y cada episodio de Dubbipt tiene el suyo', !!control(A, 'borrarEp', 'e:e1'));
+    control(A, 'borrarEp', 'e:e1').onclick(); await espera();
+    t.eq('eliminar un episodio lo borra y se queda en el programa', A.diario.filter(x => /^borra/.test(x)).join(',') + ' ' + A.M.CS.vista, 'borraEp e1 programa');
+    control(A, 'abrirEp', 'e:e1').onclick(); A.M.csPintar('shows', b.cab, b.grid);
+    control(A, 'borrarEp', 'e:e1').onclick(); await espera();
+    t.eq('desde la ficha del episodio, vuelve al programa', A.M.CS.vista + ' ' + A.M.CS.ep, 'programa null');
+    A.M.csPintar('shows', b.cab, b.grid);
+    control(A, 'borrarProg', 's:s1').onclick(); await espera();
+    t.eq('eliminar el programa vuelve a la lista de programas', A.diario.filter(x => /^borraProg/.test(x)).join(',') + ' ' + A.M.CS.vista + ' ' + A.M.CS.prog, 'borraProg s1 programas null');
+    const N = armar({ borrar: false });
+    const bn = biblioteca(N.doc);
+    N.M.csPintar('shows', bn.cab, bn.grid);
+    control(N, 'abrirProg', 's:s1').onclick(); N.M.csPintar('shows', bn.cab, bn.grid);
+    control(N, 'borrarProg', 's:s1').onclick(); await espera();
+    t.eq('si se cancela, no se mueve de donde estaba', N.M.CS.vista + ' ' + N.M.CS.prog, 'programa s:s1');
   }
 
   t.seccion('9 · Actualizar');

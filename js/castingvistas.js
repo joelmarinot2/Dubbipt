@@ -65,7 +65,8 @@ const CS_ICO = {
   buscar:     '<circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/>',
   izquierda:  '<path d="M15 6l-6 6 6 6"/>',
   hecho:      '<path d="M5 12l5 5L20 7"/>',
-  fusionar:   '<path d="M7 4v5c0 3 2 5 5 5h5"/><path d="M7 20v-6"/><path d="M14 11l3 3-3 3"/>'
+  fusionar:   '<path d="M7 4v5c0 3 2 5 5 5h5"/><path d="M7 20v-6"/><path d="M14 11l3 3-3 3"/>',
+  borrar:     '<path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/>'
 };
 /** Un icono de trazo, en el mismo dibujo que los de Dubbipt. */
 function csIco(n, sz){
@@ -1414,7 +1415,9 @@ function csHtmlProgramas(lista, vivo){
           + '<div class="cs-prog-n">' + n + ' episodio' + (n === 1 ? '' : 's') + '</div>'
           + '<div class="cs-prog-bots"><button class="cs-b cs-pri cs-prog-abrir" data-cs="abrirProg" data-v="' + csEsc(p.clave) + '">Abrir</button>'
           +   '<button class="cs-b cs-prog-marcar" data-cs="estadoCard" data-v="' + csEsc(p.clave) + '" title="' + (p.estado === 'completo' ? 'Volver a ponerlo en curso' : 'Marcarlo como completado') + '">'
-          +     (p.estado === 'completo' ? csIco('actualizar', 13) + '<span>Reabrir</span>' : csIco('hecho', 13) + '<span>Completar</span>') + '</button></div>'
+          +     (p.estado === 'completo' ? csIco('actualizar', 13) + '<span>Reabrir</span>' : csIco('hecho', 13) + '<span>Completar</span>') + '</button>'
+          +   (p.show ? '<button class="cs-b cs-b-icono cs-borrar" data-cs="borrarProg" data-v="' + csEsc(p.clave) + '" title="Eliminar el programa de Dubbipt" aria-label="Eliminar el programa ' + csEsc(p.nombre) + '">' + csIco('borrar', 13) + '</button>' : '')
+          + '</div>'
           + '</div>';
       }).join('') + '</div>'
       : '<div class="cs-nada">' + (CS.buscarProg ? 'Ningún programa coincide con «' + csEsc(CS.buscarProg) + '».' : 'No hay programas.') + '</div>');
@@ -1446,7 +1449,8 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
         /* «Casting» abre el casting de Dubbipt directamente; la ficha, aparte. Uno que solo está
            en DublajeCast no se puede castear todavía: su ficha dice cómo crearlo. */
         + '<div class="cs-ep-bots"><button class="cs-b" data-cs="abrirEp" data-v="' + csEsc(e.clave) + '">Ficha</button>'
-        +   (e.ep ? '<button class="cs-b cs-pri" data-cs="castear" data-v="' + csEsc(e.clave) + '" title="Abre el capítulo con el perfil Casting: la interfaz de castear de Dubbipt">' + csIco('entrar', 14) + '<span>Casting</span></button>' : '')
+        +   (e.ep ? '<button class="cs-b cs-pri" data-cs="castear" data-v="' + csEsc(e.clave) + '" title="Abre el capítulo con el perfil Casting: la interfaz de castear de Dubbipt">' + csIco('entrar', 14) + '<span>Casting</span></button>'
+                + '<button class="cs-b cs-b-icono cs-borrar" data-cs="borrarEp" data-v="' + csEsc(e.clave) + '" title="Eliminar el capítulo de Dubbipt" aria-label="Eliminar ' + csEsc(e.titulo) + '">' + csIco('borrar', 14) + '</button>' : '')
         + '</div>'
         + '</div>';
     }).join('') + '</div>'
@@ -1459,6 +1463,7 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
                 : '<button class="cs-b cs-pri" data-cs="crearProg">' + csIco('mas', 14) + '<span>Crear en Dubbipt</span></button>')
     +   (p.serie ? '<button class="cs-b" data-cs="dcSerie">' + csIco('externo', 14) + '<span>En DublajeCast</span></button>' : '')
     +   '<button class="cs-b" data-cs="fusionProg" data-v="' + csEsc(p.clave) + '" title="Juntar este programa con otro que es el mismo">' + csIco('fusionar', 14) + '<span>Fusionar</span></button>'
+    +   (p.show ? '<button class="cs-b cs-borrar" data-cs="borrarProg" data-v="' + csEsc(p.clave) + '" title="Eliminar el programa de Dubbipt con sus capítulos">' + csIco('borrar', 14) + '<span>Eliminar</span></button>' : '')
     + '</div></div>'
     + csHtmlFusionProg(p, csActual().lista)
     + csHtmlOtroIgual(p, csActual().lista)
@@ -1608,7 +1613,8 @@ function csHtmlEpisodio(p, e, d, registro, hoy){
   return '<button class="cs-volver" data-cs="volver" data-v="programa">' + csIco('izquierda', 14) + '<span>' + csEsc(p.nombre) + '</span></button>'
     + '<div class="cs-cab"><div class="cs-cab-t"><h2>' + (e.numero != null ? 'Ep. ' + e.numero + ' · ' : '') + csEsc(e.titulo) + '</h2>'
     +   '<div class="cs-cab-sub">' + csEsc(p.nombre) + (e.dcTitulo && castNorm(e.dcTitulo) !== castNorm(e.titulo) ? ' · en DublajeCast: ' + csEsc(e.dcTitulo) : '') + '</div></div>'
-    +   (dc && p.serie ? '<button class="cs-b" data-cs="dcEp">' + csIco('externo', 14) + '<span>En DublajeCast</span></button>' : '') + '</div>'
+    +   (dc && p.serie ? '<button class="cs-b" data-cs="dcEp">' + csIco('externo', 14) + '<span>En DublajeCast</span></button>' : '')
+    +   (e.ep ? '<button class="cs-b cs-borrar" data-cs="borrarEp" data-v="' + csEsc(e.clave) + '" title="Eliminar el capítulo de Dubbipt con su libreto">' + csIco('borrar', 14) + '<span>Eliminar</span></button>' : '') + '</div>'
     + ficha
     + '<div class="cs-realizar">'
     +   (e.ep
@@ -1763,6 +1769,27 @@ async function csRealizarCasting(p, e){
   return true;
 }
 
+/**
+ * Eliminar un programa o un capítulo desde Casting: lo de Dubbipt, con su
+ * libreto. Lo que hay en DublajeCast no se toca; el programa o el capítulo
+ * seguirá saliendo como «Solo en DublajeCast».
+ */
+async function csBorrarPrograma(p){
+  if(!p || !p.show) return false;
+  if(!(await libBorrarPrograma(p.show))) return false;
+  delete CS.registros[String(p.show.id)];
+  CS.vista = 'programas'; CS.prog = null; CS.ep = null;
+  csRepintar();
+  return true;
+}
+async function csBorrarEpisodio(p, e){
+  if(!e || !e.ep) return false;
+  if(!(await libBorrarCapitulo(e.ep))) return false;
+  if(CS.vista === 'episodio'){ CS.vista = 'programa'; CS.ep = null; }
+  csRepintar();
+  return true;
+}
+
 /** Los controles de una sección. */
 function csCablear(vista){
   const a = () => csActual();
@@ -1866,6 +1893,14 @@ function csCablear(vista){
     else if(que === 'estadoProg') el.onclick = () => {
       const x = a(); if(!x.p) return;
       csCambiarEstado(x.p, x.p.estado === 'completo' ? 'en_curso' : 'completo').catch(err => fallo('csCambiarEstado · js/castingvistas.js', err, 'el estado no se ha podido guardar'));
+    };
+    else if(que === 'borrarProg') el.onclick = () => {
+      const p = a().lista.find(y => y.clave === v) || a().p;
+      csBorrarPrograma(p).catch(err => fallo('csBorrarPrograma · js/castingvistas.js', err, 'el programa no se ha podido eliminar'));
+    };
+    else if(que === 'borrarEp') el.onclick = () => {
+      const x = a(), e = (x.eps || []).find(y => y.clave === v) || x.e;
+      csBorrarEpisodio(x.p, e).catch(err => fallo('csBorrarEpisodio · js/castingvistas.js', err, 'el capítulo no se ha podido eliminar'));
     };
     else if(que === 'estadoCard') el.onclick = () => {
       const p = a().lista.find(y => y.clave === v); if(!p) return;
