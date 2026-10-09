@@ -1821,6 +1821,18 @@ body.cs-on #progHeader{ display:none !important; }
 .disp-encurso.on{ background:rgba(251,191,36,.12); border-color:rgba(251,191,36,.5); color:#FBBF24; }
 .disp-pg-fin .disp-cap-p, .disp-ep-fin{ opacity:.55; }
 .disp-cap-fin{ color:#4ADE80 !important; }
+/* El reparto del programa en una ventana aparte (js/castreparto.js), cuando se abre dentro de la página. */
+.repv-pests{ display:flex; gap:4px; background:#11131a; border:1px solid #2b3040; border-radius:9px; padding:3px; }
+.repv-pest{ background:none; border:0; color:#aab3c2; font:inherit; font-size:12.5px; padding:5px 10px; border-radius:7px; cursor:pointer; }
+.repv-pest.on{ background:#22C55E; color:#06210f; font-weight:700; }
+.repv-tramos{ display:flex; flex-direction:column; gap:4px; }
+.repv-tramo{ display:flex; flex-wrap:wrap; align-items:center; gap:5px 10px; font-size:12.5px; }
+.repv-tal{ color:#4ADE80; font-weight:700; }
+.repv-sin{ color:#FB7185; }
+.repv-per{ color:#e7ebf3; font-weight:600; }
+.repv-lin{ color:#aab3c2; font-variant-numeric:tabular-nums; }
+.repv-eps{ display:flex; flex-wrap:wrap; gap:4px; }
+.repv-ep{ background:#161a22; border:1px solid #2b3040; border-radius:999px; padding:0 7px; font-size:11px; color:#cbd5e1; font-variant-numeric:tabular-nums; }
 .disp-prog{ color:#4ADE80; font-weight:600; }
 .disp-cap{ color:#e5e7eb; }
 .disp-tenue{ color:#8b93a1; }
@@ -2332,6 +2344,7 @@ body.modo-casting #btnExport{ display:none !important; }
       <button class="btnv sm" id="btnLibCambiar" style="display:none" onclick="document.getElementById('libCambioFile').click()" title="Sube el libreto traducido -o una version nueva- dentro de este capitulo: los talentos ya repartidos se conservan">📥 Subir libreto</button>
       <input type="file" id="libCambioFile" accept="application/pdf,.pdf,.docx,.xlsx,.xlsm,.xls" style="display:none" onchange="if(this.files[0]) libCambiar(this.files[0]); this.value=''">
       <button class="btnv sm" id="btnDisp" style="display:none" onclick="dispAbrir()" title="Quién está libre, quién ha estado ya en este programa y cuánto tiene cada talento en otros programas en curso">Disponibilidad</button>
+      <button class="btnv sm" id="btnRepVentana" style="display:none" onclick="repvAbrir()" title="El reparto del programa en una ventana aparte, para buscar quién hace a quién mientras casteas">Reparto</button>
       <button class="btnv sm" id="btnBaseTal" style="display:none" onclick="talPanel()" title="La lista de actores de la empresa: solo se puede repartir a quien este aqui">🎭 Base de talentos</button>
       <button class="btnv sm" id="btnMeta" style="display:none" onclick="castMetaPanel()" title="Fecha, género, tiempo, director, técnico y estudio del programa">Cabecera</button>
       <button class="btnv sm" id="btnDcast" style="display:none" onclick="dcPanel()" title="Sincronizar el casting con DublajeCast">⇄ DublajeCast</button>
@@ -2694,7 +2707,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.54.0-nube';
+const APP_VER_NUM = 'v11.55.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -9147,7 +9160,7 @@ function ponerModo(epId, m){
   if(bu){ bu.style.display = (m === 'casting') ? '' : 'none'; castPintarUndo(); }
   const bt = document.getElementById('btnTabla');
   if(bt) bt.style.display = (m === 'casting') ? '' : 'none';
-  for(const id of ['btnImpDes','btnImpPla','btnDcast','btnMeta','btnGestos','btnBaseTal','btnLibTrad','btnLibCambiar','btnDisp']){
+  for(const id of ['btnImpDes','btnImpPla','btnDcast','btnMeta','btnGestos','btnBaseTal','btnLibTrad','btnLibCambiar','btnDisp','btnRepVentana']){
     const b = document.getElementById(id);
     if(b) b.style.display = (m === 'casting') ? '' : 'none';
   }
@@ -22800,5 +22813,6 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/dcescribir.js"></script>
 <script src="./js/castingvistas.js"></script>
 <script src="./js/castdisponible.js"></script>
+<script src="./js/castreparto.js"></script>
 <script src="./js/salud.js"></script>
 <script src="./js/qcpdf.js"></script>
