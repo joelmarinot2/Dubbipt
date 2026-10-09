@@ -99,4 +99,21 @@ exports.pruebas = async function(t){
   t.ok('desde la vista de Casting el perfil se pone antes de abrir el capítulo: solo se hereda y se fotografía el capítulo abierto',
        /const esteEp = !epId \|\| \(typeof currentEp !== 'undefined' && currentEp && currentEp\.id === epId\);/.test(HTML));
   t.ok('y al asignar o quitar un talento, como siempre', (HTML.match(/try\{ castRegAnotarPronto\(\); \}catch\(e\)\{\}/g) || []).length >= 2);
+
+  t.seccion('5 · eliminar no deja nada');
+  {
+    const arbol = { 's1': [{ name: 'e1', id: null, metadata: null }, { name: 'casting-registro.json', id: 'a', metadata: {} }],
+                    's1/e1': [{ name: 'libreto.json', id: 'b', metadata: {} }, { name: 'versiones', id: null, metadata: null }],
+                    's1/e1/versiones': [{ name: 'v1.pdf', id: 'c', metadata: {} }] };
+    const quitados = [], idb = { 'ep:e1': 1, 'data:e1': 1, 'ddl-registro::s1': 1, 'ep:e9': 1 }, ls = { 'ddl_modo::e1': 'casting', 'ddl_density': 'x', 'ddl_last_ep': 'e1' };
+    const M = montar([['/** Borra todo lo que hay bajo una carpeta de un bucket', '/**\n * Elimina un programa POR COMPLETO']], ['libBorrarCarpeta', 'libOlvidarLocal'],
+      { fallo: () => {},
+        sb: { storage: { from: () => ({ list: async (dir) => ({ data: arbol[dir] || [] }), remove: async (rutas) => { quitados.push(...rutas); return {}; } }) } },
+        idbOpen: async () => ({ transaction: () => ({ objectStore: () => ({ getAllKeys: () => { const t = {}; setTimeout(() => { t.result = Object.keys(idb); t.onsuccess(); }); return t; } }) }) }),
+        idbDel: async (k) => { delete idb[k]; },
+        localStorage: { get length(){ return Object.keys(ls).length; }, key: (i) => Object.keys(ls)[i], getItem: (k) => (k in ls ? ls[k] : null), removeItem: (k) => { delete ls[k]; } } });
+    t.eq('todos los archivos del programa, también los de las subcarpetas', (await M.libBorrarCarpeta('libretos', 's1')) + ' ' + quitados.sort().join(','), '3 s1/casting-registro.json,s1/e1/libreto.json,s1/e1/versiones/v1.pdf');
+    await M.libOlvidarLocal(['s1', 'e1']);
+    t.eq('y lo que este equipo guardaba de él, sin tocar lo demás', Object.keys(idb).join(',') + ' · ' + Object.keys(ls).join(','), 'ep:e9 · ddl_density');
+  }
 };

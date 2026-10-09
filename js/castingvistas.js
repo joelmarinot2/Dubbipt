@@ -1416,7 +1416,7 @@ function csHtmlProgramas(lista, vivo){
           + '<div class="cs-prog-bots"><button class="cs-b cs-pri cs-prog-abrir" data-cs="abrirProg" data-v="' + csEsc(p.clave) + '">Abrir</button>'
           +   '<button class="cs-b cs-prog-marcar" data-cs="estadoCard" data-v="' + csEsc(p.clave) + '" title="' + (p.estado === 'completo' ? 'Volver a ponerlo en curso' : 'Marcarlo como completado') + '">'
           +     (p.estado === 'completo' ? csIco('actualizar', 13) + '<span>Reabrir</span>' : csIco('hecho', 13) + '<span>Completar</span>') + '</button>'
-          +   (p.show ? '<button class="cs-b cs-b-icono cs-borrar" data-cs="borrarProg" data-v="' + csEsc(p.clave) + '" title="Eliminar el programa de Dubbipt" aria-label="Eliminar el programa ' + csEsc(p.nombre) + '">' + csIco('borrar', 13) + '</button>' : '')
+          +   (p.show || (p.serie && csPuedeBorrarDc()) ? '<button class="cs-b cs-b-icono cs-borrar" data-cs="borrarProg" data-v="' + csEsc(p.clave) + '" title="Eliminar el programa por completo" aria-label="Eliminar el programa ' + csEsc(p.nombre) + '">' + csIco('borrar', 13) + '</button>' : '')
           + '</div>'
           + '</div>';
       }).join('') + '</div>'
@@ -1450,7 +1450,8 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
            en DublajeCast no se puede castear todavía: su ficha dice cómo crearlo. */
         + '<div class="cs-ep-bots"><button class="cs-b" data-cs="abrirEp" data-v="' + csEsc(e.clave) + '">Ficha</button>'
         +   (e.ep ? '<button class="cs-b cs-pri" data-cs="castear" data-v="' + csEsc(e.clave) + '" title="Abre el capítulo con el perfil Casting: la interfaz de castear de Dubbipt">' + csIco('entrar', 14) + '<span>Casting</span></button>'
-                + '<button class="cs-b cs-b-icono cs-borrar" data-cs="borrarEp" data-v="' + csEsc(e.clave) + '" title="Eliminar el capítulo de Dubbipt" aria-label="Eliminar ' + csEsc(e.titulo) + '">' + csIco('borrar', 14) + '</button>' : '')
+              : '')
+        +   (e.ep || (e.dcEp && csPuedeBorrarDc()) ? '<button class="cs-b cs-b-icono cs-borrar" data-cs="borrarEp" data-v="' + csEsc(e.clave) + '" title="Eliminar el episodio por completo" aria-label="Eliminar ' + csEsc(e.titulo) + '">' + csIco('borrar', 14) + '</button>' : '')
         + '</div>'
         + '</div>';
     }).join('') + '</div>'
@@ -1463,7 +1464,7 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
                 : '<button class="cs-b cs-pri" data-cs="crearProg">' + csIco('mas', 14) + '<span>Crear en Dubbipt</span></button>')
     +   (p.serie ? '<button class="cs-b" data-cs="dcSerie">' + csIco('externo', 14) + '<span>En DublajeCast</span></button>' : '')
     +   '<button class="cs-b" data-cs="fusionProg" data-v="' + csEsc(p.clave) + '" title="Juntar este programa con otro que es el mismo">' + csIco('fusionar', 14) + '<span>Fusionar</span></button>'
-    +   (p.show ? '<button class="cs-b cs-borrar" data-cs="borrarProg" data-v="' + csEsc(p.clave) + '" title="Eliminar el programa de Dubbipt con sus capítulos">' + csIco('borrar', 14) + '<span>Eliminar</span></button>' : '')
+    +   (p.show || (p.serie && csPuedeBorrarDc()) ? '<button class="cs-b cs-borrar" data-cs="borrarProg" data-v="' + csEsc(p.clave) + '" title="Eliminar el programa por completo, con sus episodios">' + csIco('borrar', 14) + '<span>Eliminar</span></button>' : '')
     + '</div></div>'
     + csHtmlFusionProg(p, csActual().lista)
     + csHtmlOtroIgual(p, csActual().lista)
@@ -1614,7 +1615,7 @@ function csHtmlEpisodio(p, e, d, registro, hoy){
     + '<div class="cs-cab"><div class="cs-cab-t"><h2>' + (e.numero != null ? 'Ep. ' + e.numero + ' · ' : '') + csEsc(e.titulo) + '</h2>'
     +   '<div class="cs-cab-sub">' + csEsc(p.nombre) + (e.dcTitulo && castNorm(e.dcTitulo) !== castNorm(e.titulo) ? ' · en DublajeCast: ' + csEsc(e.dcTitulo) : '') + '</div></div>'
     +   (dc && p.serie ? '<button class="cs-b" data-cs="dcEp">' + csIco('externo', 14) + '<span>En DublajeCast</span></button>' : '')
-    +   (e.ep ? '<button class="cs-b cs-borrar" data-cs="borrarEp" data-v="' + csEsc(e.clave) + '" title="Eliminar el capítulo de Dubbipt con su libreto">' + csIco('borrar', 14) + '<span>Eliminar</span></button>' : '') + '</div>'
+    +   (e.ep || (dc && csPuedeBorrarDc()) ? '<button class="cs-b cs-borrar" data-cs="borrarEp" data-v="' + csEsc(e.clave) + '" title="Eliminar el episodio por completo, con su libreto">' + csIco('borrar', 14) + '<span>Eliminar</span></button>' : '') + '</div>'
     + ficha
     + '<div class="cs-realizar">'
     +   (e.ep
@@ -1770,24 +1771,81 @@ async function csRealizarCasting(p, e){
 }
 
 /**
- * Eliminar un programa o un capítulo desde Casting: lo de Dubbipt, con su
- * libreto. Lo que hay en DublajeCast no se toca; el programa o el capítulo
- * seguirá saliendo como «Solo en DublajeCast».
+ * Eliminar un programa o un capítulo POR COMPLETO: lo de Dubbipt (datos,
+ * archivos, casting, copias de este equipo) y su pareja de DublajeCast, que
+ * va a la papelera de DublajeCast. Pedido de sala: «quiero que cuando elimine
+ * programa o episodio se elimine por completo»; borrar solo lo de Dubbipt
+ * dejaba el episodio como «Solo en DublajeCast».
  */
+function csPuedeBorrarDc(){ return typeof prodPuede === 'function' && prodPuede() && typeof dcxBorrarSerie === 'function'; }
+
+async function csConfirmarBorrado(titulo, cuerpo){
+  if(typeof DDL_UI !== 'undefined' && DDL_UI.confirmModal)
+    return DDL_UI.confirmModal({ title: titulo, body: cuerpo, confirmLabel: 'Eliminar', cancelLabel: 'Cancelar', danger: true });
+  return typeof confirm === 'function' ? confirm(cuerpo) : true;
+}
+
+/** Lo de DublajeCast, después de lo de Dubbipt. Devuelve lo que dijo csEditar, o '' si no tocaba. */
+async function csBorrarEnDc(cambio, que, ctx){
+  if(!csPuedeBorrarDc()) return '';
+  const r = await csEditar(cambio, que, ctx);
+  if(r === 'sesion') castAviso('Lo de Dubbipt ya está eliminado. Entra en DublajeCast y vuelve a pulsar «Eliminar» para quitarlo también allí');
+  return r;
+}
+
 async function csBorrarPrograma(p){
-  if(!p || !p.show) return false;
-  if(!(await libBorrarPrograma(p.show))) return false;
-  delete CS.registros[String(p.show.id)];
+  if(!p || (!p.show && !p.serie)) return false;
+  const dc = !!(p.serie && csPuedeBorrarDc());
+  if(!p.show && !dc) return false;
+  const n = Math.max((p.eps || []).length, (p.dcEps || []).length);
+  const donde = p.show && dc ? 'de Dubbipt y de DublajeCast' : (p.show ? 'de Dubbipt' : 'de DublajeCast');
+  const ok = await csConfirmarBorrado('Eliminar programa', 'Se eliminará «' + p.nombre + '» por completo ' + donde + ': sus ' + n + ' episodio' + (n === 1 ? '' : 's')
+    + ', sus libretos y todo su casting.' + (dc ? ' En DublajeCast va a su papelera.' : '') + ' Esta acción no se puede deshacer.');
+  if(!ok) return false;
+  const ctx = csContexto(p, null);
+  if(p.show && !(await libBorrarPrograma(p.show, true))) return false;
+  if(p.show) delete CS.registros[String(p.show.id)];
+  if(dc) await csBorrarEnDc(pl => dcxBorrarSerie(pl, p.serie.id), 'Programa eliminado: ' + p.nombre, ctx);
   CS.vista = 'programas'; CS.prog = null; CS.ep = null;
   csRepintar();
   return true;
 }
+
 async function csBorrarEpisodio(p, e){
-  if(!e || !e.ep) return false;
-  if(!(await libBorrarCapitulo(e.ep))) return false;
+  if(!e || (!e.ep && !e.dcEp)) return false;
+  const dc = !!(e.dcEp && csPuedeBorrarDc());
+  if(!e.ep && !dc) return false;
+  const nombre = (e.numero != null ? 'Ep. ' + e.numero + ' · ' : '') + e.titulo;
+  const donde = e.ep && dc ? 'de Dubbipt y de DublajeCast' : (e.ep ? 'de Dubbipt' : 'de DublajeCast');
+  const ok = await csConfirmarBorrado('Eliminar episodio', 'Se eliminará «' + nombre + '» por completo ' + donde + ', con su libreto y su casting.'
+    + (dc ? ' En DublajeCast va a su papelera.' : '') + ' Esta acción no se puede deshacer.');
+  if(!ok) return false;
+  const ctx = csContexto(p, e);
+  if(e.ep && !(await libBorrarCapitulo(e.ep, true))) return false;
+  if(dc) await csBorrarEnDc(pl => dcxBorrarEpisodios(pl, [e.dcEp.id], 'Eliminado desde Dubbipt: ' + (p ? p.nombre + ' · ' : '') + nombre), 'Episodio eliminado: ' + nombre, ctx);
   if(CS.vista === 'episodio'){ CS.vista = 'programa'; CS.ep = null; }
   csRepintar();
   return true;
+}
+
+/** La papelera de la biblioteca: con su pareja de DublajeCast, si la tiene. */
+async function csBorrarDeBiblioteca(sh, ep){
+  let lista = [];
+  try{ lista = csProgramas((typeof sbShows === 'function') ? sbShows() : [], (typeof sbEps === 'function') ? sbEps : null, csDatos().datos); }catch(err){ lista = []; }
+  if(sh){
+    const p = lista.find(x => x.show && x.show.id === sh.id);
+    if(!p) return libBorrarPrograma(sh);
+    const ok = await csBorrarPrograma(p);
+    CS.vista = 'programas';
+    return ok;
+  }
+  if(ep){
+    const p = lista.find(x => x.show && x.show.id === ep.show_id);
+    const e = p ? csEpisodios(p).find(x => x.ep && x.ep.id === ep.id) : null;
+    if(!e) return libBorrarCapitulo(ep);
+    return csBorrarEpisodio(p, e);
+  }
+  return false;
 }
 
 /** Los controles de una sección. */
