@@ -149,6 +149,27 @@ function dcxTalentoNuevo(p, ficha){
   return true;
 }
 
+/**
+ * Un programa nuevo en DublajeCast, con su cliente y su director (PRO-47). Si
+ * ya hay uno que se llama igual, no se repite: se le ponen el cliente y el
+ * director si no los tenía. Devuelve la serie.
+ */
+function dcxSerieNueva(p, datos){
+  const nombre = String((datos && datos.name) || '').replace(/\s+/g, ' ').trim();
+  if(!nombre) return null;
+  const lista = dcxLista(p, 'series');
+  const n = castNorm(nombre);
+  let s = lista.find(x => x && castNorm(x.name || x.title) === n) || null;
+  if(!s){
+    const studios = dcxLista(p, 'studios');
+    s = { id: dcxUid(), name: nombre, type: 'serie', status: 'en_curso', director: '', tecnico: '', cliente: '', requiere_dubcard: true, studio_id: (studios[0] && studios[0].id) || 1 };
+    lista.push(s);
+  }
+  if(datos.cliente && !s.cliente) s.cliente = String(datos.cliente).trim();
+  if(datos.director && !s.director) s.director = String(datos.director).trim();
+  return s;
+}
+
 function dcxTrailerNuevo(p, datos){
   const titulo = String((datos && datos.title) || '').trim();
   if(!titulo) return false;
