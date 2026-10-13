@@ -268,9 +268,9 @@ exports.pruebas = async function(t){
     t.eq('Abrir: el programa, con sus episodios', A.M.CS.vista + ' ' + /<h2>A FILIPINO CHRISTMAS<\/h2>/.test(vista(A)) + ' ' + /Episodios \(3\)/.test(vista(A)), 'programa true true');
     t.ok('cada episodio con su estado en Dubbipt y su casting', /<b>Ep\. 1<\/b><span>Episodio 1<\/span>[\s\S]*?Con libreto[\s\S]*?<b>3<\/b> pers\.[\s\S]*?data-cs="abrirEp" data-v="e:e1"/.test(vista(A)) && /Episodio 2<\/span>[\s\S]*?Sin libreto/.test(vista(A)));
     t.ok('la barra sigue con Programas activa', /class="cs-nav-b on" data-v="programas"/.test(A.doc.getElementById('csNav').innerHTML));
-    const antes = A.diario.filter(x => x === 'renderLibrary').length;
+    const antes = A.diario.filter(x => x === 'renderLibrary').length, antesP = A.M.CS.pintados;
     await espera(); await espera();
-    t.eq('al llegar el registro de Dubbipt, se repinta solo', A.diario.filter(x => x === 'renderLibrary').length, antes + 1);
+    t.eq('al llegar el registro de Dubbipt, se repinta solo: Casting, sin la biblioteca tapada de debajo (fluidez)', (A.M.CS.pintados - antesP) + ' ' + (A.diario.filter(x => x === 'renderLibrary').length - antes), '1 0');
     A.M.csPintar('shows', b.cab, b.grid);
     t.ok('al llegar el registro de Dubbipt, se avisa del talento distinto', A.diario.includes('registro s1') && /1 distinto en DublajeCast/.test(vista(A)));
     control(A, 'nuevoEp').onclick();
@@ -297,7 +297,7 @@ exports.pruebas = async function(t){
     t.ok('las demás secciones, en el mismo sitio', /<h2>Ocupación<\/h2>/.test(vista(A)) && /class="cs-nav-b on" data-v="ocupacion"/.test(A.doc.getElementById('csNav').innerHTML));
     t.eq('repintar no duplica nada', b.lib.hijos.filter(h => h.id === 'csNav').length + ' ' + b.lib.hijos.filter(h => h.id === 'csVista').length, '1 1');
     control(A, 'ocModo', 'todos').onclick();
-    t.eq('las pestañas de Ocupación cambian lo que se ve y repintan', A.M.CS.ocModo + ' ' + A.diario.includes('renderLibrary'), 'todos true');
+    t.eq('las pestañas de Ocupación cambian lo que se ve y repintan', A.M.CS.ocModo + ' ' + /class="cs-pest on" data-cs="ocModo" data-v="todos"/.test(vista(A)), 'todos true');
     A.M.CS.ocModo = 'curso';
     A.M.CS.vista = 'pegado'; A.M.csPintar('shows', b.cab, b.grid);
     control(A, 'herramienta').onclick();

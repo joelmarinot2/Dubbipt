@@ -33,7 +33,7 @@ function cargar(o){
     csEditar: async (cambio) => { cambio({}); return o.dcFalla ? 'error' : 'guardado'; },
     sb: { from: () => ({ update: (f) => ({ eq: async () => { V.updates.push(f); return o.sinColumna ? { error: { code: '42703', message: 'column "temporadas" does not exist' } } : (o.falla ? { error: { message: 'sin red' } } : { error: null }); } }) }) }
   });
-  vm.runInContext(trozo('/* ── Temporadas: carpetas dentro de cada programa', '/* ── Pegar la lista de episodios activos')
+  vm.runInContext(trozo('function csLeerLocal(', 'const CS_ESTADOS_MEMO') + trozo('/* ── Temporadas: carpetas dentro de cada programa', '/* ── Pegar la lista de episodios activos')
     + trozo('/** Los episodios de un programa, en sus carpetas de temporada', '/** El casting de todo un programa')
     + ';this.T = { csTemporadas, csTempDe, csTempNueva, csTempRenombrar, csTempBorrar, csTempMover, csTempDetectar, csTempPlan, csTempAdivinar, csHtmlTemporadas, csTempsLocales };', V.ctx);
   V.T = V.ctx.T;

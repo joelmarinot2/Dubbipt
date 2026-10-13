@@ -194,7 +194,12 @@ function dcastDatos(){
     const w = DCAST.marco && DCAST.marco.contentWindow;
     if(w && typeof w.__dcDatos === 'function'){
       const v = w.__dcDatos();
-      const d = (v && typeof v === 'object') ? prodNormalizar(v) : null;
+      /* Lo mismo que la última vez no se vuelve a normalizar (fluidez, PRO-45). */
+      let d = null;
+      if(v && typeof v === 'object'){
+        if(DCAST.normDe === v) d = DCAST.norm;
+        else { d = prodNormalizar(v); DCAST.normDe = v; DCAST.norm = d; }
+      }
       /* Al día con su nube: lo que se ve en vivo vale, y se guarda aquí. Sin
          nube (sin sesión, conectando) puede ser una copia vieja o nada: solo
          se usa si aquí no hay nada guardado. Vacío, nunca. */
@@ -233,9 +238,17 @@ function dcastRecordar(v){
 }
 
 /** El programa de DublajeCast que corresponde a uno de Dubbipt. */
+const DCAST_SERIES = (typeof WeakMap === 'function') ? new WeakMap() : null;
 function dcastSerieDe(show, d){
   if(!show || !d) return null;
-  return d.series.find(s => prodCasarPrograma(s.name, [show]) === show) || null;
+  /* Casar por nombre (parecidos incluidos) cuesta; se recuerda por juego de datos y programa. */
+  let m = DCAST_SERIES && DCAST_SERIES.get(d);
+  if(DCAST_SERIES && !m){ m = new Map(); DCAST_SERIES.set(d, m); }
+  const k = String(show.id) + '|' + String(show.name || '');
+  if(m && m.has(k)) return m.get(k);
+  const r = d.series.find(s => prodCasarPrograma(s.name, [show]) === show) || null;
+  if(m) m.set(k, r);
+  return r;
 }
 
 /**

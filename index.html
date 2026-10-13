@@ -2951,7 +2951,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.63.0-nube';
+const APP_VER_NUM = 'v11.64.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -10859,12 +10859,20 @@ function castPintarOcupacion(){
 
 /** Nombre de personaje comparable: sin tildes, sin signos, sin dobles espacios. */
 function castNorm(t){
-  return String(t == null ? '' : t)
+  /* Con memoria: se normalizan las mismas cadenas miles de veces por pintado (fluidez, PRO-45). */
+  const memo = castNorm.memo || (castNorm.memo = new Map());
+  const s = String(t == null ? '' : t);
+  const visto = memo.get(s);
+  if(visto !== undefined) return visto;
+  const r = s
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .toUpperCase()
     .replace(/[^\p{L}\p{N} ]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+  if(memo.size > 30000) memo.clear();
+  memo.set(s, r);
+  return r;
 }
 /** El número final, si lo hay: MALE SOLDIER 4 → «4». Distingue personajes. */
 function castNumFinal(t){
