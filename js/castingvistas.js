@@ -2930,13 +2930,15 @@ async function csRealizarCasting(p, e){
   return true;
 }
 
-/* ── Un programa nuevo entra en Producción ──────────────────────────────
+/* ── Un episodio nuevo entra en Producción ──────────────────────────────
    Pedido de sala: «todos los programas que ingrese nuevos tienen que pedirme
    fecha de entrega y fecha de DUBCARD, quién lo hace y de qué cliente, para
-   que se ponga automáticamente en Producción». «Nuevo programa» lo pide
-   (obligatorio, para quien puede escribir en DublajeCast) y, al crearlo, el
-   programa entra en Producción Casting como fila nueva, en preproducción, y
-   se crea en DublajeCast con su cliente y su director. */
+   que se ponga automáticamente en Producción»; y luego: «no en programa:
+   quiero que se cree por episodio». «Nuevo episodio» lo pide (obligatorio,
+   para quien puede escribir en DublajeCast; cliente y director vienen puestos
+   con los del programa) y, al crearlo, el episodio entra en Producción
+   Casting como fila nueva -programa y capítulo-, en preproducción; el
+   programa se crea en DublajeCast con su cliente y su director si no estaba. */
 
 /** Lo que falta por rellenar, en palabras; vacío si está todo. */
 function csProdNuevoValidar(d){
@@ -2949,14 +2951,22 @@ function csProdNuevoValidar(d){
   if(!fecha(d.fecha_dubcard)) faltan.push('la fecha de DUBCARD');
   return faltan;
 }
-/** Para el formulario: los clientes y los directores que ya conoce DublajeCast. */
-function csProdNuevoOpciones(){
+/** Para el formulario: los clientes y los directores que ya conoce DublajeCast, y los del programa `show` (de su serie, o de su último capítulo en Producción). */
+function csProdNuevoOpciones(show){
   let d = null;
   try{ d = csDatos().datos; }catch(e){ d = null; }
   d = d || {};
   const team = (Array.isArray(d.team) ? d.team : []).filter(t => t && t.role === 'Director' && t.name).map(t => String(t.name));
   const lista = (k) => (Array.isArray(d[k]) ? d[k] : []).map(String).filter(Boolean);
-  return { clientes: lista('clienteList'), directores: team.concat(lista('directorList').filter(x => team.indexOf(x) < 0)) };
+  let cliente = '', director = '';
+  if(show){
+    let serie = null;
+    try{ serie = (typeof dcastSerieDe === 'function') ? dcastSerieDe(show, d) : null; }catch(e){ serie = null; }
+    const ultimo = (Array.isArray(d.produccion) ? d.produccion : []).find(r => r && castNorm(r.programa) === castNorm(show.name)) || null;
+    cliente = String((serie && serie.cliente) || (ultimo && ultimo.cliente) || '').trim();
+    director = String((serie && serie.director) || (ultimo && ultimo.director) || '').trim();
+  }
+  return { clientes: lista('clienteList'), directores: team.concat(lista('directorList').filter(x => team.indexOf(x) < 0)), cliente: cliente, director: director };
 }
 /** Una fecha con calendario: al pulsarla se abre; no se escribe a mano (Supr o Retroceso la borra). */
 function csCalendario(el){
@@ -2969,18 +2979,21 @@ function csCalendario(el){
     else try{ if(typeof el.showPicker === 'function') el.showPicker(); }catch(err){ /* el navegador abre el suyo */ }
   };
 }
-/** El programa nuevo, en Producción Casting y en DublajeCast. Dice cómo fue: 'guardado', 'faltan', 'sesion', 'error' o 'nada'. */
-function csProgramaNuevoEnProduccion(nombre, d){
-  const n = String(nombre || '').replace(/\s+/g, ' ').trim();
-  if(!n) return Promise.resolve('nada');
+/** El episodio nuevo, en Producción Casting (y su programa en DublajeCast). Dice cómo fue: 'guardado', 'faltan', 'sesion', 'error' o 'nada'. */
+function csEpisodioNuevoEnProduccion(programa, capitulo, d){
+  const n = String(programa || '').replace(/\s+/g, ' ').trim(), cap = String(capitulo || '').replace(/\s+/g, ' ').trim();
+  if(!n || !cap) return Promise.resolve('nada');
   if(csProdNuevoValidar(d).length) return Promise.resolve('faltan');
   const cliente = String(d.cliente).replace(/\s+/g, ' ').trim(), director = String(d.director).replace(/\s+/g, ' ').trim();
-  const fila = { id: (typeof dcxUid === 'function') ? dcxUid() : Date.now(), programa: n, capitulo: '', desglose_provisional: false, casting_completo: false,
+  const fila = { id: (typeof dcxUid === 'function') ? dcxUid() : Date.now(), programa: n, capitulo: cap, desglose_provisional: false, casting_completo: false,
                  cliente: cliente, director: director, fecha_miami: d.fecha_miami, formato_dubcard: /netflix/i.test(cliente) ? 'BACKLOT' : 'Excel', fecha_dubcard: d.fecha_dubcard, fase: 'pre_produccion' };
-  const que = 'Programa nuevo en Producción: ' + n + ' · ' + cliente + ' · ' + director + ' · entrega ' + d.fecha_miami + ' · DUBCARD ' + d.fecha_dubcard;
+  const que = 'Episodio nuevo en Producción: ' + n + ' · ' + cap + ' · ' + cliente + ' · ' + director + ' · entrega ' + d.fecha_miami + ' · DUBCARD ' + d.fecha_dubcard;
   return csEditar(pl => {
     if(!Array.isArray(pl.produccion)) pl.produccion = [];
-    pl.produccion.unshift(fila);
+    /* El mismo capítulo del mismo programa no se repite: se pone al día. */
+    const i = pl.produccion.findIndex(r => r && castNorm(r.programa) === castNorm(n) && castNorm(r.capitulo) === castNorm(cap));
+    if(i >= 0) pl.produccion[i] = Object.assign({}, pl.produccion[i], { cliente: cliente, director: director, fecha_miami: d.fecha_miami, fecha_dubcard: d.fecha_dubcard, formato_dubcard: fila.formato_dubcard });
+    else pl.produccion.unshift(fila);
     if(!Array.isArray(pl.clienteList)) pl.clienteList = [];
     if(!pl.clienteList.some(x => castNorm(x) === castNorm(cliente))) pl.clienteList.push(cliente);
     const team = (Array.isArray(pl.team) ? pl.team : []).some(t => t && castNorm(t.name) === castNorm(director));
@@ -2988,7 +3001,7 @@ function csProgramaNuevoEnProduccion(nombre, d){
     if(!team && !pl.directorList.some(x => castNorm(x) === castNorm(director))) pl.directorList.push(director);
     try{ if(typeof dcxSerieNueva === 'function') dcxSerieNueva(pl, { name: n, cliente: cliente, director: director }); }catch(e){ /* sin serie: la fila de Producción ya está */ }
     return true;
-  }, que, { programa: n });
+  }, que, { programa: n, episodio: cap });
 }
 
 /* ── Casting en una ventana emergente ───────────────────────────────────

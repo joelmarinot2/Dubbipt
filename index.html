@@ -2951,7 +2951,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.66.0-nube';
+const APP_VER_NUM = 'v11.67.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -12394,6 +12394,10 @@ function openFormatProfile(){
 window.openFormatProfile = openFormatProfile;
 function newEpisodeModal(){
   if(!LDB.showId){ libMsg('Entra en un programa primero'); return; }
+  /* Para Producción (PRO-47): cliente, quién lo hace y las dos fechas, obligatorios para quien escribe en DublajeCast. */
+  const showProd = (sbShows().find(x=>x.id===LDB.showId) || null);
+  const conProd = (typeof prodPuede==='function' && prodPuede() && typeof csEpisodioNuevoEnProduccion==='function');
+  const opciones = conProd ? csProdNuevoOpciones(showProd) : { clientes:[], directores:[], cliente:'', director:'' };
   const old=document.getElementById('ddlmOv'); if(old) old.remove();
   const ov=document.createElement('div'); ov.id='ddlmOv'; ov.className='ddlm-ov';
   ov.innerHTML =
@@ -12401,6 +12405,15 @@ function newEpisodeModal(){
     +'<div class="ddlm-kicker">Modal · Nuevo episodio</div>'
     +'<h2>Nuevo episodio</h2>'
     +'<div class="ddlm-field"><label for="neName">Nombre del episodio</label><input id="neName" placeholder="Ej. Episodio 1" spellcheck="false"></div>'
+    +(conProd ? '<div class="ddlm-kicker" style="margin-top:4px">Para Producción · obligatorio</div>'
+      +'<div class="ddlm-row">'
+        +'<div class="ddlm-field"><label for="neCliente">Cliente</label><input id="neCliente" list="neClientes" placeholder="Netflix" autocomplete="off" value="'+esc(opciones.cliente||'')+'"><datalist id="neClientes">'+opciones.clientes.map(x=>'<option value="'+esc(x)+'">').join('')+'</datalist></div>'
+        +'<div class="ddlm-field"><label for="neDirector">Quién lo hace</label><input id="neDirector" list="neDirectores" placeholder="Director" autocomplete="off" value="'+esc(opciones.director||'')+'"><datalist id="neDirectores">'+opciones.directores.map(x=>'<option value="'+esc(x)+'">').join('')+'</datalist></div>'
+      +'</div>'
+      +'<div class="ddlm-row">'
+        +'<div class="ddlm-field"><label for="neMiami">Fecha de entrega</label><input id="neMiami" type="date"></div>'
+        +'<div class="ddlm-field"><label for="neDubcard">Fecha de DUBCARD</label><input id="neDubcard" type="date"></div>'
+      +'</div>' : '')
     +'<div class="ddlm-field" style="margin-bottom:8px"><label>Guion del episodio</label>'
       +'<label class="ddlm-drop" id="neDrop"><span class="ddlm-drop-ic">'+ICO.upload+'</span>'
         +'<span class="ddlm-drop-t" id="neDropT">Arrastra o elige el guion</span>'
@@ -12418,9 +12431,13 @@ function newEpisodeModal(){
   q('neCancel').onclick=close;
   { const fb=q('neFmt'); if(fb) fb.onclick=()=>{ close(); openFormatProfile(); }; }
   q('neFile2').addEventListener('change', ()=>{ const f=q('neFile2').files[0]; if(f){ q('neDropT').textContent=f.name; q('neDrop').classList.add('has'); } });
+  if(conProd){ try{ csCalendario(q('neMiami')); csCalendario(q('neDubcard')); }catch(e){ /* sin calendario se escribe */ } }
+  const prodLeer = ()=> ({ cliente:(q('neCliente')||{}).value||'', director:(q('neDirector')||{}).value||'', fecha_miami:(q('neMiami')||{}).value||'', fecha_dubcard:(q('neDubcard')||{}).value||'' });
   q('neGo').addEventListener('click', async ()=>{
     const name=(q('neName').value||'').trim();
     if(!name){ q('neErr').textContent='Escribe el nombre del episodio'; q('neName').focus(); return; }
+    const prod = conProd ? prodLeer() : null;
+    if(conProd){ const faltan = csProdNuevoValidar(prod); if(faltan.length){ q('neErr').textContent='Para Producción falta '+faltan.join(', '); return; } }
     const file=q('neFile2').files[0];
     if(!file){ q('neErr').textContent='Sube el guion (PDF, Word o Excel)'; return; }
     const btn=q('neGo'); btn.disabled=true; btn.textContent='Creando…';
@@ -12428,7 +12445,11 @@ function newEpisodeModal(){
       currentEp=null;
       await loadFileForEp(file);
       close();
-      showDesgloseReview(name, async ()=>{ window._epNameOverride = name; await saveEpHere(); try{ _epOpen(true); }catch(e){} });
+      showDesgloseReview(name, async ()=>{
+        window._epNameOverride = name; await saveEpHere(); try{ _epOpen(true); }catch(e){}
+        /* Y a Producción, con su cliente, quién lo hace y sus fechas (PRO-47). */
+        if(prod){ try{ await csEpisodioNuevoEnProduccion(showProd ? showProd.name : '', name, prod); }catch(e){ fallo('csEpisodioNuevoEnProduccion · index.html:newEpisodeModal', e, 'el episodio se creó, pero no ha entrado en Producción'); } }
+      });
     }catch(e){ btn.disabled=false; btn.textContent='Crear episodio'; q('neErr').textContent=(typeof DDL_UI!=='undefined'?DDL_UI.friendlyError(e):(e&&e.message||'Error')); }
   });
   setTimeout(()=>{ const n=q('neName'); if(n) n.focus(); },60);
@@ -12615,8 +12636,6 @@ async function newShow(){
   if(!WORKSPACE || !WORKSPACE.id){ if(typeof DDL_UI!=='undefined') DDL_UI.toast('Elige o crea primero un espacio de trabajo', {kind:'err'}); showWorkspacePicker(true); return; }
   const IDIOMAS = ['Coreano','Japonés','Chino (mandarín)','Inglés','Español','Portugués','Francés','Alemán','Italiano','Tailandés','Turco','Otro'];
   const optHtml = (sel)=> IDIOMAS.map(l=>'<option'+(l===sel?' selected':'')+'>'+l+'</option>').join('');
-  const conProd = (typeof prodPuede==='function' && prodPuede() && typeof csProgramaNuevoEnProduccion==='function');
-  const opciones = conProd ? csProdNuevoOpciones() : { clientes:[], directores:[] };
   const old = document.getElementById('ddlmOv'); if(old) old.remove();
   const ov = document.createElement('div'); ov.id='ddlmOv'; ov.className='ddlm-ov';
   ov.innerHTML =
@@ -12630,16 +12649,6 @@ async function newShow(){
       +'</div>'
     +'</div>'
     +'<div class="ddlm-field"><label for="npEps">N.º de episodios <span style="color:#6b7280">(opcional)</span></label><input id="npEps" type="number" min="0" placeholder="24"></div>'
-    /* Para Producción (PRO-47): cliente, quién lo hace y las dos fechas, obligatorios para quien escribe en DublajeCast. */
-    +(conProd ? '<div class="ddlm-kicker" style="margin-top:4px">Para Producción · obligatorio</div>'
-      +'<div class="ddlm-row">'
-        +'<div class="ddlm-field"><label for="npCliente">Cliente</label><input id="npCliente" list="npClientes" placeholder="Netflix" autocomplete="off"><datalist id="npClientes">'+opciones.clientes.map(x=>'<option value="'+esc(x)+'">').join('')+'</datalist></div>'
-        +'<div class="ddlm-field"><label for="npDirector">Quién lo hace</label><input id="npDirector" list="npDirectores" placeholder="Director" autocomplete="off"><datalist id="npDirectores">'+opciones.directores.map(x=>'<option value="'+esc(x)+'">').join('')+'</datalist></div>'
-      +'</div>'
-      +'<div class="ddlm-row">'
-        +'<div class="ddlm-field"><label for="npMiami">Fecha de entrega</label><input id="npMiami" type="date"></div>'
-        +'<div class="ddlm-field"><label for="npDubcard">Fecha de DUBCARD</label><input id="npDubcard" type="date"></div>'
-      +'</div>' : '')
     +'<div class="ddlm-row">'
       +'<div class="ddlm-field"><label for="npLangSrc">Idioma original</label><select id="npLangSrc">'+optHtml('Coreano')+'</select></div>'
       +'<div class="ddlm-field"><label for="npLangDub">Idioma de doblaje</label><select id="npLangDub">'+optHtml('Español')+'</select></div>'
@@ -12655,13 +12664,9 @@ async function newShow(){
   $q('npCancel').onclick = close;
   // preview de portada
   $q('npCov').addEventListener('change', ()=>{ const f=$q('npCov').files[0]; if(f){ const img=$q('npCovImg'); img.src=URL.createObjectURL(f); img.style.display='block'; const pl=$q('npCovBox').querySelector('.pl'); if(pl) pl.style.display='none'; } });
-  if(conProd){ try{ csCalendario($q('npMiami')); csCalendario($q('npDubcard')); }catch(e){ /* sin calendario se escribe */ } }
-  const prodLeer = ()=> ({ cliente:($q('npCliente')||{}).value||'', director:($q('npDirector')||{}).value||'', fecha_miami:($q('npMiami')||{}).value||'', fecha_dubcard:($q('npDubcard')||{}).value||'' });
   $q('npGo').addEventListener('click', async ()=>{
     const name=($q('npName').value||'').trim();
     if(!name){ $q('npErr').textContent='Escribe el nombre del programa'; $q('npName').focus(); return; }
-    const prod = conProd ? prodLeer() : null;
-    if(conProd){ const faltan = csProdNuevoValidar(prod); if(faltan.length){ $q('npErr').textContent='Para Producción falta '+faltan.join(', '); return; } }
     const btn=$q('npGo'); btn.disabled=true; btn.textContent='Creando…';
     // guarda metadata extra si las columnas existen; si no, cae limpio a solo {name, workspace_id}
     const payload = { name, workspace_id:WORKSPACE.id };
@@ -12682,11 +12687,9 @@ async function newShow(){
         if(!u.error){ await sb.from('shows').update({cover_path:path}).eq('id',show.id); } }
     }catch(e){ console.warn('cover', e); }
     close();
-    /* Y a Producción, con su cliente, quién lo hace y sus fechas (PRO-47). */
-    if(prod){ try{ await csProgramaNuevoEnProduccion(name, prod); }catch(e){ fallo('csProgramaNuevoEnProduccion · index.html:newShow', e, 'el programa se creó, pero no ha entrado en Producción'); } }
     LDB.showId=show.id; libView='eps'; await libFetchAll(); renderLibrary(true);
     if(typeof libPing==='function') libPing('show', show.id);
-    if(typeof DDL_UI!=='undefined') DDL_UI.toast('Programa «'+name+'» creado'+(prod?' y puesto en Producción':''));
+    if(typeof DDL_UI!=='undefined') DDL_UI.toast('Programa «'+name+'» creado');
   });
   setTimeout(()=>{ const n=$q('npName'); if(n) n.focus(); }, 60);
 }
