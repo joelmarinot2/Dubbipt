@@ -2930,6 +2930,67 @@ async function csRealizarCasting(p, e){
   return true;
 }
 
+/* ── Un programa nuevo entra en Producción ──────────────────────────────
+   Pedido de sala: «todos los programas que ingrese nuevos tienen que pedirme
+   fecha de entrega y fecha de DUBCARD, quién lo hace y de qué cliente, para
+   que se ponga automáticamente en Producción». «Nuevo programa» lo pide
+   (obligatorio, para quien puede escribir en DublajeCast) y, al crearlo, el
+   programa entra en Producción Casting como fila nueva, en preproducción, y
+   se crea en DublajeCast con su cliente y su director. */
+
+/** Lo que falta por rellenar, en palabras; vacío si está todo. */
+function csProdNuevoValidar(d){
+  d = d || {};
+  const fecha = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || ''));
+  const faltan = [];
+  if(!String(d.cliente || '').trim()) faltan.push('el cliente');
+  if(!String(d.director || '').trim()) faltan.push('quién lo hace');
+  if(!fecha(d.fecha_miami)) faltan.push('la fecha de entrega');
+  if(!fecha(d.fecha_dubcard)) faltan.push('la fecha de DUBCARD');
+  return faltan;
+}
+/** Para el formulario: los clientes y los directores que ya conoce DublajeCast. */
+function csProdNuevoOpciones(){
+  let d = null;
+  try{ d = csDatos().datos; }catch(e){ d = null; }
+  d = d || {};
+  const team = (Array.isArray(d.team) ? d.team : []).filter(t => t && t.role === 'Director' && t.name).map(t => String(t.name));
+  const lista = (k) => (Array.isArray(d[k]) ? d[k] : []).map(String).filter(Boolean);
+  return { clientes: lista('clienteList'), directores: team.concat(lista('directorList').filter(x => team.indexOf(x) < 0)) };
+}
+/** Una fecha con calendario: al pulsarla se abre; no se escribe a mano (Supr o Retroceso la borra). */
+function csCalendario(el){
+  if(!el) return;
+  el.onclick = () => { try{ if(typeof el.showPicker === 'function') el.showPicker(); }catch(err){ /* el navegador abre el suyo */ } };
+  el.onkeydown = (ev) => {
+    if(ev.key === 'Tab' || ev.key === 'Escape' || ev.key === 'Enter') return;
+    ev.preventDefault();
+    if(ev.key === 'Backspace' || ev.key === 'Delete') el.value = '';
+    else try{ if(typeof el.showPicker === 'function') el.showPicker(); }catch(err){ /* el navegador abre el suyo */ }
+  };
+}
+/** El programa nuevo, en Producción Casting y en DublajeCast. Dice cómo fue: 'guardado', 'faltan', 'sesion', 'error' o 'nada'. */
+function csProgramaNuevoEnProduccion(nombre, d){
+  const n = String(nombre || '').replace(/\s+/g, ' ').trim();
+  if(!n) return Promise.resolve('nada');
+  if(csProdNuevoValidar(d).length) return Promise.resolve('faltan');
+  const cliente = String(d.cliente).replace(/\s+/g, ' ').trim(), director = String(d.director).replace(/\s+/g, ' ').trim();
+  const fila = { id: (typeof dcxUid === 'function') ? dcxUid() : Date.now(), programa: n, capitulo: '', desglose_provisional: false, casting_completo: false,
+                 cliente: cliente, director: director, fecha_miami: d.fecha_miami, formato_dubcard: /netflix/i.test(cliente) ? 'BACKLOT' : 'Excel', fecha_dubcard: d.fecha_dubcard, fase: 'pre_produccion' };
+  const que = 'Programa nuevo en Producción: ' + n + ' · ' + cliente + ' · ' + director + ' · entrega ' + d.fecha_miami + ' · DUBCARD ' + d.fecha_dubcard;
+  return csEditar(pl => {
+    if(!Array.isArray(pl.produccion)) pl.produccion = [];
+    pl.produccion.unshift(fila);
+    if(!Array.isArray(pl.clienteList)) pl.clienteList = [];
+    if(!pl.clienteList.some(x => castNorm(x) === castNorm(cliente))) pl.clienteList.push(cliente);
+    const team = (Array.isArray(pl.team) ? pl.team : []).some(t => t && castNorm(t.name) === castNorm(director));
+    if(!Array.isArray(pl.directorList)) pl.directorList = [];
+    if(!team && !pl.directorList.some(x => castNorm(x) === castNorm(director))) pl.directorList.push(director);
+    try{ if(typeof dcxSerieNueva === 'function') dcxSerieNueva(pl, { name: n, cliente: cliente, director: director }); }catch(e){ /* sin serie: la fila de Producción ya está */ }
+    return true;
+  }, que, { programa: n });
+}
+
 /* ── Casting en una ventana emergente ───────────────────────────────────
    Pedido de sala: «quiero que la vista de hacer casting se abra en una
    ventana emergente para poder navegar en el dashboard en otra ventana».

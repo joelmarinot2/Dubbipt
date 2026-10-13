@@ -2951,7 +2951,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.65.0-nube';
+const APP_VER_NUM = 'v11.66.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -12615,6 +12615,8 @@ async function newShow(){
   if(!WORKSPACE || !WORKSPACE.id){ if(typeof DDL_UI!=='undefined') DDL_UI.toast('Elige o crea primero un espacio de trabajo', {kind:'err'}); showWorkspacePicker(true); return; }
   const IDIOMAS = ['Coreano','Japonés','Chino (mandarín)','Inglés','Español','Portugués','Francés','Alemán','Italiano','Tailandés','Turco','Otro'];
   const optHtml = (sel)=> IDIOMAS.map(l=>'<option'+(l===sel?' selected':'')+'>'+l+'</option>').join('');
+  const conProd = (typeof prodPuede==='function' && prodPuede() && typeof csProgramaNuevoEnProduccion==='function');
+  const opciones = conProd ? csProdNuevoOpciones() : { clientes:[], directores:[] };
   const old = document.getElementById('ddlmOv'); if(old) old.remove();
   const ov = document.createElement('div'); ov.id='ddlmOv'; ov.className='ddlm-ov';
   ov.innerHTML =
@@ -12628,6 +12630,16 @@ async function newShow(){
       +'</div>'
     +'</div>'
     +'<div class="ddlm-field"><label for="npEps">N.º de episodios <span style="color:#6b7280">(opcional)</span></label><input id="npEps" type="number" min="0" placeholder="24"></div>'
+    /* Para Producción (PRO-47): cliente, quién lo hace y las dos fechas, obligatorios para quien escribe en DublajeCast. */
+    +(conProd ? '<div class="ddlm-kicker" style="margin-top:4px">Para Producción · obligatorio</div>'
+      +'<div class="ddlm-row">'
+        +'<div class="ddlm-field"><label for="npCliente">Cliente</label><input id="npCliente" list="npClientes" placeholder="Netflix" autocomplete="off"><datalist id="npClientes">'+opciones.clientes.map(x=>'<option value="'+esc(x)+'">').join('')+'</datalist></div>'
+        +'<div class="ddlm-field"><label for="npDirector">Quién lo hace</label><input id="npDirector" list="npDirectores" placeholder="Director" autocomplete="off"><datalist id="npDirectores">'+opciones.directores.map(x=>'<option value="'+esc(x)+'">').join('')+'</datalist></div>'
+      +'</div>'
+      +'<div class="ddlm-row">'
+        +'<div class="ddlm-field"><label for="npMiami">Fecha de entrega</label><input id="npMiami" type="date"></div>'
+        +'<div class="ddlm-field"><label for="npDubcard">Fecha de DUBCARD</label><input id="npDubcard" type="date"></div>'
+      +'</div>' : '')
     +'<div class="ddlm-row">'
       +'<div class="ddlm-field"><label for="npLangSrc">Idioma original</label><select id="npLangSrc">'+optHtml('Coreano')+'</select></div>'
       +'<div class="ddlm-field"><label for="npLangDub">Idioma de doblaje</label><select id="npLangDub">'+optHtml('Español')+'</select></div>'
@@ -12643,9 +12655,13 @@ async function newShow(){
   $q('npCancel').onclick = close;
   // preview de portada
   $q('npCov').addEventListener('change', ()=>{ const f=$q('npCov').files[0]; if(f){ const img=$q('npCovImg'); img.src=URL.createObjectURL(f); img.style.display='block'; const pl=$q('npCovBox').querySelector('.pl'); if(pl) pl.style.display='none'; } });
+  if(conProd){ try{ csCalendario($q('npMiami')); csCalendario($q('npDubcard')); }catch(e){ /* sin calendario se escribe */ } }
+  const prodLeer = ()=> ({ cliente:($q('npCliente')||{}).value||'', director:($q('npDirector')||{}).value||'', fecha_miami:($q('npMiami')||{}).value||'', fecha_dubcard:($q('npDubcard')||{}).value||'' });
   $q('npGo').addEventListener('click', async ()=>{
     const name=($q('npName').value||'').trim();
     if(!name){ $q('npErr').textContent='Escribe el nombre del programa'; $q('npName').focus(); return; }
+    const prod = conProd ? prodLeer() : null;
+    if(conProd){ const faltan = csProdNuevoValidar(prod); if(faltan.length){ $q('npErr').textContent='Para Producción falta '+faltan.join(', '); return; } }
     const btn=$q('npGo'); btn.disabled=true; btn.textContent='Creando…';
     // guarda metadata extra si las columnas existen; si no, cae limpio a solo {name, workspace_id}
     const payload = { name, workspace_id:WORKSPACE.id };
@@ -12666,9 +12682,11 @@ async function newShow(){
         if(!u.error){ await sb.from('shows').update({cover_path:path}).eq('id',show.id); } }
     }catch(e){ console.warn('cover', e); }
     close();
+    /* Y a Producción, con su cliente, quién lo hace y sus fechas (PRO-47). */
+    if(prod){ try{ await csProgramaNuevoEnProduccion(name, prod); }catch(e){ fallo('csProgramaNuevoEnProduccion · index.html:newShow', e, 'el programa se creó, pero no ha entrado en Producción'); } }
     LDB.showId=show.id; libView='eps'; await libFetchAll(); renderLibrary(true);
     if(typeof libPing==='function') libPing('show', show.id);
-    if(typeof DDL_UI!=='undefined') DDL_UI.toast('Programa «'+name+'» creado');
+    if(typeof DDL_UI!=='undefined') DDL_UI.toast('Programa «'+name+'» creado'+(prod?' y puesto en Producción':''));
   });
   setTimeout(()=>{ const n=$q('npName'); if(n) n.focus(); }, 60);
 }
