@@ -2001,6 +2001,45 @@ body.cs-on #progHeader{ display:none !important; }
 .dct-marco{ width:100%; min-height:calc(100vh - 230px); border:none; border-radius:12px; background:#fff; }
 .dct-pegado-completa .dct-marco{ min-height:calc(100vh - 90px); }
 .cs-tal-modos{ margin:0 0 12px; }
+/* Tráilers & Teasers, como en DublajeCast (PRO-40). */
+.cs-tr-kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:14px; }
+.cs-tr-kpi{ border:1px solid; border-radius:14px; padding:14px 18px; display:flex; flex-direction:column; gap:4px; }
+.cs-tr-kpi b{ font-size:24px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
+.cs-tr-kpi span{ font-size:10px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#8b8f97; }
+.cs-tr-kpi-total{ background:rgba(99,102,241,.08); border-color:rgba(99,102,241,.3); } .cs-tr-kpi-total b{ color:#818CF8; }
+.cs-tr-kpi-pend{ background:rgba(251,191,36,.08); border-color:rgba(251,191,36,.3); } .cs-tr-kpi-pend b{ color:#FBBF24; }
+.cs-tr-kpi-ok{ background:rgba(52,211,153,.08); border-color:rgba(52,211,153,.3); } .cs-tr-kpi-ok b{ color:#34D399; }
+.cs-tr-kpi-mal{ background:rgba(239,68,68,.08); border-color:rgba(239,68,68,.3); } .cs-tr-kpi-mal b{ color:#EF4444; }
+.cs-tr-filtros{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+.cs-tr-filtros select{ background:#0d0f12; border:1px solid #2b2f36; color:#f2f3f5; border-radius:10px; padding:7px 10px; font-family:'Inter',sans-serif; font-size:12px; }
+.cs-tr-tabla-w{ background:#101215; border:1px solid #23262b; border-radius:14px; overflow-x:auto; }
+.cs-tr-tabla{ width:100%; border-collapse:collapse; font-size:12px; }
+.cs-tr-tabla th{ padding:10px 14px; text-align:left; color:#8b8f97; font-weight:600; font-size:9.5px; text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid #23262b; white-space:nowrap; background:#14171b; }
+.cs-tr-tabla td{ padding:10px 14px; border-bottom:1px solid #1d2026; vertical-align:middle; }
+.cs-tr-tabla tr:last-child td{ border-bottom:none; }
+.cs-tr-tabla tbody tr:hover{ background:#12161a; }
+.cs-tr-tit{ color:#f2f3f5; font-weight:700; font-size:12.5px; }
+.cs-tr-f{ color:#8b8f97; font-size:11.5px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.cs-tr-tipo, .cs-tr-etapa{ display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:700; padding:2px 9px; border-radius:999px; white-space:nowrap; }
+.cs-tr-tipo-trailer{ background:rgba(99,102,241,.14); color:#818CF8; } .cs-tr-tipo-teaser{ background:rgba(139,92,246,.14); color:#A78BFA; }
+.cs-tr-etapa-grabacion{ background:rgba(56,189,248,.12); color:#38BDF8; } .cs-tr-etapa-edicion{ background:rgba(52,211,153,.12); color:#2DD4BF; }
+.cs-tr-sla{ display:inline-flex; align-items:center; gap:6px; font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+.cs-tr-sla i{ width:6px; height:6px; border-radius:50%; background:currentColor; }
+.cs-tr-sla-mal{ background:rgba(239,68,68,.1); color:#EF4444; } .cs-tr-sla-urge{ background:rgba(249,115,22,.1); color:#F97316; } .cs-tr-sla-ok{ background:rgba(52,211,153,.1); color:#34D399; } .cs-tr-sla-nada{ color:#8b8f97; }
+.cs-tr-est{ font-family:'Inter',sans-serif; font-size:10.5px; font-weight:700; padding:3px 10px; border-radius:999px; cursor:pointer; white-space:nowrap; border:1px solid; }
+.cs-tr-est-pendiente{ background:rgba(167,139,250,.12); color:#A78BFA; border-color:rgba(167,139,250,.3); }
+.cs-tr-est-en_curso{ background:rgba(251,191,36,.12); color:#FBBF24; border-color:rgba(251,191,36,.3); }
+.cs-tr-est-completo{ background:rgba(52,211,153,.12); color:#34D399; border-color:rgba(52,211,153,.3); }
+.cs-tr-acc{ display:flex; gap:4px; justify-content:flex-end; }
+.cs-tr-acc .cs-b-icono{ padding:4px 7px; }
+.cs-tr-form{ background:#101215; border:1px solid #2f3a33; border-radius:14px; padding:16px 18px; margin-bottom:14px; display:flex; flex-direction:column; gap:12px; max-width:620px; }
+.cs-tr-form-t{ font-weight:700; font-size:15px; color:#f2f3f5; }
+.cs-tr-form label{ display:flex; flex-direction:column; gap:5px; font-size:11px; color:#8b8f97; }
+.cs-tr-form input, .cs-tr-form select{ background:#0d0f12; border:1px solid #2b2f36; color:#f2f3f5; border-radius:9px; padding:8px 10px; font-family:'Inter',sans-serif; font-size:12.5px; outline:none; }
+.cs-tr-form input:focus, .cs-tr-form select:focus{ border-color:#4ADE80; }
+.cs-tr-campos{ display:grid; gap:12px; } .cs-tr-3{ grid-template-columns:repeat(3,1fr); } .cs-tr-2{ grid-template-columns:repeat(2,1fr); }
+@media (max-width:640px){ .cs-tr-3, .cs-tr-2{ grid-template-columns:1fr; } }
+.cs-tr-form-b{ display:flex; gap:8px; justify-content:flex-end; }
 /* Ocupación: cada talento con sus programas en tarjetas (PRO-39). */
 .cs-oc-filtros{ background:#101215; border:1px solid #23262b; border-radius:16px; padding:14px 18px 16px; margin-bottom:12px; }
 .cs-oc-filtros-t{ font-size:10.5px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#8b8f97; margin-bottom:10px; }
@@ -2834,7 +2873,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.58.0-nube';
+const APP_VER_NUM = 'v11.59.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);

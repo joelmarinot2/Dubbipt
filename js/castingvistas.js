@@ -39,6 +39,7 @@ const CS = { vista: 'programas', buscar: '', soloAlertas: false, programa: '',
              tab: 'episodios', buscarCast: '', ordenCast: 'episodio', fusion: null, elegidos: {}, copias: [], fusionProg: null,
              repVista: 'talento', repBuscar: '', repOrden: 'lineas', repGenero: '', repAbierto: null,
              ocBuscar: '', ocGenero: '', ocEdad: '', ocTono: '', ocModo: 'curso',
+             trForm: null, trEstado: '', trTipo: '', trEtapa: '',
              talModo: 'talentos', buscarPer: '', talAbierto: null };
 
 /* Iconos de trazo, como los de Dubbipt (ICO). Ningún emoji. */
@@ -68,6 +69,7 @@ const CS_ICO = {
   izquierda:  '<path d="M15 6l-6 6 6 6"/>',
   hecho:      '<path d="M5 12l5 5L20 7"/>',
   fusionar:   '<path d="M7 4v5c0 3 2 5 5 5h5"/><path d="M7 20v-6"/><path d="M14 11l3 3-3 3"/>',
+  tijeras:    '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.12 15.88"/><path d="M14.47 14.48L20 20"/><path d="M8.12 8.12L12 12"/>',
   editar:     '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
   borrar:     '<path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/>'
 };
@@ -1344,29 +1346,97 @@ function csHtmlOcupacion(d, vivo){
       : '<div class="cs-nada">' + (datos.length ? 'Ningún talento con episodios ' + (o.modo === 'fin' ? 'completados' : (o.modo === 'curso' ? 'en curso' : '')) + (CS.ocBuscar ? ' que coincida con «' + csEsc(CS.ocBuscar) + '»' : '') + '.' : (d ? 'Todavía no hay asignaciones.' : 'Todavía no hay casting guardado en ningún programa.')) + '</div>');
 }
 
+/* ── Tráilers & Teasers, como en DublajeCast ─────────────────────────────────
+   Pedido de sala, con una captura: «quiero que la sección de tráiler y teaser
+   tenga la organización que está en la captura y las mismas funciones que
+   tiene en DublajeCast». Cabecera con «Agregar», cifras (total, pendientes,
+   completados, críticos), filtros por estado, tipo y etapa, y la tabla: tipo,
+   etapa, título y serie, llegada, fecha límite, SLA y estado (que cambia al
+   pulsarlo: pendiente → en curso → completado), con editar y eliminar. Lo
+   mismo que TrailersView de DublajeCast, y se guarda allí. */
+
+const CS_TR_ESTADO = { pendiente: 'Pend. revisión', en_curso: 'En curso', completo: 'Completado' };
+const CS_TR_SIGUE = { pendiente: 'en_curso', en_curso: 'completo', completo: 'pendiente' };
+
+/** Una fecha «AAAA-MM-DD» como día LOCAL (new Date('AAAA-MM-DD') es UTC y en América cae el día antes). */
+function csFechaLocal(s){ const m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(String(s || '').trim()); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(s); }
+
+/** El SLA de un material: cuántos días le quedan, como lo cuenta DublajeCast. */
+function csTrSla(deadline, status, hoy){
+  if(status === 'completo') return { texto: 'Completado', nivel: 'ok' };
+  if(!deadline) return { texto: 'Sin fecha', nivel: 'nada' };
+  const h = new Date(hoy || Date.now()); h.setHours(0, 0, 0, 0);
+  const f = csFechaLocal(deadline); if(isNaN(f)) return { texto: 'Sin fecha', nivel: 'nada' };
+  f.setHours(0, 0, 0, 0);
+  const dias = Math.round((f - h) / 864e5);
+  if(dias < 0) return { texto: 'Vencido', nivel: 'mal', dias: dias };
+  if(dias === 0) return { texto: 'Hoy', nivel: 'mal', dias: dias };
+  if(dias === 1) return { texto: 'Mañana', nivel: 'mal', dias: dias };
+  if(dias <= 2) return { texto: dias + ' días', nivel: 'mal', dias: dias };
+  if(dias <= 5) return { texto: dias + ' días', nivel: 'urge', dias: dias };
+  return { texto: dias + ' días', nivel: 'ok', dias: dias };
+}
+
+/** Los materiales que se ven, filtrados y en el orden de DublajeCast: los abiertos primero, por fecha límite. */
+function csTrVisibles(d, f){
+  const l = ((d && d.trailers) || []).filter(t => (!f.estado || t.status === f.estado) && (!f.tipo || t.type === f.tipo) && (!f.etapa || t.etapa === f.etapa));
+  return l.slice().sort((a, b) => ((a.status === 'completo') - (b.status === 'completo'))
+    || ((!a.deadline) - (!b.deadline)) || (a.deadline && b.deadline ? csFechaLocal(a.deadline) - csFechaLocal(b.deadline) : 0));
+}
+
+function csHtmlTrForm(d){
+  const f = CS.trForm || {};
+  const op = (v, t, cur) => '<option value="' + csEsc(v) + '"' + (String(cur == null ? '' : cur) === String(v) ? ' selected' : '') + '>' + csEsc(t) + '</option>';
+  return '<div class="cs-tr-form"><div class="cs-tr-form-t">' + (f.id != null ? 'Editar material' : 'Nuevo material') + '</div>'
+    + '<div class="cs-tr-campos cs-tr-3">'
+    +   '<label>Tipo *<select id="csTrF_type">' + op('', '— Seleccionar —', f.type) + op('trailer', 'Tráiler', f.type) + op('teaser', 'Teaser', f.type) + '</select></label>'
+    +   '<label>Etapa<select id="csTrF_etapa">' + op('', '— Sin definir —', f.etapa) + op('grabacion', 'Grabación', f.etapa) + op('edicion', 'Edición', f.etapa) + '</select></label>'
+    +   '<label>Estado<select id="csTrF_status">' + op('pendiente', 'Pend. revisión', f.status || 'pendiente') + op('en_curso', 'En curso', f.status) + op('completo', 'Completado', f.status) + '</select></label>'
+    + '</div>'
+    + '<label>Título / descripción<input id="csTrF_title" value="' + csEsc(f.title || '') + '" placeholder="Ej: Tráiler oficial T2…"></label>'
+    + '<label>Serie / programa<select id="csTrF_series_id">' + op('', '— Sin asociar —', f.series_id)
+    +   ((d && d.series) || []).filter(s => !s.autoCreated).slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'es')).map(s => op(s.id, s.name, f.series_id)).join('') + '</select></label>'
+    + '<div class="cs-tr-campos cs-tr-2">'
+    +   '<label>Fecha de llegada<input type="date" id="csTrF_received_at" value="' + csEsc(f.received_at || '') + '"></label>'
+    +   '<label>Fecha límite de entrega<input type="date" id="csTrF_deadline" value="' + csEsc(f.deadline || '') + '"></label>'
+    + '</div>'
+    + '<div class="cs-tr-form-b"><button class="cs-b" data-cs="trCancelar">Cancelar</button><button class="cs-b cs-pri" data-cs="trGuardar">Guardar</button></div></div>';
+}
+
 function csHtmlTrailers(d, hoy, vivo){
-  const r = csResumen(d, hoy);
-  const ix = d ? prodIndices(d) : null;
-  const todos = d ? d.trailers.map(t => Object.assign({ plazo: prodPlazo(t.deadline, t.status, hoy) }, t))
-    .sort((a, b) => ((a.plazo.nivel === 'hecho') - (b.plazo.nivel === 'hecho')) || ((a.plazo.dias == null) - (b.plazo.dias == null)) || ((a.plazo.dias || 0) - (b.plazo.dias || 0))) : [];
-  const hechos = todos.filter(t => t.plazo.nivel === 'hecho').length;
-  return csCabecera('Tráilers', r.trailersPendientes + ' pendientes · ' + hechos + ' completados', vivo)
-    + (d ? '<div class="cs-nuevo"><input type="text" id="csTrTitulo" placeholder="Título del tráiler o teaser">'
-        + '<select id="csTrTipo"><option value="trailer">Tráiler</option><option value="teaser">Teaser</option></select>'
-        + '<select id="csTrProg"><option value="">Programa…</option>' + d.series.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'es')).map(s => '<option value="' + csEsc(s.id) + '">' + csEsc(s.name) + '</option>').join('') + '</select>'
-        + '<input type="date" id="csTrFecha" title="Entrega">'
-        + '<button class="cs-b cs-pri" data-cs="trNuevo">' + csIco('mas', 14) + '<span>Añadir</span></button></div>'
-      + '<div class="cs-lista">'
-        + todos.map(t => { const s = ix.serie[String(t.series_id)];
-            return '<div class="cs-linea cs-linea-g' + (t.plazo.nivel === 'hecho' ? ' cs-hecho' : '') + '">' + csChip(t.plazo.texto, t.plazo.nivel)
-              + '<span class="cs-linea-t"><b>' + csEsc(t.title || '(sin título)') + '</b> · ' + (t.type === 'teaser' ? 'Teaser' : 'Tráiler') + (s ? ' · ' + csEsc(s.name) : '') + '</span>'
-              + csSelect('status', t.status || 'pendiente', [['pendiente', 'Pendiente'], ['en_curso', 'En curso'], ['completo', 'Completado']], { cs: 'trCampo', id: t.id })
-              + '<input type="date" data-cs="trCampo" data-id="' + csEsc(t.id) + '" data-campo="deadline" value="' + csEsc(t.deadline || '') + '" title="Entrega">'
-              + '<button class="cs-b cs-b-icono" data-cs="trBorrar" data-id="' + csEsc(t.id) + '" title="Borrar" aria-label="Borrar «' + csEsc(t.title || '') + '»">' + csIco('cerrar', 13) + '</button>'
-              + '</div>'; }).join('')
-        + (!d.trailers.length ? '<div class="cs-nada">Ningún tráiler ni teaser.</div>' : '')
-        + '</div>'
-      : csVacio());
+  if(!d) return csCabecera('Tráilers & Teasers', 'Los materiales de cada programa', vivo) + csVacio();
+  const todos = d.trailers || [];
+  const h0 = hoy || new Date();
+  const criticos = todos.filter(t => t.status !== 'completo' && t.deadline && (csTrSla(t.deadline, t.status, h0).dias != null) && csTrSla(t.deadline, t.status, h0).dias <= 2).length;
+  const pendientes = todos.filter(t => t.status !== 'completo').length, hechos = todos.filter(t => t.status === 'completo').length;
+  const filtros = { estado: CS.trEstado, tipo: CS.trTipo, etapa: CS.trEtapa };
+  const lista = csTrVisibles(d, filtros);
+  const serie = {}; for(const s of (d.series || [])) serie[String(s.id)] = s;
+  const sel = (campo, valor, ops) => '<select data-cs="trFiltro" data-campo="' + campo + '">' + ops.map(x => '<option value="' + x[0] + '"' + (valor === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select>';
+  const kpi = (n, t, cls) => '<div class="cs-tr-kpi cs-tr-kpi-' + cls + '"><b>' + n + '</b><span>' + t + '</span></div>';
+  return csCabecera('Tráilers & Teasers', todos.length + ' materiales · ' + pendientes + ' pendientes' + (criticos ? ' <b class="cs-rojo">· ' + criticos + ' crítico' + (criticos === 1 ? '' : 's') + '</b>' : ''), vivo)
+      .replace(/<\/div>$/, '<button class="cs-b cs-pri" data-cs="trAgregar">' + csIco('mas', 14) + '<span>Agregar</span></button></div>')
+    + (CS.trForm ? csHtmlTrForm(d) : '')
+    + '<div class="cs-tr-kpis">' + kpi(todos.length, 'Total', 'total') + kpi(pendientes, 'Pendientes', 'pend') + kpi(hechos, 'Completados', 'ok') + (criticos ? kpi(criticos, 'Críticos', 'mal') : '') + '</div>'
+    + '<div class="cs-tr-filtros">'
+    +   sel('trEstado', CS.trEstado, [['', 'Todos los estados'], ['pendiente', 'Pend. revisión'], ['en_curso', 'En curso'], ['completo', 'Completado']])
+    +   sel('trTipo', CS.trTipo, [['', 'Todos los tipos'], ['trailer', 'Tráiler'], ['teaser', 'Teaser']])
+    +   sel('trEtapa', CS.trEtapa, [['', 'Todas las etapas'], ['grabacion', 'Grabación'], ['edicion', 'Edición']])
+    +   (CS.trEstado || CS.trTipo || CS.trEtapa ? '<button class="cs-b" data-cs="trLimpiar">' + csIco('cerrar', 12) + '<span>Limpiar</span></button>' : '')
+    + '</div>'
+    + (!lista.length ? '<div class="cs-nada">' + (todos.length ? 'Sin resultados con los filtros aplicados.' : 'No hay materiales registrados. Pulsa «Agregar» para empezar.') + '</div>'
+      : '<div class="cs-tr-tabla-w"><table class="cs-tr-tabla"><thead><tr><th>Tipo</th><th>Etapa</th><th>Título / serie</th><th>Llegada</th><th>Fecha límite</th><th>SLA</th><th>Estado</th><th></th></tr></thead><tbody>'
+        + lista.map(t => {
+            const sl = csTrSla(t.deadline, t.status, h0), s = t.series_id != null ? serie[String(t.series_id)] : null, est = t.status || 'pendiente';
+            return '<tr><td><span class="cs-tr-tipo cs-tr-tipo-' + (t.type === 'teaser' ? 'teaser' : 'trailer') + '">' + csIco(t.type === 'teaser' ? 'tijeras' : 'trailers', 11) + (t.type === 'teaser' ? 'Teaser' : 'Tráiler') + '</span></td>'
+              + '<td>' + (t.etapa ? '<span class="cs-tr-etapa cs-tr-etapa-' + csEsc(t.etapa) + '">' + (t.etapa === 'grabacion' ? 'Grabación' : 'Edición') + '</span>' : '<span class="cs-tenue">—</span>') + '</td>'
+              + '<td><b class="cs-tr-tit">' + (t.title ? csEsc(t.title) : '<i class="cs-tenue">Sin título</i>') + '</b>' + (s ? '<div class="cs-tenue">' + csEsc(s.name) + '</div>' : '') + '</td>'
+              + '<td class="cs-tr-f">' + csEsc(t.received_at || '—') + '</td><td class="cs-tr-f">' + csEsc(t.deadline || '—') + '</td>'
+              + '<td>' + (est !== 'completo' && t.deadline ? '<span class="cs-tr-sla cs-tr-sla-' + sl.nivel + '"><i></i>' + csEsc(sl.texto) + '</span>' : '<span class="cs-tenue">—</span>') + '</td>'
+              + '<td><button class="cs-tr-est cs-tr-est-' + csEsc(est) + '" data-cs="trCiclo" data-id="' + csEsc(t.id) + '" title="Pulsa para cambiar el estado">' + csEsc(CS_TR_ESTADO[est] || est) + '</button></td>'
+              + '<td><div class="cs-tr-acc"><button class="cs-b cs-b-icono" data-cs="trEditar" data-id="' + csEsc(t.id) + '" title="Editar" aria-label="Editar «' + csEsc(t.title || '') + '»">' + csIco('editar', 12) + '</button>'
+              + '<button class="cs-b cs-b-icono cs-borrar" data-cs="trBorrar" data-id="' + csEsc(t.id) + '" title="Eliminar" aria-label="Eliminar «' + csEsc(t.title || '') + '»">' + csIco('cerrar', 12) + '</button></div></td></tr>';
+          }).join('') + '</tbody></table></div>');
 }
 
 function csHtmlProduccion(d, hoy, vivo){
@@ -2703,21 +2773,40 @@ function csCablear(vista){
       const tid = id(at('id')), campo = at('campo'), valor = el.value.trim();
       csEditar(pl => dcxTalento(pl, tid, { [campo]: valor }), 'Ficha de talento: ' + campo + ' = ' + (valor || '—'));
     };
-    else if(que === 'trNuevo') el.onclick = () => {
-      const val = (k) => { const i = document.getElementById(k); return i ? i.value.trim() : ''; };
-      const titulo = val('csTrTitulo');
-      if(!titulo){ castAviso('Escribe el título del tráiler'); return; }
-      const datos = { title: titulo, type: val('csTrTipo'), series_id: val('csTrProg') ? id(val('csTrProg')) : null, deadline: val('csTrFecha') };
-      csEditar(pl => dcxTrailerNuevo(pl, datos), 'Tráiler añadido: ' + titulo);
+    /* ── Tráilers & Teasers ── */
+    else if(que === 'trAgregar') el.onclick = () => { CS.trForm = { type: 'trailer', etapa: '', title: '', series_id: '', received_at: '', deadline: '', status: 'pendiente' }; csRepintar(); };
+    else if(que === 'trEditar') el.onclick = () => {
+      const t = ((a().datos && a().datos.trailers) || []).find(x => String(x.id) === String(at('id')));
+      if(t){ CS.trForm = Object.assign({}, t); csRepintar(); }
     };
-    else if(que === 'trCampo') el.onchange = () => {
-      const tid = id(at('id')), campo = at('campo'), valor = el.value;
-      csEditar(pl => dcxTrailer(pl, tid, { [campo]: valor }), 'Tráiler: ' + (campo === 'status' ? 'estado' : 'entrega') + ' = ' + (valor || '—'));
+    else if(que === 'trCancelar') el.onclick = () => { CS.trForm = null; csRepintar(); };
+    else if(que === 'trGuardar') el.onclick = () => {
+      const val = (k) => { const i = document.getElementById('csTrF_' + k); return i ? String(i.value || '').trim() : ''; };
+      const f = { type: val('type'), etapa: val('etapa'), status: val('status') || 'pendiente', title: val('title'), series_id: val('series_id') ? id(val('series_id')) : null, received_at: val('received_at'), deadline: val('deadline') };
+      if(!f.type){ castAviso('Selecciona el tipo de material'); return; }
+      const viejo = CS.trForm || {};
+      if(viejo.id != null){
+        const tid = viejo.id;
+        CS.trForm = null;
+        csEditar(pl => dcxTrailer(pl, tid, f), 'Tráiler actualizado: ' + (f.title || '(sin título)'));
+      }else{
+        if(!f.title){ castAviso('Escribe el título del material'); return; }
+        CS.trForm = null;
+        csEditar(pl => dcxTrailerNuevo(pl, f), (f.type === 'teaser' ? 'Teaser' : 'Tráiler') + ' añadido: ' + f.title);
+      }
     };
+    else if(que === 'trCiclo') el.onclick = () => {
+      const t = ((a().datos && a().datos.trailers) || []).find(x => String(x.id) === String(at('id')));
+      if(!t) return;
+      const nuevo = CS_TR_SIGUE[t.status || 'pendiente'] || 'en_curso', tid = id(at('id'));
+      csEditar(pl => dcxTrailer(pl, tid, { status: nuevo }), 'Tráiler: estado = ' + (CS_TR_ESTADO[nuevo] || nuevo) + ' · ' + (t.title || ''));
+    };
+    else if(que === 'trFiltro') el.onchange = () => { CS[at('campo')] = el.value; csRepintar(); };
+    else if(que === 'trLimpiar') el.onclick = () => { CS.trEstado = ''; CS.trTipo = ''; CS.trEtapa = ''; csRepintar(); };
     else if(que === 'trBorrar') el.onclick = async () => {
       const tid = id(at('id'));
       const ok = (typeof DDL_UI !== 'undefined' && DDL_UI.confirmModal)
-        ? await DDL_UI.confirmModal({ title: 'Borrar tráiler', body: 'Se borra de DublajeCast. No se puede deshacer desde aquí.', confirmLabel: 'Borrar', cancelLabel: 'Cancelar', danger: true })
+        ? await DDL_UI.confirmModal({ title: 'Borrar tráiler', body: '¿Eliminar este material? Se borra de DublajeCast. No se puede deshacer desde aquí.', confirmLabel: 'Borrar', cancelLabel: 'Cancelar', danger: true })
         : true;
       if(ok) csEditar(pl => dcxTrailerBorrar(pl, tid), 'Tráiler borrado');
     };
