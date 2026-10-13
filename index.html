@@ -2001,6 +2001,67 @@ body.cs-on #progHeader{ display:none !important; }
 .dct-marco{ width:100%; min-height:calc(100vh - 230px); border:none; border-radius:12px; background:#fff; }
 .dct-pegado-completa .dct-marco{ min-height:calc(100vh - 90px); }
 .cs-tal-modos{ margin:0 0 12px; }
+/* Producción Casting, como en DublajeCast (js/csproduccion.js, PRO-42). */
+.cp-c-curso{ color:#A78BFA; } .cp-c-hecho{ color:#4ADE80; }
+.cp-bots{ display:flex; gap:7px; flex-wrap:wrap; justify-content:flex-end; margin:-6px 0 12px; }
+.cp-bots .cs-b{ padding:7px 12px; font-size:12px; }
+.cp-tabs{ margin-bottom:12px; }
+.cp-filtros{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+.cp-buscar{ flex:1 1 260px; min-width:200px; margin:0; }
+.cp-fsel{ background:#0d0f12; border:1px solid #2b2f36; color:#d7dae0; border-radius:10px; padding:8px 10px; font-family:'Inter',sans-serif; font-size:12.5px; }
+.cp-leyenda{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; }
+.cp-ley{ display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#9aa3ad; padding:3px 10px; border-radius:8px; border:1px solid; }
+.cp-ley i{ width:10px; height:10px; border-radius:2px; }
+.cp-ley-normal{ border-color:rgba(167,139,250,.2); background:rgba(167,139,250,.04); } .cp-ley-normal i{ background:rgba(167,139,250,.4); }
+.cp-ley-miami{ border-color:rgba(251,146,60,.3); background:rgba(255,140,66,.08); } .cp-ley-miami i{ background:#FB923C; }
+.cp-ley-dubcard{ border-color:rgba(196,181,253,.3); background:rgba(180,91,255,.08); } .cp-ley-dubcard i{ background:#C4B5FD; }
+.cp-ley-vencida{ border-color:rgba(251,113,133,.3); background:rgba(255,77,125,.08); } .cp-ley-vencida i{ background:#FB7185; }
+.cp-tabla-w{ background:#101215; border:1px solid #23262b; border-radius:16px; overflow-x:auto; }
+.cp-tabla{ width:100%; border-collapse:collapse; font-size:12.5px; min-width:880px; }
+.cp-tabla th{ padding:11px 10px; text-align:left; color:#A78BFA; font-weight:700; font-size:10px; text-transform:uppercase; letter-spacing:.07em; border-bottom:1px solid #23262b; white-space:nowrap; background:#14171b; }
+.cp-tabla th.cp-ord{ cursor:pointer; user-select:none; opacity:.75; } .cp-tabla th.cp-ord.on, .cp-tabla th.cp-ord:hover{ opacity:1; }
+.cp-tabla td{ padding:8px 10px; border-bottom:1px solid #1a1d22; vertical-align:middle; }
+.cp-sec td{ padding:8px 12px 6px; font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:#A78BFA; background:rgba(167,139,250,.03); }
+.cp-sec-pre td{ color:#60A5FA; background:rgba(77,159,255,.04); }
+.cp-sec td i{ opacity:.55; font-style:normal; font-weight:400; }
+.cp-fila td:first-child{ border-left:3px solid transparent; }
+.cp-fila-normal td:first-child{ border-left-color:rgba(167,139,250,.22); }
+.cp-fila-miami td:first-child{ border-left-color:#FB923C; } .cp-fila-miami{ background:rgba(255,140,66,.04); }
+.cp-fila-dubcard td:first-child{ border-left-color:#C4B5FD; } .cp-fila-dubcard{ background:rgba(180,91,255,.04); }
+.cp-fila-vencida td:first-child{ border-left-color:#FB7185; } .cp-fila-vencida{ background:rgba(255,77,125,.05); }
+.cp-fila-hecha td:first-child{ border-left-color:#28A745; }
+.cp-prog{ min-width:170px; }
+.cp-edit{ display:block; width:100%; background:transparent; border:none; border-bottom:1px dashed transparent; color:#cbd5e1; font-family:'Inter',sans-serif; font-size:12px; padding:2px 0; outline:none; }
+.cp-edit:hover{ border-bottom-color:#2b2f36; } .cp-edit:focus{ border-bottom-color:#A78BFA; }
+.cp-edit.cp-b, .cp-txt.cp-b{ font-weight:800; color:#f2f3f5; text-transform:uppercase; font-size:12.5px; }
+.cp-txt{ font-size:12px; color:#4caf7d; } .cp-txt.cp-b{ color:#4caf7d; }
+.cp-con-lista{ display:flex; gap:3px; align-items:center; }
+.cp-sel{ flex:1; min-width:110px; width:100%; background:#0d0f12; border:1px solid #2b2f36; border-radius:7px; color:#d7dae0; font-family:'Inter',sans-serif; font-size:12px; padding:6px 8px; outline:none; cursor:pointer; }
+.cp-gear{ background:none; border:none; color:#6b7079; cursor:pointer; padding:3px; display:inline-grid; place-items:center; }
+.cp-gear:hover{ color:#f2f3f5; }
+.cp-fechas{ min-width:130px; }
+.cp-fecha{ display:block; background:transparent; border:none; border-bottom:1px solid rgba(167,139,250,.22); color:#f2f3f5; font-family:'Inter',sans-serif; font-size:12px; outline:none; padding:2px 0; cursor:pointer; color-scheme:dark; width:118px; margin-bottom:3px; }
+.cp-alerta, .cp-entregada{ display:inline-flex; align-items:center; gap:4px; font-size:9.5px; font-weight:700; padding:1px 7px; border-radius:999px; }
+.cp-entregada{ color:#4caf7d; background:rgba(40,167,69,.12); }
+.cp-acc{ white-space:nowrap; text-align:right; }
+.cp-acc .cs-b{ padding:6px 11px; font-size:11.5px; }
+.cs-b.cp-finalizar{ background:linear-gradient(135deg,#1a6b3a,#28A745); border-color:#28A745; color:#fff; }
+.cs-b.cp-iniciar{ background:linear-gradient(135deg,#8B5CF6,#4D9FFF); border-color:#8B5CF6; color:#fff; }
+.cs-b.cp-reabrir{ background:rgba(40,167,69,.08); border-color:rgba(40,167,69,.3); color:#4caf7d; }
+.cp-archivo{ border-color:rgba(40,167,69,.2); }
+.cp-archivo-t{ padding:9px 14px; font-size:10px; font-weight:700; color:#4caf7d; text-transform:uppercase; letter-spacing:.1em; background:rgba(40,167,69,.06); border-bottom:1px solid rgba(40,167,69,.12); }
+.cp-archivo .cp-tabla th{ color:#4caf7d; }
+.cp-tenue{ color:#8b8f97; font-size:12px; }
+.cp-nuevo{ position:fixed; right:28px; bottom:28px; z-index:500; display:inline-flex; align-items:center; gap:7px; border:none; border-radius:999px; padding:12px 22px; font-family:'Inter',sans-serif; font-size:13px; font-weight:800; letter-spacing:.04em; color:#fff; cursor:pointer; background:linear-gradient(135deg,#8B5CF6,#4D9FFF); box-shadow:0 4px 24px rgba(139,92,246,.55),0 0 40px rgba(167,139,250,.2); }
+.cp-nuevo:hover{ filter:brightness(1.08); }
+.cp-modal label{ display:flex; flex-direction:column; gap:5px; font-size:11px; color:#8b8f97; }
+.cp-modal .cp-check{ flex-direction:row; align-items:center; gap:8px; font-size:12.5px; color:#cbd5e1; }
+.cp-fila-add{ display:flex; gap:8px; } .cp-fila-add input{ flex:1; background:#0d0f12; border:1px solid #2b2f36; color:#f2f3f5; border-radius:9px; padding:8px 10px; font-family:'Inter',sans-serif; font-size:12.5px; }
+.cp-lista{ display:flex; flex-direction:column; gap:5px; max-height:260px; overflow:auto; }
+.cp-lista-it{ display:flex; align-items:center; justify-content:space-between; background:#0c0e11; border:1px solid #1d2026; border-radius:8px; padding:6px 10px; font-size:12.5px; color:#e5e7eb; }
+.cp-det summary{ cursor:pointer; color:#A78BFA; font-size:12px; font-weight:600; margin-bottom:8px; }
+.cp-mal{ color:#FB7185; font-size:12px; line-height:1.5; background:rgba(255,77,125,.07); border:1px solid rgba(255,77,125,.3); border-radius:8px; padding:9px 12px; }
+.cp-prev{ font-size:11.5px; color:#cbd5e1; background:#0c0e11; border:1px solid #1d2026; border-radius:8px; padding:9px 12px; max-height:180px; overflow:auto; display:flex; flex-direction:column; gap:3px; }
 /* Tráilers & Teasers, como en DublajeCast (PRO-40). */
 .cs-tr-kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:14px; }
 .cs-tr-kpi{ border:1px solid; border-radius:14px; padding:14px 18px; display:flex; flex-direction:column; gap:4px; }
@@ -2876,7 +2937,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.60.0-nube';
+const APP_VER_NUM = 'v11.61.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -22984,5 +23045,6 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/castdisponible.js"></script>
 <script src="./js/castreparto.js"></script>
 <script src="./js/dctools.js"></script>
+<script src="./js/csproduccion.js"></script>
 <script src="./js/salud.js"></script>
 <script src="./js/qcpdf.js"></script>
