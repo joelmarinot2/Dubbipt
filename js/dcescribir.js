@@ -115,7 +115,7 @@ function dcxCambiarCampos(lista, id, cambios, permitidos){
 const DCX_CAMPOS_EP = ['title', 'status', 'fase', 'fecha_miami', 'fecha_dubcard', 'formato_dubcard'];
 const DCX_CAMPOS_SERIE = ['name', 'status', 'cliente', 'director'];
 const DCX_CAMPOS_TALENTO = ['name', 'genero', 'edad_aparente', 'tono_de_voz', 'registro', 'email'];
-const DCX_CAMPOS_TRAILER = ['title', 'type', 'etapa', 'series_id', 'deadline', 'status'];
+const DCX_CAMPOS_TRAILER = ['title', 'type', 'etapa', 'series_id', 'received_at', 'deadline', 'status'];
 
 function dcxEpisodio(p, epId, cambios){ return dcxCambiarCampos(dcxLista(p, 'episodes'), epId, cambios, DCX_CAMPOS_EP); }
 /** El programa: estado, cliente, director y nombre (un nombre vacío no se pone). */
@@ -152,8 +152,9 @@ function dcxTalentoNuevo(p, ficha){
 function dcxTrailerNuevo(p, datos){
   const titulo = String((datos && datos.title) || '').trim();
   if(!titulo) return false;
-  const t = { id: dcxUid(), title: titulo, type: datos.type === 'teaser' ? 'teaser' : 'trailer', status: 'pendiente' };
-  for(const k of ['etapa', 'series_id', 'deadline']) if(datos[k] != null && datos[k] !== '') t[k] = datos[k];
+  const est = ['pendiente', 'en_curso', 'completo'].indexOf(datos.status) >= 0 ? datos.status : 'pendiente';
+  const t = { id: dcxUid(), title: titulo, type: datos.type === 'teaser' ? 'teaser' : 'trailer', status: est };
+  for(const k of ['etapa', 'series_id', 'received_at', 'deadline']) if(datos[k] != null && datos[k] !== '') t[k] = datos[k];
   dcxLista(p, 'trailers').push(t);
   return true;
 }

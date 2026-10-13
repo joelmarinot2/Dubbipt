@@ -218,7 +218,7 @@ exports.pruebas = async function(t){
   t.seccion('7 · lo que se pinta: con los datos, sin ellos, y sin emojis');
   const vistas = ['dashboard', 'talentos', 'ocupacion', 'trailers', 'produccion', 'dubcards', 'pegado', 'breakdowns'];
   const html = {}; vistas.forEach(v => { html[v] = M.csHtml(v, HOY); });
-  t.ok('cada sección con su título y de dónde salen los datos', ['Dashboard', 'Talentos', 'Ocupación', 'Tráilers', 'Producción'].every((n, i) => html[vistas[i]].indexOf('<h2>' + n + '</h2>') >= 0 && /Datos de DublajeCast del 6\/10\/2026/.test(html[vistas[i]])));
+  t.ok('cada sección con su título y de dónde salen los datos', ['Dashboard', 'Talentos', 'Ocupación', 'Tráilers &amp; Teasers', 'Producción'].every((n, i) => html[vistas[i]].indexOf('<h2>' + n + '</h2>') >= 0 && /Datos de DublajeCast del 6\/10\/2026/.test(html[vistas[i]])));
   t.ok('el Dashboard, con sus números y sus listas', /<b>2<\/b><span>programas en curso<\/span>/.test(html.dashboard) && /cs-kpi cs-kpi-aviso"><b>1<\/b><span>personajes sin talento/.test(html.dashboard) && /Miami vencida hace 1 d/.test(html.dashboard) && /Tráiler oficial/.test(html.dashboard));
   t.ok('la Ocupación: buscador y filtros de la ficha, en curso / completados / todos, y cada talento con sus programas en tarjetas',
        /data-cs="ocBuscar"/.test(html.ocupacion) && /data-cs="ocFiltro" data-campo="ocGenero"/.test(html.ocupacion) && /data-cs="ocModo" data-v="curso"/.test(html.ocupacion)

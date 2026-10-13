@@ -96,7 +96,7 @@ function armar(o){
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
     ['CS', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
      'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS', 'csAsegurarDatos', 'csDevolverCopia', 'csBajarCopia', 'CS_TRAER',
-     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado', 'csBorrarPrograma', 'csBorrarEpisodio', 'csBorrarDeBiblioteca', 'csEstadoEp', 'csCambiarEstadoEp', 'csLeerActivos', 'csAplicarActivos', 'csNumeroDeLinea', 'csProgramaDeLinea', 'csParecidoPersonaje', 'csIndicePapeles', 'csBuscarPersonajes', 'CS_REGS', 'csFichasTalentos', 'csCargaTalento', 'csOcupacionDatos', 'csOcupacionVisible'],
+     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado', 'csBorrarPrograma', 'csBorrarEpisodio', 'csBorrarDeBiblioteca', 'csEstadoEp', 'csCambiarEstadoEp', 'csLeerActivos', 'csAplicarActivos', 'csNumeroDeLinea', 'csProgramaDeLinea', 'csParecidoPersonaje', 'csIndicePapeles', 'csBuscarPersonajes', 'CS_REGS', 'csFichasTalentos', 'csCargaTalento', 'csOcupacionDatos', 'csOcupacionVisible', 'csTrSla'],
     { castNorm: (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim(),
       document: { getElementById: (id) => campos[id] || null, querySelector: () => null, body: { classList: { contains: () => false, toggle: () => {}, remove: () => {} } } },
       prodPuede: () => true, PROD: PROD, PROD_ET: PR.PROD_ET, prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard,
@@ -293,14 +293,36 @@ exports.pruebas = async function(t){
   }
   {
     const A = armar();
-    Object.assign(A.campos, { csTrTitulo: { value: 'Teaser final' }, csTrTipo: { value: 'teaser' }, csTrProg: { value: '2' }, csTrFecha: { value: '2026-11-02' } });
     let c = controles(A, 'trailers');
-    c.de('trNuevo').onclick(); await espera();
-    const tr = A.nube().trailers.find(x => x.title === 'Teaser final');
-    t.eq('un tráiler nuevo, con su programa (como número) y su fecha', tr && JSON.stringify(tr, ['title', 'type', 'series_id', 'deadline', 'status']), '{"title":"Teaser final","type":"teaser","series_id":2,"deadline":"2026-11-02","status":"pendiente"}');
+    t.ok('como en DublajeCast: «Agregar», cifras y filtros por estado, tipo y etapa', !!c.de('trAgregar') && /<div class="cs-tr-kpis">/.test(c.html) && !!c.de('trFiltro', { campo: 'trEstado' }) && !!c.de('trFiltro', { campo: 'trTipo' }) && !!c.de('trFiltro', { campo: 'trEtapa' }));
+    t.ok('y la tabla: tipo, etapa, título y serie, llegada, fecha límite, SLA y estado, con editar y eliminar',
+         /<th>Tipo<\/th><th>Etapa<\/th><th>Título \/ serie<\/th><th>Llegada<\/th><th>Fecha límite<\/th><th>SLA<\/th><th>Estado<\/th>/.test(c.html) && /<b class="cs-tr-tit">Tráiler oficial<\/b><div class="cs-tenue">A Filipino Christmas<\/div>/.test(c.html) && !!c.de('trEditar', { id: 7 }) && !!c.de('trBorrar', { id: 7 }));
+    c.de('trAgregar').onclick();
+    Object.assign(A.campos, { csTrF_type: { value: 'teaser' }, csTrF_etapa: { value: 'edicion' }, csTrF_status: { value: 'en_curso' }, csTrF_title: { value: 'Teaser final' }, csTrF_series_id: { value: '2' }, csTrF_received_at: { value: '2026-10-20' }, csTrF_deadline: { value: '2026-11-02' } });
     c = controles(A, 'trailers');
-    const st = c.de('trCampo', { id: 7, campo: 'status' }); st.value = 'completo'; st.onchange(); await espera();
-    t.eq('su estado', A.nube().trailers.find(x => x.id === 7).status, 'completo');
+    t.ok('«Agregar» abre el formulario de DublajeCast', /Nuevo material/.test(c.html) && !!c.de('trGuardar'));
+    c.de('trGuardar').onclick(); await espera();
+    const tr = A.nube().trailers.find(x => x.title === 'Teaser final');
+    t.eq('un material nuevo, con tipo, etapa, estado, programa (como número), llegada y fecha límite', tr && JSON.stringify(tr, ['title', 'type', 'etapa', 'status', 'series_id', 'received_at', 'deadline']),
+         '{"title":"Teaser final","type":"teaser","etapa":"edicion","status":"en_curso","series_id":2,"received_at":"2026-10-20","deadline":"2026-11-02"}');
+    t.eq('y el formulario se cierra', A.M.CS.trForm, null);
+    c = controles(A, 'trailers');
+    c.de('trCiclo', { id: 7 }).onclick(); await espera();
+    t.eq('pulsar el estado lo pasa al siguiente: pendiente → en curso', A.nube().trailers.find(x => x.id === 7).status, 'en_curso');
+    controles(A, 'trailers').de('trEditar', { id: 7 }).onclick();
+    t.eq('editar abre el formulario con lo que tiene', A.M.CS.trForm && A.M.CS.trForm.title, 'Tráiler oficial');
+    Object.assign(A.campos, { csTrF_type: { value: 'trailer' }, csTrF_etapa: { value: 'grabacion' }, csTrF_status: { value: 'completo' }, csTrF_title: { value: 'Tráiler oficial v2' }, csTrF_series_id: { value: '1' }, csTrF_received_at: { value: '' }, csTrF_deadline: { value: '2026-10-08' } });
+    controles(A, 'trailers').de('trGuardar').onclick(); await espera();
+    t.eq('y guarda los cambios', JSON.stringify(A.nube().trailers.find(x => x.id === 7), ['title', 'etapa', 'status']), '{"title":"Tráiler oficial v2","etapa":"grabacion","status":"completo"}');
+    A.M.CS.trTipo = 'teaser';
+    t.ok('los filtros dejan solo lo que se pide', /Teaser final/.test(controles(A, 'trailers').html) && !/Tráiler oficial v2/.test(controles(A, 'trailers').html) && !!controles(A, 'trailers').de('trLimpiar'));
+    controles(A, 'trailers').de('trLimpiar').onclick();
+    t.eq('«Limpiar» los quita', A.M.CS.trTipo, '');
+    t.eq('el SLA, como lo cuenta DublajeCast', ['2026-10-05', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-11', '2026-10-20'].map(f => A.M.csTrSla(f, 'pendiente', new Date(2026, 9, 7)).texto).join(','), 'Vencido,Hoy,Mañana,2 días,4 días,13 días');
+    A.M.CS.trForm = { type: '' }; Object.assign(A.campos, { csTrF_type: { value: '' } });
+    controles(A, 'trailers').de('trGuardar').onclick();
+    t.ok('sin tipo, se pide', A.avisos.includes('Selecciona el tipo de material'));
+    A.M.CS.trForm = null;
     c = controles(A, 'trailers');
     await c.de('trBorrar', { id: 7 }).onclick(); await espera();
     t.ok('y borrarlo, preguntando antes', !A.nube().trailers.some(x => x.id === 7) && A.diario.some(x => /^pregunta Borrar tráiler/.test(x)));
