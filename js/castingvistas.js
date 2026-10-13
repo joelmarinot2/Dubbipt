@@ -2499,7 +2499,8 @@ function csHtml(vista, hoy){
     case 'talentos':   return csHtmlTalentos(datos, vivo);
     case 'ocupacion':  return csHtmlOcupacion(datos, vivo);
     case 'trailers':   return csHtmlTrailers(datos, h, vivo);
-    case 'produccion': return csHtmlProduccion(datos, h, vivo);
+    /* Producción Casting, como en DublajeCast (js/csproduccion.js, PRO-42). Sin ese archivo, la tabla de antes. */
+    case 'produccion': return (datos && typeof CSP !== 'undefined' && CSP && typeof CSP.html === 'function') ? CSP.html(datos, vivo) : csHtmlProduccion(datos, h, vivo);
   }
   return '';
 }
@@ -2886,6 +2887,7 @@ function csCablear(vista){
   });
   /* Las herramientas que antes eran de DublajeCast se enganchan aparte (data-dct). */
   try{ if(typeof DCT !== 'undefined' && DCT && typeof DCT.cablear === 'function') DCT.cablear(vista, CS.vista); }catch(e){ fallo('DCT.cablear · js/castingvistas.js', e); }
+  try{ if(CS.vista === 'produccion' && typeof CSP !== 'undefined' && CSP && typeof CSP.cablear === 'function') CSP.cablear(vista); }catch(e){ fallo('CSP.cablear · js/castingvistas.js', e); }
 }
 
 /** Actualizar: si DublajeCast está abierto con sesión, ya es en vivo; si no, se trae con la sesión del puente. */
