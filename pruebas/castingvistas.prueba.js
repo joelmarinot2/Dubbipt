@@ -220,7 +220,9 @@ exports.pruebas = async function(t){
   const html = {}; vistas.forEach(v => { html[v] = M.csHtml(v, HOY); });
   t.ok('cada sección con su título y de dónde salen los datos', ['Dashboard', 'Talentos', 'Ocupación', 'Tráilers', 'Producción'].every((n, i) => html[vistas[i]].indexOf('<h2>' + n + '</h2>') >= 0 && /Datos de DublajeCast del 6\/10\/2026/.test(html[vistas[i]])));
   t.ok('el Dashboard, con sus números y sus listas', /<b>2<\/b><span>programas en curso<\/span>/.test(html.dashboard) && /cs-kpi cs-kpi-aviso"><b>1<\/b><span>personajes sin talento/.test(html.dashboard) && /Miami vencida hace 1 d/.test(html.dashboard) && /Tráiler oficial/.test(html.dashboard));
-  t.ok('la Ocupación, con el selector de programa y la barra de cada uno', /<select data-cs="programa">/.test(html.ocupacion) && /style="width:100%"><\/i><em>276<\/em>/.test(html.ocupacion) && /style="width:14%"><\/i><em>40<\/em>/.test(html.ocupacion));
+  t.ok('la Ocupación: buscador y filtros de la ficha, en curso / completados / todos, y cada talento con sus programas en tarjetas',
+       /data-cs="ocBuscar"/.test(html.ocupacion) && /data-cs="ocFiltro" data-campo="ocGenero"/.test(html.ocupacion) && /data-cs="ocModo" data-v="curso"/.test(html.ocupacion)
+       && /<div class="cs-oc-tal">[\s\S]*?<div class="cs-oc-prog/.test(html.ocupacion));
   t.ok('Producción, con su filtro', /<input type="checkbox" data-cs="soloAlertas">/.test(html.produccion));
   t.ok('las herramientas de DublajeCast, con su explicación y su botón', /Prepara las DUBCARD/.test(html.dubcards) && /data-cs="herramienta" data-v="dubcards"/.test(html.dubcards) && /data-v="pegado"/.test(html.pegado) && /data-v="breakdowns"/.test(html.breakdowns));
   t.ok('ni un emoji en ninguna', vistas.every(v => !EMOJI.test(html[v])) && !EMOJI.test(M.csNavHtml('dashboard')), vistas.filter(v => EMOJI.test(html[v])).join(','));
@@ -294,8 +296,9 @@ exports.pruebas = async function(t){
     A.M.CS.vista = 'ocupacion'; A.M.csPintar('shows', b.cab, b.grid);
     t.ok('las demás secciones, en el mismo sitio', /<h2>Ocupación<\/h2>/.test(vista(A)) && /class="cs-nav-b on" data-v="ocupacion"/.test(A.doc.getElementById('csNav').innerHTML));
     t.eq('repintar no duplica nada', b.lib.hijos.filter(h => h.id === 'csNav').length + ' ' + b.lib.hijos.filter(h => h.id === 'csVista').length, '1 1');
-    control(A, 'programa').value = '2'; control(A, 'programa').onchange();
-    t.eq('el selector de programa de Ocupación filtra y repinta', A.M.CS.programa + ' ' + A.diario.includes('renderLibrary'), '2 true');
+    control(A, 'ocModo', 'todos').onclick();
+    t.eq('las pestañas de Ocupación cambian lo que se ve y repintan', A.M.CS.ocModo + ' ' + A.diario.includes('renderLibrary'), 'todos true');
+    A.M.CS.ocModo = 'curso';
     A.M.CS.vista = 'pegado'; A.M.csPintar('shows', b.cab, b.grid);
     control(A, 'herramienta').onclick();
     t.ok('las herramientas de DublajeCast se abren en su pantalla', A.diario.includes('dcastAbrir pegado'));
