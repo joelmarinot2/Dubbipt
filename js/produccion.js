@@ -216,6 +216,9 @@ function prodFormatoDubcard(ep, serie){
 /** Las alertas de un capítulo, las dos. */
 function prodAlertasEp(ep, serie, hoy){
   const out = [];
+  /* Un capítulo completado, o de un programa completado, no tiene entregas pendientes (PRO-48). */
+  if(ep && ep.status === 'completo') return out;
+  if(serie && serie.status === 'completo') return out;
   const m = prodAlertaMiami(ep && ep.fecha_miami, ep && ep.fase, hoy);
   const dc = prodAlertaDubcard(ep && ep.fecha_dubcard, prodFormatoDubcard(ep, serie), ep && ep.fase, hoy);
   if(m) out.push(m);

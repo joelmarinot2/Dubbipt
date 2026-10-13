@@ -100,6 +100,74 @@ function csEsc(s){ return (typeof esc === 'function') ? esc(String(s == null ? '
 /* ── Las cuentas (sin pantalla: se prueban solas) ──────────────────────── */
 
 /** Lo del Dashboard: los números, las entregas que vienen y los tráilers que vencen. */
+/* ── Las entregas de un capítulo: lo que de verdad falta ────────────────
+   Pedido de sala, con una captura del Dashboard: «¿por qué me salen estas
+   DUBCARD vencidas si ya están completadas?». La alerta se calculaba con las
+   fechas y la fase guardadas en el capítulo de DublajeCast, que se quedan
+   como estaban aunque el capítulo se complete desde aquí o su fila de
+   Producción se finalice. Ahora un capítulo completado -en DublajeCast, en
+   Dubbipt o con su fila de Producción finalizada- no tiene entregas
+   pendientes, y si está en Producción mandan las fechas, el formato y la
+   fase de su fila, que es donde se llevan. */
+
+/** Las filas de Producción por programa (nombre normalizado), una vez por juego de datos. */
+const CS_PROD_FILAS = (typeof WeakMap === 'function') ? new WeakMap() : null;
+function csFilasProduccionPor(d){
+  if(!d || !Array.isArray(d.produccion)) return {};
+  let m = CS_PROD_FILAS && CS_PROD_FILAS.get(d);
+  if(m && m.lista === d.produccion && m.n === d.produccion.length) return m.por;
+  const por = {};
+  for(const r of d.produccion){ if(!r) continue; const k = castNorm(r.programa); if(k) (por[k] = por[k] || []).push(r); }
+  if(CS_PROD_FILAS) CS_PROD_FILAS.set(d, { lista: d.produccion, n: d.produccion.length, por: por });
+  return por;
+}
+/** La fila de Producción de un capítulo de DublajeCast: mismo programa y mismo capítulo (por número, o por título). */
+function csFilaProduccionDe(d, serie, e){
+  if(!d || !serie || !e) return null;
+  const filas = csFilasProduccionPor(d)[castNorm(serie.name)] || [];
+  if(!filas.length) return null;
+  const n = parseInt(e.episode_number, 10), t = castNorm(e.title);
+  const numero = (c) => { const nums = String(c == null ? '' : c).match(/\d+/g); return nums ? parseInt(nums[nums.length - 1], 10) : NaN; };
+  return filas.find(r => isFinite(n) && numero(r.capitulo) === n) || (t ? filas.find(r => castNorm(r.capitulo) === t) : null) || null;
+}
+/** Los capítulos de DublajeCast cuya pareja en Dubbipt está completada. */
+function csDcCompletadosEnDubbipt(){
+  const set = new Set();
+  try{
+    for(const p of csActual().lista){
+      if(!p.serie) continue;
+      for(const e of csEpisodios(p)) if(e.dcEp && csEstadoEp(e) === 'completo') set.add(String(e.dcEp.id));
+    }
+  }catch(err){ /* sin biblioteca: solo lo de DublajeCast */ }
+  return set;
+}
+/** Las entregas que de verdad faltan de un capítulo de DublajeCast. `hechos`: los completados en Dubbipt (opcional). */
+function csAlertasEp(d, serie, e, hoy, hechos){
+  if(!e) return [];
+  if(hechos && hechos.has(String(e.id))) return [];
+  const fila = csFilaProduccionDe(d, serie, e);
+  if(fila && fila.fase === 'completado') return [];
+  let ep = fila ? Object.assign({}, e, { fecha_miami: fila.fecha_miami || '', fecha_dubcard: fila.fecha_dubcard || '', fase: fila.fase || e.fase || '', formato_dubcard: fila.formato_dubcard || e.formato_dubcard || '' }) : e;
+  /* Pedido de sala: «hay algunos programas que no requieren DUBCARD». La marca del programa manda sobre lo demás. */
+  if(serie && serie.requiere_dubcard === false) ep = Object.assign({}, ep, { formato_dubcard: 'No necesita DUBCARD' });
+  return prodAlertasEp(ep, serie, hoy);
+}
+
+/** El programa requiere DUBCARD, o no: en DublajeCast, y sus filas de Producción se ponen a tono. */
+function csProgRequiereDubcard(p, si){
+  if(!p || !p.serie) return Promise.resolve('nada');
+  const sid = p.serie.id, nombre = castNorm(p.nombre), requiere = !!si;
+  return csEditar(pl => {
+    let hubo = dcxSerie(pl, sid, { requiere_dubcard: requiere });
+    for(const r of (Array.isArray(pl.produccion) ? pl.produccion : [])){
+      if(!r || castNorm(r.programa) !== nombre) continue;
+      if(!requiere && r.formato_dubcard !== 'No necesita DUBCARD'){ r.formato_dubcard = 'No necesita DUBCARD'; hubo = true; }
+      else if(requiere && r.formato_dubcard === 'No necesita DUBCARD'){ r.formato_dubcard = /netflix/i.test(String(r.cliente || '')) ? 'BACKLOT' : 'Excel'; hubo = true; }
+    }
+    return hubo;
+  }, p.nombre + ': ' + (requiere ? 'requiere DUBCARD' : 'no requiere DUBCARD'), csContexto(p, null));
+}
+
 function csResumen(d, hoy){
   const out = { enCurso: 0, programas: 0, capitulos: 0, talentos: 0, asignaciones: 0, sinTalento: 0, trailersPendientes: 0, entregas: [], trailers: [] };
   if(!d) return out;
@@ -111,9 +179,10 @@ function csResumen(d, hoy){
   const asignado = new Set(d.castings.map(c => String(c.episode_id) + ':' + String(c.character_id)));
   out.asignaciones = asignado.size;
   out.sinTalento = d.appearances.filter(a => !asignado.has(String(a.episode_id) + ':' + String(a.character_id))).length;
+  const hechos = csDcCompletadosEnDubbipt();
   for(const e of d.episodes){
     const s = ix.serie[String(e.series_id)];
-    for(const a of prodAlertasEp(e, s, hoy)) out.entregas.push({ programa: s ? s.name : '', capitulo: e.episode_number, titulo: e.title || '', nivel: a.nivel, dias: a.dias, texto: a.texto });
+    for(const a of csAlertasEp(d, s, e, hoy, hechos)) out.entregas.push({ programa: s ? s.name : '', capitulo: e.episode_number, titulo: e.title || '', nivel: a.nivel, dias: a.dias, texto: a.texto });
   }
   out.entregas.sort((a, b) => a.dias - b.dias || String(a.programa).localeCompare(String(b.programa), 'es'));
   for(const t of d.trailers){
@@ -182,10 +251,10 @@ function csTalentos(d, buscar){
 /** Las filas de Producción: un capítulo por fila, con sus fechas, su DUBCARD y sus alertas. */
 function csProduccion(d, hoy, soloAlertas){
   if(!d) return [];
-  const ix = prodIndices(d);
+  const ix = prodIndices(d), hechos = csDcCompletadosEnDubbipt();
   return d.episodes.map(e => {
     const s = ix.serie[String(e.series_id)];
-    const al = prodAlertasEp(e, s, hoy);
+    const al = csAlertasEp(d, s, e, hoy, hechos);
     return { programa: s ? s.name : '', cliente: (e.cliente || (s && s.cliente) || ''), capitulo: e.episode_number, titulo: e.title || '',
              fase: (PROD_ET.fase[e.fase] || e.fase || ''), estado: (PROD_ET.estado[e.status] || e.status || ''),
              miami: e.fecha_miami || '', dubcard: prodFormatoDubcard(e, s), fechaDubcard: e.fecha_dubcard || '',
@@ -2575,6 +2644,7 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
     +   (p.serie
           ? '<label>Cliente <input type="text" data-cs="progCampo" data-campo="cliente" value="' + csEsc(p.cliente) + '" placeholder="—"></label>'
             + '<label>Director <input type="text" data-cs="progCampo" data-campo="director" value="' + csEsc(p.director) + '" placeholder="—"></label>'
+            + '<label class="cs-check cs-prog-dubcard" title="Si el programa no necesita DUBCARD, no se piden sus fechas ni avisan"><input type="checkbox" data-cs="progDubcard"' + (p.serie.requiere_dubcard === false ? '' : ' checked') + '> Requiere DUBCARD</label>'
           : '')
     + '</div>'
     + csHtmlRevisar(p, d, hayLibreto)
@@ -2731,7 +2801,7 @@ function csTablaCasting(filas, dcEp, e){
 function csHtmlEpisodio(p, e, d, registro, hoy){
   const dc = e.dcEp;
   const filas = csCastingDe(e, d, registro);
-  const alertas = dc ? prodAlertasEp(dc, p.serie, hoy) : [];
+  const alertas = (dc && csEstadoEp(e) !== 'completo') ? csAlertasEp(d, p.serie, dc, hoy) : [];
   const ficha = '<div class="cs-ep-ficha">'
       + (e.ep ? '<div><span>Nombre en Dubbipt</span><input type="text" data-cs="epNombre" value="' + csEsc(e.ep.name) + '" title="El número del nombre es lo que lo junta con su episodio de DublajeCast"></div>' : '')
       + (dc ? '<div><span>Título en DublajeCast</span><input type="text" data-cs="epCampo" data-campo="title" value="' + csEsc(dc.title || '') + '"></div>'
@@ -2948,7 +3018,7 @@ function csProdNuevoValidar(d){
   if(!String(d.cliente || '').trim()) faltan.push('el cliente');
   if(!String(d.director || '').trim()) faltan.push('quién lo hace');
   if(!fecha(d.fecha_miami)) faltan.push('la fecha de entrega');
-  if(!fecha(d.fecha_dubcard)) faltan.push('la fecha de DUBCARD');
+  if(!d.sinDubcard && !fecha(d.fecha_dubcard)) faltan.push('la fecha de DUBCARD');
   return faltan;
 }
 /** Para el formulario: los clientes y los directores que ya conoce DublajeCast, y los del programa `show` (de su serie, o de su último capítulo en Producción). */
@@ -2958,15 +3028,16 @@ function csProdNuevoOpciones(show){
   d = d || {};
   const team = (Array.isArray(d.team) ? d.team : []).filter(t => t && t.role === 'Director' && t.name).map(t => String(t.name));
   const lista = (k) => (Array.isArray(d[k]) ? d[k] : []).map(String).filter(Boolean);
-  let cliente = '', director = '';
+  let cliente = '', director = '', requiereDubcard = true;
   if(show){
     let serie = null;
     try{ serie = (typeof dcastSerieDe === 'function') ? dcastSerieDe(show, d) : null; }catch(e){ serie = null; }
     const ultimo = (Array.isArray(d.produccion) ? d.produccion : []).find(r => r && castNorm(r.programa) === castNorm(show.name)) || null;
     cliente = String((serie && serie.cliente) || (ultimo && ultimo.cliente) || '').trim();
     director = String((serie && serie.director) || (ultimo && ultimo.director) || '').trim();
+    requiereDubcard = !(serie && serie.requiere_dubcard === false);
   }
-  return { clientes: lista('clienteList'), directores: team.concat(lista('directorList').filter(x => team.indexOf(x) < 0)), cliente: cliente, director: director };
+  return { clientes: lista('clienteList'), directores: team.concat(lista('directorList').filter(x => team.indexOf(x) < 0)), cliente: cliente, director: director, requiereDubcard: requiereDubcard };
 }
 /** Una fecha con calendario: al pulsarla se abre; no se escribe a mano (Supr o Retroceso la borra). */
 function csCalendario(el){
@@ -2985,14 +3056,15 @@ function csEpisodioNuevoEnProduccion(programa, capitulo, d){
   if(!n || !cap) return Promise.resolve('nada');
   if(csProdNuevoValidar(d).length) return Promise.resolve('faltan');
   const cliente = String(d.cliente).replace(/\s+/g, ' ').trim(), director = String(d.director).replace(/\s+/g, ' ').trim();
+  const sinDubcard = !!d.sinDubcard, fechaDubcard = sinDubcard ? '' : d.fecha_dubcard;
   const fila = { id: (typeof dcxUid === 'function') ? dcxUid() : Date.now(), programa: n, capitulo: cap, desglose_provisional: false, casting_completo: false,
-                 cliente: cliente, director: director, fecha_miami: d.fecha_miami, formato_dubcard: /netflix/i.test(cliente) ? 'BACKLOT' : 'Excel', fecha_dubcard: d.fecha_dubcard, fase: 'pre_produccion' };
-  const que = 'Episodio nuevo en Producción: ' + n + ' · ' + cap + ' · ' + cliente + ' · ' + director + ' · entrega ' + d.fecha_miami + ' · DUBCARD ' + d.fecha_dubcard;
+                 cliente: cliente, director: director, fecha_miami: d.fecha_miami, formato_dubcard: sinDubcard ? 'No necesita DUBCARD' : (/netflix/i.test(cliente) ? 'BACKLOT' : 'Excel'), fecha_dubcard: fechaDubcard, fase: 'pre_produccion' };
+  const que = 'Episodio nuevo en Producción: ' + n + ' · ' + cap + ' · ' + cliente + ' · ' + director + ' · entrega ' + d.fecha_miami + (sinDubcard ? ' · sin DUBCARD' : ' · DUBCARD ' + fechaDubcard);
   return csEditar(pl => {
     if(!Array.isArray(pl.produccion)) pl.produccion = [];
     /* El mismo capítulo del mismo programa no se repite: se pone al día. */
     const i = pl.produccion.findIndex(r => r && castNorm(r.programa) === castNorm(n) && castNorm(r.capitulo) === castNorm(cap));
-    if(i >= 0) pl.produccion[i] = Object.assign({}, pl.produccion[i], { cliente: cliente, director: director, fecha_miami: d.fecha_miami, fecha_dubcard: d.fecha_dubcard, formato_dubcard: fila.formato_dubcard });
+    if(i >= 0) pl.produccion[i] = Object.assign({}, pl.produccion[i], { cliente: cliente, director: director, fecha_miami: d.fecha_miami, fecha_dubcard: fechaDubcard, formato_dubcard: fila.formato_dubcard });
     else pl.produccion.unshift(fila);
     if(!Array.isArray(pl.clienteList)) pl.clienteList = [];
     if(!pl.clienteList.some(x => castNorm(x) === castNorm(cliente))) pl.clienteList.push(cliente);
@@ -3247,6 +3319,10 @@ function csCablear(vista){
       const campo = at('campo'), valor = el.value, epId = x.e.dcEp.id;
       const et = { title: 'Título en DublajeCast', status: 'Estado', fase: 'Fase', fecha_miami: 'Fecha de Miami', fecha_dubcard: 'Fecha de DUBCARD', formato_dubcard: 'Formato de DUBCARD' }[campo] || campo;
       csEditar(pl => dcxEpisodio(pl, epId, { [campo]: campo === 'title' ? valor.replace(/\s+/g, ' ').trim() : valor }), et + ': ' + (valor || '—'), ctxDe(x));
+    };
+    else if(que === 'progDubcard') el.onchange = () => {
+      const x = a(); if(!x.p || !x.p.serie) return;
+      csProgRequiereDubcard(x.p, el.checked).catch(err => fallo('csProgRequiereDubcard · js/castingvistas.js', err, 'no se ha podido cambiar'));
     };
     else if(que === 'progCampo') el.onchange = () => {
       const x = a(); if(!x.p || !x.p.serie) return;

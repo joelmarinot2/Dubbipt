@@ -1116,6 +1116,8 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .ddlm-field input, .ddlm-field select{ width:100%; background:#0f1215; border:1px solid #23262b; border-radius:10px; padding:11px 13px;
   color:#f2f3f5; font-family:'Inter',sans-serif; font-size:14px; outline:none; transition:border-color .12s; }
 .ddlm-field input::placeholder{ color:#6b7280; }
+.ddlm-nota{ color:#9CA3AF; font-size:12.5px; padding:11px 0; }
+.cs-prog-dubcard{ margin-bottom:0; align-self:end; }
 .ddlm-field input:focus, .ddlm-field select:focus{ border-color:#4ADE80; }
 .ddlm-field select{ appearance:none; -webkit-appearance:none; cursor:pointer;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%238b8f97' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
@@ -2951,7 +2953,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.67.0-nube';
+const APP_VER_NUM = 'v11.68.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -12412,7 +12414,8 @@ function newEpisodeModal(){
       +'</div>'
       +'<div class="ddlm-row">'
         +'<div class="ddlm-field"><label for="neMiami">Fecha de entrega</label><input id="neMiami" type="date"></div>'
-        +'<div class="ddlm-field"><label for="neDubcard">Fecha de DUBCARD</label><input id="neDubcard" type="date"></div>'
+        +(opciones.requiereDubcard ? '<div class="ddlm-field"><label for="neDubcard">Fecha de DUBCARD</label><input id="neDubcard" type="date"></div>'
+          : '<div class="ddlm-field"><label>DUBCARD</label><div class="ddlm-nota" id="neSinDubcard">Este programa no necesita DUBCARD</div></div>')
       +'</div>' : '')
     +'<div class="ddlm-field" style="margin-bottom:8px"><label>Guion del episodio</label>'
       +'<label class="ddlm-drop" id="neDrop"><span class="ddlm-drop-ic">'+ICO.upload+'</span>'
@@ -12431,8 +12434,8 @@ function newEpisodeModal(){
   q('neCancel').onclick=close;
   { const fb=q('neFmt'); if(fb) fb.onclick=()=>{ close(); openFormatProfile(); }; }
   q('neFile2').addEventListener('change', ()=>{ const f=q('neFile2').files[0]; if(f){ q('neDropT').textContent=f.name; q('neDrop').classList.add('has'); } });
-  if(conProd){ try{ csCalendario(q('neMiami')); csCalendario(q('neDubcard')); }catch(e){ /* sin calendario se escribe */ } }
-  const prodLeer = ()=> ({ cliente:(q('neCliente')||{}).value||'', director:(q('neDirector')||{}).value||'', fecha_miami:(q('neMiami')||{}).value||'', fecha_dubcard:(q('neDubcard')||{}).value||'' });
+  if(conProd){ try{ csCalendario(q('neMiami')); if(q('neDubcard')) csCalendario(q('neDubcard')); }catch(e){ /* sin calendario se escribe */ } }
+  const prodLeer = ()=> ({ cliente:(q('neCliente')||{}).value||'', director:(q('neDirector')||{}).value||'', fecha_miami:(q('neMiami')||{}).value||'', fecha_dubcard:(q('neDubcard')||{}).value||'', sinDubcard: !opciones.requiereDubcard });
   q('neGo').addEventListener('click', async ()=>{
     const name=(q('neName').value||'').trim();
     if(!name){ q('neErr').textContent='Escribe el nombre del episodio'; q('neName').focus(); return; }

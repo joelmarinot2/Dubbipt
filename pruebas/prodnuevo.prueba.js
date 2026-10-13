@@ -41,8 +41,8 @@ exports.pruebas = async function(t){
     t.eq('sin nada: falta todo, en palabras', M.csProdNuevoValidar({}).join(' / '), 'el cliente / quién lo hace / la fecha de entrega / la fecha de DUBCARD');
     t.eq('una fecha escrita a mano no vale', M.csProdNuevoValidar({ cliente: 'Netflix', director: 'DIEGO', fecha_miami: '14/10/2026', fecha_dubcard: '2026-10-20' }).join(' / '), 'la fecha de entrega');
     t.eq('con todo, nada falta', M.csProdNuevoValidar({ cliente: ' Netflix ', director: 'DIEGO', fecha_miami: '2026-10-14', fecha_dubcard: '2026-10-20' }).length, 0);
-    t.eq('las opciones: los clientes de DublajeCast y los directores (del equipo primero, sin repetir)', JSON.stringify(M.csProdNuevoOpciones()), '{"clientes":["Netflix"],"directores":["WILFREDO HUESO","DIEGO"],"cliente":"","director":""}');
-    t.eq('sin datos de DublajeCast, listas vacías', JSON.stringify(armar({ datos: null }).M.csProdNuevoOpciones()), '{"clientes":[],"directores":[],"cliente":"","director":""}');
+    t.eq('las opciones: los clientes de DublajeCast y los directores (del equipo primero, sin repetir)', JSON.stringify(M.csProdNuevoOpciones()), '{"clientes":["Netflix"],"directores":["WILFREDO HUESO","DIEGO"],"cliente":"","director":"","requiereDubcard":true}');
+    t.eq('sin datos de DublajeCast, listas vacías', JSON.stringify(armar({ datos: null }).M.csProdNuevoOpciones()), '{"clientes":[],"directores":[],"cliente":"","director":"","requiereDubcard":true}');
     t.eq('si faltan, no se guarda nada', (await M.csEpisodioNuevoEnProduccion('AKKA', 'Episodio 1', { cliente: 'Netflix' })) + ' ' + A.datos.produccion.length, 'faltan 0');
   }
 
@@ -70,15 +70,27 @@ exports.pruebas = async function(t){
   t.seccion('3 · un programa que ya estaba en DublajeCast no se repite, y presta su cliente y director');
   {
     const A = armar({ datos: { produccion: [], series: [{ id: 1, name: 'AKKA', cliente: '', director: 'DIEGO', status: 'en_curso' }], studios: [] } }), M = A.M;
-    t.eq('al crear un episodio de un programa de DublajeCast, vienen puestos su cliente y su director', JSON.stringify(M.csProdNuevoOpciones({ id: 's1', name: 'Akka' })), '{"clientes":[],"directores":[],"cliente":"","director":"DIEGO"}');
+    t.eq('al crear un episodio de un programa de DublajeCast, vienen puestos su cliente y su director', JSON.stringify(M.csProdNuevoOpciones({ id: 's1', name: 'Akka' })), '{"clientes":[],"directores":[],"cliente":"","director":"DIEGO","requiereDubcard":true}');
     await M.csEpisodioNuevoEnProduccion('akka', 'Episodio 1', { cliente: 'Netflix', director: 'MARÍA', fecha_miami: '2026-10-14', fecha_dubcard: '2026-10-20' });
     t.eq('la misma serie, con el cliente que le faltaba y su director de siempre', A.datos.series.length + ' ' + JSON.stringify([A.datos.series[0].cliente, A.datos.series[0].director]), '1 ["Netflix","DIEGO"]');
     t.eq('dcxSerieNueva sin nombre, nada', A.DX.dcxSerieNueva({ series: [] }, { name: ' ' }), null);
   }
 
+  t.seccion('3b · un programa que no requiere DUBCARD');
+  {
+    const A = armar({ datos: { produccion: [], series: [{ id: 1, name: 'AKKA', cliente: 'Netflix', director: 'DIEGO', status: 'en_curso', requiere_dubcard: false }], studios: [] } }), M = A.M;
+    t.eq('el formulario lo sabe', M.csProdNuevoOpciones({ id: 's1', name: 'Akka' }).requiereDubcard, false);
+    t.eq('sin DUBCARD no se pide su fecha', M.csProdNuevoValidar({ cliente: 'Netflix', director: 'DIEGO', fecha_miami: '2026-10-14', sinDubcard: true }).length, 0);
+    await M.csEpisodioNuevoEnProduccion('Akka', 'Episodio 1', { cliente: 'Netflix', director: 'DIEGO', fecha_miami: '2026-10-14', fecha_dubcard: '2026-10-20', sinDubcard: true });
+    const f = A.datos.produccion[0];
+    t.eq('la fila va con «No necesita DUBCARD» y sin fecha, aunque viniera una', JSON.stringify([f.formato_dubcard, f.fecha_dubcard]) + ' ' + /sin DUBCARD/.test(A.apuntes[0][0]), '["No necesita DUBCARD",""] true');
+  }
+
   t.seccion('4 · el formulario de «Nuevo episodio» (y no el de programa)');
   {
-    t.ok('pide cliente, quién lo hace, fecha de entrega y fecha de DUBCARD, con calendario, con los del programa ya puestos', ['neCliente', 'neDirector', 'neMiami', 'neDubcard'].every(id => HTML.indexOf('id="' + id + '"') >= 0) && /csCalendario\(q\('neMiami'\)\); csCalendario\(q\('neDubcard'\)\)/.test(HTML) && /value="'\+esc\(opciones\.cliente\|\|''\)\+'"/.test(HTML));
+    t.ok('pide cliente, quién lo hace, fecha de entrega y fecha de DUBCARD, con calendario, con los del programa ya puestos', ['neCliente', 'neDirector', 'neMiami', 'neDubcard'].every(id => HTML.indexOf('id="' + id + '"') >= 0) && /csCalendario\(q\('neMiami'\)\); if\(q\('neDubcard'\)\) csCalendario\(q\('neDubcard'\)\)/.test(HTML) && /value="'\+esc\(opciones\.cliente\|\|''\)\+'"/.test(HTML));
+    t.ok('si el programa no necesita DUBCARD, no pide su fecha y lo dice', /opciones\.requiereDubcard \? '<div class="ddlm-field"><label for="neDubcard">/.test(HTML) && /Este programa no necesita DUBCARD/.test(HTML) && /sinDubcard: !opciones\.requiereDubcard/.test(HTML));
+    t.ok('en la página del programa, la casilla «Requiere DUBCARD»', /data-cs="progDubcard"/.test(fs.readFileSync(path.join(RAIZ, 'js', 'castingvistas.js'), 'utf8')) && /'requiere_dubcard'\]/.test(fs.readFileSync(path.join(RAIZ, 'js', 'dcescribir.js'), 'utf8')));
     t.ok('solo para quien puede escribir en DublajeCast, y con las listas que ya conoce', /const conProd = \(typeof prodPuede==='function' && prodPuede\(\) && typeof csEpisodioNuevoEnProduccion==='function'\);/.test(HTML) && /csProdNuevoOpciones\(showProd\)/.test(HTML) && /list="neClientes"/.test(HTML));
     t.ok('no deja crear si falta algo, y lo dice', /const faltan = csProdNuevoValidar\(prod\); if\(faltan\.length\)\{ q\('neErr'\)\.textContent='Para Producción falta '\+faltan\.join\(', '\); return; \}/.test(HTML));
     t.ok('al guardar el episodio, entra en Producción con el programa y el capítulo', /await saveEpHere\(\);[\s\S]{0,200}await csEpisodioNuevoEnProduccion\(showProd \? showProd\.name : '', name, prod\)/.test(HTML));
