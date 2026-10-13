@@ -38,6 +38,7 @@ const CS = { vista: 'programas', buscar: '', soloAlertas: false, programa: '',
              prog: null, ep: null, filtro: 'en_curso', buscarProg: '', orden: 'lineas', registros: {},
              tab: 'episodios', buscarCast: '', ordenCast: 'episodio', fusion: null, elegidos: {}, copias: [], fusionProg: null,
              repVista: 'talento', repBuscar: '', repOrden: 'lineas', repGenero: '', repAbierto: null,
+             ocBuscar: '', ocGenero: '', ocEdad: '', ocTono: '', ocModo: 'curso',
              talModo: 'talentos', buscarPer: '', talAbierto: null };
 
 /* Iconos de trazo, como los de Dubbipt (ICO). Ningún emoji. */
@@ -1032,7 +1033,9 @@ function csIndicePapeles(d, regs){
   }
   return Array.from(por.values()).map(x => {
     const eps = Array.from(x.eps.keys()).filter(k => k !== '?').map(Number).sort((a, b) => a - b);
-    return { personaje: x.personaje, programa: x.programa, progClave: x.progClave, talento: x.talento, eps: eps, principal: x.principal,
+    const porEp = {};
+    for(const [k, v] of x.eps) if(k !== '?') porEp[k] = v;
+    return { personaje: x.personaje, programa: x.programa, progClave: x.progClave, talento: x.talento, eps: eps, principal: x.principal, porEp: porEp,
              lineas: Array.from(x.eps.values()).reduce((t, v) => t + v, 0), de: Array.from(x.de).sort().join(' y ') };
   });
 }
@@ -1226,19 +1229,119 @@ function csHtmlTalentos(d, vivo){
       : (fichas.length ? '<div class="cs-nada">Ningún talento con «' + csEsc(CS.buscar) + '».</div>' : (d ? '<div class="cs-nada">Todavía no hay talentos.</div>' : csVacio())));
 }
 
+/* ── Ocupación: cada talento con sus programas en tarjetas ───────────────────
+   Pedido de sala, con una captura de DublajeCast: «trabajemos en la ventana
+   de ocupación; aquí vas a mostrarme en tarjetas los programas que están en
+   curso de los talentos, también coloca un buscador como el de la captura».
+   Cada talento con sus programas, y de cada programa sus episodios con el
+   personaje y las líneas. Por omisión, solo los episodios en curso; también
+   los completados, o todo. Se busca por nombre (del talento, del programa o
+   del personaje) y se filtra por género, edad y tono de la ficha. De
+   DublajeCast y del casting guardado en Dubbipt de todos los programas. */
+
+/**
+ * La ocupación de cada talento: [{ clave, nombre, t, programas: [{ clave,
+ * programa, estado, eps: [{ n, fin, lineas, personajes: [{ nombre, lineas }] }] }] }].
+ * `lista`: los programas de la vista, para el estado de cada programa y de cada episodio.
+ */
+function csOcupacionDatos(d, regs, lista){
+  const fichas = {};
+  if(d) for(const t of d.talents) if(t && t.name) fichas[castNorm(t.name)] = t;
+  const progDe = {}, estadoEp = {};
+  for(const p of (lista || [])){
+    progDe[p.clave] = p;
+    const m = (estadoEp[p.clave] = {});
+    try{ for(const e of csEpisodios(p)) if(e.numero != null) m[e.numero] = csEstadoEp(e); }catch(err){ /* sin episodios: el estado del programa */ }
+  }
+  const por = new Map();
+  for(const pp of csIndicePapeles(d, regs)){
+    if(!pp.talento) continue;
+    const k = castNorm(pp.talento);
+    if(!k) continue;
+    let x = por.get(k);
+    if(!x){ x = { clave: k, nombre: (fichas[k] && fichas[k].name) || pp.talento, t: fichas[k] || null, progs: new Map() }; por.set(k, x); }
+    let g = x.progs.get(pp.progClave);
+    if(!g){ g = { clave: pp.progClave, programa: progDe[pp.progClave] ? progDe[pp.progClave].nombre : pp.programa, eps: new Map() }; x.progs.set(pp.progClave, g); }
+    for(const n of pp.eps){
+      let e = g.eps.get(n);
+      if(!e){ e = { n: n, pers: new Map() }; g.eps.set(n, e); }
+      const pk = castNorm(pp.personaje), lin = (pp.porEp && +pp.porEp[String(n)]) || 0;
+      const ya = e.pers.get(pk);
+      if(!ya) e.pers.set(pk, { nombre: pp.personaje, lineas: lin }); else ya.lineas = Math.max(ya.lineas, lin);
+    }
+  }
+  return Array.from(por.values()).map(x => ({
+    clave: x.clave, nombre: x.nombre, t: x.t,
+    programas: Array.from(x.progs.values()).map(g => {
+      const pr = progDe[g.clave] || null, estado = pr ? pr.estado : 'en_curso', est = estadoEp[g.clave] || {};
+      const eps = Array.from(g.eps.values()).map(e => {
+        const personajes = Array.from(e.pers.values()).sort((a, b) => (b.lineas - a.lineas) || a.nombre.localeCompare(b.nombre, 'es'));
+        return { n: e.n, fin: estado === 'completo' || est[e.n] === 'completo', personajes: personajes, lineas: personajes.reduce((t, y) => t + y.lineas, 0) };
+      }).sort((a, b) => a.n - b.n);
+      return { clave: g.clave, programa: g.programa, estado: estado, eps: eps };
+    })
+  }));
+}
+
+/**
+ * Lo que se ve: los episodios del modo ('curso', 'fin' o 'todos'), buscado y
+ * filtrado por la ficha. Devuelve { talentos: [{ …, programas (solo los del
+ * modo), nProg, nEps, lineas, activos }], cuenta: { curso, fin, todos } }.
+ */
+function csOcupacionVisible(datos, o){
+  const q = castNorm(o.buscar);
+  const ficha = (t, campo, v) => !v || (t && t[campo] === v);
+  const pasa = (x) => ficha(x.t, 'genero', o.genero) && ficha(x.t, 'edad_aparente', o.edad) && ficha(x.t, 'tono_de_voz', o.tono);
+  const enModo = (x, modo) => x.programas.map(g => Object.assign({}, g, { eps: g.eps.filter(e => modo === 'todos' || (modo === 'fin' ? e.fin : !e.fin)) })).filter(g => g.eps.length);
+  const cuenta = { curso: 0, fin: 0, todos: 0 };
+  const talentos = [];
+  for(const x of datos){
+    if(!pasa(x)) continue;
+    const casa = !q || x.clave.indexOf(q) >= 0 || x.programas.some(g => castNorm(g.programa).indexOf(q) >= 0 || g.eps.some(e => e.personajes.some(y => castNorm(y.nombre).indexOf(q) >= 0)));
+    if(!casa) continue;
+    for(const m of ['curso', 'fin', 'todos']) if(enModo(x, m).length) cuenta[m]++;
+    const programas = enModo(x, o.modo).sort((a, b) => ((a.estado === 'completo') - (b.estado === 'completo')) || (b.eps.reduce((t, e) => t + e.lineas, 0) - a.eps.reduce((t, e) => t + e.lineas, 0)) || a.programa.localeCompare(b.programa, 'es'));
+    if(!programas.length) continue;
+    const eps = programas.reduce((t, g) => t + g.eps.length, 0), lineas = programas.reduce((t, g) => t + g.eps.reduce((u, e) => u + e.lineas, 0), 0);
+    talentos.push(Object.assign({}, x, { programas: programas, nProg: programas.length, nEps: eps, lineas: lineas,
+      activos: x.programas.filter(g => g.estado !== 'completo' && g.eps.some(e => !e.fin)).length }));
+  }
+  talentos.sort((a, b) => (b.lineas - a.lineas) || a.nombre.localeCompare(b.nombre, 'es'));
+  return { talentos: talentos, cuenta: cuenta };
+}
+
 function csHtmlOcupacion(d, vivo){
-  const filas = csOcupacion(d, CS.programa);
-  const max = filas.reduce((m, f) => Math.max(m, f.lineas), 0) || 1;
-  return csCabecera('Ocupación', 'Cuánto trabaja cada talento: personajes, capítulos y líneas', vivo)
-    + (d ? '<label class="cs-sel">Programa <select data-cs="programa"><option value="">Todos</option>'
-        + d.series.slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'es')).map(s => '<option value="' + csEsc(s.id) + '"' + (String(CS.programa) === String(s.id) ? ' selected' : '') + '>' + csEsc(s.name) + '</option>').join('')
-        + '</select></label>'
-      + (filas.length ? '<div class="cs-tabla cs-ocup"><div class="cs-fila cs-fila-cab"><span>Talento</span><span>Personajes</span><span>Capítulos</span><span>Líneas</span><span>Programas</span></div>'
-          + filas.map(f => '<div class="cs-fila"><span><b>' + csEsc(f.talento) + '</b></span><span>' + f.personajes + '</span><span>' + f.capitulos + '</span>'
-            + '<span class="cs-barra-c"><i class="cs-barra" style="width:' + Math.round(100 * f.lineas / max) + '%"></i><em>' + f.lineas + '</em></span>'
-            + '<span class="cs-tenue">' + csEsc(f.programas.join(', ')) + '</span></div>').join('') + '</div>'
-        : '<div class="cs-nada">Sin asignaciones' + (CS.programa ? ' en ese programa' : '') + '.</div>')
-      : csVacio());
+  const regs = csRegistrosTodos(d);
+  const datos = csOcupacionDatos(d, regs, csActual().lista);
+  if(!d && !datos.length) return csCabecera('Ocupación', 'Cada talento con sus programas en curso', vivo) + csVacio();
+  const o = { buscar: CS.ocBuscar, genero: CS.ocGenero, edad: CS.ocEdad, tono: CS.ocTono, modo: CS.ocModo || 'curso' };
+  const v = csOcupacionVisible(datos, o);
+  const sel = (campo, valor, ops) => '<select data-cs="ocFiltro" data-campo="' + campo + '"><option value="">— Todos —</option>'
+    + ops.filter(x => x[0]).map(x => '<option value="' + csEsc(x[0]) + '"' + (valor === x[0] ? ' selected' : '') + '>' + csEsc(x[1]) + '</option>').join('') + '</select>';
+  const pest = (k, t) => '<button class="cs-pest' + (o.modo === k ? ' on' : '') + '" data-cs="ocModo" data-v="' + k + '">' + t + (k === 'todos' ? '' : ' <b>' + v.cuenta[k] + '</b>') + '</button>';
+  const lin = (n) => n + ' lín.';
+  return csCabecera('Ocupación', v.talentos.length + ' talento' + (v.talentos.length === 1 ? '' : 's') + ' encontrado' + (v.talentos.length === 1 ? '' : 's'), vivo)
+    + '<div class="cs-oc-filtros"><div class="cs-oc-filtros-t">Filtros de búsqueda</div><div class="cs-oc-campos">'
+    +   '<label class="cs-oc-nombre">Nombre<input type="text" data-cs="ocBuscar" placeholder="Buscar talento, programa o personaje…" value="' + csEsc(CS.ocBuscar) + '" autocomplete="off"></label>'
+    +   '<label>Género' + sel('ocGenero', CS.ocGenero, CS_OP_GENERO) + '</label>'
+    +   '<label>Edad' + sel('ocEdad', CS.ocEdad, CS_OP_EDAD) + '</label>'
+    +   '<label>Tono' + sel('ocTono', CS.ocTono, CS_OP_TONO) + '</label>'
+    + '</div></div>'
+    + '<div class="cs-pests cs-oc-pests">' + pest('curso', 'Ep. en curso') + pest('fin', 'Ep. completados') + pest('todos', 'Todos') + '</div>'
+    + (CS_REGS.yendo && !CS_REGS.lista ? '<div class="cs-tenue">Leyendo el casting de los programas de Dubbipt…</div>' : '')
+    + (v.talentos.length ? '<div class="cs-oc-lista">' + v.talentos.map((x, i) => {
+        const c = csCargaTalento(x.activos);
+        return '<div class="cs-oc-tal"><div class="cs-oc-cab"><span class="cs-oc-n">' + (i + 1) + '</span>'
+          + '<div class="cs-oc-t"><b>' + csEsc(x.nombre) + '</b><div class="cs-oc-datos"><span class="cs-tenue">' + x.nProg + ' prog. · ' + x.nEps + ' ep. · <b>' + x.lineas + '</b> líns.</span>' + csChipsFicha(x.t) + '</div></div>'
+          + '<span class="cs-carga cs-carga-' + c.clave + '">' + c.texto + '</span></div>'
+          + '<div class="cs-oc-progs">' + x.programas.map(g => '<div class="cs-oc-prog' + (g.estado === 'completo' ? ' cs-oc-prog-fin' : '') + '">'
+              + '<div class="cs-oc-prog-cab"><b>' + csEsc(g.programa) + '</b>' + csChipEstado(g.estado) + '<span class="cs-oc-lin">' + lin(g.eps.reduce((t, e) => t + e.lineas, 0)) + '</span></div>'
+              + '<div class="cs-oc-eps">' + g.eps.map(e => '<div class="cs-oc-ep' + (e.fin ? ' cs-oc-ep-fin' : '') + '"><span class="cs-oc-epn">Ep.' + csEsc(e.n) + '</span>'
+                  + '<span class="cs-oc-per">' + csEsc(e.personajes.map(y => y.nombre).join(', ')) + '</span>' + (e.lineas ? '<span class="cs-oc-lin">' + lin(e.lineas) + '</span>' : '') + '</div>').join('') + '</div>'
+              + '</div>').join('') + '</div>'
+          + '</div>';
+      }).join('') + '</div>'
+      : '<div class="cs-nada">' + (datos.length ? 'Ningún talento con episodios ' + (o.modo === 'fin' ? 'completados' : (o.modo === 'curso' ? 'en curso' : '')) + (CS.ocBuscar ? ' que coincida con «' + csEsc(CS.ocBuscar) + '»' : '') + '.' : (d ? 'Todavía no hay asignaciones.' : 'Todavía no hay casting guardado en ningún programa.')) + '</div>');
 }
 
 function csHtmlTrailers(d, hoy, vivo){
@@ -2468,6 +2571,9 @@ function csCablear(vista){
     else if(que === 'herramienta') el.onclick = () => dcastAbrir(v);
     else if(que === 'buscar') el.oninput = () => escribir('buscar');
     else if(que === 'buscarPer') el.oninput = () => escribir('buscarPer');
+    else if(que === 'ocBuscar') el.oninput = () => escribir('ocBuscar');
+    else if(que === 'ocFiltro') el.onchange = () => { CS[at('campo')] = el.value; csRepintar(); };
+    else if(que === 'ocModo') el.onclick = () => { CS.ocModo = v; csRepintar(); };
     else if(que === 'talAbrir') el.onclick = () => { CS.talAbierto = v; csRepintar(); try{ window.scrollTo(0, 0); }catch(err){ /* sin desplazar */ } };
     else if(que === 'talCerrar') el.onclick = () => { CS.talAbierto = null; csRepintar(); };
     else if(que === 'talModo') el.onclick = () => { CS.talModo = v; csRepintar(); const i = document.querySelector('#csVista [data-cs="buscarPer"]'); if(i) try{ i.focus(); }catch(err){ /* sin foco */ } };

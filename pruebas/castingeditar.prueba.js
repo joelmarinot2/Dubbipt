@@ -96,7 +96,7 @@ function armar(o){
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
     ['CS', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
      'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS', 'csAsegurarDatos', 'csDevolverCopia', 'csBajarCopia', 'CS_TRAER',
-     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado', 'csBorrarPrograma', 'csBorrarEpisodio', 'csBorrarDeBiblioteca', 'csEstadoEp', 'csCambiarEstadoEp', 'csLeerActivos', 'csAplicarActivos', 'csNumeroDeLinea', 'csProgramaDeLinea', 'csParecidoPersonaje', 'csIndicePapeles', 'csBuscarPersonajes', 'CS_REGS', 'csFichasTalentos', 'csCargaTalento'],
+     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado', 'csBorrarPrograma', 'csBorrarEpisodio', 'csBorrarDeBiblioteca', 'csEstadoEp', 'csCambiarEstadoEp', 'csLeerActivos', 'csAplicarActivos', 'csNumeroDeLinea', 'csProgramaDeLinea', 'csParecidoPersonaje', 'csIndicePapeles', 'csBuscarPersonajes', 'CS_REGS', 'csFichasTalentos', 'csCargaTalento', 'csOcupacionDatos', 'csOcupacionVisible'],
     { castNorm: (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim(),
       document: { getElementById: (id) => campos[id] || null, querySelector: () => null, body: { classList: { contains: () => false, toggle: () => {}, remove: () => {} } } },
       prodPuede: () => true, PROD: PROD, PROD_ET: PR.PROD_ET, prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard,
@@ -929,5 +929,38 @@ exports.pruebas = async function(t){
          /<div class="cs-tdprog-cab"><b>A FILIPINO CHRISTMAS<\/b><span class="cs-chip cs-estado cs-estado-en_curso">/.test(v.html) && /<span class="cs-tdep">Ep\.1<\/span><span class="cs-tdep">Ep\.2<\/span>/.test(v.html)
          && /<b>ALLY <i class="cs-tdest"><svg[\s\S]*?<\/i><\/b><span class="cs-tenue">Ep\. 1–2<\/span><span class="cs-tdlin">276 lín\.<\/span>/.test(v.html));
     M.CS.talAbierto = null;
+  }
+
+  t.seccion('15 · Ocupación: cada talento con sus programas en tarjetas (PRO-39)');
+  {
+    for(const sh of SHOWS) delete sh.estado;
+    for(const x of EPS_DUB.s1) delete x.estado;
+    const A = armar();
+    const M = A.M;
+    const d = PR.prodNormalizar(A.nube());
+    const regs = [{ showId: 's1', programa: 'A FILIPINO CHRISTMAS', serieId: 1, reg: { personajes: {}, capitulos: { 'Episodio 2': { personajes: { REY: { display: 'REY', talent: 'Ana Rojas', lineas: 7 } } } } } }];
+    const datos = M.csOcupacionDatos(d, regs, M.csActual().lista);
+    const ana = datos.find(x => x.clave === 'ANA ROJAS');
+    t.eq('cada talento, sus programas y de cada uno sus episodios con el personaje y las líneas', ana.programas.map(g => g.programa + ' ' + g.eps.map(e => e.n + ':' + e.personajes.map(y => y.nombre + '=' + y.lineas).join('+')).join(' ')).join(' | '),
+         'A FILIPINO CHRISTMAS 1:ALLY=186 2:ALLY=90+REY=7');
+    const o = { buscar: '', genero: '', edad: '', tono: '', modo: 'curso' };
+    let v = M.csOcupacionVisible(datos, o);
+    t.ok('por omisión, los episodios en curso, con cuántos talentos hay en cada pestaña', v.talentos.some(x => x.clave === 'ANA ROJAS') && v.cuenta.curso >= 1 && v.cuenta.fin === 0);
+    /* El Episodio 1 de Dubbipt, completado: sale de «en curso» y entra en «completados». */
+    EPS_DUB.s1[0].estado = 'completo';
+    const datos2 = M.csOcupacionDatos(d, regs, M.csActual().lista);
+    const enCurso = M.csOcupacionVisible(datos2, o).talentos.find(x => x.clave === 'ANA ROJAS');
+    const hechos = M.csOcupacionVisible(datos2, Object.assign({}, o, { modo: 'fin' })).talentos.find(x => x.clave === 'ANA ROJAS');
+    t.eq('un episodio completado pasa de «en curso» a «completados»', enCurso.programas[0].eps.map(e => e.n).join(',') + ' · ' + hechos.programas[0].eps.map(e => e.n).join(','), '2 · 1');
+    t.eq('«Todos», los dos', M.csOcupacionVisible(datos2, Object.assign({}, o, { modo: 'todos' })).talentos.find(x => x.clave === 'ANA ROJAS').nEps, 2);
+    delete EPS_DUB.s1[0].estado;
+    t.eq('se busca por talento, programa o personaje', ['ana', 'filipino', 'rey', 'zz'].map(q => M.csOcupacionVisible(datos, Object.assign({}, o, { buscar: q })).talentos.length > 0).join(','), 'true,true,true,false');
+    const conFicha = datos.map(x => x.clave === 'ANA ROJAS' ? Object.assign({}, x, { t: { genero: 'femenino', edad_aparente: 'adulto', tono_de_voz: 'agudo' } }) : x);
+    t.eq('y se filtra por la ficha: género, edad y tono', [['genero', 'femenino'], ['genero', 'masculino'], ['tono', 'agudo']].map(([k, val]) => M.csOcupacionVisible(conFicha, Object.assign({}, o, { [k]: val })).talentos.map(x => x.clave).join('+') || '-').join(' | '), 'ANA ROJAS | - | ANA ROJAS');
+    M.CS_REGS.lista = regs; M.CS_REGS.ts = Date.now();
+    M.CS.vista = 'ocupacion';
+    const c = controles(A, 'ocupacion');
+    t.ok('en pantalla: el buscador, los filtros, las pestañas y una tarjeta por programa con sus episodios', !!c.de('ocBuscar') && !!c.de('ocFiltro', { campo: 'ocTono' }) && !!c.de('ocModo', { v: 'fin' })
+         && /<div class="cs-oc-prog"><div class="cs-oc-prog-cab"><b>A FILIPINO CHRISTMAS<\/b>[\s\S]*?<span class="cs-oc-epn">Ep\.2<\/span><span class="cs-oc-per">ALLY, REY<\/span><span class="cs-oc-lin">97 lín\.<\/span>/.test(c.html));
   }
 };

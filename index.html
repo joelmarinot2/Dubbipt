@@ -2001,6 +2001,36 @@ body.cs-on #progHeader{ display:none !important; }
 .dct-marco{ width:100%; min-height:calc(100vh - 230px); border:none; border-radius:12px; background:#fff; }
 .dct-pegado-completa .dct-marco{ min-height:calc(100vh - 90px); }
 .cs-tal-modos{ margin:0 0 12px; }
+/* Ocupación: cada talento con sus programas en tarjetas (PRO-39). */
+.cs-oc-filtros{ background:#101215; border:1px solid #23262b; border-radius:16px; padding:14px 18px 16px; margin-bottom:12px; }
+.cs-oc-filtros-t{ font-size:10.5px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#8b8f97; margin-bottom:10px; }
+.cs-oc-campos{ display:grid; grid-template-columns:minmax(220px,1fr) repeat(3,minmax(120px,150px)); gap:10px; }
+.cs-oc-campos label{ display:flex; flex-direction:column; gap:6px; font-size:10.5px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#8b8f97; min-width:0; }
+.cs-oc-campos input, .cs-oc-campos select{ background:#0b0d10; border:1px solid #2b2f36; color:#f2f3f5; border-radius:10px; padding:9px 12px; font-family:'Inter',sans-serif; font-size:13px; font-weight:500; letter-spacing:0; text-transform:none; outline:none; }
+.cs-oc-campos input:focus, .cs-oc-campos select:focus{ border-color:#4ADE80; }
+@media (max-width:760px){ .cs-oc-campos{ grid-template-columns:1fr 1fr; } .cs-oc-nombre{ grid-column:1 / -1; } }
+.cs-oc-pests{ margin-bottom:12px; }
+.cs-oc-lista{ display:flex; flex-direction:column; gap:12px; }
+.cs-oc-tal{ background:#101215; border:1px solid #23262b; border-radius:16px; overflow:hidden; }
+.cs-oc-cab{ display:flex; align-items:center; gap:12px; padding:13px 18px; border-bottom:1px solid #1d2026; }
+.cs-oc-n{ display:grid; place-items:center; min-width:30px; height:30px; border-radius:8px; background:#1a1d22; color:#A5B4FC; font-weight:800; font-size:13px; }
+.cs-oc-t{ flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.cs-oc-t > b{ font-size:15px; font-weight:800; color:#f2f3f5; text-transform:uppercase; }
+.cs-oc-datos{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; font-size:12px; }
+.cs-oc-datos .cs-tenue b{ color:#f2f3f5; }
+.cs-oc-progs{ display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; padding:14px 18px 16px; }
+.cs-oc-prog{ background:#0c0e11; border:1px solid #1d2026; border-top:3px solid #FBBF24; border-radius:12px; padding:10px 12px; display:flex; flex-direction:column; gap:7px; min-width:0; }
+.cs-oc-prog.cs-oc-prog-fin{ border-top-color:#22C55E; opacity:.75; }
+.cs-oc-prog-cab{ display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap; }
+.cs-oc-prog-cab b{ flex:1; min-width:120px; font-size:13px; font-weight:800; color:#f2f3f5; text-transform:uppercase; overflow-wrap:anywhere; }
+.cs-oc-lin{ color:#A5B4FC; font-weight:700; font-size:11.5px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cs-oc-eps{ display:flex; flex-direction:column; gap:4px; }
+.cs-oc-ep{ display:flex; align-items:center; gap:8px; background:#101215; border-radius:8px; padding:5px 8px; font-size:11.5px; }
+.cs-oc-ep.cs-oc-ep-fin{ opacity:.55; }
+.cs-oc-epn{ color:#2DD4BF; background:rgba(45,212,191,.1); border-radius:999px; padding:1px 8px; font-weight:700; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.cs-oc-per{ flex:1; min-width:0; color:#cbd5e1; text-transform:uppercase; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cs-oc-per::before{ content:''; display:inline-block; width:5px; height:5px; border-radius:50%; background:#FBBF24; margin-right:7px; vertical-align:middle; }
+.cs-oc-ep-fin .cs-oc-per::before{ background:#22C55E; }
 /* Talentos como en DublajeCast: tarjetas y la ficha de cada uno (PRO-37). */
 .cs-tgrid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; margin-top:12px; }
 .cs-tcard{ text-align:left; background:#101215; border:1px solid #23262b; border-radius:14px; padding:14px 15px; display:flex; flex-direction:column; align-items:flex-start; gap:7px; cursor:pointer; color:#e5e7eb; font-family:'Inter',sans-serif; min-width:0; }
@@ -2804,7 +2834,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.57.0-nube';
+const APP_VER_NUM = 'v11.58.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
