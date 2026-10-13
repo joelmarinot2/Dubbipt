@@ -55,8 +55,8 @@ exports.pruebas = async function(t){
   {
     const V = cargar(), P = V.P;
     const h = P.html(V.datos, false);
-    t.ok('cabecera con en curso, completados y total, y sus botones: Excel (subir y bajar), sincronizar fechas, API y Reset',
-         /<h2>Producción Casting<\/h2>[\s\S]*?3 en curso[\s\S]*?1 completados[\s\S]*?4 total/.test(h) && ['importar', 'exportar', 'sincronizar', 'api', 'reset'].every(k => new RegExp('data-pc="' + k + '"').test(h)));
+    t.ok('cabecera con en curso, completados y total, y sus botones: Excel (subir y bajar) y Reset',
+         /<h2>Producción Casting<\/h2>[\s\S]*?3 en curso[\s\S]*?1 completados[\s\S]*?4 total/.test(h) && ['importar', 'exportar', 'reset'].every(k => new RegExp('data-pc="' + k + '"').test(h)));
     t.ok('pestañas, buscador, filtros por cliente, director y alertas, y la leyenda de colores',
          /data-pc="tab" data-v="en_curso">En curso <b>3<\/b>/.test(h) && /data-pc="tab" data-v="completados">Completados <b>1<\/b>/.test(h) && /data-pc="buscar"/.test(h)
          && /data-c="cliente"><option value="">Todos los clientes/.test(h) && /data-c="director"><option value="">Todos los directores/.test(h) && /data-c="alerta"/.test(h) && /Vencida \(muestra días\)/.test(h));
@@ -135,20 +135,48 @@ exports.pruebas = async function(t){
     t.eq('«Reset» limpia todo, preguntando antes', V.datos.produccion.length, 0);
   }
 
-  t.seccion('4 · la API externa de fechas');
+  t.seccion('4 · sin API externa ni «Sincronizar fechas» (pedido de sala)');
   {
     const V = cargar(), P = V.P;
-    const ext = [{ programa: 'Empress of Flames', capitulo: '106', fecha_miami: '2026-10-28', fecha_dubcard: '' }, { programa: 'Nada que ver', capitulo: '1', fecha_miami: '2026-11-01', fecha_dubcard: '' }];
-    const u = P.computeExternalUpdates(ext, V.datos.produccion);
-    t.eq('empareja por nombre de programa y capítulo, y solo cambia fechas', JSON.stringify(u.map(x => [x.id, x.fecha_miami])), '[[3,"2026-10-28"]]');
-    t.eq('sin configurar, «Sincronizar» lo dice', JSON.stringify(await P.sincronizar(true)) + ' ' + V.avisos.slice(-1)[0], '{"ok":false} Configura primero la API externa');
-    const W = cargar({ fetch: async () => ({ ok: true, headers: { get: () => 'application/json' }, text: async () => JSON.stringify({ data: { entregas: [{ show: 'EMPRESS OF FLAMES', ep: 'Episodio 106', miami: '28/10/2026', dub: '2026-10-29' }] } }) }) });
-    W.ctx.localStorage.setItem('dc_ext_api_cfg_v1', JSON.stringify({ enabled: true, url: 'https://api.ejemplo.com/x', authType: 'none', jsonPath: 'data.entregas', fieldProgram: 'show', fieldChapter: 'ep', fieldMiami: 'miami', fieldDubcard: 'dub', intervalMin: 60 }));
-    const r = await W.P.sincronizar(true);
-    t.eq('configurada, trae las fechas (JSON anidado, fechas en cualquier formato) y las aplica', JSON.stringify(r) + ' ' + JSON.stringify(W.datos.produccion.find(x => x.id === 3), ['fecha_miami', 'fecha_dubcard']), '{"ok":true,"updates":1,"read":1} {"fecha_miami":"2026-10-28","fecha_dubcard":"2026-10-29"}');
-    const X = cargar();
-    X.ctx.localStorage.setItem('dc_ext_api_cfg_v1', JSON.stringify({ enabled: true, url: 'https://otro.com', authType: 'none' }));
-    t.ok('si no conecta, se dice por qué (CORS o la política de seguridad de Dubbipt)', !(await X.P.sincronizar(true)).ok && /política de seguridad/.test(X.avisos.slice(-1)[0]));
+    const h = P.html(V.datos, false);
+    t.ok('ni el botón de la API ni el de sincronizar fechas', !/data-pc="(api|sincronizar)"/.test(h) && !/API|Sincronizar/.test(h));
+    t.ok('ni su código: nada llama fuera', !/fetch\(|computeExternalUpdates|arrancarSync|dc_ext_api_cfg/.test(fs.readFileSync(path.join(RAIZ, 'js', 'csproduccion.js'), 'utf8')) && !('sincronizar' in P));
+  }
+
+  t.seccion('4b · guardar se ve al instante (pedido de sala: «está un poco lento»)');
+  {
+    const CV = fs.readFileSync(path.join(RAIZ, 'js', 'castingvistas.js'), 'utf8');
+    const trozo = CV.slice(CV.indexOf('let CS_COLA'), CV.indexOf('/* ── Nombres, el cambiador de talento'));
+    const montarEd = () => {
+      const W = { pintado: [], avisos: [], llamadas: [], esperas: [] };
+      W.ctx = vm.createContext({
+        dcast: { sesion: { id: 'u' }, payload: { produccion: [{ id: 1, fase: 'pre_produccion' }] } },
+        PROD: { datos: { produccion: [{ id: 1, fase: 'pre_produccion' }], historialDubbipt: ['h'] } }, DCX: { escrito: 0 },
+        prodNormalizar: (x) => x, castAviso: (t) => W.avisos.push(t), dcxEntrada: (x) => x, dcPanel(){},
+        csRepintar: () => W.pintado.push(JSON.stringify(W.ctx.PROD.datos.produccion)),
+        dcxGuardar: (cambio) => new Promise((ok, mal) => { W.llamadas.push(cambio); W.esperas.push({ ok, mal }); })
+      });
+      vm.runInContext(trozo + ';this.csEditar = csEditar;', W.ctx);
+      return W;
+    };
+    const fase = (c) => (c.PROD.datos.produccion[0] || {}).fase;
+    const W = montarEd();
+    const r1 = W.ctx.csEditar(p => { p.produccion[0].fase = 'completado'; return true; }, 'Producción: finalizado');
+    t.eq('al pulsar, ya se ve (antes de que DublajeCast conteste)', fase(W.ctx) + ' ' + W.pintado.length, 'completado 1');
+    t.ok('lo propio de Dubbipt (quién cambió qué) no se pierde al pintar antes', W.ctx.PROD.datos.historialDubbipt && W.ctx.PROD.datos.historialDubbipt[0] === 'h');
+    W.ctx.csEditar(p => { p.produccion[0].director = 'DIEGO'; return true; }, 'Director');
+    await espera();
+    t.eq('dos cambios seguidos: van en fila, no «espera un momento»', W.llamadas.length, 1);
+    W.esperas[0].ok({ cambiado: true }); t.eq('el primero, guardado', await r1, 'guardado');
+    await espera(); await espera();
+    t.eq('y entonces va el segundo', W.llamadas.length, 2);
+    const X = montarEd();
+    const r2 = X.ctx.csEditar(p => { p.produccion[0].fase = 'completado'; return true; }, 'x');
+    await espera(); X.esperas[0].mal(new Error('sin red'));
+    t.eq('si no se pudo guardar, vuelve a lo de antes y lo dice', (await r2) + ' ' + fase(X.ctx) + ' ' + /sin red/.test(X.avisos[0]), 'error pre_produccion true');
+    const Y = montarEd(); Y.ctx.dcast.payload = null;
+    Y.ctx.csEditar(p => { p.produccion[0].fase = 'completado'; return true; }, 'x');
+    t.eq('sin copia leída todavía, espera a guardar (como antes)', fase(Y.ctx) + ' ' + Y.pintado.length, 'pre_produccion 0');
   }
 
   t.seccion('5 · dónde está');
