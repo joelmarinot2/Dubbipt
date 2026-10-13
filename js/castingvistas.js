@@ -1798,25 +1798,67 @@ async function csImportarTodo(){
   return 'hecho';
 }
 
+/* Pedido de sala: «está un poco lento cuando le doy completado o se guardan
+   datos». Guardar es leer y escribir todo DublajeCast; eso sigue igual, pero
+   el cambio se ve ya (sobre la última copia leída) y los guardados van en
+   fila, uno detrás de otro, en vez de «espera un momento». Si falla, se
+   vuelve a lo de antes. */
+let CS_COLA = Promise.resolve();
+
+/** El cambio, al instante y solo en pantalla. Devuelve lo de antes, para deshacerlo, o null. */
+function csAlInstante(cambio){
+  try{
+    if(typeof dcast === 'undefined' || !dcast || !dcast.sesion || !dcast.payload || typeof PROD === 'undefined') return null;
+    const copia = JSON.parse(JSON.stringify(dcast.payload));
+    if(!cambio(copia)) return null;
+    const antes = { datos: PROD.datos, escrito: DCX.escrito };
+    const nuevo = prodNormalizar(copia);
+    PROD.datos = (typeof prodConservarPropio === 'function') ? prodConservarPropio(nuevo, PROD.datos) : nuevo;
+    if(antes.datos){
+      if(antes.datos.historialDubbipt) PROD.datos.historialDubbipt = antes.datos.historialDubbipt;
+      if(antes.datos.relevosAceptados) PROD.datos.relevosAceptados = antes.datos.relevosAceptados;
+    }
+    DCX.escrito = Date.now();
+    csRepintar();
+    return antes;
+  }catch(e){ return null; /* sin pintar antes: se pinta al guardar */ }
+}
+
+/** Al abrir Casting, la copia de DublajeCast se lee una vez, por detrás: así el primer cambio ya se ve al instante. */
+let CS_CALENTANDO = false;
+function csCalentar(){
+  try{
+    if(CS_CALENTANDO || typeof dcLeer !== 'function' || typeof dcast === 'undefined' || !dcast || dcast.payload) return;
+    CS_CALENTANDO = true;
+    Promise.resolve().then(() => dcLeer()).catch(() => { /* sin sesión: se lee al guardar */ }).then(() => { CS_CALENTANDO = false; });
+  }catch(e){ CS_CALENTANDO = false; /* se lee al guardar */ }
+}
+
 /** Guardar un cambio en DublajeCast, decir cómo fue y repintar. Sin sesión, se abre la entrada. */
 function csEditar(cambio, hecho, ctx){
-  return (async () => {
+  const antes = csAlInstante(cambio);
+  const deshacer = () => { if(antes){ PROD.datos = antes.datos; DCX.escrito = antes.escrito; } };
+  const tarea = CS_COLA.then(async () => {
     try{
       const r = await dcxGuardar(cambio, hecho ? dcxEntrada(hecho, ctx) : null);
       if(r.cambiado && hecho) castAviso(hecho);
       csRepintar();
       return r.cambiado ? 'guardado' : 'igual';
     }catch(e){
+      deshacer();
       if(e && e.sinSesion){
         castAviso('Para guardar en DublajeCast, entra con tu cuenta de DublajeCast');
         try{ dcPanel(); }catch(x){ /* sin el panel, el aviso ya lo dice */ }
+        csRepintar();
         return 'sesion';
       }
       castAviso('No se pudo guardar en DublajeCast: ' + (e && e.message ? e.message : e));
       csRepintar();
       return 'error';
     }
-  })();
+  });
+  CS_COLA = tarea.catch(() => 'error');
+  return tarea;
 }
 
 /* ── Nombres, el cambiador de talento y quién cambió qué ────────────────────
@@ -2685,6 +2727,7 @@ async function csBorrarDeBiblioteca(sh, ep){
 
 /** Los controles de una sección. */
 function csCablear(vista){
+  csCalentar();
   const a = () => csActual();
   const ctxDe = (x) => csContexto(x && x.p, x && x.e);
   vista.querySelectorAll('[data-cs]').forEach(el => {
