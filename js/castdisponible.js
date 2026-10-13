@@ -8,13 +8,13 @@
  * ventana con cada talento:
  *   · si ya ha estado en ESTE programa, y con qué personajes: lo dice el
  *     registro de casting del programa en Dubbipt y, para el administrador,
- *     DublajeCast;
+ *     Casting;
  *   · lo que tiene en este capítulo;
  *   · lo ocupado que está: en cuántos programas EN CURSO más tiene papel, con
- *     cuántos personajes y líneas (la «Ocupación» de DublajeCast). Eso viene
- *     de DublajeCast, y solo lo ve el administrador (PRO-8).
+ *     cuántos personajes y líneas (la «Ocupación» de Casting). Eso viene
+ *     de Casting, y solo lo ve el administrador (PRO-8).
  *   · su HISTORIAL: en qué programas y episodios ha estado, con qué
- *     personajes y cuántas líneas, en cápsulas (PRO-29). De DublajeCast
+ *     personajes y cuántas líneas, en cápsulas (PRO-29). De Casting
  *     (administrador) y del casting guardado en Dubbipt de todos los programas.
  *     Por omisión solo los episodios ACTIVOS: los completados -o de programas
  *     completados- no salen (PRO-31). El botón «Solo en curso» lo quita y los
@@ -43,14 +43,14 @@ function dispNivel(n){
 /**
  * Las filas de la ventana, una por talento. `o`:
  *   base      nombres de la base de talentos de Dubbipt
- *   d         lo de DublajeCast (o nulo: sin él no hay ocupación)
- *   serie     el programa de DublajeCast que se está casteando (o nulo)
+ *   d         lo de Casting (o nulo: sin él no hay ocupación)
+ *   serie     el programa de Casting que se está casteando (o nulo)
  *   registro  el registro de casting del programa en Dubbipt
  *   enCap     lo que lleva cada talento en este capítulo (castOcupacion())
  *   showId    el programa de Dubbipt que se está casteando
  *   registros los registros de casting de TODOS los programas de Dubbipt:
  *             [{ showId, programa, serieId, reg, completo, finNombres, finNums }]
- *             (serieId: su pareja en DublajeCast; completo: el programa está
+ *             (serieId: su pareja en Casting; completo: el programa está
  *             completado; finNombres/finNums: sus episodios completados)
  */
 function dispFilas(o){
@@ -64,7 +64,7 @@ function dispFilas(o){
     return f;
   };
   /* El historial: programa → episodio → personaje, con sus líneas. Lo mismo
-     dicho por DublajeCast y por Dubbipt se cuenta una vez (las líneas, las mayores). */
+     dicho por Casting y por Dubbipt se cuenta una vez (las líneas, las mayores). */
   const registros = Array.isArray(o.registros) ? o.registros.slice() : [];
   if(o.showId && o.registro && !registros.some(r => String(r.showId) === String(o.showId)))
     registros.push({ showId: o.showId, programa: o.programa || '', serieId: serie ? serie.id : null, reg: o.registro });
@@ -116,7 +116,7 @@ function dispFilas(o){
                isFinite(n) ? n : null, e.title || '', nomCh, lin[String(c.character_id) + '|' + String(c.episode_id)] || 0, fin);
       }
       if(serie && String(s.id) === String(serie.id)){
-        if(nomCh && !f.enPrograma.some(x => castNorm(x.personaje) === castNorm(nomCh))) f.enPrograma.push({ personaje: nomCh, de: 'DublajeCast' });
+        if(nomCh && !f.enPrograma.some(x => castNorm(x.personaje) === castNorm(nomCh))) f.enPrograma.push({ personaje: nomCh, de: 'Casting' });
         continue;
       }
       const enCurso = (e.status || 'en_curso') === 'en_curso' && (s.status || 'en_curso') !== 'completo';
@@ -249,7 +249,7 @@ function dispHtml(filas, programa, conDc, o){
     +   '<select id="dispOrden">' + op('programa', 'Los del programa primero') + op('libres', 'Los más libres primero') + op('nombre', 'Por nombre') + '</select>'
     + '</div>'
     + '<div class="meta-nota">' + (DISP.soloEnCurso ? 'Dónde ha estado cada talento: solo programas y episodios en curso.' : 'Dónde ha estado cada talento: todo, también lo completado (atenuado).') + '</div>'
-    + (conDc ? '' : '<div class="meta-nota">La ocupación en otros programas viene de DublajeCast y solo la ve el administrador. Aquí, lo que sabe Dubbipt: quién ha estado en este programa y lo de este capítulo.</div>')
+    + (conDc ? '' : '<div class="meta-nota">La ocupación en otros programas viene de Casting y solo la ve el administrador. Aquí, lo que sabe Dubbipt: quién ha estado en este programa y lo de este capítulo.</div>')
     + (l.length ? '<div class="disp-lista">' + l.map(f => '<div class="disp-fila' + (f.enPrograma.length ? ' disp-del' : '') + '">'
         + '<div class="disp-nom"><b>' + dispEsc(f.nombre) + '</b>' + (f.ficha ? '<span class="disp-ficha">' + dispEsc(f.ficha) + '</span>' : '') + '</div>'
         + '<div class="disp-datos">'
@@ -258,7 +258,7 @@ function dispHtml(filas, programa, conDc, o){
         +   (f.enCap.length ? '<span class="disp-cap">En este capítulo: ' + dispEsc(f.enCap.join(', ')) + ' · ' + f.lineasCap + ' int.</span>' : '')
         +   (f.programas.length ? '<span class="disp-tenue">En curso: ' + dispEsc(f.programas.slice(0, 4).join(', ')) + (f.programas.length > 4 ? '…' : '') + ' · ' + f.personajes + ' pers. · ' + f.lineas + ' líneas</span>' : '')
         + '</div>' + dispHtmlHistorial(f, !DISP.soloEnCurso) + '</div>').join('') + '</div>'
-      : '<div class="disp-nada">' + (filas.length ? 'Ningún talento coincide.' : 'Todavía no hay talentos: ni base en Dubbipt ni datos de DublajeCast.') + '</div>');
+      : '<div class="disp-nada">' + (filas.length ? 'Ningún talento coincide.' : 'Todavía no hay talentos: ni base en Dubbipt ni datos de Casting.') + '</div>');
 }
 
 /* ── Una ventana aparte, para llevarla a otra pantalla ────────────────────
@@ -326,7 +326,7 @@ function dispFirma(q){
 /* Los registros de los demás programas, para el historial: se piden como mucho una vez por minuto. */
 const DISP_REGS = { de: {}, cada: 60000 };
 
-/** Los registros de casting de todos los programas de Dubbipt, con su pareja de DublajeCast. */
+/** Los registros de casting de todos los programas de Dubbipt, con su pareja de Casting. */
 async function dispRegistros(q, actual){
   const shows = (typeof sbShows === 'function') ? (sbShows() || []) : [];
   const ahora = Date.now();

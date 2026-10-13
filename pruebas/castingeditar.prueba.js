@@ -1,15 +1,15 @@
-/* Casting: importar de DublajeCast, el casting y el reparto, y editar · especificacion 09, PRO-13
+/* Casting: importar de Casting, el casting y el reparto, y editar · especificacion 09, PRO-13
  *
- * Pedido de sala: «quiero que importes todos los programas de DublajeCast;
+ * Pedido de sala: «quiero que importes todos los programas de Casting;
  * también que se pueda ver el casting, el reparto y los episodios, y que se
- * puedan hacer todas las funciones que se hacían en DublajeCast».
+ * puedan hacer todas las funciones que se hacían en Casting».
  *
  * Lo que protege esta prueba:
  *  · importar crea lo que falta, pregunta antes y no toca lo que ya hay;
  *  · el casting y el reparto de un programa dicen lo que dicen los datos, con
  *    los relevos a la vista;
  *  · cada control de editar hace SU cambio, sobre el episodio, el personaje o
- *    el talento que le toca, y lo guarda en DublajeCast.
+ *    el talento que le toca, y lo guarda en Casting.
  */
 'use strict';
 const { montar } = require('./ayuda');
@@ -122,7 +122,7 @@ function armar(o){
       dcxRelevosAceptados: () => RELEVOS, dcxAceptarRelevo: (k) => { if(RELEVOS.includes(k)) return false; RELEVOS.push(k); return true; },
       dcxHistorial: () => H, dcxEntrada: (que, ctx) => Object.assign({ cuando: '2026-10-08T10:05:00Z', quien: 'Pamela', que: que }, ctx || {}), dcxRegistrar: (e) => { H.unshift(e); return true; },
       DDL_MODO: 'casting', currentEp: null, herramientasPanel: () => {},
-      dcPanel: () => diario.push('dcPanel'),
+      dcPanel: () => diario.push('dcPanel'), dcSesion: async () => (o.sesion ? { id: 'u' } : null), prodGuardar: async () => { diario.push('prodGuardar'); return { ok: true }; },
       DDL_UI: { confirmModal: async (cfg) => { diario.push('pregunta ' + cfg.title + ' · ' + cfg.body); return o.confirmar !== false; } },
       sb: sb, uid: () => 'u' + (sbInsertados.length + 1) + '-' + Math.random().toString(36).slice(2, 6), libFetchAll: async () => diario.push('libFetchAll'),
       WORKSPACE: ('ws' in o) ? o.ws : { id: 'wsP' }, castSimil: SIM.castSimil, localStorage: almacen,
@@ -146,7 +146,7 @@ exports.pruebas = async function(t){
   const { M } = armar();
   const d = PR.prodNormalizar(VOLCADO());
 
-  t.seccion('1 · el reparto de un programa, como en DublajeCast');
+  t.seccion('1 · el reparto de un programa, como en Casting');
   t.eq('episodios seguidos, en corto', M.csTramoTexto([3, 1, 2, 5, 7, 8]) + ' | ' + M.csTramoTexto([]) + ' | ' + M.csTramoTexto(['4']), '1–3, 5, 7–8 |  | 4');
   const p1 = M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], d).find(p => p.clave === 's:s1');
   const rep = M.csReparto(p1, d);
@@ -156,7 +156,7 @@ exports.pruebas = async function(t){
   const desordenado = PR.prodNormalizar(Object.assign(VOLCADO(), { episodes: VOLCADO().episodes.slice().reverse() }));
   const pDes = M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], desordenado).find(p => p.clave === 's:s1');
   t.eq('los tramos siguen el orden de los episodios, vengan como vengan', M.csReparto(pDes, desordenado)[0].tramos.map(x => x.talento + ' ' + M.csTramoTexto(x.eps)).join(' → '), 'ANA ROJAS 1–2 → BEATRIZ SOL 3');
-  t.eq('un programa que no está en DublajeCast no tiene reparto', M.csReparto({ serie: null }, d).length + ' ' + M.csReparto(p1, null).length, '0 0');
+  t.eq('un programa que no está en Casting no tiene reparto', M.csReparto({ serie: null }, d).length + ' ' + M.csReparto(p1, null).length, '0 0');
 
   t.seccion('2 · el casting de todo un programa');
   const eps1 = M.csEpisodios(p1);
@@ -167,7 +167,7 @@ exports.pruebas = async function(t){
        '1:ALLY 1:JANA 1:TITO BOY 2:ALLY 3:ALLY | 1:ALLY 2:ALLY 3:ALLY 1:JANA 1:TITO BOY | 1:ALLY 2:ALLY 3:ALLY 1:JANA 1:TITO BOY | 1:ALLY 2:ALLY 1:JANA 3:ALLY 1:TITO BOY');
   t.eq('buscar por personaje o por talento', orden('episodio', 'tito') + ' | ' + orden('episodio', 'beatriz'), '1:TITO BOY | 1:JANA 3:ALLY');
 
-  t.seccion('3 · importar de DublajeCast lo que falta');
+  t.seccion('3 · importar de Casting lo que falta');
   t.eq('el nombre de un episodio nuevo', [M.csNombreEpisodio({ episode_number: 3 }, {}, [{ episode_number: 3 }]), M.csNombreEpisodio({ episode_number: 1 }, { type: 'pelicula' }, []),
        M.csNombreEpisodio({ episode_number: 1, title: 'Akka 1 (bis)' }, {}, [{ episode_number: 1 }, { episode_number: 1 }])].join(' | '), 'Episodio 3 | Película | Akka 1 (bis)');
   const plan = M.csPlanImportar(M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], d));
@@ -176,11 +176,11 @@ exports.pruebas = async function(t){
   {
     const A = armar();
     t.eq('importar: pregunta con la cuenta y crea', await A.M.csImportarTodo(), 'hecho');
-    t.ok('la pregunta dice cuántos y que no se toca lo que hay', A.diario.some(x => /^pregunta Importar de DublajeCast · Se crean en Dubbipt 2 programas y 4 episodios, sin libreto[\s\S]*no se toca/.test(x)));
+    t.ok('la pregunta dice cuántos y que no se toca lo que hay', A.diario.some(x => /^pregunta Crear en la biblioteca · Se crean en Dubbipt 2 programas y 4 episodios, sin libreto[\s\S]*no se toca/.test(x)));
     t.eq('los programas, en el espacio de trabajo', A.sbInsertados.filter(x => x[0] === 'shows').map(x => x[1].name + '@' + x[1].workspace_id).join(' '), 'Akka@wsP La peli@wsP');
     t.eq('sus episodios, en su programa', A.sbInsertados.filter(x => x[0] === 'episodes*').map(x => x[1].map(f => f.show_id + ':' + f.name).join(',')).join(' | '), 'nuevo-1:Akka 1,nuevo-1:Akka 1 (bis) | nuevo-3:Película | s1:Episodio 3');
     t.ok('cada episodio con su id y su fecha', A.sbInsertados.filter(x => x[0] === 'episodes*').every(x => x[1].every(f => f.id && f.updated_at)));
-    t.ok('y se recarga la biblioteca y se dice', A.diario.includes('libFetchAll') && A.avisos.includes('Importado de DublajeCast: 2 programas y 4 episodios'));
+    t.ok('y se recarga la biblioteca y se dice', A.diario.includes('libFetchAll') && A.avisos.includes('Creado en la biblioteca: 2 programas y 4 episodios'));
   }
   {
     const A = armar({ confirmar: false });
@@ -233,7 +233,7 @@ exports.pruebas = async function(t){
     A.M.CS.repOrden = 'lineas';
   }
 
-  t.seccion('5 · editar: cada control, su cambio, guardado en DublajeCast');
+  t.seccion('5 · editar: cada control, su cambio, guardado en Casting');
   {
     const A = armar();
     A.M.CS.vista = 'episodio'; A.M.CS.prog = 's:s1'; A.M.CS.ep = 'e:e1';
@@ -294,13 +294,13 @@ exports.pruebas = async function(t){
   {
     const A = armar();
     let c = controles(A, 'trailers');
-    t.ok('como en DublajeCast: «Agregar», cifras y filtros por estado, tipo y etapa', !!c.de('trAgregar') && /<div class="cs-tr-kpis">/.test(c.html) && !!c.de('trFiltro', { campo: 'trEstado' }) && !!c.de('trFiltro', { campo: 'trTipo' }) && !!c.de('trFiltro', { campo: 'trEtapa' }));
+    t.ok('como en Casting: «Agregar», cifras y filtros por estado, tipo y etapa', !!c.de('trAgregar') && /<div class="cs-tr-kpis">/.test(c.html) && !!c.de('trFiltro', { campo: 'trEstado' }) && !!c.de('trFiltro', { campo: 'trTipo' }) && !!c.de('trFiltro', { campo: 'trEtapa' }));
     t.ok('y la tabla: tipo, etapa, título y serie, llegada, fecha límite, SLA y estado, con editar y eliminar',
          /<th>Tipo<\/th><th>Etapa<\/th><th>Título \/ serie<\/th><th>Llegada<\/th><th>Fecha límite<\/th><th>SLA<\/th><th>Estado<\/th>/.test(c.html) && /<b class="cs-tr-tit">Tráiler oficial<\/b><div class="cs-tenue">A Filipino Christmas<\/div>/.test(c.html) && !!c.de('trEditar', { id: 7 }) && !!c.de('trBorrar', { id: 7 }));
     c.de('trAgregar').onclick();
     Object.assign(A.campos, { csTrF_type: { value: 'teaser' }, csTrF_etapa: { value: 'edicion' }, csTrF_status: { value: 'en_curso' }, csTrF_title: { value: 'Teaser final' }, csTrF_series_id: { value: '2' }, csTrF_received_at: { value: '2026-10-20' }, csTrF_deadline: { value: '2026-11-02' } });
     c = controles(A, 'trailers');
-    t.ok('«Agregar» abre el formulario de DublajeCast', /Nuevo material/.test(c.html) && !!c.de('trGuardar'));
+    t.ok('«Agregar» abre el formulario de Casting', /Nuevo material/.test(c.html) && !!c.de('trGuardar'));
     c.de('trGuardar').onclick(); await espera();
     const tr = A.nube().trailers.find(x => x.title === 'Teaser final');
     t.eq('un material nuevo, con tipo, etapa, estado, programa (como número), llegada y fecha límite', tr && JSON.stringify(tr, ['title', 'type', 'etapa', 'status', 'series_id', 'received_at', 'deadline']),
@@ -318,7 +318,7 @@ exports.pruebas = async function(t){
     t.ok('los filtros dejan solo lo que se pide', /Teaser final/.test(controles(A, 'trailers').html) && !/Tráiler oficial v2/.test(controles(A, 'trailers').html) && !!controles(A, 'trailers').de('trLimpiar'));
     controles(A, 'trailers').de('trLimpiar').onclick();
     t.eq('«Limpiar» los quita', A.M.CS.trTipo, '');
-    t.eq('el SLA, como lo cuenta DublajeCast', ['2026-10-05', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-11', '2026-10-20'].map(f => A.M.csTrSla(f, 'pendiente', new Date(2026, 9, 7)).texto).join(','), 'Vencido,Hoy,Mañana,2 días,4 días,13 días');
+    t.eq('el SLA, como lo cuenta Casting', ['2026-10-05', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-11', '2026-10-20'].map(f => A.M.csTrSla(f, 'pendiente', new Date(2026, 9, 7)).texto).join(','), 'Vencido,Hoy,Mañana,2 días,4 días,13 días');
     A.M.CS.trForm = { type: '' }; Object.assign(A.campos, { csTrF_type: { value: '' } });
     controles(A, 'trailers').de('trGuardar').onclick();
     t.ok('sin tipo, se pide', A.avisos.includes('Selecciona el tipo de material'));
@@ -331,10 +331,8 @@ exports.pruebas = async function(t){
     t.ok('si se dice que no, no se borra ni se guarda nada', N.nube().trailers.some(x => x.id === 7) && !N.diario.some(x => /^guarda/.test(x)));
   }
   {
-    const S = armar({ sinSesion: true });
-    t.eq('sin sesión de DublajeCast: se pide entrar', await S.M.csEditar(p => DX.dcxSerie(p, 1, { cliente: 'X' }), 'ok') + ' ' + S.diario.includes('dcPanel') + ' ' + /entra con tu cuenta de DublajeCast/.test(S.avisos[0]), 'sesion true true');
     const F = armar({ fallaGuardar: true });
-    t.eq('si falla, se dice y se repinta como estaba', await F.M.csEditar(p => DX.dcxSerie(p, 1, { cliente: 'X' }), 'ok') + ' ' + F.avisos[0] + ' ' + F.diario.includes('renderLibrary'), 'error No se pudo guardar en DublajeCast: sin red true');
+    t.eq('si falla, se dice y se repinta como estaba', await F.M.csEditar(p => DX.dcxSerie(p, 1, { cliente: 'X' }), 'ok') + ' ' + F.avisos[0] + ' ' + F.diario.includes('renderLibrary'), 'error No se pudo guardar: sin red true');
     const I = armar();
     t.eq('si no cambia nada, ni se dice', await I.M.csEditar(p => DX.dcxSerie(p, 1, { cliente: 'Netflix' }), 'ok') + ' ' + I.avisos.length, 'igual 0');
   }
@@ -342,7 +340,7 @@ exports.pruebas = async function(t){
     const A = armar();
     const f = { personaje: 'X', dc: 'ANA', dubbipt: 'LUZ', talento: 'LUZ', choca: true, charId: 5 };
     t.ok('la celda avisa si Dubbipt dice otro', /data-ch="5" data-per="X" data-antes="ANA" value="ANA"[\s\S]*?en Dubbipt: LUZ/.test(A.M.csTalentoCelda(f, { id: 9 })));
-    t.eq('sin episodio de DublajeCast, no se edita: se lee', A.M.csTalentoCelda({ personaje: 'X', dc: '', dubbipt: 'LUZ', talento: 'LUZ', charId: null }, null), '<span class="cs-talento">LUZ</span> <small class="cs-tenue">de Dubbipt</small>');
+    t.eq('sin episodio de Casting, no se edita: se lee', A.M.csTalentoCelda({ personaje: 'X', dc: '', dubbipt: 'LUZ', talento: 'LUZ', charId: null }, null), '<span class="cs-talento">LUZ</span> <small class="cs-tenue">de Dubbipt</small>');
   }
 
   t.seccion('6 · cada nombre, el cambiador de talento y quién cambió qué');
@@ -351,7 +349,7 @@ exports.pruebas = async function(t){
     const progs = () => A.M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], PR.prodNormalizar(A.nube()));
     const p1 = progs().find(p => p.clave === 's:s1');
     t.eq('renombrar un programa que está en los dos lados: en los dos', await A.M.csRenombrarPrograma(p1, '  A Filipino Christmas  2 '), 'guardado');
-    t.eq('en DublajeCast', A.nube().series[0].name, 'A Filipino Christmas 2');
+    t.eq('en Casting', A.nube().series[0].name, 'A Filipino Christmas 2');
     t.eq('y en Dubbipt, el mismo programa', JSON.stringify(A.sbInsertados.filter(x => x[0] === 'shows~')), '[["shows~",{"name":"A Filipino Christmas 2"},"s1"]]');
     t.eq('apuntado: quién, qué y dónde', JSON.stringify(A.H[0], ['quien', 'que', 'programa', 'serieId', 'showId']), '{"quien":"Pamela","que":"Programa renombrado: «A FILIPINO CHRISTMAS» → «A Filipino Christmas 2»","programa":"A FILIPINO CHRISTMAS","serieId":1,"showId":"s1"}');
     t.eq('el mismo nombre o vacío, nada', await A.M.csRenombrarPrograma(p1, 'A FILIPINO CHRISTMAS') + ' ' + await A.M.csRenombrarPrograma(p1, '  ') + ' ' + A.H.length, 'igual igual 1');
@@ -370,7 +368,7 @@ exports.pruebas = async function(t){
     t.eq('sin episodio de Dubbipt, nada', await A.M.csRenombrarEpisodio(p1, { ep: null }, 'X'), 'igual');
     t.ok('y su casting guardado se va con el nombre nuevo', A.diario.includes('registro s1 Episodio 1 → Episodio 1 · Boracay'));
     const soloDc = A.M.csEpisodios(p1).find(e => !e.ep && e.dcEp && e.dcEp.id === 13);
-    t.eq('uno que solo está en DublajeCast cambia su título allí', await A.M.csRenombrarEpisodio(p1, soloDc, 'Año nuevo 2') + ' ' + A.nube().episodes.find(e => e.id === 13).title, 'guardado Año nuevo 2');
+    t.eq('uno que solo está en Casting cambia su título allí', await A.M.csRenombrarEpisodio(p1, soloDc, 'Año nuevo 2') + ' ' + A.nube().episodes.find(e => e.id === 13).title, 'guardado Año nuevo 2');
     A.M.CS.vista = 'programa'; A.M.CS.prog = 's:s1'; A.M.CS.tab = 'episodios';
     const cp = controles(A, 'programa');
     t.ok('cada episodio tiene su lápiz para cambiarle el nombre', !!cp.de('renEp', { v: 'e:e1' }) && !!cp.de('renEp', { v: 'd:13' }));
@@ -378,9 +376,9 @@ exports.pruebas = async function(t){
     t.ok('y cada programa, en su tarjeta', !!controles(A, 'programas').de('renProg', { v: 's:s1' }));
     A.M.CS.vista = 'episodio'; A.M.CS.prog = 's:s1'; A.M.CS.ep = 'e:e1';
     const c = controles(A, 'episodio');
-    t.ok('en el episodio: su nombre en Dubbipt y su título en DublajeCast, para cambiarlos', c.de('epNombre').value === 'Episodio 1' && c.de('epCampo', { campo: 'title' }).value === 'Boracay');
+    t.ok('en el episodio: su nombre en Dubbipt y su título en Casting, para cambiarlos', c.de('epNombre').value === 'Episodio 1' && c.de('epCampo', { campo: 'title' }).value === 'Boracay');
     const tit = c.de('epCampo', { campo: 'title' }); tit.value = ' Boracay  nuevo '; tit.onchange(); await espera();
-    t.eq('el título, en DublajeCast y apuntado', A.nube().episodes.find(e => e.id === 11).title + ' · ' + A.H[0].que, 'Boracay nuevo · Título en DublajeCast:  Boracay  nuevo ');
+    t.eq('el título, en Casting y apuntado', A.nube().episodes.find(e => e.id === 11).title + ' · ' + A.H[0].que, 'Boracay nuevo · Título en Casting:  Boracay  nuevo ');
   }
   {
     const A = armar();
@@ -425,10 +423,10 @@ exports.pruebas = async function(t){
     const progs = () => A.M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], PR.prodNormalizar(A.nube()));
     const akka = progs().find(p => p.clave === 'dc:2');
     const rep = A.M.csRepetidosDc(akka, PR.prodNormalizar(A.nube()));
-    t.eq('el Ep. 1 de Akka está dos veces en DublajeCast', rep.map(g => g.numero + ': se queda ' + g.keep.id + ', fusiona ' + g.dups.map(e => e.id).join(',')).join(' | '), '1: se queda 21, fusiona 22');
+    t.eq('el Ep. 1 de Akka está dos veces en Casting', rep.map(g => g.numero + ': se queda ' + g.keep.id + ', fusiona ' + g.dups.map(e => e.id).join(',')).join(' | '), '1: se queda 21, fusiona 22');
     const peli = PR.prodNormalizar(Object.assign(VOLCADO(), { episodes: VOLCADO().episodes.concat([{ id: 32, series_id: 3, episode_number: 1, title: 'La peli (versión 2)' }]) }));
     t.eq('una película con dos «episodios» no es un repetido', A.M.csRepetidosDc(A.M.csProgramas([], () => [], peli).find(p => p.clave === 'dc:3'), peli).length, 0);
-    t.eq('una película no tiene repetidos, ni un programa de Dubbipt sin DublajeCast', A.M.csRepetidosDc(progs().find(p => p.clave === 'dc:3'), PR.prodNormalizar(A.nube())).length + ' ' + A.M.csRepetidosDc({ serie: null }, null).length, '0 0');
+    t.eq('una película no tiene repetidos, ni un programa de Dubbipt sin Casting', A.M.csRepetidosDc(progs().find(p => p.clave === 'dc:3'), PR.prodNormalizar(A.nube())).length + ' ' + A.M.csRepetidosDc({ serie: null }, null).length, '0 0');
     const p1 = progs().find(p => p.clave === 's:s1');
     const inc = A.M.csInconsistencias(p1, PR.prodNormalizar(A.nube()));
     t.eq('ALLY tiene dos talentos en el programa', inc.map(r => r.personaje + ': ' + r.talentos.map(x => x.nombre + ' ' + x.eps.join(',')).join(' / ')).join(' | '), 'ALLY: ANA ROJAS 1,2 / BEATRIZ SOL 3');
@@ -451,10 +449,10 @@ exports.pruebas = async function(t){
     const A = armar({ payload: pl });
     A.M.CS.vista = 'programa'; A.M.CS.prog = 'dc:2'; A.M.CS.tab = 'episodios';
     let c = controles(A, 'programa');
-    t.ok('los repetidos se ofrecen fusionar', /El <b>Ep\. 1<\/b> está 2 veces en DublajeCast/.test(c.html) && !!c.de('fusionar', { v: 1 }));
+    t.ok('los repetidos se ofrecen fusionar', /El <b>Ep\. 1<\/b> está 2 veces en Casting/.test(c.html) && !!c.de('fusionar', { v: 1 }));
     c.de('fusionar', { v: 1 }).onclick();
     c = controles(A, 'programa');
-    t.ok('al fusionar: cuál se queda, qué pasa, y la pregunta por lo que choca', /Se queda <b>Ep\. 1 · Akka 1 \(bis\)<\/b> \(4 registros\)/.test(c.html) && /van a la papelera de DublajeCast/.test(c.html) && /¿Cuál vale\?[\s\S]*?<b>JANA<\/b><label><input type="radio" name="csEl102" data-cs="elegir" data-ch="102" value="2" checked> BEATRIZ SOL<\/label><label><input type="radio" name="csEl102" data-cs="elegir" data-ch="102" value="1"> ANA ROJAS/.test(c.html));
+    t.ok('al fusionar: cuál se queda, qué pasa, y la pregunta por lo que choca', /Se queda <b>Ep\. 1 · Akka 1 \(bis\)<\/b> \(4 registros\)/.test(c.html) && /van a la papelera de Casting/.test(c.html) && /¿Cuál vale\?[\s\S]*?<b>JANA<\/b><label><input type="radio" name="csEl102" data-cs="elegir" data-ch="102" value="2" checked> BEATRIZ SOL<\/label><label><input type="radio" name="csEl102" data-cs="elegir" data-ch="102" value="1"> ANA ROJAS/.test(c.html));
     const el = c.de('elegir', { ch: 102 }); el.value = '1'; el.onchange();
     c.de('fusionarYa', { v: 1 }).onclick(); await espera();
     const P = A.nube();
@@ -463,7 +461,7 @@ exports.pruebas = async function(t){
     t.eq('con el talento elegido donde chocaban, y los que solo estaban en el repetido', P.castings.filter(x => x.episode_id === 22).map(x => x.character_id + ':' + x.talent_id).sort().join(' '), '102:1 103:2');
     t.ok('nada se queda apuntando al repetido', !P.appearances.some(a => a.episode_id === 21) && !P.castings.some(x => x.episode_id === 21));
     t.eq('lo que le faltaba al que se queda, del repetido', P.episodes.find(e => e.id === 22).fecha_miami, '2026-10-30');
-    t.ok('el repetido, a la papelera de DublajeCast, para poder restaurarlo', P.trash && P.trash[0].kind === 'episode' && P.trash[0].data.episodes[0].id === 21 && P.trash[0].data.castings.length === 1);
+    t.ok('el repetido, a la papelera de Casting, para poder restaurarlo', P.trash && P.trash[0].kind === 'episode' && P.trash[0].data.episodes[0].id === 21 && P.trash[0].data.castings.length === 1);
     t.eq('y apuntado', A.H[0].que, 'Fusionado el Ep. 1: 2 capítulos repetidos en uno');
   }
   {
@@ -488,51 +486,55 @@ exports.pruebas = async function(t){
   {
     const A = armar();
     t.ok('el Dashboard dice qué programas hay que revisar', /Para revisar[\s\S]*?<b>A FILIPINO CHRISTMAS<\/b> · 1 personaje con dos talentos[\s\S]*?data-cs="abrirProg" data-v="s:s1"[\s\S]*?<b>Akka<\/b> · 1 capítulo repetido/.test(controles(A, 'dashboard').html));
-    t.ok('sin nada borrado, no sale el apartado', !/Lo que se borró en DublajeCast/.test(controles(A, 'dashboard').html));
+    t.ok('sin nada borrado, no sale el apartado', !/Lo que se borró en Casting/.test(controles(A, 'dashboard').html));
   }
 
   t.seccion('8 · que no se borre nada');
   {
-    /* Al entrar: lo guardado y lo último, una vez; sin prisa de repetir. */
+    /* Al entrar: lo guardado; y una sola vez, desvincular DublajeCast (PRO-49). */
     const A = armar({ trae: true });
     A.PROD.cargado = false;
     await A.M.csAsegurarDatos();
-    t.eq('carga lo guardado y trae lo último, y repinta', A.diario.filter(x => /^prodCargar|^prodSincronizar|^renderLibrary/.test(x)).join(','), 'prodCargar,prodSincronizar,renderLibrary');
-    t.eq('pintar otra vez enseguida no vuelve a traer', await A.M.csAsegurarDatos() + ' ' + A.diario.filter(x => x === 'prodSincronizar').length, 'false 1');
+    t.eq('carga lo guardado; sin sesión de DublajeCast se queda con la copia de Dubbipt, lo apunta, lo guarda y repinta', A.diario.filter(x => /^prodCargar|^prodSincronizar|^prodGuardar|^renderLibrary/.test(x)).join(',') + ' · ' + (A.PROD.datos.desvinculado || {}).de, 'prodCargar,prodGuardar,renderLibrary · la copia que Dubbipt ya tenía');
+    t.ok('y lo dice', A.avisos.some(a => /Dubbipt es desde ahora el dueño de los datos de Casting \(la copia que Dubbipt ya tenía\)/.test(a)));
+    t.eq('pintar otra vez: nada que traer, nada que repintar', await A.M.csAsegurarDatos() + ' ' + A.diario.filter(x => x === 'renderLibrary').length, 'false 1');
     A.M.CS_TRAER.ultima = Date.now() - 121000;
     await A.M.csAsegurarDatos();
-    t.eq('a los dos minutos, sí', A.diario.filter(x => x === 'prodSincronizar').length, 2);
-    const N = armar(); N.PROD.cargado = true; N.PROD.ws = 'wsP';
+    t.eq('ni a los dos minutos: DublajeCast ya no se consulta', A.diario.filter(x => x === 'prodSincronizar').length, 0);
+    const B = armar({ trae: true, sesion: true }); B.PROD.cargado = true; B.PROD.ws = 'wsP';
+    await B.M.csAsegurarDatos();
+    t.eq('con sesión de DublajeCast en el equipo: se lee por última vez todo lo de allí y queda apuntado', B.diario.filter(x => x === 'prodSincronizar').length + ' · ' + (B.PROD.datos.desvinculado || {}).de, '1 · DublajeCast, leído por última vez');
+    const N = armar(); N.PROD.cargado = true; N.PROD.ws = 'wsP'; N.PROD.datos.desvinculado = { cuando: 'x', de: 'y' };
     await N.M.csAsegurarDatos();
-    t.eq('si DublajeCast no trae nada nuevo, no repinta', N.diario.filter(x => x === 'renderLibrary').length, 0);
+    t.eq('ya desvinculado: no repinta ni consulta nada', N.diario.filter(x => /^renderLibrary|^prodSincronizar/.test(x)).length, 0);
   }
   {
     /* Si al traer falta algo, se avisa y se ofrece devolverlo. */
     const COPIA = () => ({ id: 77, cuando: Date.now(), por: { series: 1, episodes: 3 }, total: 4, datos: PR.prodNormalizar(VOLCADO()) });
     const copia = COPIA();
-    const A = armar({ trae: true, payload: Object.assign(VOLCADO(), { series: VOLCADO().series.filter(s => s.id !== 3) }), alSincronizar: (l) => l.unshift(copia) });
+    const A = armar({ trae: true, sesion: true, payload: Object.assign(VOLCADO(), { series: VOLCADO().series.filter(s => s.id !== 3) }), alSincronizar: (l) => l.unshift(copia) });
     A.PROD.cargado = true; A.PROD.ws = 'wsP';
     await A.M.csAsegurarDatos();
-    t.eq('se avisa de lo que falta', A.avisos.join('|'), 'En DublajeCast faltan 1 programa, 3 capítulos que antes estaban. Dubbipt guardó una copia: se puede devolver desde el Dashboard de Casting');
+    t.ok('se avisa de lo que falta', A.avisos.includes('En los datos de Casting faltan 1 programa, 3 capítulos que antes estaban. Dubbipt guardó una copia: se puede devolver desde el Dashboard de Casting'));
     let c = controles(A, 'dashboard');
-    t.ok('el Dashboard lo enseña, con devolver y descargar', /Lo que se borró en DublajeCast[\s\S]*?faltaban 1 programa, 3 capítulos[\s\S]*?data-cs="devolver" data-v="77"[\s\S]*?data-cs="bajarCopia" data-v="77"/.test(c.html));
+    t.ok('el Dashboard lo enseña, con devolver y descargar', /Lo que se borró en Casting[\s\S]*?faltaban 1 programa, 3 capítulos[\s\S]*?data-cs="devolver" data-v="77"[\s\S]*?data-cs="bajarCopia" data-v="77"/.test(c.html));
     c.de('bajarCopia').onclick();
     const bajado = A.bajados[0];
-    t.ok('descargar: un archivo que DublajeCast sabe importar', /^dublajecast_copia_\d{4}-\d\d-\d\d\.json$/.test(bajado[0]) && JSON.parse(bajado[1])._version === 'dublajecast_v2' && JSON.parse(bajado[1]).series.length === VOLCADO().series.length && bajado[2] === 'application/json');
+    t.ok('descargar: un archivo que Casting sabe importar', /^dublajecast_copia_\d{4}-\d\d-\d\d\.json$/.test(bajado[0]) && JSON.parse(bajado[1])._version === 'dublajecast_v2' && JSON.parse(bajado[1]).series.length === VOLCADO().series.length && bajado[2] === 'application/json');
     const antes = A.nube().series.length;
     t.eq('devolver: pregunta, vuelve lo que faltaba y se apunta', await A.M.csDevolverCopia(77) + ' ' + (A.nube().series.length - antes) + ' · ' + A.H[0].que,
-         'guardado 1 · Devuelto a DublajeCast lo que se había borrado (1 programa, 3 capítulos)');
-    t.ok('preguntó diciendo que lo de ahora no se toca', A.diario.some(x => /^pregunta Devolver a DublajeCast · .*Lo que hay ahora no se toca\./.test(x)));
-    t.eq('y la copia queda como devuelta: ya no sale', A.COPIAS[0].devuelta + ' ' + /Lo que se borró en DublajeCast/.test(controles(A, 'dashboard').html), '1 false');
+         'guardado 1 · Devuelto a Casting lo que se había borrado (1 programa, 3 capítulos)');
+    t.ok('preguntó diciendo que lo de ahora no se toca', A.diario.some(x => /^pregunta Devolver a Casting · .*Lo que hay ahora no se toca\./.test(x)));
+    t.eq('y la copia queda como devuelta: ya no sale', A.COPIAS[0].devuelta + ' ' + /Lo que se borró en Casting/.test(controles(A, 'dashboard').html), '1 false');
     const B = armar({ copias: [COPIA()] });
     B.M.CS.copias = B.COPIAS.slice();
-    t.eq('si ya estaba todo, se dice y no se escribe nada', await B.M.csDevolverCopia(77) + ' ' + B.avisos.includes('Ya estaba todo en DublajeCast: no faltaba nada'), 'igual true');
+    t.eq('si ya estaba todo, se dice y no se escribe nada', await B.M.csDevolverCopia(77) + ' ' + B.avisos.includes('Ya estaba todo en Casting: no faltaba nada'), 'igual true');
     const C = armar({ copias: [COPIA()], confirmar: false });
     C.M.CS.copias = C.COPIAS.slice();
     t.eq('si se dice que no, nada', await C.M.csDevolverCopia(77) + ' ' + C.diario.filter(x => /^guarda/.test(x)).length + ' ' + !C.COPIAS[0].devuelta, 'cancelado 0 true');
     const D = armar({ copias: [COPIA()], sinSesion: true });
     D.M.CS.copias = D.COPIAS.slice();
-    t.eq('sin sesión de DublajeCast, la copia sigue para luego', await D.M.csDevolverCopia(77) + ' ' + !D.COPIAS[0].devuelta, 'sesion true');
+    t.eq('si no se pudo guardar, la copia sigue para luego', await D.M.csDevolverCopia(77) + ' ' + !D.COPIAS[0].devuelta, 'error true');
     t.eq('una copia que no existe', await D.M.csDevolverCopia(5), 'no hay');
   }
 
@@ -544,7 +546,7 @@ exports.pruebas = async function(t){
     A.M.CS.vista = 'programa'; A.M.CS.prog = 's:sZ'; A.M.CS.tab = 'reparto';
     controles(A, 'programa'); await espera();
     let c = controles(A, 'programa');
-    t.ok('el reparto de un programa sin DublajeCast, del registro de Dubbipt', /<b>LUZ MAR<\/b><div class="cs-tenue">1 pers\. · 2 apar\. · <b>0<\/b> lín\.<\/div>[\s\S]*?<b>Max<\/b><\/div><span class="cs-rep-eps"><span class="cs-rep-ep">Ep\.1<\/span><span class="cs-rep-ep">Ep\.2<\/span>/.test(c.html)
+    t.ok('el reparto de un programa sin Casting, del registro de Dubbipt', /<b>LUZ MAR<\/b><div class="cs-tenue">1 pers\. · 2 apar\. · <b>0<\/b> lín\.<\/div>[\s\S]*?<b>Max<\/b><\/div><span class="cs-rep-eps"><span class="cs-rep-ep">Ep\.1<\/span><span class="cs-rep-ep">Ep\.2<\/span>/.test(c.html)
          && /Sin talento \(1\)[\s\S]*?<b>Rita<\/b>/.test(c.html));
     c.de('repAbrir', { v: 'per:MAX' }).onclick();
     c = controles(A, 'programa');
@@ -557,7 +559,7 @@ exports.pruebas = async function(t){
     controles(B, 'episodio'); await espera();
     c = controles(B, 'episodio');
     const max = c.de('talentoDub', { per: 'Max' });
-    t.eq('en el episodio, el talento se puede cambiar aunque no esté en DublajeCast', max.value + ' · ' + c.de('talentoDub', { per: 'Rita' }).value + ' · ' + max.getAttribute('data-e'), 'LUZ MAR ·  · e:z2');
+    t.eq('en el episodio, el talento se puede cambiar aunque no esté en Casting', max.value + ' · ' + c.de('talentoDub', { per: 'Rita' }).value + ' · ' + max.getAttribute('data-e'), 'LUZ MAR ·  · e:z2');
     const rita = c.de('talentoDub', { per: 'Rita' }); rita.value = '  Pepe   Gil '; rita.onchange(); await espera();
     t.eq('y se guarda en el registro, limpio', B.regGuardados.sZ.personajes.RITA.talent + ' · ' + B.avisos[B.avisos.length - 1], 'Pepe Gil · Rita: Pepe Gil (antes: sin asignar)');
     const C = armar({ shows: ZS, eps: ZE, registros: ZR() });
@@ -588,14 +590,14 @@ exports.pruebas = async function(t){
     t.ok('el Reparto lo enseña: líneas de verdad y «Sin talento» con quien falta', /<b>LUZ MAR<\/b><div class="cs-tenue">1 pers\. · 1 apar\. · <b>40<\/b> lín\.<\/div>/.test(c.html) && /Sin talento \(1\)[\s\S]*?<b>Rita<\/b><\/div><span class="cs-rep-lin">15 lín\.<\/span>/.test(c.html));
   }
   {
-    /* En un programa que también está en DublajeCast, lo casteado en Dubbipt manda. */
+    /* En un programa que también está en Casting, lo casteado en Dubbipt manda. */
     const A = armar();
     const d = PR.prodNormalizar(A.nube());
     const p = A.M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], d).find(x => x.clave === 's:s1');
     const REG = { personajes: {}, capitulos: { 'Episodio 1': { ts: 1, personajes: { ALLY: { display: 'ALLY', talent: 'CARLA PAZ', lineas: 99 }, NUEVO: { display: 'NUEVO', talent: 'LUZ MAR', lineas: 7 } } } } };
     const rep = A.M.csRepartoDe(p, d, REG);
     const ally = rep.find(r => r.personaje === 'ALLY');
-    t.eq('el talento de Dubbipt en su capítulo; las líneas, las de DublajeCast', ally.tramos.map(x => x.talento + ' ' + A.M.csTramoTexto(x.eps) + ' ' + x.lineas).join(' → ') + ' · ' + ally.de, 'CARLA PAZ 1 186 → ANA ROJAS 2 90 → BEATRIZ SOL 3 30 · ambos');
+    t.eq('el talento de Dubbipt en su capítulo; las líneas, las de Casting', ally.tramos.map(x => x.talento + ' ' + A.M.csTramoTexto(x.eps) + ' ' + x.lineas).join(' → ') + ' · ' + ally.de, 'CARLA PAZ 1 186 → ANA ROJAS 2 90 → BEATRIZ SOL 3 30 · ambos');
     t.eq('y el personaje que solo salió en Dubbipt, también, con su reasignar de Dubbipt', JSON.stringify(rep.filter(r => r.personaje === 'NUEVO').map(r => [r.clave, r.de, r.lineas])), '[["per:NUEVO","dubbipt",7]]');
     t.eq('sin fotos, igual que antes', A.M.csRepartoDe(p, d, { personajes: {} }).find(r => r.personaje === 'ALLY').tramos.map(x => x.talento).join(','), 'ANA ROJAS,BEATRIZ SOL');
   }
@@ -648,13 +650,13 @@ exports.pruebas = async function(t){
     const d = PR.prodNormalizar({ series: [{ id: 7, name: '100 Days of Deception' }], episodes: [{ id: 71, series_id: 7, episode_number: 1 }, { id: 73, series_id: 7, episode_number: 3 }, { id: 700, series_id: 7, episode_number: 100 }],
                                   characters: [], talents: [], castings: [], appearances: [] });
     const pd = A.M.csProgramas(DS, (id) => DE[id], d)[0];
-    t.eq('con DublajeCast, cada uno con su pareja, aunque allí haya un Ep. 100', A.M.csEpisodios(pd).map(e => e.ep ? e.ep.id + '→' + (e.dcEp ? e.dcEp.id : '—') : 'dc:' + e.dcEp.id).join(' '), 'd1→71 d2→— d3→73 dc:700');
+    t.eq('con Casting, cada uno con su pareja, aunque allí haya un Ep. 100', A.M.csEpisodios(pd).map(e => e.ep ? e.ep.id + '→' + (e.dcEp ? e.dcEp.id : '—') : 'dc:' + e.dcEp.id).join(' '), 'd1→71 d2→— d3→73 dc:700');
   }
 
   t.seccion('8f · marcar los programas completados (PRO-25)');
   {
     const { M } = armar();
-    t.eq('el estado: completado si lo dice Dubbipt o DublajeCast', [[{ estado: 'completo' }, null], [{ estado: 'en_curso' }, { status: 'completo' }], [{ estado: 'en_curso' }, { status: 'en_curso' }], [{ id: 1 }, null], [null, { status: 'pendiente' }]].map(x => M.csEstadoDe(x[0], x[1])).join(' '), 'completo completo en_curso en_curso pendiente');
+    t.eq('el estado: completado si lo dice Dubbipt o Casting', [[{ estado: 'completo' }, null], [{ estado: 'en_curso' }, { status: 'completo' }], [{ estado: 'en_curso' }, { status: 'en_curso' }], [{ id: 1 }, null], [null, { status: 'pendiente' }]].map(x => M.csEstadoDe(x[0], x[1])).join(' '), 'completo completo en_curso en_curso pendiente');
     const ZS = [{ id: 'sZ', name: 'ZOMBIES', estado: 'en_curso' }, { id: 'sY', name: 'YETI', estado: 'completo' }];
     const A = armar({ shows: ZS, eps: { sZ: [], sY: [] } });
     A.M.CS.vista = 'programas'; A.M.CS.filtro = 'todos'; A.M.CS.buscarProg = '';
@@ -685,13 +687,13 @@ exports.pruebas = async function(t){
     t.eq('un estado raro, nada', await B.M.csCambiarEstado(B.M.csActual().lista[0], 'roto'), 'nada');
   }
   {
-    /* En DublajeCast también, para el administrador. */
+    /* En Casting también, para el administrador. */
     const A = armar();
     const p = A.M.csActual().lista.find(x => x.clave === 's:s1');
     t.eq('en los dos lados', await A.M.csCambiarEstado(p, 'completo') + ' · ' + A.nube().series[0].status + ' · ' + JSON.stringify(A.sbInsertados.filter(x => x[0] === 'shows~').map(x => x[1])), 'nube · completo · [{"estado":"completo"}]');
     const D = armar({ sinSesion: true });
     const pd = D.M.csActual().lista.find(x => x.clave === 'dc:2');
-    t.eq('uno solo de DublajeCast sin sesión: no se finge', await D.M.csCambiarEstado(pd, 'completo'), 'error');
+    t.eq('uno solo de Casting sin sesión: no se finge', await D.M.csCambiarEstado(pd, 'completo'), 'error');
   }
 
   t.seccion('9 · fusionar programas');
@@ -763,69 +765,69 @@ exports.pruebas = async function(t){
     t.eq('consigo mismo, nada', await N.M.csFusionarProgramas(ln[0], ln[0]), 'nada');
   }
   {
-    /* Con DublajeCast: el de allí pasa al que se queda. */
+    /* Con Casting: el de allí pasa al que se queda. */
     const A = armar();
     const lista = A.M.csActual().lista, queda = lista.find(x => x.clave === 's:s1'), pasa = lista.find(x => x.clave === 'dc:2');
-    t.eq('el plan, en los dos lados', A.M.csPlanFusion(queda, pasa).join(' '), 'En DublajeCast, 2 capítulos, tráilers y producción de «Akka» pasan a «A FILIPINO CHRISTMAS», y «Akka» va a la papelera de DublajeCast.');
-    t.eq('fusionar en DublajeCast', await A.M.csFusionarProgramas(queda, pasa), 'hecho');
+    t.eq('el plan, en los dos lados', A.M.csPlanFusion(queda, pasa).join(' '), 'En Casting, 2 capítulos, tráilers y producción de «Akka» pasan a «A FILIPINO CHRISTMAS», y «Akka» va a la papelera de Casting.');
+    t.eq('fusionar en Casting', await A.M.csFusionarProgramas(queda, pasa), 'hecho');
     const P = A.nube();
     t.ok('«Akka» desaparece y sus capítulos son del que queda', !P.series.some(s => s.id === 2) && P.episodes.filter(e => String(e.series_id) === '1').length === VOLCADO().episodes.filter(e => ['1', '2'].includes(String(e.series_id))).length && P.trash[0].kind === 'series');
     t.eq('en Dubbipt no se toca nada', A.movidos.length + ' ' + A.borrados.length + ' ' + A.sbInsertados.length, '0 0 0');
     const S = armar({ sinSesion: true });
     const ls = S.M.csActual().lista;
-    t.eq('sin sesión de DublajeCast, nada en ningún lado', await S.M.csFusionarProgramas(ls.find(x => x.clave === 's:s1'), ls.find(x => x.clave === 'dc:2')) + ' ' + S.H.length, 'sesion 0');
+    t.eq('si no se pudo guardar, nada en ningún lado', await S.M.csFusionarProgramas(ls.find(x => x.clave === 's:s1'), ls.find(x => x.clave === 'dc:2')) + ' ' + S.H.length, 'error 0');
   }
   {
-    /* Uno solo en DublajeCast y otro solo en Dubbipt: se renombra para que casen. */
+    /* Uno solo en Casting y otro solo en Dubbipt: se renombra para que casen. */
     const A = armar({ shows: [{ id: 's1', name: 'A FILIPINO CHRISTMAS' }, { id: 'sP', name: 'LA PELI DOBLADA' }], eps: { s1: EPS_DUB.s1, sP: [] } });
     const lista = A.M.csActual().lista, peli = lista.find(x => x.clave === 'dc:3'), dub = lista.find(x => x.clave === 's:sP');
-    t.eq('se queda el de DublajeCast: el de Dubbipt se llama como él', (await A.M.csFusionarProgramas(peli, dub)) + ' ' + JSON.stringify(A.sbInsertados.filter(x => x[0] === 'shows~').map(x => [x[2], x[1].name])), 'hecho [["sP","La peli"]]');
+    t.eq('se queda el de Casting: el de Dubbipt se llama como él', (await A.M.csFusionarProgramas(peli, dub)) + ' ' + JSON.stringify(A.sbInsertados.filter(x => x[0] === 'shows~').map(x => [x[2], x[1].name])), 'hecho [["sP","La peli"]]');
     t.eq('y se va a él', A.M.CS.prog, 's:sP');
     const B = armar({ shows: [{ id: 's1', name: 'A FILIPINO CHRISTMAS' }, { id: 'sP', name: 'LA PELI DOBLADA' }], eps: { s1: EPS_DUB.s1, sP: [] } });
     const lb = B.M.csActual().lista;
     await B.M.csFusionarProgramas(lb.find(x => x.clave === 's:sP'), lb.find(x => x.clave === 'dc:3'));
-    t.eq('se queda el de Dubbipt: el de DublajeCast se llama como él', B.nube().series.find(s => s.id === 3).name, 'LA PELI DOBLADA');
+    t.eq('se queda el de Dubbipt: el de Casting se llama como él', B.nube().series.find(s => s.id === 3).name, 'LA PELI DOBLADA');
   }
 
-  t.seccion('10 · eliminar por completo: Dubbipt y DublajeCast');
+  t.seccion('10 · eliminar por completo: Dubbipt y Casting');
   {
     const P0 = VOLCADO();
     const P1 = JSON.parse(JSON.stringify(P0));
-    t.eq('borrar un episodio de DublajeCast quita sus personajes y castings', DX.dcxBorrarEpisodios(P1, [11]) + ' ' + P1.episodes.some(e => e.id === 11) + ' ' + P1.appearances.some(a => a.episode_id === 11) + ' ' + P1.castings.some(c => c.episode_id === 11), 'true false false false');
+    t.eq('borrar un episodio de Casting quita sus personajes y castings', DX.dcxBorrarEpisodios(P1, [11]) + ' ' + P1.episodes.some(e => e.id === 11) + ' ' + P1.appearances.some(a => a.episode_id === 11) + ' ' + P1.castings.some(c => c.episode_id === 11), 'true false false false');
     t.eq('y lo deja en su papelera, con todo, para poder restaurarlo', P1.trash[0].kind + ' ' + P1.trash[0].data.episodes.length + ' ' + P1.trash[0].data.castings.length, 'episode 1 2');
     t.eq('los demás no se tocan', P1.episodes.length + ' ' + P1.castings.length, (P0.episodes.length - 1) + ' ' + (P0.castings.length - 2));
     t.eq('uno que no existe no cambia nada', DX.dcxBorrarEpisodios(JSON.parse(JSON.stringify(P0)), [999]), false);
     const P2 = Object.assign(JSON.parse(JSON.stringify(P0)), { produccion: [{ programa: 'A Filipino Christmas', capitulo: 1 }, { programa: 'Akka', capitulo: 1 }] });
-    t.eq('borrar un programa de DublajeCast quita sus episodios, castings, tráilers y producción', DX.dcxBorrarSerie(P2, 1) + ' ' + P2.series.map(x => x.id).join(',') + ' · ' + P2.episodes.filter(e => e.series_id === 1).length + ' ' + P2.castings.length + ' ' + P2.trailers.length + ' ' + P2.produccion.map(r => r.programa).join(','), 'true 2,3 · 0 0 0 Akka');
+    t.eq('borrar un programa de Casting quita sus episodios, castings, tráilers y producción', DX.dcxBorrarSerie(P2, 1) + ' ' + P2.series.map(x => x.id).join(',') + ' · ' + P2.episodes.filter(e => e.series_id === 1).length + ' ' + P2.castings.length + ' ' + P2.trailers.length + ' ' + P2.produccion.map(r => r.programa).join(','), 'true 2,3 · 0 0 0 Akka');
     t.eq('y va entero a la papelera', P2.trash[0].kind + ' ' + P2.trash[0].data.series[0].name, 'series A Filipino Christmas');
     t.ok('los talentos y los personajes, que son de todos, se quedan', P2.talents.length === P0.talents.length && P2.characters.length === P0.characters.length);
   }
   {
-    /* «Eliminé este episodio, se borró el casting de Dubbipt pero se quedó el ep»: tenía pareja en DublajeCast. */
+    /* «Eliminé este episodio, se borró el casting de Dubbipt pero se quedó el ep»: tenía pareja en Casting. */
     const A = armar();
     const p = A.M.csActual().lista.find(x => x.clave === 's:s1');
     const e1 = A.M.csEpisodios(p).find(x => x.ep && x.ep.id === 'e1');
-    t.ok('el Episodio 1 de Dubbipt tiene su pareja en DublajeCast', !!(e1 && e1.dcEp && e1.dcEp.id === 11));
-    t.eq('eliminarlo lo borra de Dubbipt y de DublajeCast, preguntando una vez', (await A.M.csBorrarEpisodio(p, e1)) + ' ' + A.diario.filter(x => /^borra|^pregunta/.test(x)).length + ' ' + A.diario.includes('borraEp e1 true') + ' ' + A.nube().episodes.some(e => e.id === 11), 'true 2 true false');
-    t.ok('la pregunta dice que es de los dos sitios', A.diario.some(x => /^pregunta Eliminar episodio .*de Dubbipt y de DublajeCast/.test(x)));
+    t.ok('el Episodio 1 de Dubbipt tiene su pareja en Casting', !!(e1 && e1.dcEp && e1.dcEp.id === 11));
+    t.eq('eliminarlo lo borra de Dubbipt y de Casting, preguntando una vez', (await A.M.csBorrarEpisodio(p, e1)) + ' ' + A.diario.filter(x => /^borra|^pregunta/.test(x)).length + ' ' + A.diario.includes('borraEp e1 true') + ' ' + A.nube().episodes.some(e => e.id === 11), 'true 2 true false');
+    t.ok('la pregunta dice que es de los dos sitios', A.diario.some(x => /^pregunta Eliminar episodio .*de Dubbipt y de Casting/.test(x)));
     t.ok('y queda apuntado quién lo eliminó', A.H.some(h => /^Episodio eliminado/.test(h.que)));
     const p2 = A.M.csActual().lista.find(x => x.clave === 's:s1');
     const solo = A.M.csEpisodios(p2).find(x => !x.ep && x.dcEp && x.dcEp.id === 13);
-    t.eq('uno que ya solo está en DublajeCast también se puede eliminar', (await A.M.csBorrarEpisodio(p2, solo)) + ' ' + A.nube().episodes.some(e => e.id === 13), 'true false');
+    t.eq('uno que ya solo está en Casting también se puede eliminar', (await A.M.csBorrarEpisodio(p2, solo)) + ' ' + A.nube().episodes.some(e => e.id === 13), 'true false');
   }
   {
     const A = armar();
     const p = A.M.csActual().lista.find(x => x.clave === 's:s1');
-    t.eq('eliminar el programa lo borra de Dubbipt y de DublajeCast', (await A.M.csBorrarPrograma(p)) + ' ' + A.diario.includes('borraProg s1 true') + ' ' + A.nube().series.some(s => s.id === 1) + ' ' + A.M.CS.vista, 'true true false programas');
+    t.eq('eliminar el programa lo borra de Dubbipt y de Casting', (await A.M.csBorrarPrograma(p)) + ' ' + A.diario.includes('borraProg s1 true') + ' ' + A.nube().series.some(s => s.id === 1) + ' ' + A.M.CS.vista, 'true true false programas');
     const N = armar({ confirmar: false });
     const pn = N.M.csActual().lista.find(x => x.clave === 's:s1');
     t.eq('si se cancela, nada', (await N.M.csBorrarPrograma(pn)) + ' ' + N.diario.filter(x => /^borra/.test(x)).length + ' ' + N.nube().series.some(s => s.id === 1), 'false 0 true');
     const S = armar({ sinSesion: true });
     const ps = S.M.csActual().lista.find(x => x.clave === 's:s1');
     await S.M.csBorrarPrograma(ps);
-    t.ok('sin sesión en DublajeCast: lo de Dubbipt se borra y se dice cómo terminar', S.diario.includes('borraProg s1 true') && S.avisos.some(a => /Entra en DublajeCast y vuelve a pulsar «Eliminar»/.test(a)));
+    t.ok('si lo de Casting no se pudo guardar: lo de Dubbipt se borra y se dice cómo terminar', S.diario.includes('borraProg s1 true') && S.avisos.some(a => /vuelve a pulsar «Eliminar» para quitarlo también de ahí/.test(a)));
     const B = armar();
-    t.eq('la papelera de la biblioteca también borra su pareja de DublajeCast', (await B.M.csBorrarDeBiblioteca(null, EPS_DUB.s1[1])) + ' ' + B.diario.includes('borraEp e2 true') + ' ' + B.nube().episodes.some(e => e.id === 12), 'true true false');
+    t.eq('la papelera de la biblioteca también borra su pareja de Casting', (await B.M.csBorrarDeBiblioteca(null, EPS_DUB.s1[1])) + ' ' + B.diario.includes('borraEp e2 true') + ' ' + B.nube().episodes.some(e => e.id === 12), 'true true false');
   }
 
   t.seccion('11 · cada episodio, en producción o completado; y la lista de activos (PRO-31)');
@@ -834,15 +836,15 @@ exports.pruebas = async function(t){
     const p = A.M.csActual().lista.find(x => x.clave === 's:s1');
     const e1 = A.M.csEpisodios(p).find(x => x.ep && x.ep.id === 'e1');
     t.eq('por omisión, en producción', A.M.csEstadoEp(e1), 'en_curso');
-    t.eq('completado en DublajeCast o en Dubbipt, completado', A.M.csEstadoEp({ ep: { id: 'x', estado: 'completo' }, dcEp: { status: 'en_curso' } }) + ' ' + A.M.csEstadoEp({ ep: { id: 'x' }, dcEp: { status: 'completo' } }), 'completo completo');
+    t.eq('completado en Casting o en Dubbipt, completado', A.M.csEstadoEp({ ep: { id: 'x', estado: 'completo' }, dcEp: { status: 'en_curso' } }) + ' ' + A.M.csEstadoEp({ ep: { id: 'x' }, dcEp: { status: 'completo' } }), 'completo completo');
     const r = await A.M.csCambiarEstadoEp(p, e1, 'completo');
     t.eq('marcarlo completado: en Dubbipt, en una petición', r + ' ' + JSON.stringify(A.sbInsertados.find(x => /^episodes/.test(x[0])) || null), 'nube ["episodes~",{"estado":"completo"},["e1"]]');
-    t.eq('y en DublajeCast, su status', A.nube().episodes.find(x => x.id === 11).status, 'completo');
+    t.eq('y en Casting, su status', A.nube().episodes.find(x => x.id === 11).status, 'completo');
     t.ok('apuntado y dicho', A.H.some(h => /^Episodio completado: /.test(h.que)) && A.avisos.some(a => /^Episodio completado: /.test(a)));
     A.M.CS.vista = 'programa'; A.M.CS.prog = 's:s1'; A.M.CS.tab = 'episodios';
     const v = controles(A, 'programa');
     t.ok('cada episodio dice su estado y tiene su botón con nombre: «Reabrir» si está completado', /cs-estado-completo/.test(v.html) && !!v.de('estadoEp', { v: 'e:e1' }) && /data-cs="estadoEp" data-v="e:e1"[^>]*>[\s\S]*?<span>Reabrir<\/span>/.test(v.html));
-    t.ok('y «Completar» si está en curso, también en los que solo están en DublajeCast', /data-cs="estadoEp" data-v="e:e2"[^>]*>[\s\S]*?<span>Completar<\/span>/.test(v.html) && !!v.de('estadoEp', { v: 'd:13' }));
+    t.ok('y «Completar» si está en curso, también en los que solo están en Casting', /data-cs="estadoEp" data-v="e:e2"[^>]*>[\s\S]*?<span>Completar<\/span>/.test(v.html) && !!v.de('estadoEp', { v: 'd:13' }));
     for(const x of EPS_DUB.s1) delete x.estado;            // lo compartido, como estaba
   }
   {
@@ -873,7 +875,7 @@ exports.pruebas = async function(t){
     controles(A, 'programa').de('repAbrir', { v: 'ch:101' }).onclick();
     A.campos.csRepNuevo = { value: 'Carla Paz' };
     controles(A, 'programa').de('repGuardar', { v: 'ch:101' }).onclick(); await espera(); await espera(); await espera();
-    t.eq('cambia en DublajeCast', A.nube().castings.filter(x => x.character_id === 101).map(x => A.nube().talents.find(y => y.id === x.talent_id).name).join(','), 'CARLA PAZ,CARLA PAZ,CARLA PAZ');
+    t.eq('cambia en Casting', A.nube().castings.filter(x => x.character_id === 101).map(x => A.nube().talents.find(y => y.id === x.talent_id).name).join(','), 'CARLA PAZ,CARLA PAZ,CARLA PAZ');
     const g = A.regGuardados.s1;
     t.eq('y en Dubbipt, en todos sus episodios: si no, el Reparto seguía con el viejo', g && (g.personajes.ALLY.talent + ' · ' + g.capitulos['Episodio 1'].personajes.ALLY.talent + ' · ' + g.capitulos['Episodio 2'].personajes.ALLY.talent), 'Carla Paz · Carla Paz · Carla Paz');
     t.ok('y se cierra', A.M.CS.repAbierto === null);
@@ -909,7 +911,7 @@ exports.pruebas = async function(t){
     const ally = M.csBuscarPersonajes(papeles, 'aly');
     t.eq('cada papel: programa (el nombre de Dubbipt si es de los dos), talento, episodios y líneas, y de dónde sale; por líneas',
          ally[0].personaje + ' · ' + ally[0].papeles.map(x => x.programa + ' / ' + x.talento + ' / ' + x.eps.join('+') + ' / ' + x.lineas + ' / ' + x.de).join(' | '),
-         'ALLY · A FILIPINO CHRISTMAS / ANA ROJAS / 1+2 / 276 / DublajeCast | A FILIPINO CHRISTMAS / Luz Mar / 2 / 95 / Dubbipt | A FILIPINO CHRISTMAS / BEATRIZ SOL / 3 / 30 / DublajeCast');
+         'ALLY · A FILIPINO CHRISTMAS / ANA ROJAS / 1+2 / 276 / Casting | A FILIPINO CHRISTMAS / Luz Mar / 2 / 95 / Dubbipt | A FILIPINO CHRISTMAS / BEATRIZ SOL / 3 / 30 / Casting');
     t.eq('también lo que solo está en Dubbipt', M.csBuscarPersonajes(papeles, 'macs').map(g => g.personaje + ' · ' + g.papeles[0].programa + ' / ' + g.papeles[0].talento + ' / ' + g.papeles[0].eps.join('+')).join(), 'Max · SOLO DUBBIPT / Pepe / 4');
     t.eq('quien aún no tiene talento también sale', M.csBuscarPersonajes(papeles, 'tito boy')[0].papeles[0].talento, '');
     t.eq('lo escrito tal cual va primero', M.csBuscarPersonajes([{ personaje: 'JANAS', programa: 'P', talento: 'T', eps: [], lineas: 0, de: 'x' }, { personaje: 'JANA', programa: 'P', talento: 'T', eps: [], lineas: 0, de: 'x' }], 'jana').map(g => g.personaje).join(','), 'JANA,JANAS');
@@ -922,7 +924,7 @@ exports.pruebas = async function(t){
     M.CS.talModo = 'talentos';
   }
 
-  t.seccion('14 · Talentos como en DublajeCast: tarjetas y la ficha de cada uno (PRO-37)');
+  t.seccion('14 · Talentos como en Casting: tarjetas y la ficha de cada uno (PRO-37)');
   {
     for(const sh of SHOWS) delete sh.estado;               // lo compartido, como estaba
     const A = armar();
@@ -933,9 +935,9 @@ exports.pruebas = async function(t){
     const fichas = M.csFichasTalentos(d, regs, lista);
     const ana = fichas.find(f => f.clave === 'ANA ROJAS');
     t.eq('cada talento con sus cifras: programas, episodios, personajes y líneas', [ana.nProg, ana.nEps, ana.nPer, ana.lineas].join(' '), '1 2 2 283');
-    t.eq('el desglose por programa: cada personaje con sus episodios y líneas, de DublajeCast y de Dubbipt', ana.programas.map(g => g.programa + ' [' + g.eps.join(',') + '] ' + g.personajes.map(y => y.nombre + ':' + y.eps.join('+') + ':' + y.lineas + (y.principal ? '*' : '')).join(' ')).join(' | '),
+    t.eq('el desglose por programa: cada personaje con sus episodios y líneas, de Casting y de Dubbipt', ana.programas.map(g => g.programa + ' [' + g.eps.join(',') + '] ' + g.personajes.map(y => y.nombre + ':' + y.eps.join('+') + ':' + y.lineas + (y.principal ? '*' : '')).join(' ')).join(' | '),
          'A FILIPINO CHRISTMAS [1,2] ALLY:1+2:276* REY:2:7');
-    t.ok('también los talentos sin papeles, de la base de DublajeCast', fichas.length >= d.talents.length);
+    t.ok('también los talentos sin papeles, de la base de Casting', fichas.length >= d.talents.length);
     t.eq('la carga, por programas en curso', [0, 2, 3, 5].map(n => M.csCargaTalento(n).texto).join(','), 'Bajo,Bajo,Medio,Alto');
     M.CS_REGS.lista = regs; M.CS_REGS.ts = Date.now();
     M.CS.vista = 'talentos'; M.CS.talModo = 'talentos'; M.CS.talAbierto = null; M.CS.buscar = '';

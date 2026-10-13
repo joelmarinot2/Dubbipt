@@ -320,9 +320,7 @@ exports.pruebas = async function(t){
   t.seccion('9 · por dónde se entra');
   const F2 = fuentes().map(f => f.src).join('\n');
   const HTML = require('fs').readFileSync(require('./ayuda').INDEX, 'utf8');
-  t.ok('el botón de Producción está en la cabecera de Programas, la que se ve, y no en la de la biblioteca, que la app oculta siempre',
-       /id="btnProduccion"'\+\(\(typeof prodPuede==='function' && prodPuede\(\)\) \? '' : ' style="display:none"'\)\+' title="DublajeCast tal cual/.test(HTML) && /head\.querySelector\('#btnProduccion'\); if\(bp\) bp\.onclick=\(\)=> dcastAbrir\(\);/.test(HTML)
-       && !/<button class="btnv sm" id="btnProduccion"/.test(HTML));
+  t.ok('el botón «DublajeCast original» ya no está en ninguna cabecera (PRO-49): DublajeCast está desvinculado', !/btnProduccion/.test(HTML) && !/DublajeCast original/.test(HTML));
   t.ok('se repinta al cambiar de perfil y al saber el rol', /prodPintarBoton\(\); \}catch\(e\)\{ fallo\('prodPintarBoton · index\.html:ponerModo'/.test(HTML) && /prodPintarBoton\(\); \}catch\(e\)\{ fallo\('prodPintarBoton · index\.html:loadMyRole'/.test(HTML));
   t.ok('«Traer TODO» y la caja de herramientas, solo para quien puede', /\(\(typeof prodPuede === 'function' && prodPuede\(\)\)\s+\? '<button class="modo-op dc-b" id="dcTodo">/.test(HTML) && /\(\(typeof prodPuede === 'function' && prodPuede\(\)\)\s+\? '<button class="herr-it" id="herrProd">/.test(F2));
   t.ok('la base de datos solo deja al administrador', (() => { const q = require('fs').readFileSync(require('path').join(__dirname, '..', 'sql', 'mejora-03-produccion.sql'), 'utf8'); return /using \(public\.is_admin\(\)\)\s+with check \(public\.is_admin\(\)\);/.test(q) && !/w\.owner = auth\.uid\(\)/.test(q); })());

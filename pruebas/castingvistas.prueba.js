@@ -1,10 +1,10 @@
-/* Casting con la organización de DublajeCast y la interfaz de Dubbipt · especificacion 09, PRO-11
+/* Casting con la organización de Casting y la interfaz de Dubbipt · especificacion 09, PRO-11
  *
- * Pedido de sala: «que tenga la misma organización que DublajeCast, pero con
+ * Pedido de sala: «que tenga la misma organización que Casting, pero con
  * la interfaz de Dubbipt», y «no quiero ningún emoji en los iconos».
  *
  * Lo que protege esta prueba:
- *  · que las secciones sean las de DublajeCast y en su orden;
+ *  · que las secciones sean las de Casting y en su orden;
  *  · que cada cuenta (dashboard, ocupación, talentos, producción) diga lo que
  *    dicen los datos, sin contar dos veces ni perder lo que no casa;
  *  · que Programas siga siendo la lista de Dubbipt y las demás la tapen sin
@@ -16,13 +16,14 @@ const fs = require('fs');
 const path = require('path');
 const { montar, RAIZ } = require('./ayuda');
 
-exports.nombre = 'Casting con la organización de DublajeCast';
+exports.nombre = 'Casting con la organización de Casting';
 
 const HOY = new Date(2026, 9, 7);
 const dia = (n) => { const d = new Date(HOY); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
 const VOLCADO = {
   _version: 'dublajecast_v2',
+  desvinculado: { cuando: '2026-10-06T00:00:00Z', de: 'prueba' },
   series: [{ id: 1, name: 'A Filipino Christmas', cliente: 'Netflix', status: 'en_curso' }, { id: 2, name: 'Akka', cliente: 'Discovery', status: 'en_curso' }, { id: 3, name: 'Dofus', status: 'completo' }],
   episodes: [{ id: 11, series_id: 1, episode_number: 1, title: 'Boracay', fase: 'pre_produccion', fecha_miami: dia(-1), fecha_dubcard: dia(2) },
              { id: 12, series_id: 1, episode_number: 2, title: 'Episodio 2', fase: 'produccion_activa', fecha_miami: dia(-5) },
@@ -42,7 +43,7 @@ const VOLCADO = {
 const PR = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ PRODUCCIÓN · LO QUE VIENE DE DUBLAJECAST', '/* ═══ FIN DE PRODUCCIÓN']],
   ['prodNormalizar', 'prodIndices', 'prodCasarPrograma', 'prodAlertasEp', 'prodPlazo', 'prodFormatoDubcard', 'prodFichaTexto', 'PROD_ET'], { castNorm: undefined, console: { warn: () => {} } });
 
-/* Lo de DublajeCast entero que se usa aquí, de verdad. */
+/* Lo de Casting entero que se usa aquí, de verdad. */
 const DC = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ DUBLAJECAST ENTERO', '/* ═══ FIN DE DUBLAJECAST ENTERO']],
   ['dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting', 'dcastNumerosDe'],
   { castNorm: undefined, prodCasarPrograma: PR.prodCasarPrograma, prodIndices: PR.prodIndices, window: { addEventListener: () => {} }, document: {}, location: { origin: '' } });
@@ -106,7 +107,7 @@ function armar(o){
       document: doc, prodPuede: () => (o.puede !== undefined ? o.puede : true), PROD: PROD, PROD_ET: PR.PROD_ET,
       prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard, prodFichaTexto: PR.prodFichaTexto, prodCasarPrograma: PR.prodCasarPrograma,
       prodPanel: () => diario.push('prodPanel'), prodVista: 'programas',
-      prodImportarDesdeDublajeCast: async () => { diario.push('importa'); return { r: 1 }; }, prodResumenTexto: () => 'Traído de DublajeCast: …',
+      prodImportarDesdeCasting: async () => { diario.push('importa'); return { r: 1 }; }, prodResumenTexto: () => 'Traído de Casting: …',
       dcSesion: async () => (o.sesion ? { id: 'u' } : null),
       dcastDatos: () => ({ datos: PROD.datos, vivo: vivo }), dcastAbrir: (v) => { diario.push('dcastAbrir ' + v); return true; },
       castAviso: (t) => avisos.push(t), sbShows: () => (o.shows || SHOWS), sbEps: (id) => EPS_DUB[id] || [], LDB: LDB, libView: 'eps',
@@ -140,11 +141,11 @@ exports.pruebas = async function(t){
   const { M } = armar();
   const d = PR.prodNormalizar(VOLCADO);
 
-  t.seccion('1 · las secciones de DublajeCast, en su orden');
+  t.seccion('1 · las secciones de Casting, en su orden');
   t.eq('las nueve, como en su barra', M.CS_SECCIONES.map(s => s.t).join(' · '), 'Dashboard · Programas · Talentos · Ocupación · Tráilers · Producción · DUBCARDs · Pegado de casting · Breakdowns');
   t.eq('las tres que procesan archivos, todavía la herramienta de allí', M.CS_SECCIONES.filter(s => s.dc).map(s => s.v + '>' + s.dc).join(' '), 'dubcards>dubcards pegado>pegado breakdowns>breakdowns');
   const nav = M.csNavHtml('talentos');
-  t.ok('la activa, marcada; las de DublajeCast, distinguidas', /class="cs-nav-b on" data-v="talentos"/.test(nav) && /class="cs-nav-b cs-nav-dc" data-v="pegado"/.test(nav) && (nav.match(/ on"/g) || []).length === 1);
+  t.ok('la activa, marcada; las de Casting, distinguidas', /class="cs-nav-b on" data-v="talentos"/.test(nav) && /class="cs-nav-b cs-nav-dc" data-v="pegado"/.test(nav) && (nav.match(/ on"/g) || []).length === 1);
   t.ok('cada una con su icono de trazo', (nav.match(/<svg [^>]*stroke="currentColor"/g) || []).length === 9);
   t.ok('todos los iconos dibujados', M.CS_SECCIONES.every(s => M.CS_ICO[s.v]) && ['externo', 'actualizar', 'aviso', 'estrella', 'entrar', 'cerrar', 'derecha', 'abajo', 'mas', 'subir', 'bajar', 'traer'].every(k => M.CS_ICO[k]));
   t.eq('un icono que no existe, vacío pero sin romper', /<svg[^>]*><\/svg>/.test(M.csIco('nada')), true);
@@ -182,55 +183,53 @@ exports.pruebas = async function(t){
   t.eq('con su fase, su cliente y su DUBCARD', [pr[0].fase, pr[0].cliente, pr[0].dubcard + ' ' + pr[0].fechaDubcard, pr[1].dubcard].join(' · '), 'Preproducción · Netflix · BACKLOT ' + dia(2) + ' · Excel');
   t.eq('solo los que tienen alertas', M.csProduccion(d, HOY, true).map(f => f.programa + ' ' + f.capitulo + ' ' + f.alertas.length).join(' | '), 'A Filipino Christmas 1 2 | Akka 1 1');
 
-  t.seccion('6 · Programas, programa y episodio, como en DublajeCast');
+  t.seccion('6 · Programas, programa y episodio, como en Casting');
   const progs = M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], d);
-  t.eq('todos los programas: los de Dubbipt con lo que sabe DublajeCast, y los que solo están allí', progs.map(p => p.clave + ' ' + p.nombre + ' ' + p.estado).join(' | '), 's:s1 A FILIPINO CHRISTMAS en_curso | dc:2 Akka en_curso | dc:3 Dofus completo');
-  t.eq('con su cliente, de DublajeCast', progs.map(p => p.cliente || '—').join(' '), 'Netflix Discovery —');
-  t.eq('uno de Dubbipt que DublajeCast no tiene, en curso y sin serie', JSON.stringify(M.csProgramas([{ id: 'x', name: 'Nuevo' }], () => [], d).find(p => p.clave === 's:x'), ['estado', 'serie']), '{"estado":"en_curso","serie":null}');
+  t.eq('todos los programas: los de Dubbipt con lo que sabe Casting, y los que solo están allí', progs.map(p => p.clave + ' ' + p.nombre + ' ' + p.estado).join(' | '), 's:s1 A FILIPINO CHRISTMAS en_curso | dc:2 Akka en_curso | dc:3 Dofus completo');
+  t.eq('con su cliente, de Casting', progs.map(p => p.cliente || '—').join(' '), 'Netflix Discovery —');
+  t.eq('uno de Dubbipt que Casting no tiene, en curso y sin serie', JSON.stringify(M.csProgramas([{ id: 'x', name: 'Nuevo' }], () => [], d).find(p => p.clave === 's:x'), ['estado', 'serie']), '{"estado":"en_curso","serie":null}');
   t.eq('todos por nombre, vengan de donde vengan', M.csProgramas([{ id: 'z', name: 'Zeta' }], () => [], d).map(p => p.nombre).join(','), 'A Filipino Christmas,Akka,Dofus,Zeta');
-  t.eq('sin datos de DublajeCast, solo los de Dubbipt', M.csProgramas(SHOWS, () => [], null).map(p => p.clave).join(','), 's:s1');
-  t.eq('filtrar por estado, como en DublajeCast', ['todos', 'en_curso', 'completo'].map(f => M.csFiltrarProgramas(progs, f, '').length).join(' '), '3 2 1');
+  t.eq('sin datos de Casting, solo los de Dubbipt', M.csProgramas(SHOWS, () => [], null).map(p => p.clave).join(','), 's:s1');
+  t.eq('filtrar por estado, como en Casting', ['todos', 'en_curso', 'completo'].map(f => M.csFiltrarProgramas(progs, f, '').length).join(' '), '3 2 1');
   t.eq('y buscar por nombre o cliente, sin mayúsculas', M.csFiltrarProgramas(progs, 'todos', 'netflix').map(p => p.nombre).join(',') + ' · ' + M.csFiltrarProgramas(progs, 'en_curso', 'dofus').length, 'A FILIPINO CHRISTMAS · 1');
   t.eq('buscando se mira en todos, también los completados, aunque se esté en «En curso»', M.csFiltrarProgramas(progs, 'en_curso', 'dofus').map(p => p.estado).join(','), 'completo');
   t.eq('palabra a palabra, también en los capítulos: «filipino 102» encuentra el programa que tiene el 102', M.csFiltrarProgramas([{ nombre: 'A FILIPINO CHRISTMAS', eps: [{ name: 'Episodio 102' }], dcEps: [] }, { nombre: 'Otro', eps: [{ name: 'Episodio 102' }], dcEps: [] }], 'en_curso', 'filipino 102').map(p => p.nombre).join(','), 'A FILIPINO CHRISTMAS');
-  t.eq('y en los de DublajeCast, por título o número', M.csFiltrarProgramas([{ nombre: 'Akka', eps: [], dcEps: [{ title: 'The Last New Year', episode_number: 7 }] }], 'todos', 'akka 7').length + ' ' + M.csFiltrarProgramas([{ nombre: 'Akka', eps: [], dcEps: [{ title: 'The Last New Year', episode_number: 7 }] }], 'todos', 'last year').length, '1 1');
+  t.eq('y en los de Casting, por título o número', M.csFiltrarProgramas([{ nombre: 'Akka', eps: [], dcEps: [{ title: 'The Last New Year', episode_number: 7 }] }], 'todos', 'akka 7').length + ' ' + M.csFiltrarProgramas([{ nombre: 'Akka', eps: [], dcEps: [{ title: 'The Last New Year', episode_number: 7 }] }], 'todos', 'last year').length, '1 1');
   t.eq('si falta una palabra, no', M.csFiltrarProgramas([{ nombre: 'A FILIPINO CHRISTMAS', eps: [{ name: 'Episodio 101' }], dcEps: [] }], 'todos', 'filipino 102').length, 0);
   const p1 = progs[0], eps1 = M.csEpisodios(p1);
-  t.eq('los episodios: los de Dubbipt con su pareja de DublajeCast, por número; sin número, al final', eps1.map(e => e.clave + ' ' + e.numero + ' ' + (e.dcEp ? e.dcEp.id : '—')).join(' | '), 'e:e1 1 11 | e:e2 2 12 | e:e9 null —');
-  t.eq('con el título de DublajeCast cuando es otro', eps1[0].dcTitulo, 'Boracay');
+  t.eq('los episodios: los de Dubbipt con su pareja de Casting, por número; sin número, al final', eps1.map(e => e.clave + ' ' + e.numero + ' ' + (e.dcEp ? e.dcEp.id : '—')).join(' | '), 'e:e1 1 11 | e:e2 2 12 | e:e9 null —');
+  t.eq('con el título de Casting cuando es otro', eps1[0].dcTitulo, 'Boracay');
   const epsAkka = M.csEpisodios(progs[1]);
-  t.eq('los de un programa que solo está en DublajeCast', epsAkka.map(e => e.clave + ' ' + e.titulo).join(' | '), 'd:21 Akka 1');
+  t.eq('los de un programa que solo está en Casting', epsAkka.map(e => e.clave + ' ' + e.titulo).join(' | '), 'd:21 Akka 1');
   const mezcla = M.csEpisodios(M.csProgramas(SHOWS, () => [{ id: 'e1', name: 'Episodio 1' }], PR.prodNormalizar({ series: [{ id: 1, name: 'A Filipino Christmas' }], episodes: [{ id: 11, series_id: 1, episode_number: 1 }, { id: 13, series_id: 1, episode_number: 3, title: 'Año nuevo' }] }))[0]);
-  t.eq('y los que DublajeCast tiene y Dubbipt todavía no, en su sitio', mezcla.map(e => e.clave + ' ' + e.numero).join(' | '), 'e:e1 1 | d:13 3');
+  t.eq('y los que Casting tiene y Dubbipt todavía no, en su sitio', mezcla.map(e => e.clave + ' ' + e.numero).join(' | '), 'e:e1 1 | d:13 3');
   const porTitulo = M.csEpisodios(M.csProgramas(SHOWS, () => [{ id: 'f', name: 'Año nuevo' }], PR.prodNormalizar({ series: [{ id: 1, name: 'A Filipino Christmas' }], episodes: [{ id: 13, series_id: 1, episode_number: 3, title: 'Año nuevo' }] }))[0]);
-  t.eq('un episodio que casa por título lleva el número de DublajeCast', porTitulo.map(e => e.clave + ' ' + e.numero).join(' | '), 'e:f 3');
+  t.eq('un episodio que casa por título lleva el número de Casting', porTitulo.map(e => e.clave + ' ' + e.numero).join(' | '), 'e:f 3');
   t.eq('el número de un nombre', [M.csNumeroDe('Episodio 12'), M.csNumeroDe('E02 Piloto'), M.csNumeroDe('Especial')].join(' '), '12 2 NaN');
-  t.eq('un episodio que solo está en DublajeCast no recoge nada del registro, ni lo apuntado sin capítulo', DC.dcastFilasCasting(d, d.episodes.find(e => e.id === 21), { personajes: { X: { display: 'X', talent: 'Y', episodios: [''] } } }, '').map(f => f.personaje).join(','), 'MANJAYA');
+  t.eq('un episodio que solo está en Casting no recoge nada del registro, ni lo apuntado sin capítulo', DC.dcastFilasCasting(d, d.episodes.find(e => e.id === 21), { personajes: { X: { display: 'X', talent: 'Y', episodios: [''] } } }, '').map(f => f.personaje).join(','), 'MANJAYA');
   {
-    /* «Los episodios que no estén creados en DublajeCast, crea el casting y el reparto.» */
+    /* «Los episodios que no estén creados en Casting, crea el casting y el reparto.» */
     const reg = { personajes: { ALLY: { display: 'Ally', talent: 'VIEJA', episodios: ['Episodio 7'] } },
                   capitulos: { 'Episodio 7': { personajes: { ALLY: { display: 'Ally', talent: 'BETO LUNA', lineas: 40 }, TITO: { display: 'Tito', talent: '', lineas: 6 } } } } };
     const fl = DC.dcastFilasCasting(null, null, reg, 'episodio 7');
     t.eq('uno solo de Dubbipt: todos sus personajes, con líneas y su talento (o sin él), de su foto', fl.map(f => f.personaje + ':' + (f.talento || '-') + ':' + f.lineas).join(' '), 'Ally:BETO LUNA:40 Tito:-:6');
   }
-  t.eq('el casting de un episodio: DublajeCast y el registro de Dubbipt', M.csCastingDe(eps1[0], d, REGISTRO).map(f => f.personaje + '=' + f.talento + (f.choca ? '!' : '')).join(' '), 'ALLY=ANA ROJAS JANA=LUZ MAR! TITO BOY=');
+  t.eq('el casting de un episodio: Casting y el registro de Dubbipt', M.csCastingDe(eps1[0], d, REGISTRO).map(f => f.personaje + '=' + f.talento + (f.choca ? '!' : '')).join(' '), 'ALLY=ANA ROJAS JANA=LUZ MAR! TITO BOY=');
 
   t.seccion('7 · lo que se pinta: con los datos, sin ellos, y sin emojis');
   const vistas = ['dashboard', 'talentos', 'ocupacion', 'trailers', 'produccion', 'dubcards', 'pegado', 'breakdowns'];
   const html = {}; vistas.forEach(v => { html[v] = M.csHtml(v, HOY); });
-  t.ok('cada sección con su título y de dónde salen los datos', ['Dashboard', 'Talentos', 'Ocupación', 'Tráilers &amp; Teasers', 'Producción'].every((n, i) => html[vistas[i]].indexOf('<h2>' + n + '</h2>') >= 0 && /Datos de DublajeCast del 6\/10\/2026/.test(html[vistas[i]])));
+  t.ok('cada sección con su título y de dónde salen los datos', ['Dashboard', 'Talentos', 'Ocupación', 'Tráilers &amp; Teasers', 'Producción'].every((n, i) => html[vistas[i]].indexOf('<h2>' + n + '</h2>') >= 0 && /Datos de Casting de Dubbipt · 6\/10\/2026/.test(html[vistas[i]])));
   t.ok('el Dashboard, con sus números y sus listas', /<b>2<\/b><span>programas en curso<\/span>/.test(html.dashboard) && /cs-kpi cs-kpi-aviso"><b>1<\/b><span>personajes sin talento/.test(html.dashboard) && /Miami vencida hace 1 d/.test(html.dashboard) && /Tráiler oficial/.test(html.dashboard));
   t.ok('la Ocupación: buscador y filtros de la ficha, en curso / completados / todos, y cada talento con sus programas en tarjetas',
        /data-cs="ocBuscar"/.test(html.ocupacion) && /data-cs="ocFiltro" data-campo="ocGenero"/.test(html.ocupacion) && /data-cs="ocModo" data-v="curso"/.test(html.ocupacion)
        && /<div class="cs-oc-tal">[\s\S]*?<div class="cs-oc-prog/.test(html.ocupacion));
   t.ok('Producción, con su filtro', /<input type="checkbox" data-cs="soloAlertas">/.test(html.produccion));
-  t.ok('las herramientas de DublajeCast, con su explicación y su botón', /Prepara las DUBCARD/.test(html.dubcards) && /data-cs="herramienta" data-v="dubcards"/.test(html.dubcards) && /data-v="pegado"/.test(html.pegado) && /data-v="breakdowns"/.test(html.breakdowns));
+  t.ok('las herramientas de Casting, con su explicación (sin js/dctools.js cargado, se dice)', /Prepara las DUBCARD/.test(html.dubcards) && ['dubcards', 'pegado', 'breakdowns'].every(v => /no está cargada/.test(html[v])));
   t.ok('ni un emoji en ninguna', vistas.every(v => !EMOJI.test(html[v])) && !EMOJI.test(M.csNavHtml('dashboard')), vistas.filter(v => EMOJI.test(html[v])).join(','));
   {
-    const V = armar({ vivo: true });
-    t.ok('en vivo, lo dice', /DublajeCast en vivo/.test(V.M.csHtml('dashboard', HOY)));
     const N = armar({ datos: null });
-    t.ok('sin datos: qué falta y cómo traerlo', ['dashboard', 'talentos', 'ocupacion', 'trailers', 'produccion'].every(v => /Todavía no hay datos de DublajeCast\./.test(N.M.csHtml(v, HOY)) && /data-cs="traer"/.test(N.M.csHtml(v, HOY))));
+    t.ok('sin datos: qué falta y cómo traerlo', ['dashboard', 'talentos', 'ocupacion', 'trailers', 'produccion'].every(v => /Todavía no hay datos de Casting\./.test(N.M.csHtml(v, HOY)) && /data-cs="traer"/.test(N.M.csHtml(v, HOY))));
     t.eq('una sección que no existe, nada', N.M.csHtml('nada', HOY), '');
   }
   {
@@ -248,7 +247,7 @@ exports.pruebas = async function(t){
     t.eq('la tabla del casting, por líneas o por personaje', l + ' · ' + orden(), 'ZOE,ANA · ANA,ZOE');
   }
 
-  t.seccion('8 · la distribución de DublajeCast, montada en la biblioteca');
+  t.seccion('8 · la distribución de Casting, montada en la biblioteca');
   const vista = (A) => A.doc.getElementById('csVista').innerHTML;
   const control = (A, que, v) => A.doc.getElementById('csVista').querySelectorAll('[data-cs]').find(c => c.getAttribute('data-cs') === que && (v === undefined || c.getAttribute('data-v') === v));
   const espera = () => new Promise(r => setTimeout(r, 0));
@@ -256,11 +255,11 @@ exports.pruebas = async function(t){
     const A = armar();
     const b = biblioteca(A.doc);
     t.eq('con el perfil Casting: la barra a la izquierda, primera; la sección al lado; lo de siempre, tapado', A.M.csPintar('shows', b.cab, b.grid) + ' ' + b.lib.hijos.map(h => h.id).join(',') + ' ' + A.body.classList.contains('cs-on'), 'true csNav,csVista,dashHead,libGrid true');
-    t.eq('y al pintar, se asegura de tener lo de DublajeCast', A.diario.filter(x => x === 'asegura').length, 1);
+    t.eq('y al pintar no se trae nada de DublajeCast: los datos ya son de Dubbipt (desvinculado)', A.diario.filter(x => x === 'asegura').length + ' ' + !!A.PROD.datos.desvinculado, '0 true');
     t.ok('la barra con su título y Programas activa', /<div class="cs-nav-t">Casting<\/div>/.test(A.doc.getElementById('csNav').innerHTML) && /class="cs-nav-b on" data-v="programas"/.test(A.doc.getElementById('csNav').innerHTML));
-    t.ok('Programas: las tarjetas, en curso primero como en DublajeCast', /<h2>Programas<\/h2>/.test(vista(A)) && /2 de 3/.test(vista(A)) && /data-v="s:s1"/.test(vista(A)) && /data-v="dc:2"/.test(vista(A)) && !/data-v="dc:3"/.test(vista(A)));
+    t.ok('Programas: las tarjetas, en curso primero como en Casting', /<h2>Programas<\/h2>/.test(vista(A)) && /2 de 3/.test(vista(A)) && /data-v="s:s1"/.test(vista(A)) && /data-v="dc:2"/.test(vista(A)) && !/data-v="dc:3"/.test(vista(A)));
     t.ok('con sus pestañas y cuántos hay en cada una', /data-cs="filtro" data-v="todos">Todos <b>3<\/b>/.test(vista(A)) && /data-v="en_curso">En curso <b>2<\/b>/.test(vista(A)) && /data-v="completo">Completados <b>1<\/b>/.test(vista(A)));
-    t.ok('el que solo está en DublajeCast, dicho', /Akka[\s\S]*?Solo en DublajeCast/.test(vista(A)));
+    t.ok('el que solo está en Casting, dicho', /Akka[\s\S]*?Solo en Casting/.test(vista(A)));
     control(A, 'filtro', 'completo').onclick(); A.M.csPintar('shows', b.cab, b.grid);
     t.ok('la pestaña Completados enseña los completados', /data-v="dc:3"/.test(vista(A)) && !/data-v="s:s1"/.test(vista(A)));
     control(A, 'filtro', 'en_curso').onclick(); A.M.csPintar('shows', b.cab, b.grid);
@@ -272,16 +271,14 @@ exports.pruebas = async function(t){
     await espera(); await espera();
     t.eq('al llegar el registro de Dubbipt, se repinta solo: Casting, sin la biblioteca tapada de debajo (fluidez)', (A.M.CS.pintados - antesP) + ' ' + (A.diario.filter(x => x === 'renderLibrary').length - antes), '1 0');
     A.M.csPintar('shows', b.cab, b.grid);
-    t.ok('al llegar el registro de Dubbipt, se avisa del talento distinto', A.diario.includes('registro s1') && /1 distinto en DublajeCast/.test(vista(A)));
+    t.ok('al llegar el registro de Dubbipt, se avisa del talento distinto', A.diario.includes('registro s1') && /1 distinto en Casting/.test(vista(A)));
     control(A, 'nuevoEp').onclick();
     t.ok('Nuevo episodio, en este programa', A.diario.includes('newEpisodeModal s1'));
-    control(A, 'dcSerie').onclick();
-    t.ok('y el programa en DublajeCast', A.diario.includes('dcastAbrir series'));
     control(A, 'abrirEp', 'e:e1').onclick(); A.M.csPintar('shows', b.cab, b.grid);
     t.eq('Casting: el episodio', A.M.CS.vista + ' ' + /<h2>Ep\. 1 · Episodio 1<\/h2>/.test(vista(A)), 'episodio true');
     t.ok('el principal, marcado con su estrella', /<i class="cs-prin" title="Principal">[\s\S]*?<\/i>ALLY<\/b>/.test(vista(A)) && !/<\/i>JANA<\/b>/.test(vista(A)));
     t.ok('con el botón «Realizar casting»', /<button class="cs-cta" data-cs="realizar">[\s\S]*?<span>Realizar casting<\/span><\/button>/.test(vista(A)));
-    t.ok('su ficha de DublajeCast y su tabla de casting', /<span>Fase<\/span><select data-cs="epCampo" data-campo="fase">[\s\S]*?<option value="pre_produccion" selected>Preproducción<\/option>/.test(vista(A)) && /<span>Alertas<\/span>/.test(vista(A)) && /2 de 3 personajes con talento/.test(vista(A)) && /<div class="cs-fila cs-falta"><span><b>TITO BOY<\/b><\/span><span class="cs-tenue">12<\/span><span><input class="cs-tal-in" list="csListaTalentos" data-cs="talento" data-ep="11" data-ch="103" data-per="TITO BOY" data-antes="" value="" placeholder="Asignar…">/.test(vista(A)));
+    t.ok('su ficha de Casting y su tabla de casting', /<span>Fase<\/span><select data-cs="epCampo" data-campo="fase">[\s\S]*?<option value="pre_produccion" selected>Preproducción<\/option>/.test(vista(A)) && /<span>Alertas<\/span>/.test(vista(A)) && /2 de 3 personajes con talento/.test(vista(A)) && /<div class="cs-fila cs-falta"><span><b>TITO BOY<\/b><\/span><span class="cs-tenue">12<\/span><span><input class="cs-tal-in" list="csListaTalentos" data-cs="talento" data-ep="11" data-ch="103" data-per="TITO BOY" data-antes="" value="" placeholder="Asignar…">/.test(vista(A)));
     control(A, 'orden', 'personaje').onclick(); A.M.csPintar('shows', b.cab, b.grid);
     t.ok('la tabla, por personaje si se pide', vista(A).indexOf('>ALLY<') < vista(A).indexOf('>JANA<') && vista(A).indexOf('>JANA<') < vista(A).indexOf('>TITO BOY<') && /class="cs-pest on" data-cs="orden" data-v="personaje"/.test(vista(A)));
     A.LDB.showId = 'otro';
@@ -300,8 +297,6 @@ exports.pruebas = async function(t){
     t.eq('las pestañas de Ocupación cambian lo que se ve y repintan', A.M.CS.ocModo + ' ' + /class="cs-pest on" data-cs="ocModo" data-v="todos"/.test(vista(A)), 'todos true');
     A.M.CS.ocModo = 'curso';
     A.M.CS.vista = 'pegado'; A.M.csPintar('shows', b.cab, b.grid);
-    control(A, 'herramienta').onclick();
-    t.ok('las herramientas de DublajeCast se abren en su pantalla', A.diario.includes('dcastAbrir pegado'));
     A.M.CS.prog = 's:s1'; A.M.CS.ep = 'e:e1'; A.M.csPintar('shows', b.cab, b.grid);
     A.doc.getElementById('csNav').querySelectorAll('.cs-nav-b').find(x => x.dataset.v === 'talentos').onclick();
     t.eq('pulsar una sección de la barra va a ella, desde donde sea', [A.M.CS.vista, String(A.M.CS.prog), String(A.LDB.showId), A.LDB.browse].join(' '), 'talentos null null true');
@@ -313,7 +308,7 @@ exports.pruebas = async function(t){
     A.M.csPintar('shows', b.cab, b.grid);
     control(A, 'filtro', 'todos').onclick();
     control(A, 'abrirProg', 'dc:2').onclick(); A.M.csPintar('shows', b.cab, b.grid);
-    t.ok('un programa que solo está en DublajeCast se ofrece crear en Dubbipt', /data-cs="crearProg"/.test(vista(A)) && !/data-cs="nuevoEp"/.test(vista(A)) && /Solo en DublajeCast/.test(vista(A)));
+    t.ok('un programa que solo está en Casting se ofrece crear en Dubbipt', /data-cs="crearProg"/.test(vista(A)) && !/data-cs="nuevoEp"/.test(vista(A)) && /Solo en Casting/.test(vista(A)));
     control(A, 'abrirEp', 'd:21').onclick(); A.M.csPintar('shows', b.cab, b.grid);
     t.ok('y su episodio no tiene «Realizar casting»: hay que crear el programa', !/data-cs="realizar"/.test(vista(A)) && /Crear el programa en Dubbipt/.test(vista(A)) && /MANJAYA/.test(vista(A)));
     await control(A, 'crearProg').onclick(); await espera();
@@ -336,11 +331,11 @@ exports.pruebas = async function(t){
     const vi = new El('div'); vi.id = 'csVista'; b.lib.appendChild(vi);
     N.M.CS.vista = 'dashboard';
     t.eq('quien no es administrador, en Casting: la misma organización, sin la interfaz antigua', N.M.csPintar('shows', b.cab, b.grid) + ' ' + N.body.classList.contains('cs-on') + ' ' + N.M.CS.vista, 'true true programas');
-    t.ok('pero solo con Programas: nada de lo que viene de DublajeCast', (N.doc.getElementById('csNav').innerHTML.match(/class="cs-nav-b/g) || []).length === 1 && /data-v="programas"/.test(N.doc.getElementById('csNav').innerHTML)
+    t.ok('pero solo con Programas: nada de lo que viene de Casting', (N.doc.getElementById('csNav').innerHTML.match(/class="cs-nav-b/g) || []).length === 1 && /data-v="programas"/.test(N.doc.getElementById('csNav').innerHTML)
       && /data-v="s:s1"/.test(N.doc.getElementById('csVista').innerHTML) && !/Akka|dc:2|importarTodo/.test(N.doc.getElementById('csVista').innerHTML));
     t.eq('y no puede ir a las demás secciones', N.M.csIr('talentos'), false);
     N.M.CS.vista = 'programa'; N.M.CS.prog = 's:s1'; N.M.csPintar('shows', b.cab, b.grid);
-    t.ok('ni ve los cambios hechos en DublajeCast', !/data-v="historial"|Cambios de este/.test(N.doc.getElementById('csVista').innerHTML) && /<h2>A FILIPINO CHRISTMAS<\/h2>/.test(N.doc.getElementById('csVista').innerHTML));
+    t.ok('ni ve los cambios hechos en Casting', !/data-v="historial"|Cambios de este/.test(N.doc.getElementById('csVista').innerHTML) && /<h2>A FILIPINO CHRISTMAS<\/h2>/.test(N.doc.getElementById('csVista').innerHTML));
     N.M.CS.vista = 'programas'; N.M.CS.prog = null; N.M.csPintar('shows', b.cab, b.grid);
     N.doc.getElementById('csVista').querySelectorAll('[data-cs]').find(c => c.getAttribute('data-cs') === 'herramientas').onclick();
     t.ok('con las Herramientas a mano, como antes', N.diario.includes('herramientasPanel'));
@@ -370,16 +365,16 @@ exports.pruebas = async function(t){
     t.ok('cada episodio de Dubbipt, con «Casting» que va directo y «Ficha» aparte', /data-cs="abrirEp" data-v="e:e1">Ficha<\/button><button class="cs-b cs-pri" data-cs="castear" data-v="e:e1"[^>]*>[\s\S]*?<span>Casting<\/span>/.test(vista(A)));
     t.eq('«Casting» no pasa por la ficha: abre el capítulo con el perfil Casting', (control(A, 'castear', 'e:e1').onclick(), await espera(), A.diario.filter(x => /^ponerModo|^openEpisode/.test(x)).join(',') + ' ' + A.LDB.showId + ' ' + A.M.CS.vista), 'ponerModo e1 casting,openEpisode e1 s1 programa');
     A.M.CS.prog = 'dc:2'; A.M.csPintar('shows', b.cab, b.grid);
-    t.ok('uno que solo está en DublajeCast no se puede castear todavía: solo su ficha', /data-cs="abrirEp" data-v="d:/.test(vista(A)) && !/data-cs="castear"/.test(vista(A)));
+    t.ok('uno que solo está en Casting no se puede castear todavía: solo su ficha', /data-cs="abrirEp" data-v="d:/.test(vista(A)) && !/data-cs="castear"/.test(vista(A)));
   }
 
   {
-    /* Eliminar programas y episodios desde Casting: lo de Dubbipt, nada de DublajeCast. */
+    /* Eliminar programas y episodios desde Casting: lo de Dubbipt, nada de Casting. */
     const A = armar();
     const b = biblioteca(A.doc);
     A.M.csPintar('shows', b.cab, b.grid);
     t.ok('cada programa de Dubbipt tiene su botón de eliminar en la tarjeta', !!control(A, 'borrarProg', 's:s1'));
-    t.ok('uno que solo está en DublajeCast, no', !/data-cs="borrarProg" data-v="dc:/.test(vista(A)));
+    t.ok('uno que solo está en Casting, no', !/data-cs="borrarProg" data-v="dc:/.test(vista(A)));
     control(A, 'abrirProg', 's:s1').onclick(); A.M.csPintar('shows', b.cab, b.grid);
     t.ok('dentro del programa, también', !!control(A, 'borrarProg', 's:s1'));
     t.ok('y cada episodio de Dubbipt tiene el suyo', !!control(A, 'borrarEp', 'e:e1'));
@@ -401,12 +396,9 @@ exports.pruebas = async function(t){
 
   t.seccion('9 · Actualizar');
   {
-    const V = armar({ vivo: true });
-    t.eq('en vivo ya está al día', await V.M.csActualizar() + ' ' + V.diario.includes('importa'), 'vivo false');
-    const S = armar({ sesion: false });
-    t.eq('sin sesión del puente: se abre DublajeCast para entrar', await S.M.csActualizar() + ' ' + S.diario.includes('dcastAbrir dashboard') + ' ' + /entra en tu cuenta de DublajeCast/.test(S.avisos[0]), 'sesion true true');
-    const C = armar({ sesion: true });
-    t.eq('con sesión: se trae, se dice y se repinta', await C.M.csActualizar() + ' ' + C.diario.includes('importa') + ' ' + C.diario.includes('renderLibrary') + ' ' + C.avisos[0], 'traido true true Traído de DublajeCast: …');
+    const V = armar();
+    t.eq('Actualizar relee la nube de Dubbipt (ya no hay DublajeCast que traer), repinta y lo dice', await V.M.csActualizar() + ' ' + V.diario.includes('carga') + ' ' + V.diario.includes('renderLibrary') + ' ' + V.avisos[0], 'leido true true Al día con la nube de Dubbipt');
+    t.ok('la cabecera ya no dice «en vivo» ni ofrece DublajeCast', /Datos de Casting de Dubbipt/.test(V.M.csHtml('dashboard', HOY)) && !/DublajeCast/.test(V.M.csHtml('dashboard', HOY)) && !/data-cs="dcSerie"|data-cs="dcEp"/.test(V.M.csHtml('programas', HOY)));
   }
 
   t.seccion('10 · sin emojis en lo que se ve de Casting');

@@ -2,7 +2,7 @@
  *
  * Pedido de sala, con una captura del Dashboard: «¿por qué me salen estas
  * DUBCARD vencidas si ya están completadas?». Lo que protege esta prueba:
- * completado en DublajeCast, completado en Dubbipt, programa completado o
+ * completado en Casting, completado en Dubbipt, programa completado o
  * fila de Producción finalizada: sin entregas; y si el capítulo está en
  * Producción, mandan las fechas y la fase de su fila.
  */
@@ -19,10 +19,10 @@ exports.pruebas = async function(t){
   const serie = { id: 1, name: 'AGENTE KIM', status: 'en_curso' };
   const ep = (x) => Object.assign({ id: 11, series_id: 1, episode_number: 101, title: 'Episodio 101', fecha_miami: '2026-06-17', fecha_dubcard: '2026-06-16', fase: 'pre_produccion' }, x || {});
 
-  t.seccion('1 · lo de siempre, y lo completado en DublajeCast');
+  t.seccion('1 · lo de siempre, y lo completado en Casting');
   {
     t.eq('un capítulo con fechas pasadas y sin completar: vencidas', PR.prodAlertasEp(ep(), serie, HOY).map(a => a.texto).join(' · '), 'Miami vencida hace 118 d · DUBCARD vencida hace 119 d');
-    t.eq('completado en DublajeCast: nada', PR.prodAlertasEp(ep({ status: 'completo' }), serie, HOY).length, 0);
+    t.eq('completado en Casting: nada', PR.prodAlertasEp(ep({ status: 'completo' }), serie, HOY).length, 0);
     t.eq('de un programa completado: nada', PR.prodAlertasEp(ep(), { id: 1, name: 'X', status: 'completo' }, HOY).length, 0);
   }
 
@@ -64,9 +64,9 @@ exports.pruebas = async function(t){
     t.eq('la marca del programa manda, aunque su fila de Producción traiga formato y fecha: solo avisa Miami', M.csAlertasEp(d, sinDc, d.episodes[0], HOY).map(a => a.texto).join(' · '), 'Miami vencida hace 118 d');
     ED.pl = { series: [{ id: 1, name: 'AGENTE KIM', requiere_dubcard: true }], produccion: [{ id: 1, programa: 'Agente Kim', capitulo: '101', cliente: 'Netflix', formato_dubcard: 'BACKLOT' }, { id: 2, programa: 'OTRO', formato_dubcard: 'Excel' }] };
     const p = { nombre: 'AGENTE KIM', serie: ED.pl.series[0] };
-    t.eq('quitarle la marca: en DublajeCast, y sus filas de Producción pasan a «No necesita DUBCARD» (las de otros, no)', (await M.csProgRequiereDubcard(p, false)) + ' ' + ED.pl.series[0].requiere_dubcard + ' ' + ED.pl.produccion.map(r => r.formato_dubcard).join(','), 'guardado false No necesita DUBCARD,Excel');
+    t.eq('quitarle la marca: en Casting, y sus filas de Producción pasan a «No necesita DUBCARD» (las de otros, no)', (await M.csProgRequiereDubcard(p, false)) + ' ' + ED.pl.series[0].requiere_dubcard + ' ' + ED.pl.produccion.map(r => r.formato_dubcard).join(','), 'guardado false No necesita DUBCARD,Excel');
     t.ok('queda apuntado', /AGENTE KIM: no requiere DUBCARD/.test(ED.que));
     t.eq('volver a ponerla: sus filas vuelven a su formato por cliente', (await M.csProgRequiereDubcard(p, true)) + ' ' + ED.pl.produccion.map(r => r.formato_dubcard).join(','), 'guardado BACKLOT,Excel');
-    t.eq('sin serie en DublajeCast, nada', await M.csProgRequiereDubcard({ nombre: 'X', serie: null }, false), 'nada');
+    t.eq('sin serie en Casting, nada', await M.csProgRequiereDubcard({ nombre: 'X', serie: null }, false), 'nada');
   }
 };

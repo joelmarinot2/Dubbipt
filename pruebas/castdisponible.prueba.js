@@ -7,7 +7,7 @@ exports.nombre = 'Casting: la disponibilidad de los talentos';
 const PR = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ PRODUCCIÓN · LO QUE VIENE DE DUBLAJECAST', '/* ═══ FIN DE PRODUCCIÓN']],
   ['prodNormalizar', 'prodFichaTexto', 'prodCasarPrograma'], { castNorm: undefined, console: { warn: () => {} } });
 
-/* Lo de DublajeCast: «Akka» es el programa que se castea. */
+/* Lo de Casting: «Akka» es el programa que se castea. */
 const DC = () => PR.prodNormalizar({
   series: [{ id: 1, name: 'Akka', status: 'en_curso' }, { id: 2, name: 'Dofus', status: 'en_curso' }, { id: 3, name: 'Ninjago', status: 'en_curso' },
            { id: 4, name: 'Viejo', status: 'completo' }, { id: 5, name: 'Rex', status: 'en_curso' }],
@@ -39,16 +39,16 @@ exports.pruebas = async function(t){
 
   t.seccion('1 · lo que se sabe de cada talento');
   t.eq('el nombre, como en la base de Dubbipt, que es el que usa el casting', de('ANA ROJAS').nombre, 'Ana Rojas');
-  t.eq('uno por talento: los de la base y los de DublajeCast, sin repetir', filas.map(f => f.clave).sort().join(', '), 'ANA ROJAS, BETO LUNA, CARLA PAZ, DIEGO SOL');
-  t.eq('quién ya ha estado en este programa: DublajeCast y el registro de Dubbipt, sin repetir el personaje', de('ANA ROJAS').enPrograma.map(x => x.personaje + '/' + x.de).join(' ') + ' · ' + de('BETO LUNA').enPrograma.map(x => x.personaje + '/' + x.de + '/' + x.episodios).join(' '), 'JANA/DublajeCast · Ally/Dubbipt/2');
+  t.eq('uno por talento: los de la base y los de Casting, sin repetir', filas.map(f => f.clave).sort().join(', '), 'ANA ROJAS, BETO LUNA, CARLA PAZ, DIEGO SOL');
+  t.eq('quién ya ha estado en este programa: Casting y el registro de Dubbipt, sin repetir el personaje', de('ANA ROJAS').enPrograma.map(x => x.personaje + '/' + x.de).join(' ') + ' · ' + de('BETO LUNA').enPrograma.map(x => x.personaje + '/' + x.de + '/' + x.episodios).join(' '), 'JANA/Casting · Ally/Dubbipt/2');
   t.eq('lo ocupado: los programas EN CURSO de fuera, sin el que se castea, los completados ni los capítulos completados',
        de('ANA ROJAS').programas.join(', ') + ' · ' + de('ANA ROJAS').personajes + ' pers. · ' + de('ANA ROJAS').lineas + ' líneas', 'Dofus, Ninjago, Rex · 4 pers. · 55 líneas');
   t.eq('quien solo tiene papel en un programa terminado, o en un capítulo terminado, está libre', de('BETO LUNA').nivel.texto + ' · ' + de('CARLA PAZ').nivel.texto, 'Libre · Libre');
   t.eq('cuán ocupado', [0, 1, 2, 3].map(n => M.dispNivel(n).clave + ':' + M.dispNivel(n).texto).join(' '), 'libre:Libre algo:En 1 programa algo:En 2 programas mucho:En 3 programas');
-  t.eq('la ficha de DublajeCast', de('ANA ROJAS').ficha, 'Femenino · Adulto · Agudo');
+  t.eq('la ficha de Casting', de('ANA ROJAS').ficha, 'Femenino · Adulto · Agudo');
   t.eq('lo de este capítulo', de('DIEGO SOL').enCap.join(',') + ' · ' + de('DIEGO SOL').lineasCap, 'Narrador · 12');
   const sinDc = M.dispFilas({ base: ['ANA ROJAS'], d: null, serie: null, registro: REG, enCap: [] });
-  t.eq('sin DublajeCast: lo de Dubbipt, y sin decir cuán ocupado (no se sabe)', sinDc.map(f => f.clave + ':' + f.enPrograma.length + ':' + f.nivel).join(' '), 'ANA ROJAS:1:null BETO LUNA:1:null');
+  t.eq('sin Casting: lo de Dubbipt, y sin decir cuán ocupado (no se sabe)', sinDc.map(f => f.clave + ':' + f.enPrograma.length + ':' + f.nivel).join(' '), 'ANA ROJAS:1:null BETO LUNA:1:null');
   t.eq('sin nada, nada', M.dispFilas({}).length, 0);
 
   t.seccion('2 · buscar, filtrar y ordenar');
@@ -68,7 +68,7 @@ exports.pruebas = async function(t){
   t.ok('los del programa, marcados', /<div class="disp-fila disp-del"><div class="disp-nom"><b>BETO LUNA<\/b>/.test(h));
   t.ok('buscar, solo los del programa y el orden, en la ventana', /id="dispBuscar"/.test(h) && /id="dispSolo"/.test(h) && /<option value="programa" selected>Los del programa primero<\/option>/.test(h));
   t.ok('uno solo, en singular', /Akka · 1 talento ya ha estado en él/.test(M.dispHtml(filas.filter(f => f.clave === 'ANA ROJAS'), 'Akka', true)));
-  t.ok('sin DublajeCast se dice por qué no hay ocupación', /solo la ve el administrador/.test(M.dispHtml(sinDc, 'Akka', false)) && !/solo la ve el administrador/.test(h));
+  t.ok('sin Casting se dice por qué no hay ocupación', /solo la ve el administrador/.test(M.dispHtml(sinDc, 'Akka', false)) && !/solo la ve el administrador/.test(h));
   t.ok('cerrar, con un icono de trazo y no un emoji', /id="dispCerrar"[^>]*><svg /.test(h) && !/[\u{1F300}-\u{1FAFF}☀-➿]/u.test(h));
   M.DISP.buscar = 'nadie';
   t.ok('si nada coincide, se dice', /Ningún talento coincide\./.test(M.dispHtml(filas, 'Akka', true)));
@@ -94,7 +94,7 @@ exports.pruebas = async function(t){
     t.ok('solo los episodios activos: ni el episodio completado (Dofus 2) ni los de un programa completado (Viejo)', !/Viejo/.test(resumen(beto)) && !/2:REY/.test(resumen(ana)));
     const fin = M.dispFilas({ base: [], d: d, serie: d.series[0], registro: REG2, enCap: [], showId: 's1', programa: 'AKKA',
                               registros: [{ showId: 's1', programa: 'AKKA', serieId: 1, reg: REG2, finNombres: ['Episodio 1'], finNums: [1] }] });
-    t.eq('un episodio completado en Dubbipt tampoco, aunque DublajeCast lo tenga en curso', resumen(fin.find(f => f.clave === 'ANA ROJAS')).split(' | ')[0], 'Dofus 50 [1:DOFUS 40+REY 10]');
+    t.eq('un episodio completado en Dubbipt tampoco, aunque Casting lo tenga en curso', resumen(fin.find(f => f.clave === 'ANA ROJAS')).split(' | ')[0], 'Dofus 50 [1:DOFUS 40+REY 10]');
     const finP = M.dispFilas({ base: [], d: null, serie: null, registro: null, enCap: [],
                                registros: [{ showId: 's9', programa: 'Otro 3', completo: true, reg: { capitulos: { 'Otro 3 Ep 4': { personajes: { X: { display: 'Pirata', talent: 'Luz', lineas: 7 } } } } } }] });
     t.eq('ni nada de un programa completado de Dubbipt', finP[0].historial.length, 0);
@@ -110,12 +110,12 @@ exports.pruebas = async function(t){
     t.eq('y se busca en lo que se ve', M.dispVisibles(fh, 'viejo', false, 'nombre').map(f => f.clave).join(','), 'BETO LUNA');
     M.DISP.soloEnCurso = true;
     t.eq('con «Solo en curso», un programa completado no se encuentra', M.dispVisibles(fh, 'viejo', false, 'nombre').length, 0);
-    t.eq('lo que dicen DublajeCast y Dubbipt del mismo episodio se cuenta una vez, y el programa con el nombre de Dubbipt', ana.historial[0].episodios[0].personajes.length + ' ' + ana.historial[0].programa, '1 AKKA');
+    t.eq('lo que dicen Casting y Dubbipt del mismo episodio se cuenta una vez, y el programa con el nombre de Dubbipt', ana.historial[0].episodios[0].personajes.length + ' ' + ana.historial[0].programa, '1 AKKA');
     t.ok('los capítulos de antes de las fotos también cuentan, sin líneas', /AKKA\* 0 \[2:Ally 0\]/.test(resumen(beto)));
     t.ok('un personaje sin talento no es de nadie', !fh.some(f => f.historial.some(pg => pg.episodios.some(e => e.personajes.some(x => x.nombre === 'Nadie')))));
     const sinDc2 = M.dispFilas({ base: [], d: null, serie: null, registro: null, enCap: [],
                                  registros: [{ showId: 's9', programa: 'Otro programa 3', reg: { capitulos: { 'Otro programa 3 Ep 4': { personajes: { X: { display: 'Pirata', talent: 'Luz', lineas: 7 } } } } } }] });
-    t.eq('sin DublajeCast, lo que sabe Dubbipt de todos sus programas', resumen(sinDc2[0]), 'Otro programa 3 7 [4:Pirata 7]');
+    t.eq('sin Casting, lo que sabe Dubbipt de todos sus programas', resumen(sinDc2[0]), 'Otro programa 3 7 [4:Pirata 7]');
     t.eq('buscar por un programa en el que ha estado', M.dispVisibles(fh, 'ninjago', false, 'nombre').map(f => f.clave).join(','), 'ANA ROJAS');
     const hh = M.dispHtml(fh.filter(f => f.clave === 'ANA ROJAS'), 'AKKA', true);
     t.ok('en cápsulas: una por programa, con sus episodios y líneas', /<details class="disp-pg disp-pg-este" open><summary class="disp-cap-p"><span class="disp-cap-n">AKKA<\/span><span class="disp-cap-c">1 ep\.<\/span><span class="disp-cap-c">12 líneas<\/span><\/summary>/.test(hh));

@@ -222,7 +222,7 @@ exports.pruebas = async function(t){
        (F.match(/window\._libTraducido = null;/g) || []).length >= 4);
   t.ok('el botón está en la barra y solo se enseña en casting',
        /id="btnLibTrad" style="display:none" onclick="libTraducidoCambiar\(\)"/.test(fuentesHtml())
-       && /\['btnImpDes','btnImpPla','btnDcast','btnMeta','btnGestos','btnBaseTal','btnLibTrad'[,\]]/.test(F));
+       && /\['btnImpDes','btnImpPla','btnMeta','btnGestos','btnBaseTal','btnLibTrad'[,\]]/.test(F));
   t.ok('y al entrar en casting se pone al día', /if\(m === 'casting' && esteEp\)\{\s+try\{ libTraducidoPintar\(\); \}/.test(F));
   t.ok('guardar un capítulo que sale de la lista no pregunta por el PDF: ya trae su libreto',
        /if\(esNuevo && !lastPdfBuf && lastXlsBuf && !\(script && script\.length\)\)\{/.test(F));

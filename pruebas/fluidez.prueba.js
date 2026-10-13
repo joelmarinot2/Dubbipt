@@ -78,7 +78,6 @@ exports.pruebas = async function(t){
     t.ok('el reparto, los papeles, las fichas y la ocupación se recuerdan', ['CS_REPARTO_MEMO', 'CS_PAPELES_MEMO', 'CS_FICHAS_MEMO', 'CS_OC_MEMO'].every(k => CV.indexOf('const ' + k) >= 0));
     t.ok('repintar Casting no repinta la biblioteca tapada de debajo', /function csRepintarSolo\(\)/.test(CV) && /if\(csRepintarSolo\(\)\) return;\s*\n\s*renderLibrary\(true\);/.test(CV));
     t.ok('la serie de cada programa se recuerda por juego de datos', /DCAST_SERIES/.test(fs.readFileSync(path.join(RAIZ, 'js', 'dublajecast.js'), 'utf8')));
-    t.ok('lo del marco de DublajeCast no se normaliza dos veces', /DCAST\.normDe === v/.test(fs.readFileSync(path.join(RAIZ, 'js', 'dublajecast.js'), 'utf8')));
-    t.ok('la copia para guardar va por structuredClone cuando lo hay', /function dcxCopia\(x\)[\s\S]*?structuredClone/.test(fs.readFileSync(path.join(RAIZ, 'js', 'dcescribir.js'), 'utf8')) && /dcxCopia\(dcast\.payload\)/.test(CV));
+    t.ok('la copia para guardar va por structuredClone cuando lo hay', /function dcxCopia\(x\)[\s\S]*?structuredClone/.test(fs.readFileSync(path.join(RAIZ, 'js', 'dcescribir.js'), 'utf8')) && /const p = dcxCopia\(PROD\.datos\)/.test(fs.readFileSync(path.join(RAIZ, 'js', 'dcescribir.js'), 'utf8')));
   }
 };
