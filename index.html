@@ -2951,7 +2951,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.64.0-nube';
+const APP_VER_NUM = 'v11.65.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3392,6 +3392,8 @@ async function dondeReanudar(d){
     if(!(WORKSPACE && WORKSPACE.id)) return false;      // hay que elegir espacio: ahí se queda
     if(d.show) LDB.showId = d.show;
     if(d.ep){
+      /* En una ventana recién abierta la biblioteca aún no está: sin ella el capítulo no se encuentra. */
+      if(d.silencio){ try{ await libEnsure(); }catch(e){ /* se abre con lo que haya en la caché */ } }
       LDB.browse = false;
       const k = (d.libreto && d.libreto !== '__full__') ? d.libreto : null;
       /* El libreto tiene que ABRIRSE ya por donde iba, no abrirse arriba y
@@ -3413,7 +3415,7 @@ async function dondeReanudar(d){
       LDB.browse = true;
       await renderLibrary();
     }
-    if(typeof DDL_UI !== 'undefined' && DDL_UI.toast) DDL_UI.toast('Seguimos donde lo dejaste');
+    if(!d.silencio && typeof DDL_UI !== 'undefined' && DDL_UI.toast) DDL_UI.toast('Seguimos donde lo dejaste');
     return true;
   }finally{
     window._reanudando = false;
@@ -3433,12 +3435,33 @@ function ddlAunCargando(f){
 }
 function postLogin(){
   if(ddlAunCargando(postLogin)) return;
+  /* Una ventana de casting (PRO-46): derecha al capítulo, sin preguntar nada. */
+  const vc = ventanaCastingPedida();
+  if(vc){
+    dondeReanudar(vc).catch((e) => fallo('dondeReanudar · index.html:postLogin (ventana de casting)', e, 'no se ha podido abrir el capítulo para castear'));
+    return;
+  }
   const d = dondeLeer();
   if(d){
     dondeReanudar(d).catch((e) => fallo('dondeReanudar · index.html:postLogin', e, 'no se ha podido volver a donde estabas'));
     return;
   }
   empezarSesion();
+}
+/**
+ * Pedido de sala: «quiero que la vista de hacer casting se abra en una ventana
+ * emergente para poder navegar en el dashboard en otra ventana». Casting abre
+ * otra ventana de Dubbipt con ?casting=<capítulo>&show=<programa>: esto lo
+ * lee y lo convierte en un «dónde» para reanudar ahí, con el perfil Casting.
+ */
+function ventanaCastingPedida(){
+  try{
+    const q = new URLSearchParams(String(location.search || '').replace(/^\?/, ''));
+    const ep = q.get('casting');
+    if(!ep) return null;
+    try{ document.body.classList.add('ventana-casting'); }catch(e){ /* sin clase, igual funciona */ }
+    return { v: 1, modo: 'casting', rol: null, ws: (WORKSPACE && WORKSPACE.id) || null, show: q.get('show') || null, vista: 'eps', ep: ep, silencio: true };
+  }catch(e){ return null; }
 }
 /** Una sesión nueva: la tarea primero y el dispositivo solo si es Grabación. */
 function empezarSesion(){

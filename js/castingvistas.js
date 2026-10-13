@@ -2923,9 +2923,74 @@ async function csNuevoPrograma(nombre){
 async function csRealizarCasting(p, e){
   if(!p || !p.show || !e || !e.ep) return false;
   delete CS.registros[String(p.show.id)];
+  if(csCastingEnVentana(p, e)) return true;
   LDB.showId = p.show.id;
   try{ ponerModo(e.ep.id, 'casting'); }catch(err){ fallo('ponerModo · js/castingvistas.js:csRealizarCasting', err); }
   await openEpisode(e.ep.id);
+  return true;
+}
+
+/* ── Casting en una ventana emergente ───────────────────────────────────
+   Pedido de sala: «quiero que la vista de hacer casting se abra en una
+   ventana emergente para poder navegar en el dashboard en otra ventana».
+   «Casting» abre el capítulo en OTRA ventana de Dubbipt (la misma app, con
+   ?casting=<capítulo>&show=<programa>: al entrar va derecha a ese capítulo
+   con el perfil Casting, sin preguntar nada) y esta se queda donde estaba.
+   Si el navegador no deja abrir ventanas, se abre aquí como antes. Al
+   volver a esta ventana, o al cerrarse la otra, el casting del programa se
+   vuelve a leer, que habrá cambiado. Dentro de una ventana de casting, el
+   siguiente capítulo se abre ahí mismo. */
+const CS_VENT = { abiertas: new Map(), tmr: null, nombre: 'ddl_casting', ultimo: 0, cada: 2500 };
+
+/** La dirección de la ventana de casting de un capítulo. */
+function csCastingUrl(showId, epId){
+  const base = (typeof location !== 'undefined' && location && location.pathname) ? location.pathname : './';
+  return base + '?casting=' + encodeURIComponent(epId) + '&show=' + encodeURIComponent(showId);
+}
+/** ¿Esta ventana ES una de casting? Entonces el capítulo se abre aquí mismo. */
+function csEsVentanaCasting(){
+  try{ return typeof window !== 'undefined' && !!window && String(window.name || '').indexOf(CS_VENT.nombre) === 0; }catch(e){ return false; }
+}
+/** Abre el capítulo en otra ventana. Dice si pudo; si no, se abre aquí. */
+function csCastingEnVentana(p, e){
+  if(csEsVentanaCasting() || typeof window === 'undefined' || !window || typeof window.open !== 'function') return false;
+  const nombre = CS_VENT.nombre + '_' + String(e.ep.id).replace(/[^\w-]/g, '_');
+  let w = null;
+  try{ w = window.open(csCastingUrl(p.show.id, e.ep.id), nombre, 'width=1280,height=860,resizable=yes,scrollbars=yes'); }catch(err){ w = null; }
+  if(!w) return false;
+  try{ w.focus(); }catch(err){ /* el navegador decide */ }
+  CS_VENT.abiertas.set(nombre, { w: w, showId: p.show.id });
+  csVentanasVigilar();
+  castAviso('Casting de «' + e.titulo + '» abierto en otra ventana; esta se queda aquí. Si no la ves, permite las ventanas emergentes de Dubbipt.');
+  return true;
+}
+/** El casting de esos programas se vuelve a leer: lo casteado en la otra ventana se ve aquí. */
+function csVentanasReleer(showIds){
+  for(const s of showIds) delete CS.registros[String(s)];
+  if(typeof CS_REGS !== 'undefined' && CS_REGS){ CS_REGS.lista = null; CS_REGS.ts = 0; }
+  CS_VENT.ultimo = Date.now();
+  csRepintar();
+}
+/** Mientras haya ventanas de casting abiertas: al cerrarse una, se relee su programa. */
+function csVentanasVigilar(){
+  if(CS_VENT.tmr || typeof setInterval !== 'function') return;
+  CS_VENT.tmr = setInterval(() => {
+    const cerradas = [];
+    for(const [nombre, v] of Array.from(CS_VENT.abiertas)){
+      let cerrada = true;
+      try{ cerrada = !v.w || v.w.closed; }catch(e){ cerrada = true; }
+      if(!cerrada) continue;
+      CS_VENT.abiertas.delete(nombre); cerradas.push(v.showId);
+    }
+    if(cerradas.length) csVentanasReleer(cerradas);
+    if(!CS_VENT.abiertas.size && typeof clearInterval === 'function'){ clearInterval(CS_VENT.tmr); CS_VENT.tmr = null; }
+  }, CS_VENT.cada);
+}
+/** Al volver a esta ventana con alguna de casting abierta: se relee (no más de una vez cada pocos segundos). */
+function csVentanasAlVolver(){
+  if(!CS_VENT.abiertas.size || Date.now() - CS_VENT.ultimo < CS_VENT.cada) return false;
+  const shows = new Set(); for(const v of CS_VENT.abiertas.values()) shows.add(String(v.showId));
+  csVentanasReleer(Array.from(shows));
   return true;
 }
 
@@ -3261,6 +3326,12 @@ async function csActualizar(){
 }
 
 /* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST ═══ */
+
+/* Al volver a esta ventana desde una de casting, lo casteado allí se relee (PRO-46). */
+if(typeof window !== 'undefined' && window && typeof window.addEventListener === 'function' && !window.__csVentanas){
+  window.__csVentanas = true;
+  window.addEventListener('focus', () => { try{ csVentanasAlVolver(); }catch(e){ /* se relee al cerrarse la otra */ } });
+}
 
 /* Los tráilers por entregar, también sin estar en Casting: al rato de abrir y cada media hora (csTrAvisar solo avisa una vez al día de cada uno). */
 if(typeof window !== 'undefined' && typeof setInterval === 'function' && !window.__csTrAvisos){
