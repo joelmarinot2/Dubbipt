@@ -403,30 +403,29 @@ function dcxCopia(x){
   return JSON.parse(JSON.stringify(x));
 }
 
+/**
+ * Guardar un cambio. Pedido de sala: «desvincula DublajeCast de Dubbipt,
+ * pero mantén todos los datos que hay». Los datos de Casting son ya de
+ * Dubbipt: se cambia la copia de aquí y se guarda en la nube de Dubbipt
+ * (prodGuardar), sin sesión ni nube de DublajeCast (PRO-49). `cambio(p)`
+ * recibe los datos y dice si cambió algo. Se ve al instante; la nube va
+ * detrás y, si no se pudo, se dice y se reintenta con el siguiente cambio.
+ */
 async function dcxGuardar(cambio, entrada){
   if(DCX.guardando) throw new Error('ya se está guardando otro cambio: espera un momento');
   DCX.guardando = true;
   try{
-    const u = await dcSesion();
-    if(!u){ const e = new Error('sin sesión en DublajeCast'); e.sinSesion = true; throw e; }
-    for(let intento = 0; intento < 2; intento++){
-      const p = dcxCopia(await dcLeer());
-      if(!cambio(p)) return { cambiado: false };
-      try{
-        await dcEscribir(p);
-        dcxLocal(p, entrada);
-        return { cambiado: true };
-      }catch(e){
-        if(intento || !/cambió los datos/.test(String(e && e.message))) throw e;
-      }
-    }
-    return { cambiado: false };
+    if(!PROD.datos) PROD.datos = prodNormalizar({});
+    const p = dcxCopia(PROD.datos);
+    if(!cambio(p)) return { cambiado: false };
+    dcxLocal(p, entrada);
+    return { cambiado: true };
   }finally{
     DCX.guardando = false;
   }
 }
 
-/** Lo escrito, también aquí: Producción lo guarda y se pinta ya, sin esperar a DublajeCast. */
+/** Lo escrito, puesto en Producción (se pinta ya) y guardado en la nube de Dubbipt por detrás. */
 function dcxLocal(p, entrada){
   const historial = dcxHistorial(), relevos = dcxRelevosAceptados();
   PROD.datos = (typeof prodConservarPropio === 'function') ? prodConservarPropio(prodNormalizar(p), PROD.datos) : prodNormalizar(p);
@@ -436,8 +435,8 @@ function dcxLocal(p, entrada){
   PROD.cuando = Date.now();
   if(!PROD.origen) PROD.origen = 'DublajeCast';
   DCX.escrito = Date.now();
-  try{ Promise.resolve(prodGuardar()).catch(() => { /* la copia en la nube de Dubbipt se intenta en el siguiente cambio */ }); }
-  catch(e){ /* sin guardar aquí, DublajeCast ya lo tiene */ }
+  try{ if(typeof prodGuardarPronto === 'function') prodGuardarPronto(); else Promise.resolve(prodGuardar()).catch(() => { /* se intenta en el siguiente cambio */ }); }
+  catch(e){ /* se intenta en el siguiente cambio */ }
 }
 
 /* ── Quién cambió qué ───────────────────────────────────────────────────

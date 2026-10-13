@@ -355,6 +355,24 @@ async function prodGuardar(){
 }
 
 /** Carga lo guardado: la nube manda; si no llega, lo del equipo. Devuelve el resumen o nulo. */
+/* Guardar en la nube de Dubbipt a los pocos ms del último cambio, juntando los
+   seguidos en uno; si no se pudo, se dice (no más de una vez cada medio minuto)
+   y se reintenta con el siguiente cambio (PRO-49). */
+const PROD_PRONTO = { tmr: null, aviso: 0, cada: 400 };
+function prodGuardarPronto(){
+  if(PROD_PRONTO.tmr || typeof setTimeout !== 'function') return false;
+  PROD_PRONTO.tmr = setTimeout(async () => {
+    PROD_PRONTO.tmr = null;
+    let r = null;
+    try{ r = await prodGuardar(); }catch(e){ r = { ok: false, causa: String((e && e.message) || e) }; }
+    if(r && !r.ok && typeof castAviso === 'function' && Date.now() - PROD_PRONTO.aviso > 30000){
+      PROD_PRONTO.aviso = Date.now();
+      castAviso('No se pudo guardar en la nube de Dubbipt: ' + (r.causa || 'sin red') + '. Se vuelve a intentar con el siguiente cambio.');
+    }
+  }, PROD_PRONTO.cada);
+  return true;
+}
+
 async function prodCargar(fuerza){
   if(PROD.cargado && !fuerza && PROD.ws === prodWs()) return PROD.datos ? prodResumen(PROD.datos) : null;
   PROD.ws = prodWs();
@@ -718,9 +736,11 @@ function prodHtmlDatos(){
         + r.castings + ' asignaciones · ' + r.apariciones + ' apariciones · ' + r.estudios + ' estudios · ' + r.trailers + ' tráilers · ' + r.produccion + ' filas de producción · ' + r.breakdowns + ' breakdowns'
         + (PROD.origen ? '<br>De <b>' + prodEsc(PROD.origen) + '</b>' : '') + (PROD.cuando ? ' · ' + new Date(PROD.cuando).toLocaleString('es') : '')
         + (donde ? '<br>Guardado ' + donde + '.' : '') + '</div>'
-      : '<div class="meta-nota">Todavía no hay nada traído. Tráelo de DublajeCast con tu sesión, o desde el archivo que exporta (<b>dublajecast_backup_….json</b>).</div>')
+      : '<div class="meta-nota">Todavía no hay datos de Casting. Impórtalos una vez de DublajeCast con su cuenta, o desde el archivo que exporta (<b>dublajecast_backup_….json</b>).</div>')
+    + '<div class="meta-nota" style="margin-top:8px">Dubbipt es el dueño de estos datos: lo que se cambia en Casting se guarda aquí y no se escribe en DublajeCast. Importar de DublajeCast es cosa de una vez, para traer lo que faltara.</div>'
     + '<div class="io-rej" style="margin-top:10px">'
-    +   '<button class="io-b" id="prodTraer">' + (typeof csIco === 'function' ? csIco('traer', 14) : '') + ' Traer de DublajeCast</button>'
+    +   '<button class="io-b" id="prodTraer">' + (typeof csIco === 'function' ? csIco('traer', 14) : '') + ' Importar de DublajeCast (una vez)</button>'
+    +   ((typeof dcPanel === 'function') ? '<button class="io-b" id="prodCuenta">' + (typeof csIco === 'function' ? csIco('entrar', 14) : '') + ' Cuenta de DublajeCast</button>' : '')
     +   '<button class="io-b" id="prodArchivo">' + (typeof csIco === 'function' ? csIco('subir', 14) : '') + ' Importar un JSON exportado</button>'
     +   (r ? '<button class="io-b" id="prodBajar">' + (typeof csIco === 'function' ? csIco('bajar', 14) : '') + ' Exportar JSON</button>' : '')
     + '</div>'
@@ -738,7 +758,7 @@ async function prodPanel(){
   const r = d ? prodResumen(d) : null;
   const html = '<div class="modo-caja" role="dialog" aria-modal="true" style="max-width:860px;text-align:left">'
     + '<div class="modo-tit">Producción</div>'
-    + '<div class="modo-sub" style="margin-bottom:8px">' + (r ? r.series + ' programas · ' + r.episodios + ' capítulos · ' + r.talentos + ' talentos' : 'Lo que viene de DublajeCast') + '</div>'
+    + '<div class="modo-sub" style="margin-bottom:8px">' + (r ? r.series + ' programas · ' + r.episodios + ' capítulos · ' + r.talentos + ' talentos' : 'Los datos de Casting de Dubbipt') + '</div>'
     + '<div class="prod-pests">' + pest('programas', 'Programas') + pest('talentos', 'Talentos') + pest('trailers', 'Tráilers') + pest('datos', 'Datos') + '</div>'
     + (d && (prodVista === 'programas' || prodVista === 'talentos')
         ? '<input id="prodBuscar" type="text" placeholder="Buscar…" value="' + prodEsc(prodBuscar) + '" style="width:100%;box-sizing:border-box;background:#11131a;color:#e7ebf3;border:1px solid #2b3040;border-radius:9px;padding:8px 10px;font-size:13px;margin:8px 0">'
@@ -763,6 +783,8 @@ async function prodPanel(){
   const bus = ov.querySelector('#prodBuscar');
   if(bus) bus.oninput = () => { prodBuscar = bus.value; const pos = bus.selectionStart; prodPanel(); const b2 = document.querySelector('#prodOv #prodBuscar'); if(b2){ b2.focus(); try{ b2.setSelectionRange(pos, pos); }catch(e){ /* el cursor al final */ } } };
   const traer = ov.querySelector('#prodTraer');
+  const cuenta = ov.querySelector('#prodCuenta');
+  if(cuenta) cuenta.onclick = () => { cerrar(); dcPanel(); };
   if(traer) traer.onclick = async () => {
     traer.disabled = true;
     try{

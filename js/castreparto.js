@@ -7,7 +7,7 @@
  * Con el capítulo abierto en Casting, el botón «Reparto» abre una ventana del
  * navegador aparte (para llevarla a otra pantalla, como la Disponibilidad)
  * con el Reparto del programa: el mismo que la vista de Casting (csRepartoDe:
- * DublajeCast y lo casteado en Dubbipt, capítulo a capítulo). Por personaje
+ * Casting y lo casteado en Dubbipt, capítulo a capítulo). Por personaje
  * -con su talento por tramos de episodios y sus líneas- o por talento -con
  * sus personajes-. Se busca por personaje o por talento, sin tildes ni
  * mayúsculas. Se pone al día sola al asignar un talento aquí o al cambiar de

@@ -56,7 +56,7 @@ function cargar(o){
 }
 
 exports.pruebas = async function(t){
-  t.seccion('1 · DUBCARDs: el procesado de DublajeCast, aquí');
+  t.seccion('1 · DUBCARDs: el procesado de Casting, aquí');
   {
     const V = cargar(), D = V.D;
     D.ST.dc.entries = [
@@ -99,9 +99,9 @@ exports.pruebas = async function(t){
   {
     const rec = { id: 'b1', title: 'BREAKDOWN_X_EP01', name: 'X', ep: '1', createdAt: '2026-10-10T00:00:00Z', model: 'm', text: '# BREAKDOWN_X_EP01' };
     const V = cargar();
-    t.eq('se guarda donde lo guarda DublajeCast (su lista de breakdowns), y se apunta', (await V.D.bdGuardar(rec)) + ' ' + V.datos.breakdowns.length + ' ' + V.editados[0], 'nube 1 Breakdown guardado: BREAKDOWN_X_EP01');
+    t.eq('se guarda donde lo guarda Casting (su lista de breakdowns), y se apunta', (await V.D.bdGuardar(rec)) + ' ' + V.datos.breakdowns.length + ' ' + V.editados[0], 'nube 1 Breakdown guardado: BREAKDOWN_X_EP01');
     const S = cargar({ sinSesion: true });
-    t.eq('sin sesión en DublajeCast, se queda en este equipo y se dice', (await S.D.bdGuardar(rec)) + ' ' + S.D.bdGuardados().length + ' ' + S.avisos.some(a => /se queda en este equipo/.test(a)), 'equipo 1 true');
+    t.eq('sin sesión en Casting, se queda en este equipo y se dice', (await S.D.bdGuardar(rec)) + ' ' + S.D.bdGuardados().length + ' ' + S.avisos.some(a => /se queda en este equipo/.test(a)), 'equipo 1 true');
     t.ok('y se ve en la lista, marcado', /solo en este equipo/.test(S.D.html('breakdowns')));
   }
   {
@@ -127,7 +127,7 @@ exports.pruebas = async function(t){
   }
   const HTML = fs.readFileSync(INDEX, 'utf8'), SW = fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8'), CV = fs.readFileSync(path.join(RAIZ, 'js', 'castingvistas.js'), 'utf8');
   t.ok('el archivo, cargado y en la caché, con la página de Pegado', /<script src="\.\/js\/dctools\.js"><\/script>/.test(HTML) && /'\.\/js\/dctools\.js'/.test(SW) && /'\.\/dctools\/pegado-casting\.html'/.test(SW));
-  t.ok('la vista de Casting las pinta y las engancha, en vez de abrir DublajeCast', /if\(typeof DCT !== 'undefined' && DCT && typeof DCT\.html === 'function'\)\{ const h = DCT\.html\(sec\.v\); if\(h\) return h; \}/.test(CV) && /DCT\.cablear\(vista, CS\.vista\)/.test(CV));
+  t.ok('la vista de Casting las pinta y las engancha, en vez de abrir Casting', /if\(typeof DCT !== 'undefined' && DCT && typeof DCT\.html === 'function'\)\{ const h = DCT\.html\(sec\.v\); if\(h\) return h; \}/.test(CV) && /DCT\.cablear\(vista, CS\.vista\)/.test(CV));
   const DCTJS = fs.readFileSync(path.join(RAIZ, 'js', 'dctools.js'), 'utf8');
   t.ok('sin JSZip ni React: lo de Dubbipt', !/new JSZip|JSZip\.loadAsync|React\.|useState/.test(DCTJS));
 };

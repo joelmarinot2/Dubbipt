@@ -3,19 +3,19 @@
  * Pedido de sala: «quiero que las herramientas de dubcards, breakdowns,
  * producción y tráiler estén dentro de Dubbipt, que no sea un link».
  * Producción y Tráilers ya eran de Dubbipt (castingvistas.js). DUBCARDs,
- * Breakdowns y Pegado de casting abrían DublajeCast; ahora se usan aquí:
+ * Breakdowns y Pegado de casting abrían Casting; ahora se usan aquí:
  *
- *   · El procesado es el MISMO de DublajeCast: su código, copiado tal cual
+ *   · El procesado es el MISMO de Casting: su código, copiado tal cual
  *     de dublajecast/index.html (líneas de DC_CREW a bdPrint), con tres
  *     cambios para Dubbipt: fflate en vez de JSZip para leer y escribir
  *     Word, el pdf.js que ya carga Dubbipt, y Groq y OpenRouter por el proxy
  *     /api/llm del sitio (la CSP de Dubbipt no deja llamarlos directo).
  *   · La interfaz es nueva, sin React, con el aspecto de la vista de Casting.
- *   · Los breakdowns se guardan donde los guarda DublajeCast (su lista
+ *   · Los breakdowns se guardan donde los guarda Casting (su lista
  *     `breakdowns`), así se ven en los dos sitios. La clave de API se guarda
- *     en este equipo con la misma clave de almacenamiento que DublajeCast.
+ *     en este equipo con la misma clave de almacenamiento que Casting.
  *   · Pegado de casting es una página aparte (dctools/pegado-casting.html,
- *     la misma que DublajeCast lleva dentro) que se abre aquí, en un marco.
+ *     la misma que Casting lleva dentro) que se abre aquí, en un marco.
  *
  * Todo va dentro de una función para que sus nombres (safe, lev, normN…)
  * no choquen con los de Dubbipt. Hacia fuera: DCT.html(vista), DCT.cablear(raiz, vista).
@@ -28,7 +28,7 @@
 const DCT = (function(){
 'use strict';
 
-/* ── Lo que el código de DublajeCast toma de su propio archivo ── */
+/* ── Lo que el código de Casting toma de su propio archivo ── */
 const safe=v=>String(v==null?"":v);
 function lev(a,b){if(!a.length)return b.length;if(!b.length)return a.length;const r=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=i;for(let j=1;j<=b.length;j++){const v=a[i-1]===b[j-1]?r[j-1]:1+Math.min(r[j-1],r[j],p);r[j-1]=p;p=v;}r[b.length]=p;}return r[b.length];}
 const normN=n=>safe(n).toLowerCase().replace(/[áä]/g,"a").replace(/[éë]/g,"e").replace(/[íï]/g,"i").replace(/[óö]/g,"o").replace(/[úü]/g,"u").replace(/ñ/g,"n").replace(/\([^)]*\)/g,"").replace(/\s+/g," ").trim();
@@ -48,7 +48,7 @@ async function readFileBuffer(file){
   }
 }
 
-/* ── El código de DublajeCast (copiado; ver arriba) ─────────────────────── */
+/* ── El código de Casting (copiado; ver arriba) ─────────────────────── */
 const DC_CREW=[
   {rol:'Dirección de Doblaje',nombre:'Wilfredo Hueso'},
   {rol:'Mezcla de Sonido',nombre:'Edwin Rodriguez'},
@@ -218,7 +218,7 @@ const BD_PROVIDERS={
 };
 const BD_DEFAULT_CFG={provider:"nvidia",apiKey:"",model:BD_PROVIDERS.nvidia.defaultModel,effort:"high",baseUrl:"",temperature:0.3};
 function getBdCfg(){try{const v=localStorage.getItem(BD_CFG_KEY);const c={...BD_DEFAULT_CFG,...(v?JSON.parse(v):{})};if(!BD_PROVIDERS[c.provider])c.provider="nvidia";return c;}catch(e){return{...BD_DEFAULT_CFG};}}
-function saveBdCfg(c){try{localStorage.setItem(BD_CFG_KEY,JSON.stringify(c));}catch(e){/* lo mismo que en DublajeCast: sin eso se sigue */}}
+function saveBdCfg(c){try{localStorage.setItem(BD_CFG_KEY,JSON.stringify(c));}catch(e){/* lo mismo que en Casting: sin eso se sigue */}}
 const bdProviderLabel=cfg=>(BD_PROVIDERS[cfg.provider]||BD_PROVIDERS.custom).l.split(" — ")[0]+" · "+(cfg.model||"");
 /* URL del endpoint según proveedor (NVIDIA vía proxy del propio sitio) */
 function bdEndpoint(cfg,path){
@@ -357,7 +357,7 @@ o	No uses tablas ni otros símbolos de Markdown distintos de los indicados.
 •	RESUMEN GENERAL DE LA SERIE (sólo si los DATOS DE ENTRADA lo piden): es una excepción explícita a la regla "no redactes un resumen general de la serie". Inclúyelo como sección aparte, titulada exactamente "RESUMEN GENERAL DE LA SERIE", inmediatamente después del título y antes del resumen del episodio. Extensión: 5 a 8 líneas con premisa, protagonistas y situación general hasta este episodio. Fuentes, en este orden: show guide (etiquetar [SHOW GUIDE]), breakdowns anteriores de la misma serie adjuntos como contexto, y lo que el libreto establece. Si no hay show guide ni breakdowns anteriores, indícalo en una línea y limítate a lo que el libreto deja claro. No adelantes nada que estas fuentes no revelen.`;
 
 /* Decodificación de texto con respaldo a Windows-1252 (libretos antiguos) */
-function bdDecode(buf){const u=new TextDecoder("utf-8").decode(buf);if((u.match(/\uFFFD/g)||[]).length>5){try{return new TextDecoder("windows-1252").decode(buf);}catch(e){/* lo mismo que en DublajeCast: sin eso se sigue */}}return u;}
+function bdDecode(buf){const u=new TextDecoder("utf-8").decode(buf);if((u.match(/\uFFFD/g)||[]).length>5){try{return new TextDecoder("windows-1252").decode(buf);}catch(e){/* lo mismo que en Casting: sin eso se sigue */}}return u;}
 /* pdf.js cargado bajo demanda; el worker se sirve como blob (los workers deben ser del mismo origen) */
 async function bdLoadPdfJs(){
   /* Dubbipt: el pdf.js que ya carga la aplicación, con su worker. */
@@ -391,7 +391,7 @@ async function bdListModels(cfg){
   const pr=BD_PROVIDERS[cfg.provider]||BD_PROVIDERS.custom;
   if(pr.kind==="anthropic")return pr.models.slice();
   const res=await fetch(bdEndpoint(cfg,"/models"),{headers:{"Authorization":"Bearer "+cfg.apiKey}});
-  if(!res.ok){let msg="HTTP "+res.status;try{const j=await res.json();msg=(j.error&&(j.error.message||j.error))||j.detail||msg;}catch(e){/* lo mismo que en DublajeCast: sin eso se sigue */}throw new Error(typeof msg==="string"?msg:JSON.stringify(msg));}
+  if(!res.ok){let msg="HTTP "+res.status;try{const j=await res.json();msg=(j.error&&(j.error.message||j.error))||j.detail||msg;}catch(e){/* lo mismo que en Casting: sin eso se sigue */}throw new Error(typeof msg==="string"?msg:JSON.stringify(msg));}
   const j=await res.json();const arr=Array.isArray(j.data)?j.data:(Array.isArray(j)?j:[]);
   return arr.map(m=>m.id||m.name).filter(Boolean).sort();
 }
@@ -415,7 +415,7 @@ async function bdGenerate({cfg,system,user,onDelta,signal}){
   }
   const res=await fetch(url,{method:"POST",headers,body:JSON.stringify(body),signal});
   if(!res.ok){
-    let msg="HTTP "+res.status;try{const j=await res.json();msg=(j.error&&(j.error.message||(typeof j.error==="string"?j.error:null)))||j.detail||j.message||msg;}catch(e){/* lo mismo que en DublajeCast: sin eso se sigue */}
+    let msg="HTTP "+res.status;try{const j=await res.json();msg=(j.error&&(j.error.message||(typeof j.error==="string"?j.error:null)))||j.detail||j.message||msg;}catch(e){/* lo mismo que en Casting: sin eso se sigue */}
     if(typeof msg!=="string")msg=JSON.stringify(msg);
     if(res.status===401||res.status===403)msg="Clave de API inválida, revocada o sin permiso ("+msg+")";
     else if(res.status===429)msg="Límite de uso alcanzado — espera un momento y vuelve a intentar ("+msg+")";
@@ -457,7 +457,7 @@ async function bdGenerate({cfg,system,user,onDelta,signal}){
       }
     }
   }
-  if(buf.trim()){for(const line of buf.split("\n")){if(!line.startsWith("data:"))continue;const data=line.slice(5).trim();if(!data||data==="[DONE]")continue;try{handle(JSON.parse(data));}catch(e){/* lo mismo que en DublajeCast: sin eso se sigue */}}}
+  if(buf.trim()){for(const line of buf.split("\n")){if(!line.startsWith("data:"))continue;const data=line.slice(5).trim();if(!data||data==="[DONE]")continue;try{handle(JSON.parse(data));}catch(e){/* lo mismo que en Casting: sin eso se sigue */}}}
   // Modelos "razonadores" pueden envolver su pensamiento en <think>…</think>: se descarta
   text=text.replace(/<think>[\s\S]*?<\/think>\s*/g,"").trim();
   if(stop==="length")stop="max_tokens";
@@ -561,7 +561,7 @@ function bdPrint(rec){
   const html=bdPrintHtml(rec);
   const fr=document.createElement("iframe");fr.className="ddl-encima";fr.setAttribute("aria-hidden","true");fr.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
   document.body.appendChild(fr);
-  const done=()=>{setTimeout(()=>{try{fr.remove();}catch(e){/* lo mismo que en DublajeCast: sin eso se sigue */}},1500);};
+  const done=()=>{setTimeout(()=>{try{fr.remove();}catch(e){/* lo mismo que en Casting: sin eso se sigue */}},1500);};
   fr.onload=()=>{try{const w=fr.contentWindow;w.addEventListener("afterprint",done);w.focus();w.print();setTimeout(done,60000);}catch(e){done();}};
   fr.srcdoc=html;
 }
@@ -578,7 +578,7 @@ const ST = {
         busy: false, live: '', result: null, err: '', abort: null, openId: null, cfgOpen: false, cfgMsg: '', locales: [] },
   pg: { completa: false }
 };
-/* Sin emojis en pantalla (PRO-N6): los textos de DublajeCast los traen; aquí se quitan al pintar. */
+/* Sin emojis en pantalla (PRO-N6): los textos de Casting los traen; aquí se quitan al pintar. */
 const SIN_EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{20E3}]/gu;
 const limpio = s => String(s == null ? '' : s).replace(SIN_EMOJI, '').replace(/([^\s]) {2,}/g, '$1 ');
 const E = s => limpio(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -590,7 +590,7 @@ const DC_CLIENT_KEY = 'dc_dubcard_client_v1';
 
 /* ── DUBCARDs ─────────────────────────────────────────────────────────────── */
 
-/** Lee un desglose (.xlsm/.xlsx): sus personajes de DESGLOCE y su talento de CASTING. Lo de DublajeCast, tal cual. */
+/** Lee un desglose (.xlsm/.xlsx): sus personajes de DESGLOCE y su talento de CASTING. Lo de Casting, tal cual. */
 async function dcParseFile(en, addLog){
   addLog('📂 ' + en.name);
   try{
@@ -659,7 +659,7 @@ async function dcProcesar(){
   }finally{ S.busy = false; repintar(); }
 }
 
-/** El Excel de DUBCARD, para descargar. Lo de DublajeCast, tal cual. */
+/** El Excel de DUBCARD, para descargar. Lo de Casting, tal cual. */
 function dcDescargar(){
   const S = ST.dc, processed = S.processed, isNetflix = !S.client || S.client.kind === 'netflix';
   if(!processed.length){ aviso('Primero procesa los archivos'); return; }
@@ -792,7 +792,7 @@ function dcCablear(raiz){
 
 /* ── Breakdowns ───────────────────────────────────────────────────────────── */
 
-/** Los breakdowns guardados: los de DublajeCast y los de este equipo que aún no subieron. */
+/** Los breakdowns guardados: los de Casting y los de este equipo que aún no subieron. */
 function bdGuardados(){
   let dc = [];
   try{ const d = (typeof csDatos === 'function') ? csDatos().datos : null; dc = (d && Array.isArray(d.breakdowns)) ? d.breakdowns : []; }catch(e){ dc = []; }
@@ -800,13 +800,13 @@ function bdGuardados(){
   return dc.concat(ST.bd.locales.filter(b => !ids.has(String(b.id)))).slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 }
 
-/** Guarda un breakdown donde los guarda DublajeCast (su lista `breakdowns`). Sin sesión, se queda en este equipo y se dice. */
+/** Guarda un breakdown donde los guarda Casting (su lista `breakdowns`). Sin sesión, se queda en este equipo y se dice. */
 async function bdGuardar(rec){
   ST.bd.locales.push(rec);
   if(typeof csEditar !== 'function') return 'equipo';
   const r = await csEditar(p => { if(!Array.isArray(p.breakdowns)) p.breakdowns = []; if(p.breakdowns.some(b => String(b.id) === String(rec.id))) return false; p.breakdowns.push(rec); return true; }, 'Breakdown guardado: ' + rec.title);
   if(r === 'guardado' || r === 'igual'){ ST.bd.locales = ST.bd.locales.filter(b => b.id !== rec.id); return 'nube'; }
-  aviso('El breakdown se queda en este equipo: entra en DublajeCast para guardarlo con los demás');
+  aviso('El breakdown se queda en este equipo: entra en Casting para guardarlo con los demás');
   return 'equipo';
 }
 
@@ -873,7 +873,7 @@ async function bdGenerar(){
   finally{ B.busy = false; B.abort = null; repintar(); }
 }
 
-/** El breakdown en pantalla: lo que DublajeCast pinta con BdDoc. */
+/** El breakdown en pantalla: lo que Casting pinta con BdDoc. */
 function bdDocHtml(text){
   const inline = s => E(s).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
   let out = '', ul = false;

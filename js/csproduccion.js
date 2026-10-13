@@ -1,10 +1,10 @@
-/* Producción Casting, como en DublajeCast · especificacion 09, PRO-42
+/* Producción Casting, como en Casting · especificacion 09, PRO-42
  *
  * Pedido de sala, con una captura: «quiero que la pestaña de producción se
  * vea como la de la captura y que tenga todas las funciones, excepto las
  * casillas de marcar desglose y casting».
  *
- * Es ProduccionCastingView de DublajeCast, sobre los mismos datos (su lista
+ * Es ProduccionCastingView de Casting, sobre los mismos datos (su lista
  * `produccion`, `clienteList`, `directorList`): pestañas en curso /
  * completados; buscador y filtros por cliente, director y alertas; la
  * leyenda de colores; secciones de preproducción y producción activa; cada
@@ -19,7 +19,7 @@
  * Las funciones puras se copian tal cual de dublajecast/index.html (alertas,
  * fechas, Excel); la interfaz es nueva, sin React, dentro de una
  * función para que sus nombres no choquen con los de Dubbipt. Todo se guarda
- * en DublajeCast con csEditar. Hacia fuera: CSP.html(datos, vivo), CSP.cablear(raiz).
+ * en Casting con csEditar. Hacia fuera: CSP.html(datos, vivo), CSP.cablear(raiz).
  * De donde depende: XLSX, csEditar, csDatos, csRepintar, csCabecera, csIco,
  * castAviso, dcxUid, DDL_UI.
  */
@@ -29,7 +29,7 @@
 const CSP = (function(){
 'use strict';
 
-/* ── Copiado de DublajeCast ── */
+/* ── Copiado de Casting ── */
 const safe=v=>String(v==null?"":v);
 const PC_DUBCARD_OPTS=["BACKLOT","Plataforma Padlot","Excel","PNG","No necesita DUBCARD"];
 const PC_FASE_LABELS={"pre_produccion":"Pre-producción","produccion_activa":"En Producción","completado":"Finalizado"};
@@ -83,9 +83,9 @@ const datos = () => { try{ return (typeof csDatos === 'function') ? csDatos().da
 const nuevoId = () => (typeof dcxUid === 'function') ? dcxUid() : Date.now() * 1000 + Math.floor(Math.random() * 1000);
 const mismo = (a, b) => String(a) === String(b);
 
-/** Un cambio en DublajeCast, como sus acciones PRODUCCION/…: lee, cambia y guarda (con la sesión de DublajeCast). */
+/** Un cambio en Casting, como sus acciones PRODUCCION/…: lee, cambia y guarda (con la sesión de Casting). */
 function editar(cambio, que){
-  if(typeof csEditar !== 'function'){ aviso('Sin conexión con DublajeCast'); return Promise.resolve('error'); }
+  if(typeof csEditar !== 'function'){ aviso('Sin conexión con Casting'); return Promise.resolve('error'); }
   return csEditar(p => { if(!Array.isArray(p.produccion)) p.produccion = []; return cambio(p); }, que || null);
 }
 function actualizar(id, campos, que){
@@ -104,13 +104,13 @@ function upd(row, campo, val){
   return actualizar(row.id, c);
 }
 
-/** Las filas con su fase (por omisión, preproducción, como en DublajeCast). */
+/** Las filas con su fase (por omisión, preproducción, como en Casting). */
 function filas(d){ return ((d && d.produccion) || []).map(r => Object.assign({ fase: 'pre_produccion' }, r)); }
 
 function alertas(row){ return { m: calcMiamiAlert(row.fecha_miami, row.fase), d: calcDubcardAlert(row.fecha_dubcard, row.formato_dubcard, row.fase) }; }
 function esVencida(a){ return !!((a.m && a.m.label.startsWith('Vencida')) || (a.d && a.d.label.startsWith('Vencida'))); }
 
-/** Buscar, filtrar y ordenar: lo de DublajeCast. */
+/** Buscar, filtrar y ordenar: lo de Casting. */
 function aplicar(rows){
   let r = rows.slice();
   const q = ST.buscar.trim().toLowerCase();

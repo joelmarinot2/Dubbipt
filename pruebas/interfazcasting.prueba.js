@@ -97,7 +97,7 @@ function armar(o){
   const PROD = { datos: ('datos' in o) ? o.datos : PR.prodNormalizar(VOLCADO), cuando: new Date(2026, 9, 6).getTime() };
   const LDB = { showId: ('showId' in o) ? o.showId : 's1' };
   const M = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ DUBLAJECAST ENTERO', '/* ═══ FIN DE DUBLAJECAST ENTERO']],
-    ['DCAST', 'dcastIr', 'dcastAbrir', 'dcastAtender', 'dcastDatos', 'dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting'],
+    ['DCAST', 'dcastAbrir', 'dcastDatos', 'dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting'],
     { castNorm: undefined, document: doc, window: { addEventListener: () => {} }, location: { origin: 'https://dubbipt.vercel.app' },
       prodPuede: () => (o.puede !== undefined ? o.puede : true), PROD_SIN_PERMISO: '🔒 solo admin', prodPintarBoton: () => {},
       prodCasarPrograma: PR.prodCasarPrograma, prodNormalizar: PR.prodNormalizar, prodIndices: PR.prodIndices, PROD: PROD,
@@ -144,55 +144,20 @@ exports.pruebas = async function(t){
   t.eq('sin nada, nada', M.dcastFilasCasting(null, null, null, 'Episodio 1').length, 0);
   t.eq('y se encuentra el capítulo de DublajeCast desde el de Dubbipt', M.dcastEpDeDc('Episodio 1', d.episodes.filter(e => e.series_id === 1)).id + ' ' + M.dcastSerieDe(SH, d).name, '11 A Filipino Christmas');
 
-  t.seccion('4 · los datos: en vivo si DublajeCast está abierto, si no lo traído');
+  t.seccion('4 · los datos: siempre los de Dubbipt (PRO-49)');
   {
     const A = armar();
-    t.eq('sin DublajeCast abierto, lo traído', A.M.dcastDatos().vivo + ' ' + (A.M.dcastDatos().datos === A.PROD.datos), 'false true');
-    const NUEVA = () => ({ series: [{ id: 9, name: 'Nueva' }], characters: [{ id: 1, canonical_name: 'X' }] });
-    let nube = 'synced';
-    A.M.DCAST.marco = { contentWindow: { __dcDatos: NUEVA, __dcNube: () => nube } };
-    const v = A.M.dcastDatos();
-    t.eq('abierto y al día con su nube, lo de ahora mismo, normalizado', v.vivo + ' ' + v.datos.series[0].name + ' ' + v.datos.characters[0].name + ' ' + Array.isArray(v.datos.castings), 'true Nueva X true');
-    t.ok('y se apunta para guardarlo en Dubbipt', A.M.DCAST.porGuardar && A.M.DCAST.porGuardar.series[0].name === 'Nueva' && A.esperas.length === 1);
-    A.M.dcastDatos();
-    t.eq('pintar otra vez no pone otra espera: se guarda una vez, al final', A.esperas.length, 1);
-    nube = 'connecting';
-    t.eq('sin estar al día con su nube, y con algo guardado aquí: lo guardado', A.M.dcastDatos().vivo + ' ' + (A.M.dcastDatos().datos === A.PROD.datos), 'false true');
-    A.M.DCAST.marco = { contentWindow: { __dcDatos: () => ({ series: [], talents: [] }), __dcNube: () => 'synced' } };
-    t.eq('vacío, aunque diga que está al día: lo guardado', A.M.dcastDatos().vivo, false);
-    A.M.DCAST.marco = { contentWindow: { __dcDatos: NUEVA } };
-    t.eq('una copia vieja sin el gancho de la nube: lo guardado', A.M.dcastDatos().vivo, false);
+    t.eq('lo guardado en Producción, nunca «en vivo»', (A.M.dcastDatos().datos === A.PROD.datos) + ' ' + A.M.dcastDatos().vivo, 'true false');
     const B = armar(); B.PROD.datos = null;
-    B.M.DCAST.marco = { contentWindow: { __dcDatos: NUEVA, __dcNube: () => 'off' } };
-    t.eq('sin nada guardado aquí, lo que enseñe, aunque no esté al día', B.M.dcastDatos().vivo + ' ' + !!B.M.DCAST.porGuardar, 'true false');
-    A.M.DCAST.marco = { contentWindow: { __dcDatos: () => null } };
-    t.eq('abierto sin sesión, lo traído', A.M.dcastDatos().vivo, false);
-    A.M.DCAST.marco = { get contentWindow(){ throw new Error('cruzado'); } };
-    t.eq('si el marco no deja mirar, lo traído', A.M.dcastDatos().vivo, false);
+    t.eq('sin nada guardado, nada', B.M.dcastDatos().datos + ' ' + B.M.dcastDatos().vivo, 'null false');
   }
 
-  t.seccion('5 · cada herramienta abre DublajeCast en SU pantalla');
+  t.seccion('5 · las herramientas ya no abren DublajeCast');
   {
     const A = armar();
-    const llamadas = [];
-    A.M.DCAST.ov = { style: {} };
-    A.M.DCAST.marco = { contentWindow: {} };
-    t.eq('si DublajeCast todavía no está listo, la pantalla queda pendiente', A.M.dcastAbrir('talents') + ' ' + JSON.stringify(A.M.DCAST.pendiente), 'true {"vista":"talents","serieId":null}');
-    A.M.DCAST.marco.contentWindow.__dcNav = (v, s, e) => llamadas.push([v, s, e]);
-    t.eq('al llegar su «listo», va', await A.M.dcastAtender({ accion: 'listo' }) + ' ' + JSON.stringify(llamadas) + ' ' + A.M.DCAST.pendiente, 'listo [["talents",null,null]] null');
-    A.M.dcastAbrir('casting', 1, 11);
-    t.eq('si ya está listo, va enseguida: el casting de un capítulo', JSON.stringify(llamadas[1]), '["casting",1,11]');
-    A.M.dcastAbrir();
-    t.eq('abrir sin decir pantalla no mueve nada', llamadas.length, 2);
-    t.eq('y sin nada pendiente, «listo» no hace nada', A.M.dcastIr(), false);
-    A.M.DCAST.pendiente = { vista: 'x' };
-    A.M.DCAST.marco.contentWindow.__dcNav = () => { throw new Error('roto'); };
-    t.ok('si DublajeCast falla, se dice y queda pendiente', A.M.dcastIr() === false && A.M.DCAST.pendiente && A.diario.some(x => /^fallo dcastIr/.test(x)));
-  }
-  {
+    t.eq('pedir una pantalla de DublajeCast: se dice que ya no está enlazado', A.M.dcastAbrir('talents') + ' ' + /ya no está enlazado/.test(A.avisos[0]), 'false true');
     const N = armar({ puede: false });
-    N.M.dcastAbrir('talents');
-    t.eq('sin permiso no se abre aunque se pida una pantalla', N.avisos.join('') + ' ' + N.M.DCAST.ov, '🔒 solo admin null');
+    t.eq('con o sin permiso, lo mismo: no hay nada que abrir', N.M.dcastAbrir('talents') + ' ' + N.M.DCAST.ov, 'false null');
   }
 
   t.seccion('8 · el recorrido entero');

@@ -70,7 +70,7 @@ exports.pruebas = async function(t){
     const soloDc = { clave: 'd:77', ep: null, dcEp: { id: 77 }, numero: 3, titulo: 'Ep 3' };
     await T.csTempMover(p, soloDc, id);
     const importado = { clave: 'e:12', ep: { id: 12 }, dcEp: { id: 77 }, numero: 3, titulo: 'Ep 3' };
-    t.eq('uno de DublajeCast sigue en su carpeta cuando ya está también en Dubbipt', T.csTempDe(T.csTemporadas(p), importado), id);
+    t.eq('uno de Casting sigue en su carpeta cuando ya está también en Dubbipt', T.csTempDe(T.csTemporadas(p), importado), id);
     await T.csTempMover(p, importado, '');
     t.eq('y se saca a «Sin temporada» con todas sus claves', JSON.stringify(T.csTemporadas(p).eps), '{}');
     t.eq('mover a donde ya está no guarda nada', await T.csTempMover(p, importado, ''), 'nada');
@@ -87,8 +87,8 @@ exports.pruebas = async function(t){
     t.eq('si falla, vuelve a lo de antes y lo dice', (await F.T.csTempNueva(q, 'Temporada 1')) + ' ' + F.T.csTemporadas(q).carpetas.length + ' ' + /sin red/.test(F.avisos[0]), 'error 0 true');
     const D = cargar({ admin: true });
     const r = { clave: 'd:9', nombre: 'SOLO DC', show: null, serie: { id: 9 } };
-    t.eq('uno que solo está en DublajeCast: en su serie', (await D.T.csTempNueva(r, 'Temporada 1')) + ' ' + D.editados.length + ' ' + !!(r.serie.temporadas_dubbipt && r.serie.temporadas_dubbipt.carpetas.length), 'nube 1 true');
-    t.ok('el campo se deja escribir en DublajeCast', /DCX_CAMPOS_SERIE = \[[^\]]*'temporadas_dubbipt'/.test(fs.readFileSync(path.join(RAIZ, 'js', 'dcescribir.js'), 'utf8')));
+    t.eq('uno que solo está en Casting: en su serie', (await D.T.csTempNueva(r, 'Temporada 1')) + ' ' + D.editados.length + ' ' + !!(r.serie.temporadas_dubbipt && r.serie.temporadas_dubbipt.carpetas.length), 'nube 1 true');
+    t.ok('el campo se deja escribir en Casting', /DCX_CAMPOS_SERIE = \[[^\]]*'temporadas_dubbipt'/.test(fs.readFileSync(path.join(RAIZ, 'js', 'dcescribir.js'), 'utf8')));
   }
 
   t.seccion('4 · detectar temporadas');
@@ -122,7 +122,7 @@ exports.pruebas = async function(t){
     const hc = T.csHtmlTemporadas(p, eps, T.csTemporadas(p), fila);
     t.ok('una carpeta se pliega', !/>Episodio 201</.test(hc) && /aria-expanded="false"/.test(hc));
     const D = cargar(), soloDc = { clave: 'd:9', nombre: 'X', show: null, serie: { id: 9 } };
-    t.ok('sin permiso para guardar (solo en DublajeCast y no eres administrador), sin botones', !/data-cs="temp/.test(D.T.csHtmlTemporadas(soloDc, eps, D.T.csTemporadas(soloDc), fila)));
+    t.ok('sin permiso para guardar (solo en Casting y no eres administrador), sin botones', !/data-cs="temp/.test(D.T.csHtmlTemporadas(soloDc, eps, D.T.csTemporadas(soloDc), fila)));
     t.ok('ningún emoji', !/[\u{1F300}-\u{1FAFF}☀-➿]/u.test(h));
   }
 

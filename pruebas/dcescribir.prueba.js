@@ -1,16 +1,16 @@
 /* Editar DublajeCast desde Dubbipt · especificacion 09, PRO-13
  *
  * Pedido de sala: «que se puedan hacer todas las funciones que se hacían en
- * DublajeCast». Lo que cambia sus datos se escribe en SU nube, como lo
- * escribe DublajeCast, con su control de revisión.
+ * DublajeCast»; y luego (PRO-49): «desvincula DublajeCast de Dubbipt, pero
+ * mantén todos los datos». Lo que cambia los datos de Casting se guarda en
+ * la nube de Dubbipt, sin sesión ni nube de DublajeCast.
  *
  * Lo que protege esta prueba:
  *  · que cada cambio toque lo que tiene que tocar y nada más;
- *  · que los registros nuevos salgan como los hace DublajeCast (ids, campos,
- *    nombres de talento en mayúsculas);
- *  · que no se pise lo que otro guardó entre medias: se vuelve a leer y el
- *    cambio se aplica sobre lo nuevo, una vez;
- *  · y que sin sesión no se escribe nada.
+ *  · que los registros nuevos salgan como los hacía DublajeCast (ids, campos,
+ *    nombres de talento en mayúsculas), para que sus herramientas sigan valiendo;
+ *  · que guardar cambie la copia de aquí, la pinte ya y la guarde en Dubbipt,
+ *    sin leer ni escribir nada en DublajeCast.
  */
 'use strict';
 const { montar } = require('./ayuda');
@@ -48,7 +48,7 @@ function armar(o){
       if(o.fallaEscribir) throw new Error('sin red');
       nube.payload = JSON.parse(JSON.stringify(p)); nube.rev++; diario.push('escribe ' + nube.rev); return nube.rev;
     },
-    prodNormalizar: (p) => ({ normalizado: true, talents: p.talents }), prodGuardar: async () => diario.push('prodGuardar'), PROD: PROD,
+    prodNormalizar: (p) => Object.assign({ normalizado: true }, p), prodGuardar: async () => { diario.push('prodGuardar'); return { ok: true }; }, PROD: PROD,
     prodConservarPropio: (n, v) => { for(const k in (v || {})) if(!(k in n)) n[k] = v[k]; return n; },
     sbUser: ('usuario' in o) ? o.usuario : { email: 'pamela@estudio.co', user_metadata: { full_name: 'Pamela Hernández' } }
   });
@@ -195,50 +195,22 @@ exports.pruebas = async function(t){
     t.eq('y se conservan al guardar en DublajeCast', JSON.stringify(A.M.dcxRelevosAceptados()), '["1:101:1,2"]');
   }
 
-  t.seccion('6 · guardar: sobre lo último, sin pisar a nadie');
+  t.seccion('6 · guardar: en la copia de aquí y en la nube de Dubbipt (PRO-49)');
   {
-    const A = armar();
+    const A = armar(); A.PROD.datos = A.M.dcxCopia ? null : null;
+    A.PROD.datos = Object.assign({ normalizado: true }, BASE());
     const r = await A.M.dcxGuardar(p => A.M.dcxAsignar(p, 11, 102, 'ANA ROJAS'));
-    t.eq('lee, cambia y escribe con la revisión siguiente', JSON.stringify(r) + ' ' + A.diario.join(' | '), '{"cambiado":true} lee 5 | escribe 6 | prodGuardar');
-    t.eq('y queda en la nube', A.nube.payload.castings.find(c => c.id === 504).talent_id, 1);
-    t.ok('y aquí, al momento: Producción con lo escrito', A.PROD.datos.normalizado === true && A.PROD.cuando > 0 && A.M.DCX.escrito > 0 && A.PROD.origen === 'DublajeCast');
-  }
-  {
-    const A = armar({ choques: 1 });
-    const r = await A.M.dcxGuardar(p => A.M.dcxAsignar(p, 11, 102, 'ANA ROJAS'));
-    t.eq('si otro guardó entre medias, se vuelve a leer y se aplica sobre lo suyo', JSON.stringify(r) + ' ' + A.diario.filter(x => /^lee|^escribe/.test(x)).join(' | '), '{"cambiado":true} lee 5 | lee 6 | escribe 7');
-    t.ok('sin perder lo del otro', A.nube.payload.talents.some(x => x.name === 'DE OTRO EQUIPO') && A.nube.payload.castings.find(c => c.id === 504).talent_id === 1);
-  }
-  {
-    const A = armar({ choques: 2 });
-    let err = '';
-    try{ await A.M.dcxGuardar(p => A.M.dcxAsignar(p, 11, 102, 'ANA ROJAS')); }catch(e){ err = e.message; }
-    t.ok('dos veces seguidas, se para y lo dice', /cambió los datos/.test(err) && A.M.DCX.guardando === false);
-  }
-  {
-    const A = armar();
-    const r = await A.M.dcxGuardar(p => A.M.dcxAsignar(p, 11, 102, 'BEATRIZ SOL'));
-    t.eq('si no cambia nada, no se escribe', JSON.stringify(r) + ' ' + A.diario.some(x => /^escribe/.test(x)), '{"cambiado":false} false');
-  }
-  {
-    const A = armar({ sinSesion: true });
-    let err = null;
-    try{ await A.M.dcxGuardar(p => A.M.dcxAsignar(p, 11, 102, 'ANA ROJAS')); }catch(e){ err = e; }
-    t.eq('sin sesión de DublajeCast: no se lee ni se escribe, y se sabe por qué', !!(err && err.sinSesion) + ' ' + A.diario.length, 'true 0');
-  }
-  {
-    const A = armar({ fallaEscribir: true });
-    let err = '';
-    try{ await A.M.dcxGuardar(p => A.M.dcxAsignar(p, 11, 102, 'ANA ROJAS')); }catch(e){ err = e.message; }
-    t.eq('otro fallo al escribir: se dice, no se repite, y aquí no se toca nada', err + ' · ' + A.diario.filter(x => /^lee/.test(x)).length + ' ' + A.PROD.datos, 'sin red · 1 null');
-  }
-  {
-    const A = armar();
-    const espera = A.M.dcxGuardar(p => A.M.dcxAsignar(p, 11, 102, 'ANA ROJAS'));
-    let err = '';
-    try{ await A.M.dcxGuardar(p => A.M.dcxAsignar(p, 12, 102, 'ANA ROJAS')); }catch(e){ err = e.message; }
-    await espera;
-    t.eq('dos a la vez, no: el segundo espera su turno', err, 'ya se está guardando otro cambio: espera un momento');
+    t.eq('cambia la copia de aquí y la guarda en Dubbipt, sin leer ni escribir en DublajeCast', JSON.stringify(r) + ' ' + A.diario.join(' | '), '{"cambiado":true} prodGuardar');
+    t.eq('y queda en los datos de Casting', A.PROD.datos.castings.find(c => c.id === 504).talent_id, 1);
+    t.ok('al momento: Producción con lo escrito', A.PROD.datos.normalizado === true && A.PROD.cuando > 0 && A.M.DCX.escrito > 0);
+    t.ok('la nube de DublajeCast, intacta', A.nube.payload.castings.find(c => c.id === 504).talent_id === 2 && A.nube.rev === 5);
+    const r2 = await A.M.dcxGuardar(p => A.M.dcxAsignar(p, 11, 102, 'ANA ROJAS'));
+    t.eq('si no cambia nada, no se guarda', JSON.stringify(r2) + ' ' + A.diario.filter(x => x === 'prodGuardar').length, '{"cambiado":false} 1');
+    const S = armar({ sinSesion: true }); S.PROD.datos = Object.assign({ normalizado: true }, BASE());
+    t.eq('sin sesión de DublajeCast da igual: ya no hace falta', JSON.stringify(await S.M.dcxGuardar(p => S.M.dcxAsignar(p, 11, 102, 'ANA ROJAS'))) + ' ' + S.diario.join(' | '), '{"cambiado":true} prodGuardar');
+    const V = armar();
+    t.eq('sin datos todavía: se crean para guardar', JSON.stringify(await V.M.dcxGuardar(p => V.M.dcxTalentoNuevo(p, { name: 'nueva voz' }))) + ' ' + V.PROD.datos.talents.length, '{"cambiado":true} 1');
+    t.eq('el cambio no toca lo que había mientras se aplica: trabaja sobre una copia', (() => { const B = armar(); B.PROD.datos = Object.assign({ normalizado: true }, BASE()); const antes = B.PROD.datos; B.M.dcxGuardar(p => { p.talents.push({ id: 9, name: 'X' }); return true; }); return antes.talents.length; })(), 2);
   }
   t.seccion('fusionar programas, como en DublajeCast');
   {

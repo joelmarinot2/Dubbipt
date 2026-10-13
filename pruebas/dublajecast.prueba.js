@@ -1,16 +1,15 @@
-/* DublajeCast entero, dentro de Dubbipt · especificacion 09, PRO-9 y PRO-10
+/* DublajeCast, copiado dentro de Dubbipt pero suelto · especificacion 09, PRO-9, PRO-10 y PRO-49
  *
- * Pedido de sala: «quiero traer prácticamente toda la plataforma: que cuando
- * le dé al botón de DublajeCast me abra todas las funciones del programa, y
- * que dentro de los programas estén las herramientas de Dubbipt también».
+ * Pedido de sala (PRO-9): traer la plataforma entera dentro de Dubbipt; y
+ * luego (PRO-49): «desvincula DublajeCast de Dubbipt, pero mantén todos los
+ * datos que hay». Dubbipt ya no abre DublajeCast ni le obedece: los datos de
+ * Casting son de Dubbipt. La copia (dublajecast/) sigue publicada y suelta.
  *
  * Lo que protege esta prueba:
- *  · que la barra de DublajeCast lleve al programa y al capítulo correctos,
- *    y que ante la duda abra el programa en vez de equivocar el capítulo;
- *  · que Dubbipt solo obedezca a SU DublajeCast, y solo al administrador;
- *  · que la copia no traiga lo que rompería Dubbipt: un service worker propio
- *    y el borrado de todas las cachés del sitio;
- *  · que la seguridad de Dubbipt no se afloje para hacerle sitio.
+ *  · que casar un capítulo de Casting con uno de Dubbipt siga como estaba;
+ *  · que Dubbipt ya no abra DublajeCast ni tenga botón para ello;
+ *  · que la copia publicada siga sin lo que rompería Dubbipt (service worker
+ *    propio, borrado de cachés) y que la seguridad de Dubbipt no se afloje.
  */
 'use strict';
 const fs = require('fs');
@@ -23,52 +22,17 @@ const RECORTES = [
   ['function castNorm(t){', 'async function castRegCargar(showId){'],
   ['/* ═══ DUBLAJECAST ENTERO', '/* ═══ FIN DE DUBLAJECAST ENTERO']
 ];
-const EXPORTA = ['DCAST', 'dcastCasarCapitulo', 'dcastMensajeValido', 'dcastAtender', 'dcastAbrir', 'dcastCerrar'];
+const EXPORTA = ['DCAST', 'dcastCasarCapitulo', 'dcastAbrir', 'dcastCerrar', 'dcastDatos'];
 
 const EPS = [{ id: 'e1', show_id: 's1', name: 'Episodio 1' }, { id: 'e2', show_id: 's1', name: 'Episodio 2' },
              { id: 'e3', show_id: 's1', name: '3 - La boda' }, { id: 'e12', show_id: 's1', name: 'E12 The Last New Year' }];
 
 function armar(o){
   o = o || {};
-  const diario = [], respuestas = [], avisos = [];
-  const LDB = { showId: null, browse: false };
-  const nodos = {};
-  const marco = { contentWindow: { postMessage: (d, origen) => respuestas.push([d, origen]) } };
-  const cuerpo = { clases: new Set(), classList: null };
-  cuerpo.classList = { add: (c) => cuerpo.clases.add(c), remove: (c) => cuerpo.clases.delete(c) };
-  const doc = {
-    body: Object.assign(cuerpo, { appendChild: (n) => diario.push('pega ' + n.id) }),
-    getElementById: (id) => nodos[id] || null,
-    createElement: (tag) => {
-      const n = { tag, style: {}, innerHTML: '', id: '', className: '', src: '', title: '', onclick: null, contentWindow: marco.contentWindow,
-                  appendChild: () => {}, querySelector: (s) => { const k = s.replace('#', ''); return (nodos[k] = nodos[k] || { onclick: null }); } };
-      return n;
-    }
-  };
-  let modoPuesto = null, libVistaFinal = null, oyente = null;
-  const M = montar(RECORTES, EXPORTA, {
-    castNorm: undefined, document: doc, window: { addEventListener: (ev, f) => { diario.push('escucha ' + ev); if(ev === 'message') oyente = f; } },
-    location: { origin: 'https://dubbipt.vercel.app' },
-    prodPuede: () => (o.puede !== undefined ? o.puede : true), PROD_SIN_PERMISO: '🔒 solo admin',
-    prodCasarPrograma: (n, shows) => shows.find(s => s.name.toUpperCase() === String(n).toUpperCase()) || null,
-    prodPanel: async () => diario.push('prodPanel'), prodPintarBoton: () => diario.push('prodPintarBoton'),
-    castAviso: (t) => avisos.push(t),
-    sbShows: () => [{ id: 's1', name: 'A Filipino Christmas' }],
-    sbEps: (id) => EPS.filter(e => e.show_id === id),
-    LDB: LDB,
-    renderLibrary: () => { libVistaFinal = 'pinta'; diario.push('renderLibrary'); },
-    precacheShowData: (id) => diario.push('precarga ' + id),
-    updateBackBtn: () => {}, refreshTopbar: () => {},
-    ponerModo: (ep, m) => { modoPuesto = m; diario.push('ponerModo ' + ep + ' ' + m); },
-    openEpisode: async (id) => diario.push('openEpisode ' + id),
-    newShow: async () => { nodos.npName = { value: '', focus: () => {} }; diario.push('newShow'); },
-    talPanel: () => diario.push('talPanel'), herramientasPanel: () => diario.push('herramientasPanel'),
-    fallo: (d) => diario.push('fallo ' + d),
-    libView: 'shows'
-  });
-  M.DCAST.marco = marco;
-  M.DCAST.ov = { style: { display: '' } };
-  return { M, diario, respuestas, avisos, LDB, nodos, marco, cuerpo, modo: () => modoPuesto, oyente: () => oyente };
+  const avisos = [];
+  const PROD = { datos: ('datos' in o) ? o.datos : { series: [] } };
+  const M = montar(RECORTES, EXPORTA, { castNorm: undefined, castAviso: (t) => avisos.push(t), PROD: PROD, prodCasarPrograma: () => null, prodIndices: () => ({}) });
+  return { M, avisos, PROD };
 }
 
 exports.pruebas = async function(t){
@@ -85,99 +49,14 @@ exports.pruebas = async function(t){
   t.eq('dos con el mismo título tampoco: ninguno', M.dcastCasarCapitulo(null, 'Piloto', [{ id: 'p1', name: 'Piloto' }, { id: 'p2', name: 'PILOTO' }]), null);
   t.eq('sin número ni título, ninguno', M.dcastCasarCapitulo(null, '', EPS) + ' ' + M.dcastCasarCapitulo('dos', '', EPS), 'null null');
 
-  t.seccion('2 · solo se obedece a NUESTRA DublajeCast');
-  const marco = { contentWindow: {} };
-  const ok = { origin: 'https://dubbipt.vercel.app', source: marco.contentWindow, data: { fuente: 'dublajecast', accion: 'consulta' } };
-  const v = (e) => M.dcastMensajeValido(e, marco, 'https://dubbipt.vercel.app');
-  t.eq('el bueno', v(ok), true);
-  t.eq('de otro sitio, no', v(Object.assign({}, ok, { origin: 'https://dubcast.netlify.app' })), false);
-  t.eq('de otra ventana del mismo sitio, no', v(Object.assign({}, ok, { source: {} })), false);
-  t.eq('sin su firma, no', v(Object.assign({}, ok, { data: { accion: 'consulta' } })) + ' ' + v(Object.assign({}, ok, { data: { fuente: 'dublajecast' } })) + ' ' + v(Object.assign({}, ok, { data: 'consulta' })), 'false false false');
-  t.eq('sin marco abierto, nada', M.dcastMensajeValido(ok, null, 'https://dubbipt.vercel.app'), false);
-
+  t.seccion('2 · Dubbipt ya no abre DublajeCast ni le obedece (PRO-49)');
   {
     const A = armar();
-    const f = A.oyente();
-    t.eq('Dubbipt escucha mensajes', typeof f, 'function');
-    f({ origin: 'https://otro.sitio', source: A.marco.contentWindow, data: { fuente: 'dublajecast', accion: 'talentos' } });
-    f({ origin: 'https://dubbipt.vercel.app', source: {}, data: { fuente: 'dublajecast', accion: 'talentos' } });
-    await new Promise(r => setTimeout(r, 0));
-    t.eq('y los que no vienen de nuestro marco no hacen nada', A.diario.includes('talPanel'), false);
-    f({ origin: 'https://dubbipt.vercel.app', source: A.marco.contentWindow, data: { fuente: 'dublajecast', accion: 'talentos' } });
-    await new Promise(r => setTimeout(r, 0));
-    t.eq('el nuestro, sí', A.diario.includes('talPanel'), true);
-  }
-
-  t.seccion('3 · lo que pide la barra');
-  {
-    const A = armar();
-    t.eq('consulta: el programa existe', await A.M.dcastAtender({ accion: 'consulta', programa: 'a filipino christmas' }), 'estado');
-    t.eq('y se contesta a la barra, solo a nuestro sitio', JSON.stringify(A.respuestas[0]), JSON.stringify([{ fuente: 'dubbipt', tipo: 'estado', programa: 'a filipino christmas', existe: true, nombre: 'A Filipino Christmas' }, 'https://dubbipt.vercel.app']));
-    await A.M.dcastAtender({ accion: 'consulta', programa: 'Akka' });
-    t.eq('consulta: no existe', A.respuestas[1][0].existe + ' ' + A.respuestas[1][0].nombre, 'false ');
-  }
-  {
-    const A = armar();
-    t.eq('abrir el programa', await A.M.dcastAtender({ accion: 'programa', programa: 'A Filipino Christmas', perfil: 'qc' }), 'programa');
-    t.eq('en el perfil pedido, en su lista de capítulos, y DublajeCast a un lado', [A.modo(), A.LDB.showId, A.LDB.browse, A.M.DCAST.ov.style.display, A.diario.includes('renderLibrary'), A.diario.includes('precarga s1')].join(' '), 'qc s1 true none true true');
-  }
-  {
-    const A = armar();
-    await A.M.dcastAtender({ accion: 'programa', programa: 'A Filipino Christmas', perfil: 'administrador' });
-    t.eq('un perfil que no existe no se pone', A.modo(), null);
-  }
-  {
-    const A = armar();
-    t.eq('abrir un capítulo', await A.M.dcastAtender({ accion: 'capitulo', programa: 'A Filipino Christmas', perfil: 'casting', numero: 2, titulo: 'Otro título' }), 'capitulo');
-    t.ok('con su perfil y abriéndolo', A.diario.includes('ponerModo e2 casting') && A.diario.includes('openEpisode e2') && A.LDB.showId === 's1' && A.M.DCAST.ov.style.display === 'none', A.diario.join(' | '));
-  }
-  {
-    const A = armar();
-    t.eq('un capítulo que no está: abre el programa', await A.M.dcastAtender({ accion: 'capitulo', programa: 'A Filipino Christmas', perfil: 'casting', numero: 40 }), 'programa');
-    t.ok('y lo dice en la barra', /No encuentro el capítulo 40/.test(A.respuestas[0][0].texto) && !A.diario.some(x => /^openEpisode/.test(x)));
-  }
-  {
-    const A = armar();
-    t.eq('un programa que no está en Dubbipt', await A.M.dcastAtender({ accion: 'programa', programa: 'Akka' }), 'falta');
-    t.ok('no se mueve nada y se dice', A.LDB.showId === null && A.M.DCAST.ov.style.display === '' && /«Akka» no está en Dubbipt/.test(A.respuestas[0][0].texto));
-  }
-  {
-    const A = armar();
-    t.eq('crearlo', await A.M.dcastAtender({ accion: 'crear', programa: 'Akka' }), 'crear');
-    t.eq('con el nombre ya escrito', A.nodos.npName.value + ' ' + A.diario.includes('newShow'), 'Akka true');
-  }
-  {
-    const A = armar();
-    t.eq('la base de talentos, las herramientas y Producción', [await A.M.dcastAtender({ accion: 'talentos' }), await A.M.dcastAtender({ accion: 'herramientas' }), await A.M.dcastAtender({ accion: 'produccion' })].join(' '), 'talentos herramientas produccion');
-    t.ok('cada una abre lo suyo', A.diario.includes('talPanel') && A.diario.includes('herramientasPanel') && A.diario.includes('prodPanel'));
-    for(const acc of ['talentos', 'herramientas']){
-      const B = armar();
-      await B.M.dcastAtender({ accion: acc });
-      t.eq(acc + ': DublajeCast se aparta para que se vea', B.M.DCAST.ov.style.display, 'none');
-    }
-    const C = armar();
-    await C.M.dcastAtender({ accion: 'produccion' });
-    t.eq('Producción se abre encima, sin cerrar DublajeCast', C.M.DCAST.ov.style.display, '');
-    t.eq('algo que no se conoce, nada', await A.M.dcastAtender({ accion: 'borrarTodo' }), 'nada');
-  }
-
-  t.seccion('4 · solo el administrador, en el perfil Casting (PRO-8)');
-  {
-    const N = armar({ puede: false });
-    t.eq('la barra no consigue nada', await N.M.dcastAtender({ accion: 'programa', programa: 'A Filipino Christmas' }), 'permiso');
-    t.ok('ni se mueve, ni se abre nada, y se le dice', N.LDB.showId === null && !N.diario.some(x => /renderLibrary|openEpisode|talPanel/.test(x)) && N.respuestas[0][0].texto === '🔒 solo admin');
-    N.M.DCAST.ov = null;
-    t.eq('el botón no abre DublajeCast', N.M.dcastAbrir() + ' ' + N.avisos.join('|') + ' ' + N.diario.includes('prodPintarBoton'), 'false 🔒 solo admin true');
-  }
-  {
-    const A = armar(); A.M.DCAST.ov = null; A.M.DCAST.marco = null;
-    t.eq('al administrador sí: con su marco', A.M.dcastAbrir() + ' ' + A.M.DCAST.marco.src + ' ' + A.cuerpo.clases.has('dcast-abierto'), 'true ./dublajecast/index.html true');
-    const primero = A.M.DCAST.marco;
-    A.M.dcastCerrar();
-    t.eq('«Volver a Dubbipt» lo esconde', A.M.DCAST.ov.style.display + ' ' + A.cuerpo.clases.has('dcast-abierto'), 'none false');
-    A.M.dcastAbrir();
-    t.eq('y al volver es el mismo, y se ve: lo que se hacía allí sigue', (A.M.DCAST.marco === primero) + ' ' + A.M.DCAST.ov.style.display, 'true ');
-    t.ok('el marco se pega una sola vez', A.diario.filter(x => x === 'pega dcastOv').length === 1);
+    t.eq('abrir DublajeCast: se dice que ya no está enlazado, y no se abre nada', A.M.dcastAbrir('series', 1) + ' ' + A.avisos[0], 'false DublajeCast ya no está enlazado con Dubbipt: todo el casting se hace aquí, con los datos de Dubbipt');
+    t.eq('los datos son siempre los de Dubbipt, nunca «en vivo»', (A.M.dcastDatos().datos === A.PROD.datos) + ' ' + A.M.dcastDatos().vivo, 'true false');
+    t.eq('cerrar no hace nada', A.M.dcastCerrar(), undefined);
+    const JS = fs.readFileSync(path.join(RAIZ, 'js', 'dublajecast.js'), 'utf8');
+    t.ok('ni marco, ni puente, ni mensajes', !/createElement\('iframe'\)/.test(JS) && !/addEventListener\('message'/.test(JS) && !/dcastAtender|dcastMensajeValido|__dcDatos/.test(JS));
   }
 
   t.seccion('5 · la copia de DublajeCast');
@@ -233,9 +112,9 @@ exports.pruebas = async function(t){
   const fuera = correr(false);
   t.eq('abierto suelto, no pide nada ni pinta barra', fuera.win.dubbiptPedir('consulta') + ' ' + fuera.enviados.length + ' ' + typeof fuera.win.DubbiptBarra, 'false 0 undefined');
 
-  t.seccion('8 · por dónde se entra');
+  t.seccion('8 · por dónde se entraba, ya no');
   const HTML = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');
-  t.ok('el botón de Programas abre DublajeCast entero', / DublajeCast original<\/button>'/.test(HTML) && /bp\.onclick=\(\)=> dcastAbrir\(\);/.test(HTML));
-  t.ok('y el puente del casting también, solo para quien puede', /\? '<button class="modo-op dc-b" id="dcEntero">/.test(HTML) && /if\(de\) de\.onclick = \(\) => \{ cerrar\(\); dcastAbrir\(\); \};/.test(HTML));
+  t.ok('ni el botón de Programas ni el del casting abren DublajeCast', !/DublajeCast original/.test(HTML) && !/btnProduccion/.test(HTML) && !/id="dcEntero"/.test(HTML) && !/id="btnDcast"/.test(HTML));
+  t.ok('la cuenta de DublajeCast queda solo para importar, sin «Llevar»', /Importar de DublajeCast \(una vez\)/.test(HTML) && !/id="dcLlevar"/.test(HTML) && !/dcExportar\(\)/.test(HTML.slice(HTML.indexOf('async function dcPanel'), HTML.indexOf('async function dcPanel') + 6000)));
   t.ok('el módulo se carga después de Producción', HTML.indexOf('<script src="./js/produccion.js"></script>') < HTML.indexOf('<script src="./js/dublajecast.js"></script>'));
 };

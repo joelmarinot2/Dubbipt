@@ -1,11 +1,11 @@
-/* Producción Casting, como en DublajeCast · especificacion 09, PRO-42 */
+/* Producción Casting, como en Casting · especificacion 09, PRO-42 */
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { INDEX } = require('./ayuda');
 
-exports.nombre = 'Casting: Producción Casting, como en DublajeCast';
+exports.nombre = 'Casting: Producción Casting, como en Casting';
 
 const RAIZ = path.dirname(INDEX);
 
@@ -60,7 +60,7 @@ exports.pruebas = async function(t){
     t.ok('pestañas, buscador, filtros por cliente, director y alertas, y la leyenda de colores',
          /data-pc="tab" data-v="en_curso">En curso <b>3<\/b>/.test(h) && /data-pc="tab" data-v="completados">Completados <b>1<\/b>/.test(h) && /data-pc="buscar"/.test(h)
          && /data-c="cliente"><option value="">Todos los clientes/.test(h) && /data-c="director"><option value="">Todos los directores/.test(h) && /data-c="alerta"/.test(h) && /Vencida \(muestra días\)/.test(h));
-    t.ok('las columnas de DublajeCast, sin las casillas de desglose ni de casting', /Programa \/ cap\.[\s\S]*?Cliente[\s\S]*?Director[\s\S]*?Entrega Miami[\s\S]*?Formato DUBCARD[\s\S]*?Entrega DUBCARD/.test(h) && !/Desglose|>Casting</.test(h) && !/desglose_provisional|casting_completo/.test(h));
+    t.ok('las columnas de Casting, sin las casillas de desglose ni de casting', /Programa \/ cap\.[\s\S]*?Cliente[\s\S]*?Director[\s\S]*?Entrega Miami[\s\S]*?Formato DUBCARD[\s\S]*?Entrega DUBCARD/.test(h) && !/Desglose|>Casting</.test(h) && !/desglose_provisional|casting_completo/.test(h));
     t.ok('preproducción y producción activa, cada una con lo suyo', /Preproducción <i>\(2\)<\/i>[\s\S]*?Producción activa <i>\(1\)<\/i>/.test(h));
     t.ok('en producción activa, Miami ya entregada; y «Finalizar»; en preproducción, «Iniciar»', /Entregada<\/span>/.test(h) && /data-pc="fase" data-id="1"[^>]*>[\s\S]*?<span>Finalizar/.test(h) && /data-pc="fase" data-id="2"[^>]*>[\s\S]*?<span>Iniciar/.test(h));
     t.eq('el color de cada fila por sus alertas: vencida, DUBCARD urgente, sin alerta, completada', [2, 1, 3, 4].map(id => P.colorFila(Object.assign({ fase: 'pre_produccion' }, V.datos.produccion.find(r => r.id === id)), id === 4)).join(' '), 'cp-fila-vencida cp-fila-dubcard cp-fila-normal cp-fila-hecha');
@@ -84,7 +84,7 @@ exports.pruebas = async function(t){
     P.ST.sortBy = null; P.ST.sortDir = 'asc';
   }
 
-  t.seccion('3 · las funciones, guardadas en DublajeCast');
+  t.seccion('3 · las funciones, guardadas en Casting');
   {
     const V = cargar(), P = V.P;
     let c = controles(P.html(V.datos, false));
@@ -93,7 +93,7 @@ exports.pruebas = async function(t){
     t.ok('«Nuevo» añade un registro en preproducción', V.datos.produccion.length === 5 && V.datos.produccion[0].fase === 'pre_produccion' && V.datos.produccion[0].formato_dubcard === 'Excel');
     c = controles(P.html(V.datos, false)); P.cablear(c.raiz);
     const cli = c.de('sel', { id: 2, c: 'cliente' }); cli.value = 'Netflix'; cli.onchange(); await espera();
-    t.eq('cambiar el cliente a Netflix pone la DUBCARD en BACKLOT, como en DublajeCast', JSON.stringify(V.datos.produccion.find(r => r.id === 2), ['cliente', 'formato_dubcard']), '{"cliente":"Netflix","formato_dubcard":"BACKLOT"}');
+    t.eq('cambiar el cliente a Netflix pone la DUBCARD en BACKLOT, como en Casting', JSON.stringify(V.datos.produccion.find(r => r.id === 2), ['cliente', 'formato_dubcard']), '{"cliente":"Netflix","formato_dubcard":"BACKLOT"}');
     c = controles(P.html(V.datos, false)); P.cablear(c.raiz);
     const prog = c.de('txt', { id: 3, c: 'capitulo' }); prog.value = 'Episodio 107 '; prog.onchange(); await espera();
     t.eq('programa y capítulo se editan en la tabla', V.datos.produccion.find(r => r.id === 3).capitulo, 'Episodio 107');
@@ -112,7 +112,7 @@ exports.pruebas = async function(t){
     c = controles(P.html(V.datos, false)); P.cablear(c.raiz);
     await c.de('borrar', { id: 2 }).onclick(); await espera();
     t.ok('eliminar un registro', !V.datos.produccion.some(r => r.id === 2));
-    t.ok('cada cambio se guarda en DublajeCast y se apunta lo importante', V.apuntes.includes('Producción: registro nuevo') && V.apuntes.some(a => /^Producción: finalizado EMPRESS OF FLAMES/.test(a)));
+    t.ok('cada cambio se guarda en Casting y se apunta lo importante', V.apuntes.includes('Producción: registro nuevo') && V.apuntes.some(a => /^Producción: finalizado EMPRESS OF FLAMES/.test(a)));
   }
   {
     const V = cargar(), P = V.P;
@@ -143,40 +143,28 @@ exports.pruebas = async function(t){
     t.ok('ni su código: nada llama fuera', !/fetch\(|computeExternalUpdates|arrancarSync|dc_ext_api_cfg/.test(fs.readFileSync(path.join(RAIZ, 'js', 'csproduccion.js'), 'utf8')) && !('sincronizar' in P));
   }
 
-  t.seccion('4b · guardar se ve al instante (pedido de sala: «está un poco lento»)');
+  t.seccion('4b · guardar: en la nube de Dubbipt, y se ve al momento');
   {
     const CV = fs.readFileSync(path.join(RAIZ, 'js', 'castingvistas.js'), 'utf8');
-    const trozo = CV.slice(CV.indexOf('let CS_COLA'), CV.indexOf('/* ── Nombres, el cambiador de talento'));
-    const montarEd = () => {
-      const W = { pintado: [], avisos: [], llamadas: [], esperas: [] };
+    const trozo = CV.slice(CV.indexOf('/** Guardar un cambio en los datos de Casting'), CV.indexOf('/* ── Nombres, el cambiador de talento'));
+    const montarEd = (falla) => {
+      const W = { pintado: [], avisos: [] };
       W.ctx = vm.createContext({
-        dcast: { sesion: { id: 'u' }, payload: { produccion: [{ id: 1, fase: 'pre_produccion' }] } },
-        PROD: { datos: { produccion: [{ id: 1, fase: 'pre_produccion' }], historialDubbipt: ['h'] } }, DCX: { escrito: 0 },
-        prodNormalizar: (x) => x, castAviso: (t) => W.avisos.push(t), dcxEntrada: (x) => x, dcPanel(){},
+        PROD: { datos: { produccion: [{ id: 1, fase: 'pre_produccion' }] } },
+        castAviso: (t) => W.avisos.push(t), dcxEntrada: (x) => x,
         csRepintar: () => W.pintado.push(JSON.stringify(W.ctx.PROD.datos.produccion)),
-        dcxGuardar: (cambio) => new Promise((ok, mal) => { W.llamadas.push(cambio); W.esperas.push({ ok, mal }); })
+        dcxGuardar: async (cambio) => { if(falla) throw new Error('sin red'); const copia = JSON.parse(JSON.stringify(W.ctx.PROD.datos)); const r = cambio(copia); if(r) W.ctx.PROD.datos = copia; return { cambiado: !!r }; }
       });
       vm.runInContext(trozo + ';this.csEditar = csEditar;', W.ctx);
       return W;
     };
     const fase = (c) => (c.PROD.datos.produccion[0] || {}).fase;
     const W = montarEd();
-    const r1 = W.ctx.csEditar(p => { p.produccion[0].fase = 'completado'; return true; }, 'Producción: finalizado');
-    t.eq('al pulsar, ya se ve (antes de que DublajeCast conteste)', fase(W.ctx) + ' ' + W.pintado.length, 'completado 1');
-    t.ok('lo propio de Dubbipt (quién cambió qué) no se pierde al pintar antes', W.ctx.PROD.datos.historialDubbipt && W.ctx.PROD.datos.historialDubbipt[0] === 'h');
-    W.ctx.csEditar(p => { p.produccion[0].director = 'DIEGO'; return true; }, 'Director');
-    await espera();
-    t.eq('dos cambios seguidos: van en fila, no «espera un momento»', W.llamadas.length, 1);
-    W.esperas[0].ok({ cambiado: true }); t.eq('el primero, guardado', await r1, 'guardado');
-    await espera(); await espera();
-    t.eq('y entonces va el segundo', W.llamadas.length, 2);
-    const X = montarEd();
-    const r2 = X.ctx.csEditar(p => { p.produccion[0].fase = 'completado'; return true; }, 'x');
-    await espera(); X.esperas[0].mal(new Error('sin red'));
-    t.eq('si no se pudo guardar, vuelve a lo de antes y lo dice', (await r2) + ' ' + fase(X.ctx) + ' ' + /sin red/.test(X.avisos[0]), 'error pre_produccion true');
-    const Y = montarEd(); Y.ctx.dcast.payload = null;
-    Y.ctx.csEditar(p => { p.produccion[0].fase = 'completado'; return true; }, 'x');
-    t.eq('sin copia leída todavía, espera a guardar (como antes)', fase(Y.ctx) + ' ' + Y.pintado.length, 'pre_produccion 0');
+    t.eq('guardado: se ve, se dice y se repinta', (await W.ctx.csEditar(p => { p.produccion[0].fase = 'completado'; return true; }, 'Producción: finalizado')) + ' ' + fase(W.ctx) + ' ' + W.avisos[0] + ' ' + W.pintado.length, 'guardado completado Producción: finalizado 1');
+    t.eq('si no cambia nada, ni se dice', (await W.ctx.csEditar(p => false, 'x')) + ' ' + W.avisos.length, 'igual 1');
+    const X = montarEd(true);
+    t.eq('si no se pudo guardar, se queda como estaba y lo dice', (await X.ctx.csEditar(p => { p.produccion[0].fase = 'completado'; return true; }, 'x')) + ' ' + fase(X.ctx) + ' ' + X.avisos[0], 'error pre_produccion No se pudo guardar: sin red');
+    t.ok('nada de sesiones de DublajeCast', !/sinSesion|dcPanel|dcast\.payload/.test(trozo));
   }
 
   t.seccion('5 · dónde está');
