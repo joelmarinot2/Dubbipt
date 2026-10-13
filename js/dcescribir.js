@@ -113,7 +113,7 @@ function dcxCambiarCampos(lista, id, cambios, permitidos){
 }
 
 const DCX_CAMPOS_EP = ['title', 'status', 'fase', 'fecha_miami', 'fecha_dubcard', 'formato_dubcard'];
-const DCX_CAMPOS_SERIE = ['name', 'status', 'cliente', 'director'];
+const DCX_CAMPOS_SERIE = ['name', 'status', 'cliente', 'director', 'temporadas_dubbipt'];
 const DCX_CAMPOS_TALENTO = ['name', 'genero', 'edad_aparente', 'tono_de_voz', 'registro', 'email'];
 const DCX_CAMPOS_TRAILER = ['title', 'type', 'etapa', 'series_id', 'received_at', 'deadline', 'status'];
 

@@ -40,7 +40,7 @@ const CS = { vista: 'programas', buscar: '', soloAlertas: false, programa: '',
              repVista: 'talento', repBuscar: '', repOrden: 'lineas', repGenero: '', repAbierto: null,
              ocBuscar: '', ocGenero: '', ocEdad: '', ocTono: '', ocModo: 'curso',
              trForm: null, trEstado: '', trTipo: '', trEtapa: '',
-             talModo: 'talentos', buscarPer: '', talAbierto: null };
+             talModo: 'talentos', buscarPer: '', talAbierto: null, tempCerradas: {} };
 
 /* Iconos de trazo, como los de Dubbipt (ICO). Ningún emoji. */
 const CS_ICO = {
@@ -71,6 +71,7 @@ const CS_ICO = {
   fusionar:   '<path d="M7 4v5c0 3 2 5 5 5h5"/><path d="M7 20v-6"/><path d="M14 11l3 3-3 3"/>',
   tijeras:    '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.12 15.88"/><path d="M14.47 14.48L20 20"/><path d="M8.12 8.12L12 12"/>',
   editar:     '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+  carpeta:    '<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',
   borrar:     '<path d="M3 6h18"/><path d="M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/>'
 };
 /** Un icono de trazo, en el mismo dibujo que los de Dubbipt. */
@@ -735,6 +736,149 @@ async function csCambiarEstadoEp(p, e, nuevo){
   if(!e) return 'nada';
   const nombre = (e.numero != null ? 'Ep. ' + e.numero + ' · ' : '') + e.titulo;
   return csGuardarEstadosEps([{ e: e }], nuevo, (nuevo === 'completo' ? 'Episodio completado: ' : 'Episodio en curso: ') + (p ? p.nombre + ' · ' : '') + nombre, csContexto(p, e));
+}
+
+/* ── Temporadas: carpetas dentro de cada programa ───────────────────────────
+   Pedido de sala: «que dentro de los programas pueda hacer carpetas por
+   temporadas». Cada programa tiene sus carpetas y cada episodio puede ir en
+   una. Se guardan con el programa: en Dubbipt, en su columna `temporadas`
+   (sql/mejora-06-temporadas.sql; sin ella, solo en este equipo, y se dice);
+   uno que solo está en DublajeCast, en su serie. */
+
+function csClaveTemps(){ return 'ddl-temporadas::' + ((typeof WORKSPACE !== 'undefined' && WORKSPACE && WORKSPACE.id) || 'sin-espacio'); }
+function csTempsLocales(){
+  try{ const v = JSON.parse(localStorage.getItem(csClaveTemps()) || '{}'); return (v && typeof v === 'object') ? v : {}; }catch(e){ return {}; }
+}
+function csTempsLocal(clave, t){
+  const m = csTempsLocales();
+  if(t) m[clave] = t; else delete m[clave];
+  try{ localStorage.setItem(csClaveTemps(), JSON.stringify(m)); }catch(e){ /* sin almacén: solo hasta recargar */ }
+}
+/** Siempre con la misma forma: `{ carpetas: [{ id, nombre }], eps: { clave: idCarpeta } }`. */
+function csTempsLimpias(t){
+  const carpetas = (t && Array.isArray(t.carpetas) ? t.carpetas : [])
+    .filter(c => c && c.id != null && String(c.nombre || '').trim())
+    .map(c => ({ id: String(c.id), nombre: String(c.nombre).replace(/\s+/g, ' ').trim() }));
+  const ids = new Set(carpetas.map(c => c.id)), eps = {};
+  if(t && t.eps && typeof t.eps === 'object') for(const k in t.eps) if(ids.has(String(t.eps[k]))) eps[k] = String(t.eps[k]);
+  return { carpetas: carpetas, eps: eps };
+}
+function csTempsClaveLocal(p){ return p.show ? 's:' + p.show.id : (p.serie ? 'd:' + p.serie.id : ''); }
+/** Las temporadas de un programa. */
+function csTemporadas(p){
+  if(!p) return csTempsLimpias(null);
+  const local = csTempsLocales()[csTempsClaveLocal(p)];
+  if(p.show) return csTempsLimpias((p.show.temporadas && typeof p.show.temporadas === 'object') ? p.show.temporadas : local);
+  if(p.serie) return csTempsLimpias(p.serie.temporadas_dubbipt || local);
+  return csTempsLimpias(null);
+}
+/** Las claves con las que se puede conocer un episodio: la suya y las de sus dos lados (al importar cambia de «d:» a «e:»). */
+function csTempClaves(e){
+  const k = [e.clave];
+  if(e.ep) k.push('e:' + e.ep.id);
+  if(e.dcEp) k.push('d:' + e.dcEp.id);
+  return k.filter((x, i) => k.indexOf(x) === i);
+}
+/** En qué carpeta está un episodio: su id, o null. */
+function csTempDe(t, e){
+  for(const k of csTempClaves(e)) if(t.eps[k] && t.carpetas.some(c => c.id === t.eps[k])) return t.eps[k];
+  return null;
+}
+function csTempPoner(t, e, id){
+  for(const k of csTempClaves(e)) delete t.eps[k];
+  if(id) t.eps[e.clave] = String(id);
+}
+function csTempNuevoId(){ return 't' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36); }
+
+/**
+ * De qué temporada es un episodio, por su nombre («Season 2», «Temporada 2»,
+ * «T2», «S02E05») o, si TODOS los del programa van por centenas (105, 215),
+ * por su número: 215 es de la 2. Null si no se sabe.
+ */
+function csTempAdivinar(e, centenas){
+  const txt = [e.titulo, e.dcTitulo, e.ep && e.ep.name].filter(Boolean).join(' | ');
+  const m = txt.match(/\b(?:season|temporada|temp\.?)\s*(\d{1,2})\b/i) || txt.match(/\bS(\d{1,2})\s*[EX]\s*\d/i) || txt.match(/\bT(\d{1,2})\b/);
+  if(m) return parseInt(m[1], 10) || null;
+  if(centenas && e.numero != null) return Math.floor(e.numero / 100) || null;
+  return null;
+}
+/** Lo que «Detectar temporadas» haría: los episodios aún sin carpeta de los que se sabe la temporada. */
+function csTempPlan(eps, t){
+  const nums = eps.map(e => e.numero).filter(n => n != null);
+  const centenas = nums.length > 1 && nums.every(n => n >= 100 && n < 1000);
+  return eps.filter(e => !csTempDe(t, e)).map(e => ({ e: e, n: csTempAdivinar(e, centenas) })).filter(x => x.n);
+}
+
+/** Guarda las temporadas de un programa. Se ven ya; si no se pudo, vuelve a lo de antes. */
+async function csGuardarTemps(p, t, que){
+  const limpias = csTempsLimpias(t), clave = csTempsClaveLocal(p);
+  let donde = 'nube';
+  if(p.show){
+    const antes = p.show.temporadas;
+    p.show.temporadas = limpias; csRepintar();
+    let r = null;
+    try{ r = await sb.from('shows').update({ temporadas: limpias }).eq('id', p.show.id); }catch(e){ r = { error: e }; }
+    const err = r && r.error;
+    if(!err) csTempsLocal(clave, null);
+    else if(/42703|column .*temporadas|temporadas.* does not exist|schema cache/i.test(String(err.code || '') + ' ' + String(err.message || ''))){
+      p.show.temporadas = antes; csTempsLocal(clave, limpias); donde = 'equipo';
+    }
+    else { p.show.temporadas = antes; castAviso('No se pudieron guardar las temporadas de «' + p.nombre + '»: ' + (err.message || err)); csRepintar(); return 'error'; }
+  }
+  else if(p.serie && typeof prodPuede === 'function' && prodPuede()){
+    const antes = p.serie.temporadas_dubbipt, sid = p.serie.id;
+    p.serie.temporadas_dubbipt = limpias; csRepintar();
+    const r = await csEditar(pl => dcxSerie(pl, sid, { temporadas_dubbipt: limpias }), null, csContexto(p, null));
+    if(r !== 'guardado' && r !== 'igual'){ p.serie.temporadas_dubbipt = antes; csRepintar(); return 'error'; }
+  }
+  else { csTempsLocal(clave, limpias); donde = 'equipo'; }
+  if(que){
+    if(typeof prodPuede === 'function' && prodPuede()) try{ dcxRegistrar(dcxEntrada(que, csContexto(p, null))); }catch(x){ /* sin apuntar */ }
+    castAviso(que + (donde === 'equipo' ? ' · guardado solo en este equipo: para que lo vea todo el equipo, corre sql/mejora-06-temporadas.sql una vez' : ''));
+  }
+  csRepintar();
+  return donde;
+}
+
+function csTempNueva(p, nombre){
+  const n = String(nombre || '').replace(/\s+/g, ' ').trim(); if(!n) return Promise.resolve('nada');
+  const t = csTemporadas(p);
+  if(t.carpetas.some(c => castNorm(c.nombre) === castNorm(n))){ castAviso('Ya hay una carpeta «' + n + '»'); return Promise.resolve('nada'); }
+  t.carpetas.push({ id: csTempNuevoId(), nombre: n });
+  return csGuardarTemps(p, t, 'Temporada nueva en ' + p.nombre + ': ' + n);
+}
+function csTempRenombrar(p, id, nombre){
+  const n = String(nombre || '').replace(/\s+/g, ' ').trim(); const t = csTemporadas(p), c = t.carpetas.find(x => x.id === String(id));
+  if(!n || !c || c.nombre === n) return Promise.resolve('nada');
+  const antes = c.nombre; c.nombre = n;
+  return csGuardarTemps(p, t, 'Temporada renombrada en ' + p.nombre + ': ' + n + ' (antes: ' + antes + ')');
+}
+/** Borrar una carpeta no borra episodios: vuelven a «Sin temporada». */
+function csTempBorrar(p, id){
+  const t = csTemporadas(p), c = t.carpetas.find(x => x.id === String(id));
+  if(!c) return Promise.resolve('nada');
+  t.carpetas = t.carpetas.filter(x => x !== c);
+  return csGuardarTemps(p, t, 'Carpeta quitada en ' + p.nombre + ': ' + c.nombre + ' (sus episodios quedan sin temporada)');
+}
+function csTempMover(p, e, id){
+  const t = csTemporadas(p), c = t.carpetas.find(x => x.id === String(id));
+  if((csTempDe(t, e) || '') === (c ? c.id : '')) return Promise.resolve('nada');
+  csTempPoner(t, e, c ? c.id : null);
+  const nom = (e.numero != null ? 'Ep. ' + e.numero + ' · ' : '') + e.titulo;
+  return csGuardarTemps(p, t, nom + (c ? ' → ' + c.nombre : ' → sin temporada'));
+}
+/** Crea las carpetas «Temporada N» que hagan falta y mete en ellas los episodios que se sabe de cuál son. */
+function csTempDetectar(p, eps){
+  const t = csTemporadas(p), plan = csTempPlan(eps, t);
+  if(!plan.length) return Promise.resolve('nada');
+  for(const x of plan){
+    const nombre = 'Temporada ' + x.n;
+    let c = t.carpetas.find(y => castNorm(y.nombre) === castNorm(nombre));
+    if(!c){ c = { id: csTempNuevoId(), nombre: nombre }; t.carpetas.push(c); }
+    csTempPoner(t, x.e, c.id);
+  }
+  t.carpetas.sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es', { numeric: true }));
+  return csGuardarTemps(p, t, 'Temporadas detectadas en ' + p.nombre + ': ' + plan.length + ' episodio' + (plan.length === 1 ? '' : 's') + ' en su carpeta');
 }
 
 /* ── Pegar la lista de episodios activos ─────────────────────────────────────
@@ -2299,7 +2443,9 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
   if(CS.tab === 'casting') cuerpo = csHtmlCastingPrograma(filasCast);
   else if(CS.tab === 'reparto') cuerpo = csHtmlReparto(p, reparto, d);
   else if(CS.tab === 'historial') cuerpo = csHtmlHistorial(historial, true, 200);
-  else cuerpo = eps.length ? '<div class="cs-eps">' + eps.map(e => {
+  else {
+    const temps = csTemporadas(p);
+    const fila = (e) => {
       const c = csCastingDe(e, d, registro);
       const con = c.filter(f => f.talento).length, choques = c.filter(f => f.choca).length;
       const fase = e.dcEp && e.dcEp.fase ? (PROD_ET.fase[e.dcEp.fase] || e.dcEp.fase) : '';
@@ -2320,6 +2466,9 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
         /* El estado, con su nombre: «Completar» o «Reabrir», como en las tarjetas de los programas. */
         +   (e.ep || (e.dcEp && prodPuede()) ? '<button class="cs-b cs-ep-estado' + (csEstadoEp(e) === 'completo' ? ' cs-ep-hecho' : '') + '" data-cs="estadoEp" data-v="' + csEsc(e.clave) + '" title="' + (csEstadoEp(e) === 'completo' ? 'Está completado: pulsa para volver a ponerlo en curso' : 'Está en curso: pulsa para marcarlo completado') + '">'
                 + (csEstadoEp(e) === 'completo' ? csIco('actualizar', 13) + '<span>Reabrir</span>' : csIco('hecho', 13) + '<span>Completar</span>') + '</button>' : '')
+        /* La carpeta de temporada: se cambia aquí mismo. */
+        +   (temps.carpetas.length ? '<select class="cs-temp-sel" data-cs="tempEp" data-v="' + csEsc(e.clave) + '" title="Mover a otra temporada" aria-label="Temporada de ' + csEsc(e.titulo) + '">'
+                + '<option value="">Sin temporada</option>' + temps.carpetas.map(t => '<option value="' + csEsc(t.id) + '"' + (csTempDe(temps, e) === t.id ? ' selected' : '') + '>' + csEsc(t.nombre) + '</option>').join('') + '</select>' : '')
         +   '<button class="cs-b" data-cs="abrirEp" data-v="' + csEsc(e.clave) + '">Ficha</button>'
         +   (e.ep ? '<button class="cs-b cs-pri" data-cs="castear" data-v="' + csEsc(e.clave) + '" title="Abre el capítulo con el perfil Casting: la interfaz de castear de Dubbipt">' + csIco('entrar', 14) + '<span>Casting</span></button>'
               : '')
@@ -2327,8 +2476,9 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
         +   (e.ep || (e.dcEp && csPuedeBorrarDc()) ? '<button class="cs-b cs-b-icono cs-borrar" data-cs="borrarEp" data-v="' + csEsc(e.clave) + '" title="Eliminar el episodio por completo" aria-label="Eliminar ' + csEsc(e.titulo) + '">' + csIco('borrar', 14) + '</button>' : '')
         + '</div>'
         + '</div>';
-    }).join('') + '</div>'
-    : '<div class="cs-nada">Sin episodios todavía.' + (p.show ? ' Crea el primero con «Nuevo episodio».' : '') + '</div>';
+    };
+    cuerpo = csHtmlTemporadas(p, eps, temps, fila);
+  }
   return '<button class="cs-volver" data-cs="volver" data-v="programas">' + csIco('izquierda', 14) + '<span>Programas</span></button>'
     + '<div class="cs-cab"><div class="cs-cab-t"><h2>' + csEsc(p.nombre) + '</h2><div class="cs-cab-sub">Episodios (' + eps.length + ')'
     +   (p.cliente ? ' · ' + csEsc(p.cliente) : '') + (p.director ? ' · Dir: ' + csEsc(p.director) : '') + '</div></div>'
@@ -2355,6 +2505,37 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
     + '<div class="cs-pests cs-tabs">' + pest('episodios', 'Episodios', eps.length) + pest('casting', 'Casting', filasCast.length) + pest('reparto', 'Reparto', reparto.length) + (prodPuede() ? pest('historial', 'Cambios', historial.length) : '') + '</div>'
     + cuerpo
     + csListaTalentos(d);
+}
+
+/** Los episodios de un programa, en sus carpetas de temporada (si las tiene), y la barra para crearlas. */
+function csHtmlTemporadas(p, eps, temps, fila){
+  const plan = csTempPlan(eps, temps);
+  const puede = !!(p.show || (p.serie && prodPuede()));
+  const barra = puede ? '<div class="cs-temp-bar">'
+    + '<button class="cs-b" data-cs="tempNueva">' + csIco('carpeta', 14) + '<span>Nueva temporada</span></button>'
+    + (plan.length ? '<button class="cs-b" data-cs="tempDetectar" title="Crea las carpetas «Temporada N» que hagan falta y mete los episodios por su nombre («Season 2», «T2», «S02E05») o por su número (215 es de la 2)">' + csIco('actualizar', 14) + '<span>Detectar temporadas (' + plan.length + ')</span></button>' : '')
+    + (temps.carpetas.length ? '<span class="cs-tenue">' + temps.carpetas.length + ' carpeta' + (temps.carpetas.length === 1 ? '' : 's') + '</span>' : '')
+    + '</div>' : '';
+  if(!eps.length && !temps.carpetas.length) return barra + '<div class="cs-nada">Sin episodios todavía.' + (p.show ? ' Crea el primero con «Nuevo episodio».' : '') + '</div>';
+  if(!temps.carpetas.length) return barra + '<div class="cs-eps">' + eps.map(fila).join('') + '</div>';
+  const cerradas = CS.tempCerradas || {};
+  const grupo = (id, nombre, lista, propia) => {
+    const abierta = !cerradas[(csTempsClaveLocal(p) || p.clave) + '|' + id];
+    const hechos = lista.filter(e => csEstadoEp(e) === 'completo').length;
+    return '<div class="cs-temp' + (abierta ? ' on' : '') + (propia ? '' : ' cs-temp-sin') + '">'
+      + '<div class="cs-temp-cab">'
+      +   '<button class="cs-temp-abrir" data-cs="tempAbrir" data-v="' + csEsc(id) + '" aria-expanded="' + abierta + '">'
+      +     '<i class="cs-temp-flecha">' + csIco(abierta ? 'abajo' : 'derecha', 14) + '</i>' + csIco('carpeta', 16)
+      +     '<b>' + csEsc(nombre) + '</b><span class="cs-tenue">' + lista.length + ' episodio' + (lista.length === 1 ? '' : 's') + (hechos ? ' · ' + hechos + ' completado' + (hechos === 1 ? '' : 's') : '') + '</span></button>'
+      +   (propia && puede ? '<button class="cs-b cs-b-icono" data-cs="tempRen" data-v="' + csEsc(id) + '" title="Cambiar el nombre de la carpeta" aria-label="Cambiar el nombre de ' + csEsc(nombre) + '">' + csIco('editar', 14) + '</button>'
+      +     '<button class="cs-b cs-b-icono cs-borrar" data-cs="tempBorrar" data-v="' + csEsc(id) + '" title="Quitar la carpeta (los episodios no se borran: quedan sin temporada)" aria-label="Quitar la carpeta ' + csEsc(nombre) + '">' + csIco('borrar', 14) + '</button>' : '')
+      + '</div>'
+      + (abierta ? (lista.length ? '<div class="cs-eps">' + lista.map(fila).join('') + '</div>' : '<div class="cs-nada cs-temp-vacia">Carpeta vacía: mueve aquí episodios con su selector de temporada.</div>') : '')
+      + '</div>';
+  };
+  const sin = eps.filter(e => !csTempDe(temps, e));
+  return barra + temps.carpetas.map(c => grupo(c.id, c.nombre, eps.filter(e => csTempDe(temps, e) === c.id), true)).join('')
+    + (sin.length ? grupo('_sin', 'Sin temporada', sin, false) : '');
 }
 
 /** El casting de todo un programa: cada personaje de cada episodio, con su talento, buscable y ordenable. */
@@ -2845,6 +3026,36 @@ function csCablear(vista){
       const p = a().lista.find(y => y.clave === v) || a().p; if(!p) return;
       const n = csPedirNombre('Nuevo nombre del programa:', p.nombre); if(n == null) return;
       csRenombrarPrograma(p, n).catch(err => fallo('csRenombrarPrograma · js/castingvistas.js', err, 'el programa no se ha podido renombrar'));
+    };
+    else if(que === 'tempNueva') el.onclick = () => {
+      const x = a(); if(!x.p) return;
+      const n = csPedirNombre('Nombre de la carpeta (por ejemplo, Temporada ' + (csTemporadas(x.p).carpetas.length + 1) + '):', 'Temporada ' + (csTemporadas(x.p).carpetas.length + 1)); if(n == null) return;
+      csTempNueva(x.p, n).catch(err => fallo('csTempNueva · js/castingvistas.js', err, 'la carpeta no se ha podido crear'));
+    };
+    else if(que === 'tempRen') el.onclick = () => {
+      const x = a(); if(!x.p) return; const c = csTemporadas(x.p).carpetas.find(y => y.id === v); if(!c) return;
+      const n = csPedirNombre('Nuevo nombre de la carpeta:', c.nombre); if(n == null) return;
+      csTempRenombrar(x.p, v, n).catch(err => fallo('csTempRenombrar · js/castingvistas.js', err, 'la carpeta no se ha podido renombrar'));
+    };
+    else if(que === 'tempBorrar') el.onclick = async () => {
+      const x = a(); if(!x.p) return; const c = csTemporadas(x.p).carpetas.find(y => y.id === v); if(!c) return;
+      const ok = (typeof DDL_UI !== 'undefined' && DDL_UI.confirmModal) ? await DDL_UI.confirmModal({ title: 'Quitar la carpeta', body: '¿Quitar la carpeta «' + c.nombre + '»? Sus episodios NO se borran: quedan en «Sin temporada».', confirmLabel: 'Quitar', cancelLabel: 'Cancelar', danger: true }) : true;
+      if(ok) csTempBorrar(x.p, v).catch(err => fallo('csTempBorrar · js/castingvistas.js', err, 'la carpeta no se ha podido quitar'));
+    };
+    else if(que === 'tempEp') el.onchange = () => {
+      const x = a(), e = (x.eps || []).find(y => y.clave === v); if(!x.p || !e) return;
+      csTempMover(x.p, e, el.value).catch(err => fallo('csTempMover · js/castingvistas.js', err, 'el episodio no se ha podido mover'));
+    };
+    else if(que === 'tempDetectar') el.onclick = () => {
+      const x = a(); if(!x.p) return;
+      csTempDetectar(x.p, x.eps || []).catch(err => fallo('csTempDetectar · js/castingvistas.js', err, 'las temporadas no se han podido detectar'));
+    };
+    else if(que === 'tempAbrir') el.onclick = () => {
+      const x = a(); if(!x.p) return;
+      const k = (csTempsClaveLocal(x.p) || x.p.clave) + '|' + v;
+      CS.tempCerradas = CS.tempCerradas || {};
+      if(CS.tempCerradas[k]) delete CS.tempCerradas[k]; else CS.tempCerradas[k] = true;
+      csRepintar();
     };
     else if(que === 'renEp') el.onclick = () => {
       const x = a(), e = (x.eps || []).find(y => y.clave === v) || x.e; if(!e) return;

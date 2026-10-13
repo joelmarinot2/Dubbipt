@@ -1748,6 +1748,21 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-etq{ font-size:11px; color:#9CA3AF; border:1px solid #2b2f36; border-radius:999px; padding:2px 8px; white-space:nowrap; }
 .cs-etq-dc{ color:#d7dae0; border-style:dashed; }
 .cs-eps{ display:flex; flex-direction:column; gap:8px; }
+/* Temporadas: carpetas dentro del programa (PRO-44) */
+.cs-temp-bar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+.cs-temp{ background:#0c0e11; border:1px solid #1d2026; border-radius:13px; margin-bottom:10px; overflow:hidden; }
+.cs-temp.on{ border-color:#2a2f37; }
+.cs-temp-cab{ display:flex; align-items:center; gap:6px; padding:6px 10px 6px 4px; }
+.cs-temp-abrir{ flex:1; min-width:0; display:flex; align-items:center; gap:9px; background:none; border:0; color:#f2f3f5; font:inherit; font-size:14px; padding:8px 8px; cursor:pointer; text-align:left; border-radius:9px; }
+.cs-temp-abrir:hover{ background:#14171b; }
+.cs-temp-abrir svg{ color:#FBBF24; flex:none; }
+.cs-temp-flecha{ display:inline-flex; font-style:normal; }
+.cs-temp-flecha svg{ color:#9CA3AF; }
+.cs-temp-abrir b{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cs-temp-sin .cs-temp-abrir svg{ color:#6B7280; }
+.cs-temp > .cs-eps{ padding:0 10px 10px; }
+.cs-temp-vacia{ margin:0 10px 10px; }
+.cs-temp-sel{ background:#101215; color:#f2f3f5; border:1px solid #23262b; border-radius:9px; padding:6px 8px; font-size:12px; max-width:150px; }
 .cs-ep{ display:flex; align-items:center; gap:12px; background:#101215; border:1px solid #23262b; border-left:3px solid #22C55E; border-radius:11px; padding:12px 16px; }
 .cs-ep-bots{ display:flex; gap:6px; flex-shrink:0; align-items:center; }
 /* El aviso de que el servidor no responde (js/salud.js). */
@@ -2936,7 +2951,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.62.0-nube';
+const APP_VER_NUM = 'v11.63.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
