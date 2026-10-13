@@ -51,7 +51,7 @@ class El {
   get innerHTML(){ return this._html; }
   querySelectorAll(sel){
     if(sel !== '[data-cs]') return [];
-    if(!this._todos) this._todos = [...this._html.matchAll(/<(input|button|select)\b[^>]*data-cs="([^"]+)"[^>]*>/g)].map(x => {
+    if(!this._todos) this._todos = [...this._html.matchAll(/<(input|button|select|div)\b[^>]*data-cs="([^"]+)"[^>]*>/g)].map(x => {
       const e = new El(x[1]);
       for(const m of x[0].matchAll(/(data-[\w-]+)="([^"]*)"/g)) e.atrs[m[1]] = m[2].replace(/&quot;/g, '"').replace(/&amp;/g, '&');
       const v = x[0].match(/ value="([^"]*)"/); e.value = v ? v[1] : '';
@@ -96,7 +96,7 @@ function armar(o){
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
     ['CS', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
      'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS', 'csAsegurarDatos', 'csDevolverCopia', 'csBajarCopia', 'CS_TRAER',
-     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado', 'csBorrarPrograma', 'csBorrarEpisodio', 'csBorrarDeBiblioteca', 'csEstadoEp', 'csCambiarEstadoEp', 'csLeerActivos', 'csAplicarActivos', 'csNumeroDeLinea', 'csProgramaDeLinea', 'csParecidoPersonaje', 'csIndicePapeles', 'csBuscarPersonajes', 'CS_REGS', 'csFichasTalentos', 'csCargaTalento', 'csOcupacionDatos', 'csOcupacionVisible', 'csTrSla'],
+     'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado', 'csBorrarPrograma', 'csBorrarEpisodio', 'csBorrarDeBiblioteca', 'csEstadoEp', 'csCambiarEstadoEp', 'csLeerActivos', 'csAplicarActivos', 'csNumeroDeLinea', 'csProgramaDeLinea', 'csParecidoPersonaje', 'csIndicePapeles', 'csBuscarPersonajes', 'CS_REGS', 'csFichasTalentos', 'csCargaTalento', 'csOcupacionDatos', 'csOcupacionVisible', 'csTrSla', 'csTrPorVencer', 'csTrAvisar'],
     { castNorm: (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim(),
       document: { getElementById: (id) => campos[id] || null, querySelector: () => null, body: { classList: { contains: () => false, toggle: () => {}, remove: () => {} } } },
       prodPuede: () => true, PROD: PROD, PROD_ET: PR.PROD_ET, prodIndices: PR.prodIndices, prodAlertasEp: PR.prodAlertasEp, prodPlazo: PR.prodPlazo, prodFormatoDubcard: PR.prodFormatoDubcard,
@@ -984,5 +984,42 @@ exports.pruebas = async function(t){
     const c = controles(A, 'ocupacion');
     t.ok('en pantalla: el buscador, los filtros, las pestañas y una tarjeta por programa con sus episodios', !!c.de('ocBuscar') && !!c.de('ocFiltro', { campo: 'ocTono' }) && !!c.de('ocModo', { v: 'fin' })
          && /<div class="cs-oc-prog"><div class="cs-oc-prog-cab"><b>A FILIPINO CHRISTMAS<\/b>[\s\S]*?<span class="cs-oc-epn">Ep\.2<\/span><span class="cs-oc-per">ALLY, REY<\/span><span class="cs-oc-lin">97 lín\.<\/span>/.test(c.html));
+  }
+
+  t.seccion('16 · Tráilers: el formulario flotante, el calendario y el aviso de cada día (PRO-41)');
+  {
+    const A = armar();
+    A.M.CS.vista = 'trailers';
+    controles(A, 'trailers').de('trAgregar').onclick();
+    const c = controles(A, 'trailers');
+    t.ok('«Agregar» abre una ventana flotante, con el fondo borroso, que se cierra pulsando fuera', /<div class="cs-tr-ov" data-cs="trFondo"><div class="cs-tr-form" role="dialog" aria-modal="true"/.test(c.html) && !!c.de('trFondo'));
+    t.ok('las dos fechas abren el calendario', /type="date" data-cs="trFecha" id="csTrF_received_at"/.test(c.html) && /type="date" data-cs="trFecha" id="csTrF_deadline"/.test(c.html));
+    const fecha = c.de('trFecha'); let abierto = 0; fecha.showPicker = () => { abierto++; };
+    fecha.onclick();
+    let evitado = 0; fecha.value = '2026-10-20'; fecha.onkeydown({ key: '5', preventDefault: () => { evitado++; } });
+    t.eq('pulsar abre el calendario y escribir no cambia la fecha (la abre)', abierto + ' ' + evitado + ' ' + fecha.value, '2 1 2026-10-20');
+    fecha.onkeydown({ key: 'Delete', preventDefault: () => {} });
+    t.eq('Supr la borra', fecha.value, '');
+    const fondo = c.de('trFondo');
+    fondo.onclick({ target: {} });
+    t.ok('pulsar dentro no la cierra', A.M.CS.trForm !== null);
+    fondo.onkeydown({ key: 'Escape' });
+    t.eq('Esc la cierra', A.M.CS.trForm, null);
+  }
+  {
+    const A = armar();
+    const hoy = new Date(2026, 9, 7);
+    const d = { series: [{ id: 1, name: 'Akka' }], trailers: [
+      { id: 1, title: 'Uno', type: 'teaser', series_id: 1, deadline: '2026-10-10', status: 'pendiente' },
+      { id: 2, title: 'Dos', type: 'trailer', deadline: '2026-10-11', status: 'en_curso' },
+      { id: 3, title: 'Tres', type: 'trailer', deadline: '2026-10-08', status: 'completo' },
+      { id: 4, title: 'Cuatro', type: 'trailer', deadline: '2026-10-05', status: 'pendiente' },
+      { id: 5, title: 'Cinco', type: 'trailer', status: 'pendiente' }] };
+    t.eq('se avisa de los abiertos a 3 días o menos (y los vencidos), el más urgente primero', A.M.csTrPorVencer(d, hoy).map(x => x.id).join(','), '4,1');
+    A.PROD.datos = d;
+    const av = A.M.csTrAvisar(hoy);
+    t.ok('el aviso dice qué, de qué programa y cuánto falta', av.length === 2 && A.avisos.some(x => /^2 tráilers y teasers por entregar: Tráiler «Cuatro»: vencido · 2026-10-05 \| Teaser «Uno» \(Akka\): faltan 3 días · 2026-10-10/.test(x)));
+    t.eq('una vez al día: el mismo día no se repite', A.M.csTrAvisar(hoy).length, 0);
+    t.eq('al día siguiente, otra vez (y entra el que ahora está a 3 días)', A.M.csTrAvisar(new Date(2026, 9, 8)).map(x => x.id).join(','), '4,1,2');
   }
 };

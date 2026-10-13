@@ -2032,7 +2032,10 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-tr-est-completo{ background:rgba(52,211,153,.12); color:#34D399; border-color:rgba(52,211,153,.3); }
 .cs-tr-acc{ display:flex; gap:4px; justify-content:flex-end; }
 .cs-tr-acc .cs-b-icono{ padding:4px 7px; }
-.cs-tr-form{ background:#101215; border:1px solid #2f3a33; border-radius:14px; padding:16px 18px; margin-bottom:14px; display:flex; flex-direction:column; gap:12px; max-width:620px; }
+.cs-tr-ov{ position:fixed; inset:0; z-index:4000; display:flex; align-items:center; justify-content:center; padding:16px; background:rgba(5,7,9,.55); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); animation:csTrEntra .14s ease-out; }
+@keyframes csTrEntra{ from{ opacity:0; } to{ opacity:1; } }
+.cs-tr-form{ background:#101215; border:1px solid #2f3a33; border-radius:16px; padding:20px 22px; display:flex; flex-direction:column; gap:12px; width:min(560px,100%); max-height:calc(100vh - 32px); overflow:auto; box-shadow:0 24px 60px rgba(0,0,0,.55); }
+.cs-tr-form input[type=date]{ cursor:pointer; color-scheme:dark; }
 .cs-tr-form-t{ font-weight:700; font-size:15px; color:#f2f3f5; }
 .cs-tr-form label{ display:flex; flex-direction:column; gap:5px; font-size:11px; color:#8b8f97; }
 .cs-tr-form input, .cs-tr-form select{ background:#0d0f12; border:1px solid #2b2f36; color:#f2f3f5; border-radius:9px; padding:8px 10px; font-family:'Inter',sans-serif; font-size:12.5px; outline:none; }
@@ -2873,7 +2876,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.59.0-nube';
+const APP_VER_NUM = 'v11.60.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);

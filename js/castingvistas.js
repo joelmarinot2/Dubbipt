@@ -1384,10 +1384,63 @@ function csTrVisibles(d, f){
     || ((!a.deadline) - (!b.deadline)) || (a.deadline && b.deadline ? csFechaLocal(a.deadline) - csFechaLocal(b.deadline) : 0));
 }
 
+/* ── El aviso de los tráilers por entregar ─────────────────────────────────
+   Pedido de sala: «quiero que me salga una notificación si faltan 3 días para
+   la fecha de entrega del tráiler o teaser, que me avise cada día». Una vez al
+   día, de los que no están completados y vencen en 3 días o menos (o ya
+   vencieron): en Dubbipt y, si se ha permitido, en el sistema. Lo ya avisado
+   hoy se apunta en este equipo para no repetirlo. Se mira al pintar Casting y
+   cada media hora (al pie del archivo). */
+
+/** Los que hay que avisar: abiertos, con fecha, a 3 días o menos. Del más urgente al menos. */
+function csTrPorVencer(d, hoy){
+  return ((d && d.trailers) || []).map(t => Object.assign({ sla: csTrSla(t.deadline, t.status, hoy) }, t))
+    .filter(t => t.status !== 'completo' && t.deadline && t.sla.dias != null && t.sla.dias <= 3)
+    .sort((a, b) => a.sla.dias - b.sla.dias);
+}
+
+function csTrClaveAvisos(){ return 'ddl-tr-avisos::' + ((typeof WORKSPACE !== 'undefined' && WORKSPACE && WORKSPACE.id) || 'sin-espacio'); }
+function csHoyTexto(h){ const d = new Date(h || Date.now()); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
+/** Avisa, una vez al día, de los tráilers y teasers por entregar. Devuelve los avisados ahora. */
+function csTrAvisar(hoy){
+  if(typeof prodPuede === 'function' && !prodPuede()) return [];
+  const d = (typeof PROD !== 'undefined' && PROD) ? PROD.datos : null;
+  if(!d) return [];
+  const dia = csHoyTexto(hoy);
+  let hecho = null;
+  try{ hecho = JSON.parse(localStorage.getItem(csTrClaveAvisos()) || 'null'); }catch(e){ hecho = null; }
+  if(!hecho || hecho.dia !== dia) hecho = { dia: dia, ids: [] };
+  const nuevos = csTrPorVencer(d, hoy).filter(t => hecho.ids.indexOf(String(t.id)) < 0);
+  if(!nuevos.length) return [];
+  const serie = {}; for(const s of (d.series || [])) serie[String(s.id)] = s.name;
+  const linea = (t) => (t.type === 'teaser' ? 'Teaser' : 'Tráiler') + ' «' + (t.title || 'sin título') + '»' + (t.series_id != null && serie[String(t.series_id)] ? ' (' + serie[String(t.series_id)] + ')' : '')
+    + ': ' + (t.sla.dias < 0 ? 'vencido' : (t.sla.dias === 0 ? 'se entrega hoy' : (t.sla.dias === 1 ? 'se entrega mañana' : 'faltan ' + t.sla.dias + ' días'))) + ' · ' + t.deadline;
+  const titulo = nuevos.length === 1 ? 'Un tráiler por entregar' : nuevos.length + ' tráilers y teasers por entregar';
+  try{ castAviso(titulo + ': ' + nuevos.map(linea).join(' | ')); }catch(e){ /* sin avisos en pantalla */ }
+  try{
+    if(typeof Notification !== 'undefined' && Notification.permission === 'granted')
+      new Notification('Dubbipt · ' + titulo, { body: nuevos.map(linea).join('\n'), tag: 'dubbipt-trailers-' + dia });
+  }catch(e){ /* el sistema no deja: queda el aviso en Dubbipt */ }
+  hecho.ids = hecho.ids.concat(nuevos.map(t => String(t.id)));
+  try{ localStorage.setItem(csTrClaveAvisos(), JSON.stringify(hecho)); }catch(e){ /* sin almacén: se volverá a avisar */ }
+  return nuevos;
+}
+
+/** Pide permiso para las notificaciones del sistema (tiene que ser al pulsar un botón). */
+function csTrPedirAvisos(){
+  if(typeof Notification === 'undefined'){ castAviso('Este navegador no tiene notificaciones: los avisos salen dentro de Dubbipt'); return; }
+  Promise.resolve(Notification.requestPermission()).then(p => {
+    castAviso(p === 'granted' ? 'Listo: los tráilers por entregar también avisan en el sistema' : 'Sin permiso: los avisos salen solo dentro de Dubbipt');
+    csRepintar();
+  }).catch(() => { /* sin respuesta: se queda como estaba */ });
+}
+
 function csHtmlTrForm(d){
   const f = CS.trForm || {};
   const op = (v, t, cur) => '<option value="' + csEsc(v) + '"' + (String(cur == null ? '' : cur) === String(v) ? ' selected' : '') + '>' + csEsc(t) + '</option>';
-  return '<div class="cs-tr-form"><div class="cs-tr-form-t">' + (f.id != null ? 'Editar material' : 'Nuevo material') + '</div>'
+  /* Flotante, en el centro, con el fondo borroso (PRO-41). Se cierra con Cancelar, pulsando fuera o con Esc. */
+  return '<div class="cs-tr-ov" data-cs="trFondo"><div class="cs-tr-form" role="dialog" aria-modal="true" aria-label="' + (f.id != null ? 'Editar material' : 'Nuevo material') + '"><div class="cs-tr-form-t">' + (f.id != null ? 'Editar material' : 'Nuevo material') + '</div>'
     + '<div class="cs-tr-campos cs-tr-3">'
     +   '<label>Tipo *<select id="csTrF_type">' + op('', '— Seleccionar —', f.type) + op('trailer', 'Tráiler', f.type) + op('teaser', 'Teaser', f.type) + '</select></label>'
     +   '<label>Etapa<select id="csTrF_etapa">' + op('', '— Sin definir —', f.etapa) + op('grabacion', 'Grabación', f.etapa) + op('edicion', 'Edición', f.etapa) + '</select></label>'
@@ -1397,10 +1450,10 @@ function csHtmlTrForm(d){
     + '<label>Serie / programa<select id="csTrF_series_id">' + op('', '— Sin asociar —', f.series_id)
     +   ((d && d.series) || []).filter(s => !s.autoCreated).slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'es')).map(s => op(s.id, s.name, f.series_id)).join('') + '</select></label>'
     + '<div class="cs-tr-campos cs-tr-2">'
-    +   '<label>Fecha de llegada<input type="date" id="csTrF_received_at" value="' + csEsc(f.received_at || '') + '"></label>'
-    +   '<label>Fecha límite de entrega<input type="date" id="csTrF_deadline" value="' + csEsc(f.deadline || '') + '"></label>'
+    +   '<label>Fecha de llegada<input type="date" data-cs="trFecha" id="csTrF_received_at" value="' + csEsc(f.received_at || '') + '"></label>'
+    +   '<label>Fecha límite de entrega<input type="date" data-cs="trFecha" id="csTrF_deadline" value="' + csEsc(f.deadline || '') + '"></label>'
     + '</div>'
-    + '<div class="cs-tr-form-b"><button class="cs-b" data-cs="trCancelar">Cancelar</button><button class="cs-b cs-pri" data-cs="trGuardar">Guardar</button></div></div>';
+    + '<div class="cs-tr-form-b"><button class="cs-b" data-cs="trCancelar">Cancelar</button><button class="cs-b cs-pri" data-cs="trGuardar">Guardar</button></div></div></div>';
 }
 
 function csHtmlTrailers(d, hoy, vivo){
@@ -1415,7 +1468,8 @@ function csHtmlTrailers(d, hoy, vivo){
   const sel = (campo, valor, ops) => '<select data-cs="trFiltro" data-campo="' + campo + '">' + ops.map(x => '<option value="' + x[0] + '"' + (valor === x[0] ? ' selected' : '') + '>' + x[1] + '</option>').join('') + '</select>';
   const kpi = (n, t, cls) => '<div class="cs-tr-kpi cs-tr-kpi-' + cls + '"><b>' + n + '</b><span>' + t + '</span></div>';
   return csCabecera('Tráilers & Teasers', todos.length + ' materiales · ' + pendientes + ' pendientes' + (criticos ? ' <b class="cs-rojo">· ' + criticos + ' crítico' + (criticos === 1 ? '' : 's') + '</b>' : ''), vivo)
-      .replace(/<\/div>$/, '<button class="cs-b cs-pri" data-cs="trAgregar">' + csIco('mas', 14) + '<span>Agregar</span></button></div>')
+      .replace(/<\/div>$/, ((typeof Notification !== 'undefined' && Notification.permission === 'default') ? '<button class="cs-b" data-cs="trAvisos" title="Que los tráilers por entregar (3 días o menos) avisen también en el sistema, una vez al día">' + csIco('aviso', 14) + '<span>Activar avisos</span></button>' : '')
+        + '<button class="cs-b cs-pri" data-cs="trAgregar">' + csIco('mas', 14) + '<span>Agregar</span></button></div>')
     + (CS.trForm ? csHtmlTrForm(d) : '')
     + '<div class="cs-tr-kpis">' + kpi(todos.length, 'Total', 'total') + kpi(pendientes, 'Pendientes', 'pend') + kpi(hechos, 'Completados', 'ok') + (criticos ? kpi(criticos, 'Críticos', 'mal') : '') + '</div>'
     + '<div class="cs-tr-filtros">'
@@ -2491,6 +2545,7 @@ function csPintar(modo, cab, grid){
   vista.innerHTML = csHtml(CS.vista);
   csCablear(vista);
   csAsegurarDatos();
+  try{ csTrAvisar(); }catch(e){ fallo('csTrAvisar · js/castingvistas.js', e); }
   return true;
 }
 
@@ -2780,6 +2835,23 @@ function csCablear(vista){
       if(t){ CS.trForm = Object.assign({}, t); csRepintar(); }
     };
     else if(que === 'trCancelar') el.onclick = () => { CS.trForm = null; csRepintar(); };
+    else if(que === 'trFondo'){
+      el.onclick = (ev) => { if(ev.target === el){ CS.trForm = null; csRepintar(); } };
+      el.onkeydown = (ev) => { if(ev.key === 'Escape'){ CS.trForm = null; csRepintar(); } };
+      const primero = el.querySelector && el.querySelector('#csTrF_title');
+      if(primero && !primero.value) try{ primero.focus(); }catch(err){ /* sin foco se escribe igual */ }
+    }
+    /* Las fechas, con el calendario: al pulsarlas se abre y no se escriben a mano (Supr o Retroceso las borra). */
+    else if(que === 'trFecha'){
+      el.onclick = () => { try{ if(typeof el.showPicker === 'function') el.showPicker(); }catch(err){ /* el navegador abre el suyo */ } };
+      el.onkeydown = (ev) => {
+        if(ev.key === 'Tab' || ev.key === 'Escape' || ev.key === 'Enter') return;
+        ev.preventDefault();
+        if(ev.key === 'Backspace' || ev.key === 'Delete') el.value = '';
+        else try{ if(typeof el.showPicker === 'function') el.showPicker(); }catch(err){ /* el navegador abre el suyo */ }
+      };
+    }
+    else if(que === 'trAvisos') el.onclick = () => { csTrPedirAvisos(); };
     else if(que === 'trGuardar') el.onclick = () => {
       const val = (k) => { const i = document.getElementById('csTrF_' + k); return i ? String(i.value || '').trim() : ''; };
       const f = { type: val('type'), etapa: val('etapa'), status: val('status') || 'pendiente', title: val('title'), series_id: val('series_id') ? id(val('series_id')) : null, received_at: val('received_at'), deadline: val('deadline') };
@@ -2832,3 +2904,10 @@ async function csActualizar(){
 }
 
 /* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST ═══ */
+
+/* Los tráilers por entregar, también sin estar en Casting: al rato de abrir y cada media hora (csTrAvisar solo avisa una vez al día de cada uno). */
+if(typeof window !== 'undefined' && typeof setInterval === 'function' && !window.__csTrAvisos){
+  window.__csTrAvisos = true;
+  setTimeout(() => { try{ csTrAvisar(); }catch(e){ /* se mira en el siguiente */ } }, 20000);
+  setInterval(() => { try{ csTrAvisar(); }catch(e){ /* se mira en el siguiente */ } }, 30 * 60000);
+}
