@@ -123,7 +123,21 @@ function prodResumen(d){
 }
 
 /** Los índices por id, con los ids como texto: en el JSON van unas veces como número y otras como texto. */
+/* Pedido de sala: «quiero que todo el programa sea más fluido». Los índices
+   se rehacían por cada capítulo y por cada pintado sobre decenas de miles de
+   registros (castings, apariciones). Se guardan por juego de datos; si alguna
+   lista se cambió por otra o cambió de tamaño, se rehacen. */
+const PROD_IX_LISTAS = ['series', 'episodes', 'characters', 'talents', 'studios', 'castings', 'appearances', 'trailers'];
+const PROD_IX = (typeof WeakMap === 'function') ? new WeakMap() : null;
 function prodIndices(d){
+  if(!d || typeof d !== 'object' || !PROD_IX) return prodIndicesHacer(d || {});
+  const m = PROD_IX.get(d);
+  if(m && PROD_IX_LISTAS.every((k, i) => m.listas[i] === d[k] && m.largos[i] === (Array.isArray(d[k]) ? d[k].length : -1))) return m.ix;
+  const ix = prodIndicesHacer(d);
+  PROD_IX.set(d, { ix: ix, listas: PROD_IX_LISTAS.map(k => d[k]), largos: PROD_IX_LISTAS.map(k => Array.isArray(d[k]) ? d[k].length : -1) });
+  return ix;
+}
+function prodIndicesHacer(d){
   const por = (lista) => { const m = {}; (lista || []).forEach(x => { if(x && x.id != null) m[String(x.id)] = x; }); return m; };
   const agrupa = (lista, campo) => { const m = {}; (lista || []).forEach(x => { if(!x) return; const k = String(x[campo]); (m[k] = m[k] || []).push(x); }); return m; };
   return {

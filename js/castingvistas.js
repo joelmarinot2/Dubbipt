@@ -218,9 +218,19 @@ function csNumeroDe(nombre, programa){
    cualquiera de los dos. */
 
 function csClaveEstados(){ return 'ddl-estados::' + ((typeof WORKSPACE !== 'undefined' && WORKSPACE && WORKSPACE.id) || 'sin-espacio'); }
-function csEstadosLocales(){
-  try{ const v = JSON.parse(localStorage.getItem(csClaveEstados()) || '{}'); return (v && typeof v === 'object') ? v : {}; }catch(e){ return {}; }
+/* Lo guardado en el equipo se leía y se interpretaba por cada programa y
+   por cada episodio en cada pintado; ahora solo cuando cambia (fluidez, PRO-45). */
+function csLeerLocal(memo, clave){
+  let raw = null;
+  try{ raw = localStorage.getItem(clave); }catch(e){ raw = null; }
+  if(memo.clave === clave && memo.raw === raw) return memo.valor;
+  let v = {};
+  try{ v = JSON.parse(raw || '{}'); if(!v || typeof v !== 'object') v = {}; }catch(e){ v = {}; }
+  memo.clave = clave; memo.raw = raw; memo.valor = v;
+  return v;
 }
+const CS_ESTADOS_MEMO = { clave: null, raw: null, valor: {} };
+function csEstadosLocales(){ return csLeerLocal(CS_ESTADOS_MEMO, csClaveEstados()); }
 function csEstadoLocal(showId, estado){
   const m = csEstadosLocales();
   if(estado) m[String(showId)] = estado; else delete m[String(showId)];
@@ -239,7 +249,7 @@ function csEstadoDe(show, serie){
 }
 
 function csProg(show, serie, eps, d){
-  const dcEps = (serie && d) ? d.episodes.filter(e => String(e.series_id) === String(serie.id)) : [];
+  const dcEps = (serie && d) ? ((typeof prodIndices === 'function' ? prodIndices(d).epsPorSerie[String(serie.id)] : null) || []) : [];
   return { clave: show ? 's:' + show.id : 'dc:' + serie.id, nombre: show ? show.name : serie.name, show: show || null, serie: serie || null,
            estado: csEstadoDe(show, serie), cliente: (serie && serie.cliente) || '', director: (serie && serie.director) || '',
            tipo: (serie && serie.type) || '', eps: eps || [], dcEps: dcEps };
@@ -284,7 +294,22 @@ function csFiltrarProgramas(lista, filtro, buscar){
  * DublajeCast si la tiene, y los de DublajeCast que aún no están aquí. Por
  * número de episodio.
  */
+const CS_EPS_MEMO = new Map();
 function csEpisodios(p){
+  /* Casar cada capítulo con el de DublajeCast cuesta (por nombre y por
+     número); se recuerda por programa mientras no cambien sus capítulos de
+     un lado ni del otro (fluidez, PRO-45). Quien lo usa solo lo lee. */
+  if(!p || !p.clave) return csEpisodiosHacer(p);
+  let firma = p.nombre + '\u0001' + p.dcEps.length + '\u0001';
+  for(const ep of p.eps) firma += ep.id + '=' + ep.name + '\u0002';
+  const m = CS_EPS_MEMO.get(p.clave);
+  if(m && m.firma === firma && m.dcEps === p.dcEps && m.todo === ((typeof LDB !== 'undefined' && LDB) ? LDB.epsAll : null)) return m.out;
+  const out = csEpisodiosHacer(p);
+  if(CS_EPS_MEMO.size > 2000) CS_EPS_MEMO.clear();
+  CS_EPS_MEMO.set(p.clave, { firma: firma, dcEps: p.dcEps, todo: (typeof LDB !== 'undefined' && LDB) ? LDB.epsAll : null, out: out });
+  return out;
+}
+function csEpisodiosHacer(p){
   const out = [], usados = new Set();
   for(const ep of p.eps){
     const dc = dcastEpDeDc(ep.name, p.dcEps, p.nombre);
@@ -746,9 +771,8 @@ async function csCambiarEstadoEp(p, e, nuevo){
    uno que solo está en DublajeCast, en su serie. */
 
 function csClaveTemps(){ return 'ddl-temporadas::' + ((typeof WORKSPACE !== 'undefined' && WORKSPACE && WORKSPACE.id) || 'sin-espacio'); }
-function csTempsLocales(){
-  try{ const v = JSON.parse(localStorage.getItem(csClaveTemps()) || '{}'); return (v && typeof v === 'object') ? v : {}; }catch(e){ return {}; }
-}
+const CS_TEMPS_MEMO = { clave: null, raw: null, valor: {} };
+function csTempsLocales(){ return csLeerLocal(CS_TEMPS_MEMO, csClaveTemps()); }
 function csTempsLocal(clave, t){
   const m = csTempsLocales();
   if(t) m[clave] = t; else delete m[clave];
@@ -1121,7 +1145,20 @@ function csParecidoPersonaje(q, nombre){
  * uno por personaje, programa y talento. De DublajeCast (`d`) y de los registros
  * de Dubbipt (`regs`: [{ showId, programa, serieId, reg }]).
  */
+const CS_PAPELES_MEMO = (typeof WeakMap === 'function') ? new WeakMap() : null;
+const CS_PAPELES_SIN = {};
 function csIndicePapeles(d, regs){
+  /* Recorre todos los castings y apariciones: una vez por juego de datos y
+     registros, no por cada pintado de Talentos u Ocupación (fluidez, PRO-45).
+     Quien lo usa solo lo lee. */
+  const clave = (d && typeof d === 'object') ? d : CS_PAPELES_SIN;
+  const m = CS_PAPELES_MEMO && CS_PAPELES_MEMO.get(clave);
+  if(m && m.regs === (regs || null) && m.ix === ((d && typeof prodIndices === 'function') ? prodIndices(d) : null)) return m.lista;
+  const lista = csIndicePapelesHacer(d, regs);
+  if(CS_PAPELES_MEMO) CS_PAPELES_MEMO.set(clave, { regs: regs || null, ix: (d && typeof prodIndices === 'function') ? prodIndices(d) : null, lista: lista });
+  return lista;
+}
+function csIndicePapelesHacer(d, regs){
   const por = new Map();
   const showDeSerie = {};
   for(const r of (regs || [])) if(r && r.serieId != null) showDeSerie[String(r.serieId)] = r;
@@ -1266,7 +1303,25 @@ function csHtmlBuscarPersonaje(d){
  * personajes: [{ nombre, eps, lineas, principal }], lineas }], nProg, nEps,
  * nPer, lineas, activos }], por nombre.
  */
+/** Una firma barata de la lista de programas: lo que cambia lo que se enseña de cada uno (y el estado de sus capítulos si `conEps`). */
+function csFirmaLista(lista, conEps){
+  let f = '';
+  for(const p of (lista || [])){
+    f += p.clave + '|' + p.estado + '|' + p.nombre + '|' + (p.tipo || '') + '\n';
+    if(conEps){ try{ for(const e of csEpisodios(p)) if(e.numero != null) f += e.numero + (csEstadoEp(e) === 'completo' ? 'c' : 'e') + ','; }catch(err){ /* sin episodios */ } f += '\n'; }
+  }
+  return f;
+}
+const CS_FICHAS_MEMO = { papeles: null, firma: null, talentos: null, out: null };
 function csFichasTalentos(d, regs, lista){
+  /* Se rehacía en cada tecla del buscador de Talentos (fluidez, PRO-45). */
+  const papeles = csIndicePapeles(d, regs), firma = csFirmaLista(lista, false), talentos = d ? d.talents : null;
+  const M = CS_FICHAS_MEMO;
+  if(M.out && M.papeles === papeles && M.firma === firma && M.talentos === talentos) return M.out;
+  M.out = csFichasTalentosHacer(d, regs, lista, papeles); M.papeles = papeles; M.firma = firma; M.talentos = talentos;
+  return M.out;
+}
+function csFichasTalentosHacer(d, regs, lista, papeles){
   const fichas = {};
   if(d) for(const t of d.talents) if(t && t.name) fichas[castNorm(t.name)] = t;
   const progDe = {};
@@ -1280,7 +1335,7 @@ function csFichasTalentos(d, regs, lista){
     return x;
   };
   for(const k of Object.keys(fichas)) talento(fichas[k].name);
-  for(const pp of csIndicePapeles(d, regs)){
+  for(const pp of papeles){
     if(!pp.talento) continue;
     const x = talento(pp.talento);
     if(!x) continue;
@@ -1390,7 +1445,16 @@ function csHtmlTalentos(d, vivo){
  * programa, estado, eps: [{ n, fin, lineas, personajes: [{ nombre, lineas }] }] }] }].
  * `lista`: los programas de la vista, para el estado de cada programa y de cada episodio.
  */
+const CS_OC_MEMO = { papeles: null, firma: null, talentos: null, out: null };
 function csOcupacionDatos(d, regs, lista){
+  /* Se rehacía en cada tecla del buscador de Ocupación (fluidez, PRO-45). */
+  const papeles = csIndicePapeles(d, regs), firma = csFirmaLista(lista, true), talentos = d ? d.talents : null;
+  const M = CS_OC_MEMO;
+  if(M.out && M.papeles === papeles && M.firma === firma && M.talentos === talentos) return M.out;
+  M.out = csOcupacionDatosHacer(d, regs, lista, papeles); M.papeles = papeles; M.firma = firma; M.talentos = talentos;
+  return M.out;
+}
+function csOcupacionDatosHacer(d, regs, lista, papeles){
   const fichas = {};
   if(d) for(const t of d.talents) if(t && t.name) fichas[castNorm(t.name)] = t;
   const progDe = {}, estadoEp = {};
@@ -1400,7 +1464,7 @@ function csOcupacionDatos(d, regs, lista){
     try{ for(const e of csEpisodios(p)) if(e.numero != null) m[e.numero] = csEstadoEp(e); }catch(err){ /* sin episodios: el estado del programa */ }
   }
   const por = new Map();
-  for(const pp of csIndicePapeles(d, regs)){
+  for(const pp of papeles){
     if(!pp.talento) continue;
     const k = castNorm(pp.talento);
     if(!k) continue;
@@ -1704,8 +1768,21 @@ function csTramoTexto(eps){
  * con su talento por tramos de episodios (un relevo se ve: «ANA 1–3 → LUZ 4»),
  * en cuántos episodios sale y cuántas líneas tiene. Principales primero.
  */
+const CS_REPARTO_MEMO = (typeof WeakMap === 'function') ? new WeakMap() : null;
 function csReparto(p, d){
   if(!d || !p || !p.serie) return [];
+  /* Se pedía varias veces por pintado (reparto, inconsistencias, dashboard de
+     cada programa): se recuerda por juego de datos y serie (fluidez, PRO-45).
+     Quien lo usa lo copia; nadie lo cambia. */
+  let m = CS_REPARTO_MEMO && CS_REPARTO_MEMO.get(d);
+  if(CS_REPARTO_MEMO && !m){ m = new Map(); CS_REPARTO_MEMO.set(d, m); }
+  const k = String(p.serie.id) + '|' + p.dcEps.length;
+  if(m && m.has(k)) return m.get(k);
+  const r = csRepartoHacer(p, d);
+  if(m) m.set(k, r);
+  return r;
+}
+function csRepartoHacer(p, d){
   const ix = prodIndices(d);
   const eps = p.dcEps.slice().sort((a, b) => (parseInt(a.episode_number, 10) || 0) - (parseInt(b.episode_number, 10) || 0));
   const por = {};
@@ -1953,7 +2030,7 @@ let CS_COLA = Promise.resolve();
 function csAlInstante(cambio){
   try{
     if(typeof dcast === 'undefined' || !dcast || !dcast.sesion || !dcast.payload || typeof PROD === 'undefined') return null;
-    const copia = JSON.parse(JSON.stringify(dcast.payload));
+    const copia = (typeof dcxCopia === 'function') ? dcxCopia(dcast.payload) : JSON.parse(JSON.stringify(dcast.payload));
     if(!cambio(copia)) return null;
     const antes = { datos: PROD.datos, escrito: DCX.escrito };
     const nuevo = prodNormalizar(copia);
@@ -2763,14 +2840,21 @@ function csPintar(modo, cab, grid){
   if(!vista){ vista = document.createElement('div'); vista.id = 'csVista'; vista.className = 'cs-vista'; }
   if(lib.firstChild !== nav) lib.insertBefore(nav, lib.firstChild);
   if(nav.nextSibling !== vista) lib.insertBefore(vista, nav.nextSibling);
+  csPintarVista(nav, vista);
+  csAsegurarDatos();
+  try{ csTrAvisar(); }catch(e){ fallo('csTrAvisar · js/castingvistas.js', e); }
+  return true;
+}
+
+/** La barra y la sección, pintadas y cableadas. */
+function csPintarVista(nav, vista){
+  CS.pintados = (CS.pintados || 0) + 1;
+  if(!csSecciones().some(sc => sc.v === CS.vista) && CS.vista !== 'programa' && CS.vista !== 'episodio'){ CS.vista = 'programas'; CS.prog = null; CS.ep = null; }
   const activa = (CS.vista === 'programa' || CS.vista === 'episodio') ? 'programas' : CS.vista;
   nav.innerHTML = csNavHtml(activa);
   nav.querySelectorAll('.cs-nav-b').forEach(b => { b.onclick = () => csIr(b.dataset.v); });
   vista.innerHTML = csHtml(CS.vista);
   csCablear(vista);
-  csAsegurarDatos();
-  try{ csTrAvisar(); }catch(e){ fallo('csTrAvisar · js/castingvistas.js', e); }
-  return true;
 }
 
 /**
@@ -2803,8 +2887,25 @@ function csIr(v){
 /** Vuelve a pintar lo que se ve (al cambiar de perfil, al actualizar los datos). */
 function csRepintar(){
   /* Dentro de un capítulo, no: se repinta al volver a la biblioteca. */
-  try{ if(typeof currentEp !== 'undefined' && currentEp && !LDB.browse) return; renderLibrary(true); }
+  try{
+    if(typeof currentEp !== 'undefined' && currentEp && !LDB.browse) return;
+    /* Pedido de sala: «que todo el programa sea más fluido». Con Casting ya
+       puesto, cada tecla del buscador y cada guardado repintaban también toda
+       la biblioteca de siempre (mosaico de programas, tabla de capítulos),
+       que queda tapada. Ahora solo se repinta Casting; la biblioteca, cuando
+       de verdad cambia (al moverse de sección, al cargar). */
+    if(csRepintarSolo()) return;
+    renderLibrary(true);
+  }
   catch(e){ fallo('renderLibrary · js/castingvistas.js:csRepintar', e); }
+}
+/** Solo la barra y la sección de Casting, si ya están en la página. Dice si pudo. */
+function csRepintarSolo(){
+  if(!csActivo() || typeof document === 'undefined' || typeof document.getElementById !== 'function') return false;
+  const nav = document.getElementById('csNav'), vista = document.getElementById('csVista');
+  if(!nav || !vista || !vista.parentNode || !document.body || !document.body.classList || !document.body.classList.contains('cs-on')) return false;
+  csPintarVista(nav, vista);
+  return true;
 }
 
 /** Abrir el «Nuevo programa» de Dubbipt con el nombre ya escrito. */

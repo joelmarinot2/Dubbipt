@@ -376,6 +376,12 @@ function dcxAceptarRelevo(clave){
  * sobre lo nuevo, no sobre lo viejo. Sin sesión del puente, lanza un error
  * con `sinSesion`. Devuelve { cambiado }.
  */
+/** Una copia entera de los datos, por el camino más rápido que haya. */
+function dcxCopia(x){
+  if(typeof structuredClone === 'function'){ try{ return structuredClone(x); }catch(e){ /* algo no copiable: por JSON */ } }
+  return JSON.parse(JSON.stringify(x));
+}
+
 async function dcxGuardar(cambio, entrada){
   if(DCX.guardando) throw new Error('ya se está guardando otro cambio: espera un momento');
   DCX.guardando = true;
@@ -383,7 +389,7 @@ async function dcxGuardar(cambio, entrada){
     const u = await dcSesion();
     if(!u){ const e = new Error('sin sesión en DublajeCast'); e.sinSesion = true; throw e; }
     for(let intento = 0; intento < 2; intento++){
-      const p = JSON.parse(JSON.stringify(await dcLeer()));
+      const p = dcxCopia(await dcLeer());
       if(!cambio(p)) return { cambiado: false };
       try{
         await dcEscribir(p);
