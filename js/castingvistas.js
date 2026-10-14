@@ -1442,14 +1442,17 @@ function csChipsFicha(t){
 
 function csHtmlTarjetaTalento(f){
   const c = csCargaTalento(f.activos);
-  return '<button class="cs-tcard" data-cs="talAbrir" data-v="' + csEsc(f.clave) + '" title="Ver todo lo que ha hecho ' + csEsc(f.nombre) + '">'
+  return '<div class="cs-tcard-w"><button class="cs-tcard" data-cs="talAbrir" data-v="' + csEsc(f.clave) + '" title="Ver todo lo que ha hecho ' + csEsc(f.nombre) + '">'
     + '<div class="cs-tcard-n">' + csEsc(f.nombre) + '</div>'
     + '<div class="cs-tenue">' + f.nProg + ' programa' + (f.nProg === 1 ? '' : 's') + ' · ' + f.nEps + ' ep. · ' + f.lineas + ' líneas</div>'
     + '<div class="cs-tchips">' + csChipsFicha(f.t) + '</div>'
     + '<span class="cs-carga cs-carga-' + c.clave + '">' + c.texto + '</span>'
     + (f.programas.length ? '<div class="cs-tprogs">' + f.programas.map(g => '<span class="cs-tprog' + (g.estado === 'completo' ? ' cs-tprog-fin' : '') + '">' + csEsc(g.programa) + '</span>').join('') + '</div>' : '<div class="cs-tenue">Sin papeles todavía</div>')
     + (c.clave === 'alto' ? '<div class="cs-talerta">' + csIco('aviso', 12) + 'Alta carga: ' + f.activos + ' programas en curso</div>' : '')
-    + '</button>';
+    + '</button>'
+    /* Cambiar el nombre, desde la tarjeta (PRO-50): solo los que tienen ficha en Casting. */
+    + (f.t ? '<button class="cs-b cs-b-icono cs-tcard-ren" data-cs="talRen" data-v="' + csEsc(f.t.id) + '" title="Cambiar el nombre de ' + csEsc(f.nombre) + '" aria-label="Cambiar el nombre de ' + csEsc(f.nombre) + '">' + csIco('editar', 14) + '</button>' : '')
+    + '</div>';
 }
 
 /* Un color por programa, como en Casting: el borde de arriba de su tarjeta. */
@@ -1459,7 +1462,7 @@ function csHtmlFichaTalento(f, d){
   const kpi = (n, t, cls) => '<div class="cs-tkpi cs-tkpi-' + cls + '"><b>' + n + '</b><span>' + t + '</span></div>';
   const t = f.t;
   return '<div class="cs-tficha-cab"><button class="cs-volver" data-cs="talCerrar">' + csIco('izquierda', 14) + '<span>Talentos</span></button>'
-    + '<div class="cs-tficha-t"><h2>' + csEsc(f.nombre) + '</h2><div class="cs-tchips">' + csChipsFicha(t) + '<span class="cs-carga cs-carga-' + csCargaTalento(f.activos).clave + '">' + csCargaTalento(f.activos).texto + '</span></div></div></div>'
+    + '<div class="cs-tficha-t"><h2>' + csEsc(f.nombre) + (t ? '<button class="cs-b cs-b-icono cs-tficha-ren" data-cs="talRen" data-v="' + csEsc(t.id) + '" title="Cambiar el nombre del talento" aria-label="Cambiar el nombre de ' + csEsc(f.nombre) + '">' + csIco('editar', 14) + '</button>' : '') + '</h2><div class="cs-tchips">' + csChipsFicha(t) + '<span class="cs-carga cs-carga-' + csCargaTalento(f.activos).clave + '">' + csCargaTalento(f.activos).texto + '</span></div></div></div>'
     + '<div class="cs-tkpis">' + kpi(f.nProg, 'Programas', 'a') + kpi(f.nEps, 'Episodios', 'b') + kpi(f.nPer, 'Personajes', 'c') + kpi(f.lineas, 'Líneas', 'd') + '</div>'
     + (t ? '<details class="cs-tal-ed"><summary>Editar ficha</summary><div class="cs-tal-campos">'
           +   '<label>Nombre <input type="text" data-cs="talCampo" data-id="' + csEsc(t.id) + '" data-campo="name" value="' + csEsc(t.name) + '"></label>'
@@ -2952,6 +2955,35 @@ async function csRealizarCasting(p, e){
   return true;
 }
 
+/* ── Cambiar el nombre de un talento ────────────────────────────────────
+   Pedido de sala: «en la sección de Talentos se puedan editar los nombres de
+   cada talento». Desde la tarjeta o desde su ficha. El nombre vive en tres
+   sitios y se cambia en los tres: en los datos de Casting (su ficha, y los
+   castings van por id, así que siguen), en el registro de casting de cada
+   programa de Dubbipt (que guarda el nombre) y en la base de talentos. Uno
+   que ya se llame así, no (lo dice). */
+async function csRenombrarTalento(t, nombre){
+  if(!t) return 'nada';
+  const nuevo = (typeof dcxNombreTalento === 'function') ? dcxNombreTalento(nombre) : String(nombre || '').replace(/\s+/g, ' ').trim().toUpperCase();
+  const viejo = String(t.name || '');
+  if(!nuevo || nuevo === viejo) return 'nada';
+  const r = await csEditar(pl => dcxTalento(pl, t.id, { name: nuevo }), 'Talento renombrado: ' + viejo + ' → ' + nuevo);
+  if(r !== 'guardado') return r;
+  let regs = 0;
+  try{
+    for(const sh of ((typeof sbShows === 'function') ? sbShows() : [])){
+      if(typeof castRegRenombrarTalento === 'function' && await castRegRenombrarTalento(sh.id, viejo, nuevo)) regs++;
+    }
+  }catch(e){ fallo('castRegRenombrarTalento · js/castingvistas.js', e, 'el casting de Dubbipt puede seguir con el nombre de antes'); }
+  try{ if(typeof talRenombrar === 'function') await talRenombrar(viejo, nuevo); }catch(e){ /* la base se arregla al escribirlo */ }
+  if(CS.talAbierto && castNorm(CS.talAbierto) === castNorm(viejo)) CS.talAbierto = castNorm(nuevo);
+  if(typeof CS_REGS !== 'undefined' && CS_REGS){ CS_REGS.lista = null; CS_REGS.ts = 0; }
+  CS.registros = {};
+  if(regs) castAviso('El nombre también cambió en el casting de ' + regs + ' programa' + (regs === 1 ? '' : 's') + ' de Dubbipt');
+  csRepintar();
+  return 'guardado';
+}
+
 /* ── Un episodio nuevo entra en Producción ──────────────────────────────
    Pedido de sala: «todos los programas que ingrese nuevos tienen que pedirme
    fecha de entrega y fecha de DUBCARD, quién lo hace y de qué cliente, para
@@ -3345,7 +3377,17 @@ function csCablear(vista){
     };
     else if(que === 'talCampo') el.onchange = () => {
       const tid = id(at('id')), campo = at('campo'), valor = el.value.trim();
+      if(campo === 'name'){
+        const t = ((a().datos && a().datos.talents) || []).find(x => String(x.id) === String(tid));
+        csRenombrarTalento(t, valor).catch(err => fallo('csRenombrarTalento · js/castingvistas.js', err, 'el nombre no se ha podido cambiar'));
+        return;
+      }
       csEditar(pl => dcxTalento(pl, tid, { [campo]: valor }), 'Ficha de talento: ' + campo + ' = ' + (valor || '—'));
+    };
+    else if(que === 'talRen') el.onclick = () => {
+      const t = ((a().datos && a().datos.talents) || []).find(x => String(x.id) === String(v)); if(!t) return;
+      const n = csPedirNombre('Nuevo nombre del talento:', t.name); if(n == null) return;
+      csRenombrarTalento(t, n).catch(err => fallo('csRenombrarTalento · js/castingvistas.js', err, 'el nombre no se ha podido cambiar'));
     };
     /* ── Tráilers & Teasers ── */
     else if(que === 'trAgregar') el.onclick = () => { CS.trForm = { type: 'trailer', etapa: '', title: '', series_id: '', received_at: '', deadline: '', status: 'pendiente' }; csRepintar(); };

@@ -2167,6 +2167,11 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-tficha-cab{ display:flex; align-items:flex-start; gap:14px; margin-bottom:14px; flex-wrap:wrap; }
 .cs-tficha-cab .cs-volver{ margin:0; }
 .cs-tficha-t h2{ margin:0 0 6px; font-size:22px; font-weight:800; color:#f2f3f5; text-transform:uppercase; }
+.cs-tficha-t h2 .cs-tficha-ren{ margin-left:8px; vertical-align:middle; }
+.cs-tcard-w{ position:relative; display:flex; min-width:0; }
+.cs-tcard-w .cs-tcard{ flex:1; }
+.cs-tcard-ren{ position:absolute; top:8px; right:8px; opacity:.55; }
+.cs-tcard-w:hover .cs-tcard-ren{ opacity:1; }
 .cs-tkpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:14px; }
 .cs-tkpi{ background:#101215; border:1px solid #23262b; border-left:3px solid #A78BFA; border-radius:13px; padding:14px 16px; display:flex; flex-direction:column; gap:3px; }
 .cs-tkpi b{ font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; }
@@ -2953,7 +2958,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.70.0-nube';
+const APP_VER_NUM = 'v11.71.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -11063,6 +11068,41 @@ async function castRegRenombrarEp(showId, viejo, nuevo){
 let _regT = 0;
 /** Apunta en el registro, pero esperando: asignar cinco seguidos no son cinco
     subidas a la nube. */
+/** Cambiar el nombre de un talento en el registro de casting de un programa (PRO-50): por personaje y en cada foto de capítulo; y en el capítulo abierto, si es de ese programa. */
+async function castRegRenombrarTalento(showId, viejo, nuevo){
+  if(!showId || !viejo || !nuevo) return false;
+  const reg = await castRegCargar(showId), k = castNorm(viejo);
+  if(!reg) return false;
+  let tocado = false;
+  for(const clave of Object.keys(reg.personajes || {})){
+    const x = reg.personajes[clave];
+    if(x && x.talent && castNorm(x.talent) === k){ reg.personajes[clave] = Object.assign({}, x, { talent: nuevo, ts: Date.now() }); tocado = true; }
+  }
+  for(const nombreEp of Object.keys(reg.capitulos || {})){
+    const fp = (reg.capitulos[nombreEp] && reg.capitulos[nombreEp].personajes) || {};
+    for(const clave of Object.keys(fp)){
+      const x = fp[clave];
+      if(x && x.talent && castNorm(x.talent) === k){ fp[clave] = Object.assign({}, x, { talent: nuevo }); tocado = true; }
+    }
+  }
+  if(!tocado) return false;
+  await castRegGuardar(showId, reg);
+  try{ if(typeof CS !== 'undefined' && CS && CS.registros) CS.registros[String(showId)] = reg; }catch(e){ /* sin vista de Casting */ }
+  try{
+    if(typeof charIdx !== 'undefined' && charIdx && typeof currentEp !== 'undefined' && currentEp && String(currentEp.showId) === String(showId)){
+      let n = 0;
+      for(const key in charIdx){
+        const c = charIdx[key];
+        if(!c || !c.talent || castNorm(c.talent) !== k) continue;
+        c.talent = nuevo; n++;
+        const raw = (window._charsRaw || []).find(y => y.key === key); if(raw) raw.talent = nuevo;
+      }
+      if(n){ renderCards(); if(currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }
+    }
+  }catch(e){ /* el capítulo abierto se pone al día al reabrirlo */ }
+  return true;
+}
+
 function castRegAnotarPronto(){
   clearTimeout(_regT);
   _regT = setTimeout(() => { try{ castRegAnotar(); }catch(e){} }, 1500);
