@@ -79,6 +79,6 @@ exports.pruebas = async function(t){
   t.seccion('4 · dónde está');
   const HTML = fs.readFileSync(INDEX, 'utf8'), SW = fs.readFileSync(path.join(path.dirname(INDEX), 'sw.js'), 'utf8');
   t.ok('el botón «Reparto» en la barra del casting, junto a Disponibilidad', /<button class="btnv sm" id="btnRepVentana" style="display:none" onclick="repvAbrir\(\)" title="[^"]+">Reparto<\/button>/.test(HTML));
-  t.ok('sale solo con el perfil Casting', /'btnDisp','btnRepVentana'\]\)\{/.test(HTML));
+  t.ok('sale solo con el perfil Casting', /'btnDisp','btnRepVentana'[,\]]/.test(HTML));
   t.ok('el archivo, cargado y en la caché', /<script src="\.\/js\/castreparto\.js"><\/script>/.test(HTML) && /'\.\/js\/castreparto\.js'/.test(SW));
 };

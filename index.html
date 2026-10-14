@@ -2600,6 +2600,7 @@ body.modo-casting #btnExport{ display:none !important; }
       <button type="button" class="cast-fuente" id="castFuente" style="display:none" onclick="document.getElementById('formatoFile').click()"></button>
       <input type="file" id="formatoFile" accept=".xlsm,.xlsx" style="display:none" onchange="if(this.files[0]) castSubirFormato(this.files[0]); this.value=''">
       <button class="btnv sm" id="btnUndo" style="display:none" onclick="castUndo()" disabled title="Nada que deshacer">↩ Deshacer</button>
+      <button class="btnv sm" id="btnCastOk" style="display:none" onclick="castConfirmarTodos()" disabled title="No hay talentos heredados por confirmar">Confirmar todos</button>
       <button class="btnv sm act-primary" id="btnCastOut" style="display:none" onclick="castDescargar()" title="Descarga el desglose de la empresa con los talentos ya puestos">⬇ Desglose con casting</button>
       <button class="btnv sm" id="btnEpsBack" onclick="appBack()" style="display:none" title="Volver a los episodios">‹ Episodios</button>
       <button class="btnv sm" id="btnToPrograms" onclick="goPrograms()" style="display:none" title="Ir a Programas">📚 Programas</button>
@@ -2952,7 +2953,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.69.0-nube';
+const APP_VER_NUM = 'v11.70.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -7898,6 +7899,7 @@ function renderCards(){
   catch(e){ _gestM = null; }
   const q = norm($('search').value||'');
   const enCasting = (typeof DDL_MODO !== 'undefined' && DDL_MODO === 'casting');
+  try{ castPintarConfirmar(); }catch(e){ /* sin botón en esta pantalla */ }
   const box = $('cards'); box.innerHTML='';
   let shown=0;
   for(const c of sortedChars()){
@@ -9424,9 +9426,10 @@ function ponerModo(epId, m){
   if(b) b.style.display = (m === 'casting') ? '' : 'none';
   const bu = document.getElementById('btnUndo');
   if(bu){ bu.style.display = (m === 'casting') ? '' : 'none'; castPintarUndo(); }
+  try{ castPintarConfirmar(); }catch(e){ /* sin tarjetas todavía */ }
   const bt = document.getElementById('btnTabla');
   if(bt) bt.style.display = (m === 'casting') ? '' : 'none';
-  for(const id of ['btnImpDes','btnImpPla','btnMeta','btnGestos','btnBaseTal','btnLibTrad','btnLibCambiar','btnDisp','btnRepVentana']){
+  for(const id of ['btnImpDes','btnImpPla','btnMeta','btnGestos','btnBaseTal','btnLibTrad','btnLibCambiar','btnDisp','btnRepVentana','btnCastOk']){
     const b = document.getElementById(id);
     if(b) b.style.display = (m === 'casting') ? '' : 'none';
   }
@@ -11299,6 +11302,37 @@ function castVerificar(key, verificado){
     const raw = (window._charsRaw || []).find(x => x.key === key);
     if(raw) raw.heredado = !verificado;
   }catch(e){}
+}
+
+/**
+ * Pedido de sala: «agrega en casting un botón que sea confirmar todos los
+ * talentos». Da por buenos de una vez todos los talentos heredados de otros
+ * capítulos (los naranjas, CAST-7) que ya tienen talento: lo mismo que pulsar
+ * «verificar» en cada tarjeta, con un solo paso de «Deshacer». Devuelve cuántos.
+ */
+async function castConfirmarTodos(){
+  const claves = Object.keys(charIdx || {}).filter(k => { const c = charIdx[k]; return !!(c && c.heredado && c.talent && String(c.talent).trim()); });
+  if(!claves.length){ castAviso('No hay talentos heredados por confirmar'); castPintarConfirmar(); return 0; }
+  try{ castHistPush(castFoto(claves), 'confirmar ' + claves.length + ' talento' + (claves.length === 1 ? '' : 's')); }catch(e){ /* sin deshacer para este paso */ }
+  for(const k of claves) castVerificar(k, true);
+  try{ renderPlanilla(); }catch(e){ /* sin tabla abierta */ }
+  try{ renderCards(); }catch(e){ fallo('renderCards · index.html:castConfirmarTodos', e); }
+  try{ if(typeof currentEp !== 'undefined' && currentEp && currentEp.id) await epDataUpsert(currentEp.id, currentEp.showId); }catch(e){ fallo('epDataUpsert · index.html:castConfirmarTodos', e, 'puede que esto no se haya guardado en la nube'); }
+  try{ castRegAnotarPronto(); }catch(e){ /* el registro se apunta en la siguiente asignación */ }
+  castAviso('✅ ' + claves.length + ' talento' + (claves.length === 1 ? '' : 's') + ' confirmado' + (claves.length === 1 ? '' : 's'));
+  castPintarConfirmar();
+  return claves.length;
+}
+/** El botón «Confirmar todos»: cuántos quedan; sin ninguno, apagado. */
+function castPintarConfirmar(){
+  const b = document.getElementById('btnCastOk');
+  if(!b) return 0;
+  let n = 0;
+  try{ for(const k in charIdx){ const c = charIdx[k]; if(c && c.heredado && c.talent && String(c.talent).trim()) n++; } }catch(e){ n = 0; }
+  b.disabled = !n;
+  b.textContent = n ? 'Confirmar todos (' + n + ')' : 'Confirmar todos';
+  b.title = n ? 'Da por buenos de una vez los ' + n + ' talento' + (n === 1 ? '' : 's') + ' heredado' + (n === 1 ? '' : 's') + ' de otros capítulos (los naranjas)' : 'No hay talentos heredados por confirmar';
+  return n;
 }
 
 /** Los casos que NO son coincidencia exacta se preguntan, uno por uno. */

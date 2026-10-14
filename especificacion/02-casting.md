@@ -20,6 +20,7 @@ jadeos, o una voz cambiada al personaje protagonista, se paga en horas de sala.
 | **CAST-5** | Si el desglose subido ya trae actores, se ponen solos en las tarjetas. | 👁 |
 | **CAST-6** | Existe un **registro por programa**: lo que se reparte queda apuntado y los capítulos siguientes del mismo programa heredan el actor de los personajes que ya salieron. | 👁 |
 | **CAST-7** | Lo heredado se marca en **naranja** con un botón `✓ verificar`. No es tuyo hasta que lo das por bueno. | 👁 |
+| **CAST-7b** | **«Confirmar todos».** Pedido de sala: «agrega en casting un botón que sea confirmar todos los talentos». En la barra del casting, `Confirmar todos (N)` da por buenos de una vez los N talentos heredados de otros capítulos (los naranjas) que ya tienen talento: lo mismo que pulsar «verificar» en cada tarjeta. Se guarda en la nube, se apunta en el registro del programa, y `↩ Deshacer` lo devuelve en un solo paso. Sin ninguno por confirmar, el botón está apagado y lo dice. | ✅ |
 | **CAST-8** | Lo que **no coincide exacto** por nombre se **pregunta**, uno por uno. Un nombre mal heredado es peor que uno sin heredar. | ✅ |
 | **CAST-9** | Se puede subir una **tabla de casting previa** en Excel: columna A personaje, B talento, C número de intervenciones. | 👁 |
 | **CAST-10** | La cabecera de esa tabla se detecta por **coincidencia exacta** de la celda, no buscando la palabra dentro. Buscándola dentro, una tabla cuyo primer talento se llame `ACTOR A` perdía su primera fila. | ✅ |
