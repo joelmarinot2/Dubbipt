@@ -156,6 +156,15 @@ async function talGuardar(){
   }catch(e){ fallo('talGuardar · js/talentos.js:160', e, 'la base no se ha subido a la nube'); return false; }
 }
 
+/** Cambiar el nombre de un talento en la base (PRO-50): si está, se cambia y se guarda. */
+async function talRenombrar(viejo, nuevo){
+  const k = castNorm(viejo), n = String(nuevo || '').replace(/\s+/g, ' ').trim();
+  if(!k || !n || !TAL.claves || !TAL.claves.has(k)) return false;
+  talPoner(TAL.nombres.map(x => castNorm(x) === k ? n : x), TAL.origen);
+  try{ await talGuardar(); }catch(e){ /* queda en este equipo */ }
+  return true;
+}
+
 /**
  * Carga la base. Primero la de este equipo -vale para todos los programas- y
  * si no hay, la que estuviera guardada en el programa abierto.
