@@ -1949,6 +1949,13 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-act-caja{ max-width:720px; width:min(720px, calc(100vw - 32px)); text-align:left; display:flex; flex-direction:column; gap:10px; max-height:88vh; overflow:auto; }
 .cs-act-caja textarea{ background:#0b0d10; color:#e5e7eb; border:1px solid #2a2e35; border-radius:10px; padding:10px; font:inherit; font-size:12.5px; resize:vertical; }
 .cs-act-demas{ display:flex; gap:7px; align-items:center; font-size:13px; color:#cbd5e1; cursor:pointer; }
+.cs-act-img{ display:flex; align-items:center; gap:10px; background:#0b0d10; border:1px dashed #3a3f48; border-radius:10px; padding:10px 12px; font-size:12.5px; color:#cbd5e1; }
+.cs-act-img > svg{ flex:none; color:#4ADE80; }
+.cs-act-img span{ flex:1; min-width:0; text-align:left; }
+.cs-act-img.encima{ border-color:#4ADE80; background:rgba(74,222,128,.06); }
+.cs-act-img.leyendo{ opacity:.7; pointer-events:none; }
+.cs-act-ocr{ font-size:12px; color:#9aa3ad; min-height:0; }
+.cs-act-ocr:empty{ display:none; }
 .cs-act-plan{ display:flex; flex-direction:column; gap:6px; font-size:12.5px; color:#cbd5e1; }
 .cs-act-l{ display:flex; flex-wrap:wrap; gap:5px; }
 .cs-act-ok, .cs-act-no{ border-radius:999px; padding:2px 9px; font-size:11.5px; }
@@ -2958,7 +2965,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.71.0-nube';
+const APP_VER_NUM = 'v11.72.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
