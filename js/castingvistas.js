@@ -1048,7 +1048,10 @@ function csActivosAbrir(){
   ov.id = 'csActOv'; ov.className = 'modo-cap';
   ov.innerHTML = '<div class="modo-caja cs-act-caja">'
     + '<div class="modo-tit">Episodios activos</div>'
-    + '<div class="modo-sub">Pega la lista de los episodios que están en curso, uno por línea, como venga.</div>'
+    + '<div class="modo-sub">Pega la lista de los episodios que están en curso, uno por línea, como venga, o sube una captura.</div>'
+    + '<div class="cs-act-img" id="csActImg">' + csIco('subir', 16) + '<span><b>Sube una captura</b> de la lista (o arrástrala, o pégala con Ctrl+V): Dubbipt lee los episodios y los pone aquí abajo para que los revises.</span>'
+    +   '<button class="cs-b" id="csActImgBtn" type="button">Elegir captura</button><input type="file" id="csActImgArch" accept="image/*" multiple hidden></div>'
+    + '<div class="cs-act-ocr" id="csActOcr" aria-live="polite"></div>'
     + '<textarea id="csActTexto" rows="9" placeholder="Always on Call: Season 1 - EP4&#10;100 Days of Deception EP6&#10;…"></textarea>'
     + '<label class="cs-act-demas"><input type="checkbox" id="csActDemas" checked> Marcar los demás como completados</label>'
     + '<div id="csActPlan"></div>'
@@ -1063,6 +1066,35 @@ function csActivosAbrir(){
     si.disabled = !plan || (!plan.activos.length && !(dm.checked && plan.resto.length));
   };
   tx.oninput = ver; dm.onchange = ver;
+  /* Las capturas (PRO-51): se leen y se añaden al texto, para revisarlas antes de aplicar. */
+  const oc = ov.querySelector('#csActOcr'), arch = ov.querySelector('#csActImgArch'), zona = ov.querySelector('#csActImg');
+  const leer = async (files) => {
+    const imgs = Array.from(files || []).filter(f => f && /^image\//.test(f.type || ''));
+    if(!imgs.length) return;
+    zona.classList.add('leyendo'); si.disabled = true;
+    try{
+      for(let i = 0; i < imgs.length; i++){
+        const pre = imgs.length > 1 ? 'Captura ' + (i + 1) + ' de ' + imgs.length + ': ' : '';
+        oc.textContent = pre + 'leyendo…';
+        const lineas = await csActivosLeerImagen(imgs[i], (pct, que) => { oc.textContent = pre + que + (pct != null ? ' ' + pct + '%' : ''); });
+        const ya = tx.value.replace(/\s+$/, '');
+        tx.value = (ya ? ya + '\n' : '') + lineas.join('\n');
+        oc.textContent = pre + lineas.length + ' línea' + (lineas.length === 1 ? '' : 's') + ' leída' + (lineas.length === 1 ? '' : 's') + '. Revisa el texto: lo que no case con un episodio sale abajo.';
+      }
+    }catch(err){ oc.textContent = 'No se pudo leer la captura: ' + (err && err.message ? err.message : err) + '. Puedes pegar la lista como texto.'; }
+    zona.classList.remove('leyendo');
+    ver();
+  };
+  ov.querySelector('#csActImgBtn').onclick = () => arch.click();
+  arch.onchange = () => { leer(arch.files); arch.value = ''; };
+  tx.addEventListener('paste', (ev) => {
+    const fs = Array.from((ev.clipboardData && ev.clipboardData.items) || []).filter(it => it.kind === 'file' && /^image\//.test(it.type)).map(it => it.getAsFile()).filter(Boolean);
+    if(fs.length){ ev.preventDefault(); leer(fs); }
+  });
+  const caja = ov.querySelector('.cs-act-caja');
+  caja.addEventListener('dragover', (ev) => { ev.preventDefault(); zona.classList.add('encima'); });
+  caja.addEventListener('dragleave', () => zona.classList.remove('encima'));
+  caja.addEventListener('drop', (ev) => { ev.preventDefault(); zona.classList.remove('encima'); leer(ev.dataTransfer && ev.dataTransfer.files); });
   ov.querySelector('#csActNo').onclick = () => ov.remove();
   ov.addEventListener('click', (ev) => { if(ev.target === ov) ov.remove(); });
   si.onclick = async () => {
@@ -1073,6 +1105,110 @@ function csActivosAbrir(){
   };
   try{ tx.focus(); }catch(e){ /* sin foco se escribe igual */ }
   return ov;
+}
+
+/* ── Leer la lista de una captura (PRO-51) ─────────────────────────────
+   Pedido de sala, con una captura de la lista de episodios: «que en los
+   episodios diarios se pueda subir una captura como esta». Se lee en el
+   propio navegador con Tesseract (de cdn.jsdelivr.net, que la política de
+   seguridad de Dubbipt ya deja), sin claves ni coste. Antes, la imagen se
+   agranda y se pasa a grises (lee mejor letra pequeña), y después se limpia
+   el ruido de la captura: etiquetas como «GUEST», iconos, la raya del borde. */
+const CS_OCR = {
+  lib: 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js',
+  idioma: 'eng',
+  idiomas: 'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng/4.0.0_best_int',
+  cargando: null
+};
+/* Las etiquetas de la lista que no son parte del nombre. */
+const CS_OCR_ETIQUETAS = new Set(['GUEST', 'HOST', 'OWNER', 'ADMIN', 'MEMBER', 'VIEWER', 'EDITOR', 'INVITADO', 'INVITADA']);
+
+/** Limpia lo leído de una captura: una línea por episodio, sin etiquetas, iconos ni basura. */
+function csActivosLimpiarOcr(texto){
+  const out = [], vistos = new Set();
+  for(const bruta of String(texto || '').split(/\r?\n/)){
+    let l = bruta.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/[\u2013\u2014]/g, '-').replace(/\s+/g, ' ').trim();
+    /* Por delante: la raya del borde y los iconos («|», «»», «©»…). */
+    l = l.replace(/^[^A-Za-z0-9\u00C0-\u024F(]+/, '');
+    /* Por detrás, de una en una: las etiquetas y los trozos de icono (signos sueltos o una o dos letras pegadas a ellos). */
+    for(let i = 0; i < 6; i++){
+      const antes = l;
+      l = l.replace(/\s+[^A-Za-z0-9\u00C0-\u024F()]+$/, '').trim();
+      const m = l.match(/\s(\S+)$/);
+      if(m){
+        const w = m[1].replace(/[^A-Za-z\u00C0-\u024F]/g, '').toUpperCase();
+        if(CS_OCR_ETIQUETAS.has(w) || (/^[^A-Za-z0-9]*[A-Za-z]{1,2}[^A-Za-z0-9]*$/.test(m[1]) && /[^A-Za-z0-9]/.test(m[1]))) l = l.slice(0, l.length - m[0].length).trim();
+      }
+      if(l === antes) break;
+    }
+    const letras = (l.match(/[A-Za-z\u00C0-\u024F]/g) || []).length;
+    if(letras < 3) continue;
+    if(CS_OCR_ETIQUETAS.has(l.replace(/[^A-Za-z]/g, '').toUpperCase())) continue;
+    const k = castNorm(l);
+    if(!k || vistos.has(k)) continue;
+    vistos.add(k); out.push(l);
+  }
+  return out;
+}
+
+/** Tesseract, una vez por página. */
+function csOcrCargar(){
+  if(typeof Tesseract !== 'undefined' && Tesseract && Tesseract.createWorker) return Promise.resolve(Tesseract);
+  if(CS_OCR.cargando) return CS_OCR.cargando;
+  CS_OCR.cargando = new Promise((ok, mal) => {
+    const s = document.createElement('script');
+    s.src = CS_OCR.lib; s.async = true; s.crossOrigin = 'anonymous';
+    s.onload = () => (typeof Tesseract !== 'undefined' && Tesseract.createWorker) ? ok(Tesseract) : mal(new Error('el lector de texto no se ha cargado bien'));
+    s.onerror = () => mal(new Error('no se ha podido cargar el lector de texto (sin conexión?)'));
+    document.head.appendChild(s);
+  }).catch(e => { CS_OCR.cargando = null; throw e; });
+  return CS_OCR.cargando;
+}
+
+/** La imagen, agrandada (lee mejor letra pequeña) y en grises. Devuelve un canvas. */
+function csOcrPreparar(file){
+  return new Promise((ok, mal) => {
+    const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => {
+      try{
+        const k = Math.min(3, Math.max(1, 1800 / Math.max(1, img.naturalWidth)));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        const g = c.getContext('2d');
+        g.imageSmoothingQuality = 'high';
+        g.drawImage(img, 0, 0, c.width, c.height);
+        const d = g.getImageData(0, 0, c.width, c.height), px = d.data;
+        let claro = 0;
+        for(let i = 0; i < px.length; i += 4){ const y = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]; px[i] = px[i + 1] = px[i + 2] = y; claro += y; }
+        /* Letra clara sobre fondo oscuro (el tema oscuro): se invierte, Tesseract lee mejor oscuro sobre claro. */
+        if(claro / (px.length / 4) < 110) for(let i = 0; i < px.length; i += 4){ px[i] = px[i + 1] = px[i + 2] = 255 - px[i]; }
+        g.putImageData(d, 0, 0);
+        URL.revokeObjectURL(url);
+        ok(c);
+      }catch(e){ URL.revokeObjectURL(url); mal(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); mal(new Error('no es una imagen que se pueda abrir')); };
+    img.src = url;
+  });
+}
+
+/** Lee una captura y devuelve sus líneas, limpias. `avance(pct, que)` dice por dónde va. */
+async function csActivosLeerImagen(file, avance){
+  const di = (pct, que) => { try{ if(avance) avance(pct, que); }catch(e){ /* sin aviso de avance */ } };
+  di(null, 'cargando el lector de texto…');
+  const T = await csOcrCargar();
+  const lienzo = await csOcrPreparar(file);
+  const w = await T.createWorker(CS_OCR.idioma, 1, {
+    langPath: CS_OCR.idiomas,
+    logger: (m) => { if(m && m.status === 'recognizing text') di(Math.round((m.progress || 0) * 100), 'leyendo'); }
+  });
+  try{
+    try{ await w.setParameters({ preserve_interword_spaces: '1', tessedit_pageseg_mode: '6' }); }catch(e){ /* con lo de siempre */ }
+    const r = await w.recognize(lienzo);
+    return csActivosLimpiarOcr(r && r.data ? r.data.text : '');
+  }finally{
+    try{ await w.terminate(); }catch(e){ /* se va con la página */ }
+  }
 }
 
 /** Aplica la lista: los activos en producción y, si se pide, los demás completados. */
