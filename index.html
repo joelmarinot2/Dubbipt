@@ -2965,7 +2965,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.72.0-nube';
+const APP_VER_NUM = 'v11.73.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4607,6 +4607,23 @@ async function loadPdfBuf(buf, name){
     numPages = pdfDoc.numPages;
     pdfName = name;
     pageBmp.clear();
+    /* ¿Es una lista de diálogos en PDF -la «As-Broadcast Dialogue List» de
+       Pixelogic-? Entonces se arma como la de Excel (LIB-25b): timecode,
+       personaje y la traducción, por columnas. El PDF se guarda igual. */
+    let ldp = null;
+    try{ ldp = (typeof ldDePdf === 'function') ? await ldDePdf(pdfDoc) : null; }catch(e){ ldp = null; fallo('ldDePdf · index.html:loadPdfBuf', e); }
+    if(ldp){
+      const copia = lastPdfBuf;
+      ldArmar(ldp, name);
+      lastPdfBuf = copia; pdfName = name;
+      if(!window._QUIET){ try{ ldAvisar(ldp); }catch(e){ fallo('ldAvisar · index.html:loadPdfBuf', e); } }
+      loadProgress();
+      if(typeof loadUI === 'function') loadUI();
+      rebuild();
+      if(pop.key) updatePopup();
+      $('loading').classList.remove('show'); DDL_UI.progressReset();
+      return;
+    }
     await scanPdf();
     autoDesgloseFromScan();     // ⭐ desglose de personajes automático (si no vino de Excel)
     rebuild();
