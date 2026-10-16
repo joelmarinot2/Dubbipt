@@ -220,11 +220,186 @@ function ldArmar(lista, name){
 /** Se dice lo que se ha leído y cómo queda marcado. */
 function ldAvisar(lista){
   const de = (lista && lista.info && lista.info.programa) ? ' de «' + lista.info.programa + '»' : '';
-  const txt = '🌐 Lista de diálogos original' + de + ' · ' + script.length + ' parlamentos de '
+  const txt = '🌐 Lista de diálogos' + (lista && lista.pdf ? ' en PDF' : ' original') + de + ' · ' + script.length + ' parlamentos de '
     + chars.length + ' personajes · queda SIN libreto traducido';
   if(typeof castAviso === 'function') castAviso(txt);
   else if(typeof libMsg === 'function') libMsg(txt);
   return txt;
+}
+
+/* ═══ LA LISTA DE DIÁLOGOS EN PDF ══════════════════════════════════════════
+
+   Llegó de sala «Centauro_FinalTable_F0007_Final_DialogueList.pdf»: la
+   «As-Broadcast Dialogue List» de Pixelogic, en PDF hecho con Word. Una tabla
+   de cuatro columnas, un parlamento por fila, y el personaje en cada una:
+
+     TIMECODE    │ CHARACTER     │ ORIGINAL DIALOGUE │ ENGLISH TRANSLATION
+     00:00:46:01 │ CAPTAIN COOK  │ (through speakers)│ (through speakers) Hello,
+                 │               │ 안녕하십니까, …     │ everyone! I'm Captain Cook…
+                 │               │                   │      (K-food ambassador =
+                 │               │                   │      note, phrasal …)
+
+   Es lo mismo que la lista de Excel (LIB-25), pero en un PDF: no hay casillas,
+   hay palabras con su posición. Las columnas se sacan de la cabecera (dónde
+   empieza cada título) y cada palabra va a la columna en la que empieza. Un
+   timecode en la primera columna abre una fila nueva; todo lo que viene
+   detrás -también lo que pasa a la página siguiente- es de esa fila. Las
+   cabeceras y pies de página («Page 2», «Prepared by: …») no cuentan.
+
+   El texto es el de la traducción inglesa -la lengua pivote, como en la de
+   Excel-, sin las notas del traductor: los paréntesis con «=», «alt.»,
+   «lit.», «note» o «FN» («(Haeon = fictional county)»). Las acotaciones como
+   «(through speakers)» se quedan: son del actor. Lo que no es una voz -el
+   título, el texto en pantalla- va a GRÁFICA. Con esto se arma el libreto con
+   `ldArmar`, el mismo de la lista de Excel. */
+
+const LD_PDF_TC = /^\d{1,2}:\d{2}:\d{2}[:;.]\d{2,3}$/;
+/* Lo que en la columna del personaje no es una voz: lo lee GRÁFICA. */
+const LD_PDF_GRAFICA = /^(MAIN TITLE|TITLE|EPISODE TITLE|NARRATIVE TITLE|PRINCIPAL PHOTOGRAPHY|ON ?SCREEN( TEXT)?|INSERT|GRAPHICS?|CAPTION|SIGN|TEXT ON SCREEN|CARD|TITLE CARD|END CREDITS|OPENING CREDITS|CREDITS|LOGO)$/;
+/* Marcas de la lista que no son un parlamento de nadie. */
+const LD_PDF_MARCAS = /^(LAST FRAME( OF PICTURE)?|FIRST FRAME( OF PICTURE)?|END OF (PROGRAM|PROGRAMME|EPISODE|REEL)|START OF (PROGRAM|PROGRAMME|EPISODE|REEL)|FADE (IN|OUT)|BLACK)$/;
+
+/** Dónde empieza cada columna, por la cabecera de una página. Nulo si la página no la tiene. */
+function ldPdfColumnas(pal){
+  const cab = (w) => ldCab(w.s);
+  const tcs = pal.filter(w => /^(IN )?TIME ?CODE( IN)?$|^TC( IN)?$/.test(cab(w)));
+  for(const t of tcs){
+    const fila = pal.filter(w => Math.abs(w.y - t.y) <= 3 && w.x > t.x);
+    const de = (re) => fila.filter(w => re.test(cab(w))).sort((a, b) => a.x - b.x)[0] || null;
+    const quien = de(/^(CHARACTER|CHARACTER NAME|SOURCE|SPEAKER)$/);
+    if(!quien) continue;
+    const orig = de(/^ORIGINAL( DIALOGUE| DIALOG| LANGUAGE)?$/);
+    const ing = de(/^ENGLISH( TRANSLATION| DIALOGUE)?$/)
+             || fila.filter(w => /^(TRANSLATION|DIALOGUE|DIALOG)$/.test(cab(w)) && w.x > quien.x && (!orig || w.x > orig.x + 60)).sort((a, b) => a.x - b.x)[0] || null;
+    if(!ing) continue;
+    return { y: t.y, tc: t.x, quien: quien.x, orig: orig ? orig.x : -1, dial: ing.x };
+  }
+  return null;
+}
+
+/** La columna de una palabra: aquella en la que empieza (con un poco de holgura). */
+function ldPdfColumna(cols, x){
+  const l = [['tc', cols.tc], ['quien', cols.quien], ['orig', cols.orig], ['dial', cols.dial]].filter(c => c[1] >= 0).sort((a, b) => a[1] - b[1]);
+  let k = null;
+  for(const c of l) if(x >= c[1] - 6) k = c[0];
+  return k;
+}
+
+/** Quita de la traducción las notas del traductor; deja las acotaciones. */
+function ldPdfSinNotas(t){
+  const s = String(t || '');
+  const NOTA = /\s=\s|=|\balt\.|\blit\.|\bliterally\b|\bnote\b|\bFN\b|\bi\.e\.|\bref\.|\bsic\b|\btranslator/i;
+  let out = '', i = 0;
+  while(i < s.length){
+    if(s[i] !== '('){ out += s[i++]; continue; }
+    let d = 0, j = i;
+    for(; j < s.length; j++){ if(s[j] === '(') d++; else if(s[j] === ')'){ d--; if(d === 0) break; } }
+    const grupo = s.slice(i, Math.min(j + 1, s.length));
+    /* También las largas (más de ocho palabras) y las que citan otro capítulo: «(source - ep103; …)». */
+    const larga = grupo.split(/\s+/).filter(Boolean).length > 8 || /\bsource\b|;/i.test(grupo);
+    if(!NOTA.test(grupo) && !larga) out += grupo;
+    i = j + 1;
+  }
+  return out.replace(/\s+/g, ' ').replace(/\s+([,.!?;:…])/g, '$1').trim();
+}
+
+/** El nombre de la columna del personaje, sin sus acotaciones: «PRINCIPAL PHOTOGRAPHY (on monitor)» → «PRINCIPAL PHOTOGRAPHY». */
+function ldPdfNombre(t){
+  const n = String(t || '').replace(/\([^)]*\)?/g, ' ').replace(/\[[^\]]*\]?/g, ' ').replace(/-\s+(?=\S)/g, '-').replace(/\s+/g, ' ').trim().toUpperCase();
+  return LD_PDF_GRAFICA.test(ldCab(n)) ? 'GRÁFICA' : n;
+}
+/** Los que dicen un parlamento: uno, o varios a la vez («STUDENT 7A / STUDENT 7B»), y cada uno lo graba. */
+function ldPdfVoces(t){
+  const sinAcot = String(t || '').replace(/\([^)]*\)?/g, ' ');
+  const partes = sinAcot.split(/\s*\/\s*/).map(ldPdfNombre).filter(Boolean);
+  return partes.filter((x, i) => partes.indexOf(x) === i);
+}
+
+/**
+ * Las filas de una lista de diálogos en PDF, desde las palabras de cada página
+ * -`[{ p, pal: [{ x, y, s }] }]`, con la y de arriba abajo-. Devuelve
+ * `{ filas, info }`, como la de Excel, o nulo si no es una lista.
+ */
+function ldPdfFilas(paginas){
+  let cols = null;
+  for(const pg of (paginas || []).slice(0, 3)){ cols = ldPdfColumnas(pg.pal || []); if(cols) break; }
+  if(!cols) return null;
+  const filas = [];
+  let cur = null;
+  const info = { programa: '', episodio: '' };
+  for(const pg of paginas){
+    const pal = (pg.pal || []).filter(w => String(w.s || '').trim());
+    /* Arriba: la cabecera de la página (programa, «Page 2») y, si la hay, la de las columnas. Abajo: el pie. */
+    let arriba = -Infinity, abajo = Infinity;
+    for(const w of pal){
+      if(/^Page(\s*\d+)?$/i.test(String(w.s).trim())) arriba = Math.max(arriba, w.y + 3);
+      if(/^Prepared\b/i.test(String(w.s).trim())) abajo = Math.min(abajo, w.y - 3);
+    }
+    const cp = ldPdfColumnas(pal);
+    if(cp) arriba = Math.max(arriba, cp.y + 3);
+    if(!info.programa){
+      const tope = pal.filter(w => w.y < arriba).sort((a, b) => a.y - b.y || a.x - b.x);
+      if(tope.length){
+        const y0 = tope[0].y, linea = tope.filter(w => Math.abs(w.y - y0) <= 3 && w.x < cols.dial);
+        info.programa = linea.map(w => w.s).join(' ').replace(/[“”"]/g, '').trim();
+        const ep = tope.filter(w => /^Episode/i.test(String(w.s))).sort((a, b) => a.y - b.y)[0];
+        if(ep) info.episodio = tope.filter(w => Math.abs(w.y - ep.y) <= 3 && w.x < cols.dial).map(w => w.s).join(' ').replace(/^Episode\s+/i, '').trim();
+      }
+    }
+    const cuerpo = pal.filter(w => w.y > arriba && w.y < abajo).sort((a, b) => a.y - b.y || a.x - b.x);
+    /* Por renglones: lo que está a la misma altura que un timecode es de su fila, aunque quede un punto más arriba. */
+    const renglones = [];
+    for(const w of cuerpo){
+      const r = renglones[renglones.length - 1];
+      if(r && Math.abs(w.y - r.y) <= 3) r.pal.push(w); else renglones.push({ y: w.y, pal: [w] });
+    }
+    for(const r of renglones){
+      r.pal.sort((a, b) => a.x - b.x);
+      const tc = r.pal.find(w => ldPdfColumna(cols, w.x) === 'tc' && LD_PDF_TC.test(String(w.s).trim()));
+      if(tc){ cur = { tc: String(tc.s).trim(), quien: [], orig: [], dial: [], pagina: pg.p }; filas.push(cur); }
+      if(!cur) continue;
+      for(const w of r.pal){
+        if(w === tc) continue;
+        const k = ldPdfColumna(cols, w.x);
+        if(k && k !== 'tc') cur[k].push(String(w.s).trim());
+      }
+    }
+  }
+  const out = [];
+  for(const f of filas){
+    const crudo = f.dial.join(' ').replace(/\s+/g, ' ').trim();
+    const texto = ldPdfSinNotas(crudo), orig = f.orig.join(' ').replace(/\s+/g, ' ').trim();
+    const voces = ldPdfVoces(f.quien.join(' ')).filter(v => !LD_PDF_MARCAS.test(ldCab(v)));
+    if(!voces.length){ if(texto && !LD_PDF_MARCAS.test(ldCab(f.quien.join(' ')))) out.push({ tc: f.tc, tcOut: '', quien: '', texto: texto, orig: orig, anot: '', tags: '', pagina: f.pagina }); continue; }
+    for(const v of voces) out.push({ tc: f.tc, tcOut: '', quien: v, texto: texto, orig: orig, anot: '', tags: '', pagina: f.pagina });
+  }
+  if(out.length < 4 || out.filter(f => f.quien).length < out.length / 2) return null;
+  return { filas: out, info: info };
+}
+
+/** ¿Este PDF es una lista de diálogos? Lee la cabecera de la primera página y, si lo es, todas. Devuelve la lista para `ldArmar`, o nulo. */
+async function ldDePdf(doc){
+  if(!doc || !doc.numPages) return null;
+  const palabras = async (p) => {
+    const pg = await doc.getPage(p);
+    const alto = (pg.view && pg.view[3]) || 842;
+    const tc = await pg.getTextContent();
+    return { p: p, pal: (tc.items || []).filter(it => it && String(it.str || '').trim()).map(it => ({ x: it.transform[4], y: alto - it.transform[5], s: String(it.str) })) };
+  };
+  const primeras = [];
+  for(let p = 1; p <= Math.min(2, doc.numPages); p++) primeras.push(await palabras(p));
+  if(!primeras.some(pg => ldPdfColumnas(pg.pal))) return null;
+  const paginas = primeras.slice();
+  for(let p = paginas.length + 1; p <= doc.numPages; p++){
+    paginas.push(await palabras(p));
+    try{ if(typeof libMsg === 'function' && p % 10 === 0) libMsg('Leyendo la lista de diálogos… ' + p + '/' + doc.numPages); }catch(e){ /* sin aviso */ }
+  }
+  const r = ldPdfFilas(paginas);
+  if(!r) return null;
+  const fps = ldFps(r.filas);
+  const conTC = r.filas.filter(f => ldTC(f.tc, fps) != null).length;
+  if(conTC < r.filas.length / 2) return null;
+  return { hoja: 'PDF', filas: r.filas, fps: fps, info: r.info, pdf: true };
 }
 
 /* ═══ ¿CON LIBRETO TRADUCIDO O SIN ÉL? ═════════════════════════════════════
