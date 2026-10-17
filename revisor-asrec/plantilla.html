@@ -220,7 +220,7 @@ textarea{width:100%;min-height:140px;background:var(--soft);border:1px solid var
       <div class="captura">
         <label class="boton" for="pImagen"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="m21 17-5-5-8 7"/></svg>Leer una captura</label>
         <input id="pImagen" type="file" accept="image/*" class="solo-lector">
-        <span class="nota">o pégala con Ctrl+V, o arrástrala aquí. Mejor si solo se ve la columna del diálogo (y el personaje).</span>
+        <span class="nota">o pégala con Ctrl+V, o arrástrala aquí. Saca cada personaje con su línea de diálogo y deja fuera timecodes, la transcripción y las demás columnas.</span>
         <span id="pOCR" role="status" aria-live="polite"></span>
       </div>
       <textarea id="pTexto" spellcheck="false" aria-label="Diálogo para revisar" placeholder="Por ejemplo:&#10;AMAR: Te iba a decir que&#10;RUDRA: ¡No quiero saberlo!&#10;AMAR: ya firmé el divorcio."></textarea>
@@ -643,6 +643,31 @@ async function prepararImagen(file){
   return c;
 }
 
+/** Las rayas horizontales de una tabla: filas de píxeles con un trazo
+ *  continuo más oscuro que el fondo a lo largo de casi todo el ancho. Una
+ *  línea de texto tiene muchos puntos oscuros, pero sueltos. Separan las
+ *  filas del guion aunque una casilla tenga dos líneas de texto. */
+function rayasDe(c){
+  const w = c.width, h = c.height;
+  const p = c.getContext('2d').getImageData(0, 0, w, h).data;
+  const hist = new Uint32Array(256);
+  for(let i = 0; i < p.length; i += 16) hist[p[i]]++;
+  let fondo = 0;
+  for(let v = 1; v < 256; v++) if(hist[v] > hist[fondo]) fondo = v;
+  const rayas = [];
+  let ini = -1;
+  for(let y = 0; y <= h; y++){
+    let tramo = 0, mayor = 0;
+    if(y < h) for(let i = y * w * 4, f = i + w * 4; i < f; i += 4){
+      if(p[i] < fondo - 12){ if(++tramo > mayor) mayor = tramo; } else tramo = 0;
+    }
+    const es = y < h && mayor > w * 0.4;
+    if(es && ini < 0) ini = y;
+    if(!es && ini >= 0){ if(y - ini <= 6) rayas.push((ini + y - 1) / 2); ini = -1; }
+  }
+  return rayas;
+}
+
 async function leerCaptura(file){
   if(!file || !/^image\//.test(file.type)) return;
   if($('#inicio').classList.contains('oculto')) document.querySelector('.pestanas [data-v="vProbar"]').click();
@@ -652,11 +677,29 @@ async function leerCaptura(file){
     const [w, lienzo] = await Promise.all([cargarLector(), prepararImagen(file)]);
     ocrEstado('Leyendo la captura…', 0);
     const { data } = await w.recognize(lienzo);
-    const texto = M.limpiarCaptura(data.text);
+    /* Solo el personaje y su línea de diálogo, en este orden:
+       1. tarjetas de la herramienta de Netflix, o tabla con cabecera
+          (SOURCE / DIALOGUE), con la lectura normal, por bloque;
+       2. tabla sin cabecera: se vuelve a leer en modo automático, que separa
+          las columnas (por bloque, las casillas de dos líneas se mezclan);
+       3. si no es nada de eso, línea a línea. */
+    const rayas = rayasDe(lienzo);
+    let tabla = M.ordenarTarjetas(data.lines || [], estado.dic, rayas);
+    if(!tabla){ const t = M.ordenarCaptura(data.words || [], estado.dic, rayas); if(t && t.como === 'cabecera') tabla = t; }
+    if(!tabla){
+      ocrEstado('Buscando las columnas…', 0);
+      await w.setParameters({ tessedit_pageseg_mode: '3' });
+      try{ tabla = M.ordenarCaptura((await w.recognize(lienzo)).data.words || [], estado.dic, rayas); }
+      finally{ await w.setParameters({ tessedit_pageseg_mode: '6' }); }
+    }
+    const texto = tabla ? tabla.texto : M.limpiarCaptura(data.text);
     if(!texto.trim()){ ocrEstado('No encontré texto en la imagen.', null, true); return; }
     const area = $('#pTexto');
     area.value = area.value.trim() ? area.value.replace(/\s*$/, '') + '\n' + texto : texto;
-    ocrEstado('Leída. Repasa el texto: al leer una imagen se pueden confundir tildes, «¿¡» o «…».');
+    const n = tabla ? tabla.eventos.length : texto.split('\n').length;
+    const pjs = tabla ? new Set(tabla.eventos.map(e => e.personaje).filter(Boolean)).size : 0;
+    ocrEstado('Leída' + (tabla ? ': ' + n + ' diálogo' + (n > 1 ? 's' : '') + (pjs ? ' de ' + pjs + ' personaje' + (pjs > 1 ? 's' : '') : '')
+      + (tabla.como === 'tarjetas' ? ' (personaje y línea de cada tarjeta)' : tabla.como === 'cabecera' ? ' (columnas del personaje y del diálogo)' : '') : '') + '. Repasa el texto: al leer una imagen se pueden confundir tildes, «¿¡» o «…».');
     probar();
   }catch(e){
     console.error(e);

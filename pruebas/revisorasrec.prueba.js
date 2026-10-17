@@ -187,6 +187,43 @@ exports.pruebas = async function(t){
   t.eq('lo leído se ordena: sin timecodes ni ON, «...» → «…», el personaje delante y la casilla partida, junta',
     M.limpiarCaptura('00:06:18:09 00:06:20:11 PANDIT Con esta declaración, ON\nredefinimos las leyes:\nYOUNG GURUAMMA Pero ya lo sabías... las Kathawa\nguardaban esa tierra.\nAMAR (GESTO)\n¡NO!\n…lo despiadada que eres.\n12'),
     'PANDIT: Con esta declaración, redefinimos las leyes:\nYOUNG GURUAMMA: Pero ya lo sabías… las Kathawa guardaban esa tierra.\nAMAR: (GESTO)\n¡NO!\n…lo despiadada que eres.');
+  t.eq('una tarjeta con el nombre solo y el diálogo debajo', M.limpiarCaptura('BHAVANI\nTodo tus esfuerzos fueron en vano.\nRUDRA\n¡NO!'),
+    'BHAVANI: Todo tus esfuerzos fueron en vano.\nRUDRA: ¡NO!');
+
+  /* La herramienta de Netflix, como la devuelve el lector: el punto de color,
+     la flecha y la etiqueta On salen como basura («@», «v», «[On]»), y el
+     icono del lápiz de las anotaciones, como «Z». */
+  const caja = (y, alto) => ({ x0: 10, x1: 800, y0: y, y1: y + alto });
+  const linea = (text, y, alto) => ({ text, bbox: caja(y, alto || 16) });
+  const dicT = M.crearDiccionario(('oí que se sumó como nueva intérprete estuve muy ocupado no pude pasar a saludarla debe preocuparse ' +
+    'yo debí haberlo saludado primero todo tus esfuerzos fueron en vano y aunque lo intentaste mil veces').split(' '), []);
+  const tarjetas = M.ordenarTarjetas([
+    linea('00:36:43:06 - 00:36:45:15 02:09 0781', 10), linea('@ FUKUDA v [On]', 34), linea('OÍ que se sumó como nueva intérprete.', 58, 24),
+    linea('# Foreign Dialog, Context', 100), linea('Z speaks Japanese', 120), linea('The speaker switches to semi-formal speech.', 140),
+    linea('00:36:46:09 - 00:36:49:21 03:12 0782', 180), linea('e FUKUDA ~ On', 204), linea('Estuve muy ocupado. No pude pasar a saludarla.', 228, 24),
+    linea('# Foreign Dialog', 270), linea('speaks Japanese', 290), linea('FN', 310),
+    linea('00:36:50:04 - 00:36:53:17 03:13 0783', 350), linea('GA-KYUNG On', 374), linea('Todo tus esfuerzos fueron en vano, y aunque lo', 398, 24),
+    linea('intentaste mil veces.', 424, 24), linea('# Foreign Dialog', 466), linea('speaks Japanese', 486)
+  ], dicT, [92, 262, 458]);
+  t.eq('tarjetas de Netflix: solo el personaje y su línea, sin etiquetas ni anotaciones', tarjetas && tarjetas.texto,
+    'FUKUDA: Oí que se sumó como nueva intérprete.\nFUKUDA: Estuve muy ocupado. No pude pasar a saludarla.\nGA-KYUNG: Todo tus esfuerzos fueron en vano, y aunque lo intentaste mil veces.');
+  t.eq('y el timecode de cada una', tarjetas && tarjetas.eventos.map(e => e.tc), ['00:36:43:06', '00:36:46:09', '00:36:50:04']);
+  t.eq('una cabecera de Excel no son tarjetas', M.ordenarTarjetas([linea('IN-TIMECODE OUT-TIMECODE SOURCE DIALOGUE', 0), linea('00:00:05:06 00:00:09:14 BHAVANI Hola.', 30)], dicT, []), null);
+
+  /* El Excel: la cabecera dice qué columna es cada una. La casilla de RUDRA
+     tiene dos líneas y el nombre, alineado abajo, cae en la segunda. */
+  const pal = (text, x0, y) => ({ text, bbox: { x0, x1: x0 + text.length * 8, y0: y, y1: y + 16 } });
+  const fila1 = (y, xs, textos) => textos.map((w, k) => pal(w, xs[k], y));
+  const tabla = M.ordenarCaptura([
+    ...fila1(0, [0, 200, 350, 600, 900, 970], ['IN-TIMECODE', 'SOURCE', 'TRANSCRIPTION', 'DIALOGUE', 'SOURCE', 'ONSCREEN']),
+    ...fila1(30, [0, 200, 350, 400, 460, 600, 645, 680, 760, 900], ['00:05:31:02', 'BHAVANI', 'All', 'your', 'efforts', 'Todo', 'tus', 'esfuerzos', 'fueron.', 'ON']),
+    ...fila1(60, [600, 640, 690], ['Te', 'iba', 'a']),
+    ...fila1(80, [0, 200, 350, 380, 600, 650, 700, 900], ['00:05:33:10', 'RUDRA', 'I', 'was', 'decir', 'que…', 'ya', 'OFF'])
+  ], dicT, [20, 50, 100]);
+  t.eq('tabla con cabecera: el personaje y el diálogo, sin timecodes, inglés ni ON/OFF', tabla && tabla.texto,
+    'BHAVANI: Todo tus esfuerzos fueron.\nRUDRA: Te iba a decir que… ya');
+  t.eq('sabe que la sacó de la cabecera', tabla && tabla.como, 'cabecera');
+
   for(const id of ['ocr-lib', 'ocr-worker', 'ocr-core', 'ocr-spa']){
     const b64 = (new RegExp('<script id="' + id + '" type="text/plain">([^<]{40})').exec(html) || [])[1];
     const cab = b64 ? Buffer.from(b64.slice(0, 4), 'base64') : Buffer.alloc(0);

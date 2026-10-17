@@ -43,8 +43,17 @@ Excel abierto. Se escribe o se pega un diálogo, cada línea es un evento, y dic
 al momento si está bien o qué tiene mal, con botones para aplicar la
 corrección. Para una conversación, cada línea empieza con el personaje
 (`AMAR: Te iba a decir que…`). También lee **capturas**: con el botón «Leer una
-captura», pegándola con Ctrl+V o arrastrándola; el texto leído se limpia
-(timecodes, ON/OFF, el personaje delante) y se revisa. El lector (Tesseract.js
+captura», pegándola con Ctrl+V o arrastrándola. De la captura solo saca **el
+personaje y su línea de diálogo**, y deja fuera timecodes, transcripción,
+etiquetas y anotaciones. Reconoce:
+- las **tarjetas de la herramienta de guiones de Netflix** (timecodes, «FUKUDA ▾
+  On», la línea en letra grande y, tras la raya, «# Foreign Dialog» y las
+  anotaciones);
+- el **Excel** o cualquier tabla con cabecera (SOURCE / PERSONAJE y DIALOGUE /
+  DIÁLOGO), aunque una casilla tenga dos líneas;
+- **tablas sin cabecera**: el personaje es la columna en mayúsculas y el diálogo,
+  la que más palabras en español tiene (no la transcripción en inglés);
+- tarjetas con el nombre encima del diálogo, y texto suelto línea a línea. El lector (Tesseract.js
 con el español) va dentro del archivo: ver `ocr/LEEME.md`. Con un Excel abierto, lo compara además con los nombres, las guías
 de pronunciación y el título de ese guion.
 

@@ -1262,6 +1262,10 @@ function xlsx(hojas){
   return zip(archivos);
 }
 
+/* «YOUNG GURUAMMA», «KATHAWA WOMAN 3», «AMAR'S MALE GANG MEMBER 1»: todo en
+   mayúsculas, sin signos de frase. «¡NO!» o «(GESTO)» no lo son. */
+const esNombreSuelto = (l) => /^[\p{Lu}\d][\p{Lu}\d'’ .\-]{1,40}:?$/u.test(l.trim()) && /\p{Lu}{2}/u.test(l) && !/\p{Ll}/u.test(l);
+
 /**
  * El texto que sale de leer una captura, ordenado para «Probar un diálogo»:
  *  · fuera los timecodes, los ON / OFF y las líneas sin letras;
@@ -1273,12 +1277,15 @@ function xlsx(hojas){
  */
 function limpiarCaptura(texto){
   const out = [];
+  let nombre = '';   // «BHAVANI» solo en su línea: el diálogo viene debajo
   for(let l of String(texto ?? '').split(/\r?\n/)){
     l = l.replace(/\b\d{1,2}[:;.]\d{2}[:;.]\d{2}[:;.]\d{2}\b/g, ' ')
          .replace(/(?:^|\s)(?:ON|OFF|ON_OFF|OFF_ON)(?=\s|$)/g, ' ')
          .replace(/\.\s?\.\s?\./g, '…').replace(/[‘’`´]/g, "'")
          .replace(/\s+/g, ' ').trim();
     if(!/\p{L}/u.test(l)) continue;
+    if(esNombreSuelto(l)){ nombre = l.replace(/\s*:$/, ''); continue; }
+    if(nombre){ l = nombre + ': ' + l; nombre = ''; out.push(l); continue; }
     const m = /^([\p{Lu}][\p{Lu}\d'’ .\-]{1,40}?)\s+(?=[(\[]|[¿¡«"…]?\p{Lu}?\p{Ll})/u.exec(l);
     if(m && /\p{Lu}{2}/u.test(m[1]) && !/[:]$/.test(m[1])) l = m[1].trim() + ': ' + l.slice(m[0].length);
     const previa = out[out.length - 1];
@@ -1288,7 +1295,223 @@ function limpiarCaptura(texto){
   return out.join('\n');
 }
 
-return { leerLibro, extraerGuion, crearDiccionario, sugerir, revisar, revisarTexto, contexto, limpiarCaptura, xlsx, REGLAS, CATEGORIAS,
+/* Las cabeceras que se reconocen en una captura, sin tildes ni signos. */
+const CAB_PERSONAJE = new Set(['SOURCE', 'PERSONAJE', 'PERSONAJES', 'CHARACTER', 'CHARACTERNAME', 'NOMBRE', 'SPEAKER']);
+const DOBLES = new Set(['SOURCE+ONSCREEN', 'CHARACTER+NAME', 'FN+TREATMENT', 'FN+POSITION', 'IN+TIMECODE', 'OUT+TIMECODE', 'TC+IN', 'TC+OUT']);
+const CAB_DIALOGO = new Set(['DIALOGUE', 'DIALOG', 'DIALOGO', 'DIALOGOS', 'TEXTO', 'TRADUCCION', 'ADAPTACION', 'DOBLAJE', 'LINEA']);
+
+/**
+ * Una captura de una tabla (el Excel, la herramienta de doblaje), convertida
+ * en eventos «PERSONAJE: diálogo». Solo se queda con esas dos columnas: los
+ * timecodes, la transcripción en inglés, las anotaciones o las etiquetas se
+ * quedan fuera.
+ *
+ * @param palabras  [{ text, bbox: { x0, y0, x1, y1 } }] de Tesseract
+ * @param dic       el diccionario (para saber qué columna está en español)
+ * @param rayas     alturas (y) de las líneas horizontales de la tabla, si
+ *                  las hay: separan las filas aunque una casilla ocupe varias
+ *                  líneas de texto
+ * @returns { eventos: [{ personaje, dialogo }], texto, como } o null si la
+ *          imagen no parece una tabla (entonces se usa limpiarCaptura)
+ */
+function ordenarCaptura(palabras, dic, rayas){
+  const ws = (palabras || []).map(p => ({ t: String(p.text || '').trim(), x0: p.bbox.x0, y0: p.bbox.y0, x1: p.bbox.x1, y1: p.bbox.y1 }))
+    .filter(w => w.t && w.x1 > w.x0 && w.y1 > w.y0);
+  if(ws.length < 2) return null;
+  const alturas = ws.map(w => w.y1 - w.y0).sort((a, b) => a - b);
+  const alto = alturas[Math.floor(alturas.length / 2)];
+  const cx = (w) => (w.x0 + w.x1) / 2, cy = (w) => (w.y0 + w.y1) / 2;
+  const norma = (s) => sinTildes(s).toUpperCase().replace(/[^A-Z]/g, '');
+
+  /* Palabras en líneas: se solapan en vertical. */
+  const enLineas = (lista) => {
+    const ls = [];
+    for(const w of lista.slice().sort((a, b) => cy(a) - cy(b))){
+      const l = ls.find(x => Math.abs(cy(w) - x.cy) < alto * 0.55);
+      if(l){ l.ws.push(w); l.cy = (l.cy * (l.ws.length - 1) + cy(w)) / l.ws.length; l.y0 = Math.min(l.y0, w.y0); l.y1 = Math.max(l.y1, w.y1); }
+      else ls.push({ ws: [w], cy: cy(w), y0: w.y0, y1: w.y1 });
+    }
+    for(const l of ls){ l.ws.sort((a, b) => a.x0 - b.x0); l.texto = l.ws.map(w => w.t).join(' '); }
+    return ls.sort((a, b) => a.cy - b.cy);
+  };
+
+  /* 1. Columnas por la cabecera. */
+  let colP = null, colD = null, desde = -Infinity, como = '';
+  for(const l of enLineas(ws)){
+    /* Una palabra, una cabecera; salvo las de dos palabras conocidas: «SOURCE
+       ONSCREEN» no es la columna del personaje. Juntar por cercanía fundiría
+       columnas pegadas, como «OUT-TIMECODE» y «SOURCE». */
+    const celdas = [];
+    for(const w of l.ws){
+      const c = celdas[celdas.length - 1];
+      if(c && w.x0 - c.x1 < alto * 1.6 && DOBLES.has(norma(c.t) + '+' + norma(w.t))){ c.t += ' ' + w.t; c.x1 = w.x1; }
+      else celdas.push({ t: w.t, x0: w.x0, x1: w.x1 });
+    }
+    const tipo = (c) => CAB_PERSONAJE.has(norma(c.t)) ? 'p' : CAB_DIALOGO.has(norma(c.t)) ? 'd' : '';
+    if(!celdas.some(c => tipo(c) === 'p') || !celdas.some(c => tipo(c) === 'd')) continue;
+    /* El límite entre columnas, a medio camino entre una cabecera y la siguiente. */
+    const lim = celdas.map((c, k) => k + 1 < celdas.length ? celdas[k + 1].x0 - alto * 0.4 : Infinity);
+    const k = (t) => celdas.findIndex(c => tipo(c) === t);
+    const rango = (i) => [i ? lim[i - 1] : -Infinity, lim[i]];
+    colP = rango(k('p')); colD = rango(k('d'));
+    desde = l.y1; como = 'cabecera';
+    break;
+  }
+
+  /* 2. Sin cabecera: columnas por los huecos verticales. */
+  if(!colP){
+    const ancho = Math.max(...ws.map(w => w.x1)) + 1;
+    const lleno = new Uint8Array(Math.ceil(ancho));
+    for(const w of ws) for(let x = Math.floor(w.x0); x < w.x1; x++) lleno[x] = 1;
+    const hueco = Math.max(alto * 1.5, ancho * 0.015);
+    const cols = [];
+    let ini = -1, vacio = 0;
+    for(let x = 0; x <= lleno.length; x++){
+      if(x < lleno.length && lleno[x]){ if(ini < 0) ini = x; vacio = 0; }
+      else if(ini >= 0 && (++vacio >= hueco || x === lleno.length)){ cols.push([ini, x - vacio + 1]); ini = -1; vacio = 0; }
+    }
+    if(cols.length < 2) return null;
+    const datos = cols.map(([a, b]) => {
+      const de = ws.filter(w => cx(w) >= a && cx(w) <= b);
+      const letras = de.filter(w => /\p{L}/u.test(w.t));
+      const mayus = letras.filter(w => !/\p{Ll}/u.test(w.t)).length / (letras.length || 1);
+      const largas = letras.filter(w => w.t.replace(/[^\p{L}]/gu, '').length >= 3);
+      const es = dic ? largas.filter(w => dic.tiene(w.t.replace(/[^\p{L}]/gu, '').toLowerCase())).length / (largas.length || 1) : 0;
+      const tc = de.filter(w => /^\d{1,2}[:;.]\d{2}/.test(w.t)).length / (de.length || 1);
+      return { rango: [a, b], n: letras.length, mayus, es, tc, minus: letras.filter(w => /\p{Ll}/u.test(w.t)).length };
+    });
+    const nombres = datos.filter(d => d.n && d.mayus >= 0.7 && d.tc < 0.5).sort((a, b) => b.n - a.n);
+    const textos = datos.filter(d => d.minus >= 2 && d.tc < 0.5).sort((a, b) => b.es - a.es || b.minus - a.minus);
+    if(!textos.length) return null;
+    colD = textos[0].rango;
+    colP = nombres.length ? nombres[0].rango : null;
+    como = 'columnas';
+  }
+
+  /* Con cabecera se mira dónde empieza la palabra: el texto va alineado a la
+     izquierda de su columna. Sin cabecera, su centro. */
+  const dentro = (w, r) => r && (como === 'cabecera' ? w.x0 : cx(w)) >= r[0] && (como === 'cabecera' ? w.x0 : cx(w)) < r[1] && w.y0 >= desde;
+  const lineasP = colP ? enLineas(ws.filter(w => dentro(w, colP))).filter(l => /\p{Lu}{2}/u.test(l.texto) && !/\p{Ll}/u.test(l.texto)) : [];
+  const lineasD = enLineas(ws.filter(w => dentro(w, colD)));
+  if(!lineasD.length) return null;
+
+  /* 3. Cada línea de diálogo, a su fila. Con las rayas de la tabla, la fila
+     es la franja entre dos rayas; sin ellas, el nombre más cercano en
+     vertical (las celdas pueden ir arriba o abajo). */
+  const franjas = (rayas || []).filter(y => y > desde).sort((a, b) => a - b);
+  const franja = (y) => franjas.filter(r => r <= y).length;
+  const eventos = [];
+  /* Si en una franja caben dos personajes, las rayas no son las de las filas. */
+  const fiable = franjas.length >= 2 && lineasP.length && new Set(lineasP.map(l => franja(l.cy))).size === lineasP.length;
+  if(fiable){
+    const porFranja = new Map();
+    for(const l of lineasP){ const f = franja(l.cy); if(!porFranja.has(f)) porFranja.set(f, { personaje: [], dialogo: [], y: l.cy }); porFranja.get(f).personaje.push(l.texto); }
+    for(const l of lineasD){ const f = franja(l.cy); if(!porFranja.has(f)) porFranja.set(f, { personaje: [], dialogo: [], y: l.cy }); porFranja.get(f).dialogo.push(l.texto); }
+    for(const [, e] of Array.from(porFranja.entries()).sort((a, b) => a[0] - b[0])) eventos.push({ personaje: e.personaje.join(' '), dialogo: e.dialogo.join(' ') });
+  }else if(lineasP.length){
+    const evs = lineasP.map(l => ({ personaje: l.texto, cy: l.cy, dialogo: [] }));
+    for(const l of lineasD){
+      let mejor = 0;
+      for(let k = 1; k < evs.length; k++){
+        const dk = Math.abs(evs[k].cy - l.cy), dm = Math.abs(evs[mejor].cy - l.cy);
+        /* Empate: si la línea empieza en minúscula sigue a la anterior. */
+        if(dk < dm - alto * 0.2 || Math.abs(dk - dm) <= alto * 0.2 && !/^\p{Ll}/u.test(l.texto)) mejor = k;
+      }
+      evs[mejor].dialogo.push(l.texto);
+    }
+    for(const e of evs) eventos.push({ personaje: e.personaje, dialogo: e.dialogo.join(' ') });
+  }else{
+    for(const l of lineasD) eventos.push({ personaje: '', dialogo: l.texto });
+  }
+
+  const limpio = (t) => t.replace(/\.\s?\.\s?\./g, '…').replace(/[‘’`´]/g, "'").replace(/\s+([,.;:?!…)\]])/g, '$1').replace(/([¿¡(\[])\s+/g, '$1').replace(/\s+/g, ' ').trim();
+  const fuera = eventos.map(e => ({ personaje: limpio(e.personaje).replace(/\s*:$/, ''), dialogo: arreglarInicio(limpio(e.dialogo), dic) })).filter(e => /\p{L}/u.test(e.dialogo));
+  if(!fuera.length) return null;
+  return {
+    eventos: fuera, como,
+    texto: fuera.map(e => e.personaje ? e.personaje + ': ' + e.dialogo : e.dialogo).join('\n')
+  };
+}
+
+/* El nombre del personaje en la línea de una tarjeta: «● FUKUDA ▾ On».
+   Lo que no es el nombre (el punto de color, la flecha, la etiqueta On/Off)
+   el lector lo devuelve como basura de una o dos letras: «@», «e», «v», «~». */
+const RE_TC = /\d{1,2}[:;.]\d{2}[:;.]\d{2}[:;.]\d{2}/;
+const ETIQUETA_TARJETA = /^\W{0,3}#|^\W{0,3}(foreign dialog|context|main title|episode title|sensitive language|song|lyrics|music|on-?screen text|graphics?|forced narrative|burned|narrative)\b/i;
+function nombreDeLinea(t){
+  const fichas = t.replace(/[●•◉○◦·*®©°▾▼▿⌄˅|[\](){}]/g, ' ').split(/\s+/).filter(Boolean)
+    .filter(x => !/^(on|off|on_off|off_on)$/i.test(x));
+  const nombre = [], resto = [];
+  for(const x of fichas){
+    if(/^[\p{Lu}\d][\p{Lu}\d'’.\-]*$/u.test(x) && /\p{Lu}/u.test(x) && (nombre.length || /\p{Lu}{2}/u.test(x))) nombre.push(x);
+    else resto.push(x);
+  }
+  if(!nombre.length || resto.some(x => x.replace(/[^\p{L}\d]/gu, '').length > 2)) return '';
+  return nombre.join(' ').replace(/[.\-]+$/, '');
+}
+
+/**
+ * Una captura de la herramienta de guiones de Netflix: una tarjeta por
+ * evento, con los timecodes arriba, el personaje («FUKUDA ▾ On»), la línea de
+ * diálogo en letra grande y, tras una raya, las etiquetas («# Foreign Dialog»)
+ * y las anotaciones («speaks Japanese»). Solo se queda con el personaje y su
+ * línea.
+ *
+ * @param lineas  [{ text, bbox }] de Tesseract (data.lines)
+ * @param dic     el diccionario: una anotación en inglés no es diálogo
+ * @param rayas   alturas de las líneas horizontales (la raya bajo el diálogo)
+ * @returns { eventos, texto, como: 'tarjetas' } o null si no son tarjetas
+ */
+/* La primera palabra en mayúsculas cuando el resto no lo está es casi
+   siempre un error de lectura: «OÍ que se sumó» es «Oí que se sumó». */
+function arreglarInicio(t, dic){
+  const m = /^([¿¡«"…]*)(\p{Lu}{2,3})(?=[\s,.;:!?…])/u.exec(t);
+  if(!m || !dic || !/\p{Ll}{3}/u.test(t.slice(m[0].length))) return t;
+  const w = m[2][0] + m[2].slice(1).toLowerCase();
+  return dic.tiene(w.toLowerCase()) ? m[1] + w + t.slice(m[0].length) : t;
+}
+
+function ordenarTarjetas(lineas, dic, rayas){
+  const ls = (lineas || []).map(l => ({ t: String(l.text || '').replace(/\s+/g, ' ').trim(), y0: l.bbox.y0, y1: l.bbox.y1, h: l.bbox.y1 - l.bbox.y0 }))
+    .filter(l => l.t).sort((a, b) => a.y0 - b.y0);
+  /* Tarjetas: hay líneas que solo llevan timecodes («00:36:43:06 - 00:36:45:15
+     02:09 0781»). En un Excel el timecode comparte línea con el diálogo. */
+  const soloTc = (t) => RE_TC.test(t) && /^[\d:;.,\s\-–—|]+$/.test(t);
+  if(!ls.some(l => soloTc(l.t)) || !ls.some(l => nombreDeLinea(l.t))) return null;
+  const rs = (rayas || []).slice().sort((a, b) => a - b);
+  const rayaEntre = (a, b) => rs.some(y => y > a && y < b);
+  const espanol = (t) => {
+    const ws = (t.match(/\p{L}{3,}/gu) || []);
+    return !dic || !ws.length ? 1 : ws.filter(w => dic.tiene(w.toLowerCase())).length / ws.length;
+  };
+  const eventos = [];
+  let ev = null, fase = 'fuera', hDialogo = 0, finDialogo = 0, hNombre = 0;
+  for(const l of ls){
+    if(soloTc(l.t)){ ev = { personaje: '', dialogo: [], tc: (RE_TC.exec(l.t) || [''])[0] }; eventos.push(ev); fase = 'nombre'; continue; }
+    if(/^\W*\d{1,6}\W*$/.test(l.t)) continue;                       // el número del evento
+    const nombre = nombreDeLinea(l.t);
+    /* Un nombre abre la tarjeta. Con el diálogo empezado, solo si su letra es
+       más pequeña (un «OK» en mayúsculas es diálogo). */
+    if(nombre && (fase !== 'dialogo' || (hDialogo && l.h < hDialogo * 0.85))){
+      if(!ev || fase !== 'nombre'){ ev = { personaje: '', dialogo: [], tc: '' }; eventos.push(ev); }
+      ev.personaje = nombre; fase = 'dialogo'; hDialogo = 0; hNombre = l.h; finDialogo = l.y1;
+      continue;
+    }
+    if(fase !== 'dialogo') continue;
+    const nota = ETIQUETA_TARJETA.test(l.t) || /^[✎✏✐🖉🖊&]/u.test(l.t) || /^[Zz2]\s+\p{Ll}/u.test(l.t)
+      || (hDialogo && (l.h < hDialogo * 0.8 || rayaEntre(finDialogo, l.y0)))
+      || (ev.dialogo.length && espanol(l.t) < 0.3);
+    if(nota){ fase = 'notas'; continue; }
+    ev.dialogo.push(l.t); finDialogo = l.y1;
+    if(!hDialogo) hDialogo = Math.max(l.h, hNombre);
+  }
+  const limpio = (t) => t.replace(/\.\s?\.\s?\./g, '…').replace(/[‘’`´]/g, "'").replace(/\s+([,.;:?!…)\]])/g, '$1').replace(/([¿¡(\[])\s+/g, '$1').trim();
+  const fuera = eventos.map(e => ({ personaje: e.personaje, dialogo: arreglarInicio(limpio(e.dialogo.join(' ')), dic), tc: e.tc })).filter(e => e.personaje && /\p{L}/u.test(e.dialogo));
+  if(!fuera.length) return null;
+  return { eventos: fuera, como: 'tarjetas', texto: fuera.map(e => e.personaje + ': ' + e.dialogo).join('\n') };
+}
+
+return { leerLibro, extraerGuion, crearDiccionario, sugerir, revisar, revisarTexto, contexto, limpiarCaptura, ordenarCaptura, ordenarTarjetas, xlsx, REGLAS, CATEGORIAS,
          _interno: { tapar, guiasDe, palabras, esReaccion, distancia, variantesTilde, leerZip } };
 })();
 
