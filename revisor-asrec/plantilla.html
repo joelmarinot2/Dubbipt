@@ -48,9 +48,14 @@ button{cursor:pointer}
 
 main{max-width:1180px;margin:0 auto;padding:24px 20px 80px}
 
-.soltar{border:2px dashed var(--line);border-radius:16px;background:var(--panel);padding:56px 24px;text-align:center;transition:border-color .15s, background .15s}
+/* Es un <label>: sin display:block se pinta en línea y el borde sale a trozos. */
+.soltar{display:block;cursor:pointer;border:2px dashed var(--line);border-radius:16px;background:var(--panel);padding:48px 24px;text-align:center;transition:border-color .15s, background .15s}
+.soltar:hover{border-color:var(--muted)}
 .soltar.encima{border-color:var(--accent);background:var(--accent-soft)}
+.soltar:focus-within{outline:2px solid var(--accent);outline-offset:3px}
+.soltar .icono{width:52px;height:52px;margin:0 auto 14px;border-radius:14px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
 .soltar h2{margin:0 0 6px;font-size:22px;letter-spacing:-.3px}
+.solo-lector{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .soltar p{margin:0 auto;color:var(--muted);max-width:620px}
 .boton{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:8px 14px;font-weight:600;font-size:14px}
 .boton:hover{border-color:var(--muted)}
@@ -166,15 +171,16 @@ textarea{width:100%;min-height:140px;background:var(--soft);border:1px solid var
 <main>
   <section id="inicio">
     <label id="soltar" class="soltar" for="archivo">
+      <div class="icono" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/></svg></div>
       <h2>Suelta aquí el Excel del guion</h2>
       <p>El archivo <b>.xlsx</b> del guion de doblaje (DUB SCRIPT). Se revisan las casillas
          <b>DIALOGUE</b> de la hoja <b>Dialogue List</b>. Nada sale de este ordenador.</p>
       <span class="boton prim">Elegir archivo…</span>
-      <input id="archivo" type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="oculto">
+      <input id="archivo" type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="solo-lector">
       <div id="fallo" class="fallo" role="alert"></div>
     </label>
     <div class="cuadro">
-      <div><b>Formato ASREC</b>Casillas vacías, reacciones entre paréntesis y en mayúsculas, números y abreviaturas tal como se dicen, continuaciones con «…».</div>
+      <div><b>Formato ASREC</b>Casillas vacías, reacciones sin paréntesis, MAYÚSCULAS sostenidas, números y abreviaturas como pide Netflix, continuaciones con «…».</div>
       <div><b>Ortografía</b>Diccionario de español de LibreOffice y normas de la RAE (solo, este, guion sin tilde), tildes de qué/cómo/dónde.</div>
       <div><b>Gramática</b>Concordancias, «a el», «haber si», «he echo», dequeísmo, «habían muchas», formas de vosotros en latino.</div>
       <div><b>Coherencia</b>Guías de pronunciación distintas, nombres escritos de dos formas, «Diosa» y «diosa», etiquetas que no casan con el texto.</div>
