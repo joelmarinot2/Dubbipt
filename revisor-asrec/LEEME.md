@@ -28,10 +28,17 @@ El informe se descarga en `.xlsx` con tres hojas: hallazgos (empieza por el
 **timecode inicial** de cada fila), nombres y guías (con el timecode de la
 primera vez que sale cada nombre), y resumen.
 
+**La puntuación de cada fila se mira con la de antes y la de después** del mismo
+personaje (hasta ocho filas y diez segundos de hueco): si la frase sigue, si la
+interrumpe otro personaje («…» al cortar y al retomar), si la anterior ya la
+cerró (sobra el «…», va mayúscula) o si la continuación empieza en mayúscula.
+Cada aviso enseña las filas vecinas que lo explican.
+
 **Probar un diálogo**: en la pantalla de inicio, y en su pestaña cuando hay un
 Excel abierto. Se escribe o se pega un diálogo, cada línea es un evento, y dice
 al momento si está bien o qué tiene mal, con botones para aplicar la
-corrección. Con un Excel abierto, lo compara además con los nombres, las guías
+corrección. Para una conversación, cada línea empieza con el personaje
+(`AMAR: Te iba a decir que…`). Con un Excel abierto, lo compara además con los nombres, las guías
 de pronunciación y el título de ese guion.
 
 ## Cómo se construye

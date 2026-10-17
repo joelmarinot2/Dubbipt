@@ -303,9 +303,11 @@ const R = {
   reaccionMayus: ['asrec', 'Reacciones escritas igual', 'Todas las reacciones del guion se escriben del mismo modo: si casi todas van en mayúsculas, (GESTO), las demás también.'],
   reaccionIngles:['asrec', 'Reacciones en inglés', 'En el guion en español las reacciones van en español: (RISA), no (LAUGHS).'],
   reaccionEstilo:['asrec', 'Signos de las reacciones', 'Todas las reacciones del guion se marcan con el mismo signo: paréntesis, corchetes o llaves, sin mezclar.'],
-  contFin:       ['asrec', 'Continuación: «…» al final', 'En subtítulos Netflix no pone «…» al partir una frase, pero este guion marca así las continuaciones; se pide que sea siempre igual: «…» al final de una fila y al principio de la siguiente.'],
-  contIni:       ['asrec', 'Continuación: «…» al principio', 'Si el guion marca las continuaciones con «…», la fila que continúa una frase empieza con «…».'],
+  contFin:       ['asrec', 'Continuación: «…» al final', 'Se mira la fila de antes y la de después. Cuando otro personaje interrumpe la frase, la guía de español pide «…» al final y al retomarla. Sin interrupción, Netflix no lo pide en subtítulos, pero si el guion marca así las continuaciones, se pide que sea siempre igual.'],
+  contIni:       ['asrec', 'Continuación: «…» al principio', 'La fila que retoma una frase empieza con «…» si la interrumpió otro personaje, o si el guion marca así las continuaciones.'],
   sinFinal:      ['asrec', 'Falta la puntuación final', 'Guía ASR: «proper punctuation, even if a sentence is split across multiple events». Si la frase no sigue en la fila siguiente, termina con su signo.'],
+  contMayus:     ['asrec', 'Continuación en mayúscula', 'La fila que continúa una frase sigue en minúscula: «…lo despiadada que eres», no «…Lo despiadada».'],
+  contSobra:     ['asrec', '«…» al principio sin continuación', 'Si la fila anterior del personaje ya cerró la frase con punto, «?» o «!», la siguiente no empieza con «…» (salvo que la haya interrumpido otro personaje).'],
   inicioMinus:   ['asrec', 'Empieza en minúscula', 'Guía ASR: el diálogo va «in sentence case». Empieza con mayúscula salvo que continúe la frase anterior.'],
   repetida:      ['asrec', 'Línea repetida', 'El mismo personaje dice exactamente lo mismo pocas filas después. Puede ser intencionado; la guía ASR pide quitar los eventos «redundant, or unnecessary».'],
 
@@ -360,7 +362,7 @@ const R = {
 const FUENTE = {
   vacio: 'Netflix ASR', numeros: 'Netflix ES', abreviatura: 'Netflix ES', simbolos: 'Netflix ASR', mayusSostenidas: 'Netflix ASR',
   reaccionSigno: 'Netflix ASR', reaccionBorde: 'Netflix ASR', reaccionMayus: 'guion', reaccionIngles: 'guion', reaccionEstilo: 'guion',
-  contFin: 'guion', contIni: 'guion', sinFinal: 'Netflix ASR', inicioMinus: 'Netflix ASR', repetida: 'Netflix ASR',
+  contFin: 'guion', contIni: 'guion', contMayus: 'RAE', contSobra: 'guion', sinFinal: 'Netflix ASR', inicioMinus: 'Netflix ASR', repetida: 'Netflix ASR',
   invisible: 'Netflix ES', tresPuntos: 'Netflix ES', espacios: 'guion', espacioSigno: 'RAE', suspensivos: 'Netflix ES', signosPares: 'RAE',
   puntoTrasSigno: 'Netflix ES', puntoYComa: 'Netflix ES', dobleSigno: 'Netflix ES', peroComa: 'Netflix ES', mayusPunto: 'RAE', comillas: 'Netflix ES',
   diccionario: 'Netflix ASR', rae2010: 'RAE', pegadas: 'RAE', interrogativa: 'RAE', diacritica: 'RAE', vosotros: 'Netflix ES',
@@ -593,14 +595,26 @@ function revisar(guion, dic, op = {}){
 
   /* ── Fila a fila ── */
 
-  const siguiente = (i, dir) => {
+  /* La intervención anterior o siguiente del mismo personaje: la que puede
+     continuar su frase. Hasta ocho filas y diez segundos de hueco (en los
+     guiones reales la continuación llega en menos de cuatro; más lejos ya es
+     otra frase). `entre`: lo que dicen otros personajes por medio, es decir,
+     quién lo interrumpe. */
+  const segundos = (tc) => { const m = /^(\d+):(\d+):(\d+)[:;.](\d+)$/.exec(tc || ''); return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] + +m[4] / 30 : null; };
+  const vecina = (i, dir) => {
+    const entre = [];
     for(let j = i + dir, n = 0; j >= 0 && j < filas.length && n < 8; j += dir, n++){
-      if(filas[j].source.trim() !== filas[i].source.trim()) continue;
-      if(!filas[j].dialogo.trim() || esReaccion(filas[j].dialogo)) continue;
-      return filas[j];
+      const g = filas[j];
+      if(!g.dialogo.trim() || esReaccion(g.dialogo)) continue;
+      if(g.source.trim() !== filas[i].source.trim()){ entre.push(g); continue; }
+      const [a, b] = dir > 0 ? [filas[i], g] : [g, filas[i]];
+      const hueco = segundos(b.tcIn) - segundos(a.tcOut);
+      if(segundos(a.tcOut) != null && segundos(b.tcIn) != null && hueco > 10) return null;
+      return { f: g, entre: dir > 0 ? entre : entre.reverse() };
     }
     return null;
   };
+  const siguiente = (i, dir) => { const v = vecina(i, dir); return v && v.f; };
   const final = (t) => t.replace(/[\s»”"')\]]+$/u, '').slice(-1);
   const primeraLetra = (t) => { const m = /^[\s¿¡«“"(\[—–-]*(\p{L})/u.exec(t); return m ? m[1] : ''; };
 
@@ -830,33 +844,78 @@ function revisar(guion, dic, op = {}){
     if(sens && !/SENSITIVE/.test(tags)) poner(f, 'sensible', 'aviso', '«' + sens.w + '»: falta la etiqueta SENSITIVE LANGUAGE.', sens.desde, sens.hasta, 'SENSITIVE LANGUAGE');
   });
 
-  /* ── Lo que solo se ve mirando las filas vecinas ── */
+  /* ── Lo que solo se ve mirando las filas vecinas ──
+     La puntuación de una intervención depende de la de antes y la de
+     después: si la frase sigue en otra fila, si alguien la interrumpe, si la
+     anterior ya la había cerrado. */
+
+  const ultimo = (t) => final(t.trim().replace(/\s*[(\[][^()\[\]]*\p{Ll}[^()\[\]]*[)\]]$/u, ''));   // sin la guía final
+  /* ¿La frase de `a` sigue en `b`? No, si `a` la cerró con punto, «?» o «!».
+     Sí, si `b` empieza con «…» o en minúscula, o si `a` se queda sin cerrar
+     (coma, dos puntos o sin signo) y `b` no empieza otra frase. */
+  const sigue = (a, b) => !/[.?!]/.test(ultimo(a.dialogo)) && (/^\s*[¿¡]?\s*…/.test(b.dialogo) || /^\p{Ll}/u.test(primeraLetra(b.dialogo))
+    || /[,;:]|\p{L}/u.test(ultimo(a.dialogo)) && !/^\p{Lu}/u.test(primeraLetra(b.dialogo.replace(/^\s*…\s*/, ''))));
+  const quien = (g) => g.source.trim() + ' (fila ' + g.fila + ')';
 
   filas.forEach((f, i) => {
     const t = f.dialogo;
     if(!t.trim() || esReaccion(t)) return;
     const tr = t.trim();
-    const ant = siguiente(i, -1), sig = siguiente(i, 1);
-    /* «… Akka (áka)» termina en la guía: el signo se mira antes de ella. */
-    const fin = final(tr.replace(/\s*\([^()]*\p{Ll}[^()]*\)$/u, ''));
-    const sigEmpiezaTres = sig && /^\s*…/.test(sig.dialogo);
-    const empiezaTres = /^…/.test(tr);
-    const letra = primeraLetra(tr.replace(/^…\s*/, ''));
+    const A = vecina(i, -1), S = vecina(i, 1);
+    const ant = A && A.f, sig = S && S.f;
+    const fin = ultimo(tr);
     const hasta = t.trimEnd().length;
+    const empiezaTres = /^[¿¡]?\s*…/.test(tr);
+    const letra = primeraLetra(tr.replace(/^([¿¡]?)\s*…\s*/, '$1'));
+    const sigCont = sig && sigue(f, sig);
+    const antCont = ant && sigue(ant, f);
+    const corteSig = S && S.entre.length ? S.entre[0] : null;     // quien habla antes de que siga
+    const corteAnt = A && A.entre.length ? A.entre[A.entre.length - 1] : null;
+    const vecinas = (...gs) => ({ vecinas: gs.filter(Boolean).map(g => g.i) });
 
-    /* La frase sigue en la fila siguiente (que empieza con «…»). */
-    if(sigEmpiezaTres && fin !== '…')
-      poner(f, 'contFin', 'aviso', 'La frase sigue en la fila ' + sig.fila + ' (que empieza con «…»): termina esta con «…».', hasta - 1, hasta, /[,;:.]/.test(t[hasta - 1]) ? '…' : t[hasta - 1] + '…');
-    else if(!/[.?!…:;,]/.test(fin) && !(sig && /^\p{Ll}/u.test(primeraLetra(sig.dialogo))))
-      poner(f, 'sinFinal', 'aviso', 'Falta la puntuación al final de la intervención.', hasta - 1, hasta, t[hasta - 1] + '.');
+    /* El final: «…» si la frase sigue (y siempre si alguien la interrumpe);
+       si no sigue, su punto, su «?» o su «!». */
+    /* Los dos puntos sí pueden quedarse al final: anuncian lo que sigue. */
+    if(sigCont && fin !== '…' && fin !== ':' && (/^\s*[¿¡]?\s*…/.test(sig.dialogo) || estiloSuspensivos || corteSig))
+      poner(f, 'contFin', 'aviso', corteSig
+        ? 'La interrumpe ' + quien(corteSig) + ' y la frase sigue en la fila ' + sig.fila + ': termina esta con «…».'
+        : 'La frase sigue en la fila ' + sig.fila + ': termina esta con «…».',
+        hasta - 1, hasta, /[,;:.]/.test(t[hasta - 1]) ? '…' : t[hasta - 1] + '…', vecinas(corteSig, sig));
+    else if(!sigCont && !/[.?!…:;,]/.test(fin) && fin !== ':'){
+      const otro = filas.slice(i + 1).find(g => g.dialogo.trim() && !esReaccion(g.dialogo));
+      const cortada = otro && otro.source.trim() !== f.source.trim();
+      poner(f, 'sinFinal', 'aviso', 'Falta la puntuación al final de la intervención' + (cortada ? ' (o «…» si la corta ' + quien(otro) + ')' : '') + '.',
+        hasta - 1, hasta, t[hasta - 1] + '.', vecinas(cortada && otro));
+    }else if(!sigCont && /[,;:]/.test(fin) && sig !== null){
+      /* Termina en coma y lo siguiente que dice empieza otra frase. */
+      poner(f, 'sinFinal', 'aviso', 'Termina en «' + fin + '» pero la fila ' + (sig ? sig.fila : '') + ' empieza otra frase: cierra esta con su signo o con «…».',
+        hasta - 1, hasta, '.', vecinas(sig));
+    }
 
-    /* Empieza en minúscula sin «…». */
-    if(!empiezaTres && /^\p{Ll}/u.test(letra) && !/^\s*[¿¡]?\s*…/.test(tr)){
-      const viene = ant && /[,;:…]$|\p{L}$/u.test(ant.dialogo.trim());
-      if(viene && estiloSuspensivos)
-        poner(f, 'contIni', 'aviso', 'Continúa la frase de la fila ' + ant.fila + ': en este guion la continuación empieza con «…» (y la anterior termina con «…»).', 0, 1, '…' + tr[0]);
-      else if(!viene)
-        poner(f, 'inicioMinus', 'aviso', 'La intervención empieza en minúscula.', 0, 1, tr[0].toUpperCase());
+    /* El principio. */
+    if(!empiezaTres && /^\p{Ll}/u.test(letra)){
+      if(antCont && (estiloSuspensivos || corteAnt))
+        poner(f, 'contIni', 'aviso', corteAnt
+          ? 'Retoma la frase de la fila ' + ant.fila + ' después de que hable ' + quien(corteAnt) + ': empieza con «…».'
+          : 'Continúa la frase de la fila ' + ant.fila + ': en este guion la continuación empieza con «…».',
+          0, 1, '…' + tr[0], vecinas(ant, corteAnt));
+      else if(!antCont)
+        poner(f, 'inicioMinus', 'aviso', ant && /[.?!]$/.test(ultimo(ant.dialogo))
+          ? 'La fila ' + ant.fila + ' cerró la frase: esta empieza con mayúscula.'
+          : 'La intervención empieza en minúscula.', 0, 1, tr[0].toUpperCase(), vecinas(ant));
+    }
+    if(empiezaTres && ant){
+      const cierre = ultimo(ant.dialogo);
+      const m = /^([¿¡]?\s*…\s*[¿¡]?)(\p{L}+)/u.exec(tr);
+      /* «…Lo despiadada»: la frase venía de antes, así que sigue en minúscula. */
+      if(m && /[,;:…]|\p{L}/u.test(cierre) && ES_MAYUS.test(m[2]) && m[2] !== m[2].toUpperCase()
+         && dic && dic.tiene(m[2].toLowerCase()) && !esNombre(m[2]))
+        poner(f, 'contMayus', 'aviso', 'Continúa la frase de la fila ' + ant.fila + ': sigue en minúscula.',
+          m[1].length, m[1].length + m[2].length, m[2].toLowerCase(), vecinas(ant));
+      /* «…» al principio cuando la anterior ya había cerrado con punto. */
+      if(/[.?!]/.test(cierre) && !corteAnt)
+        poner(f, 'contSobra', 'sugerencia', 'La fila ' + ant.fila + ' ya cerró la frase con «' + cierre + '»: ¿sobra el «…» del principio?',
+          0, tr.indexOf('…') + 1, tr.slice(0, tr.indexOf('…')), vecinas(ant));
     }
 
     /* Repetida pocas filas después. */
@@ -876,12 +935,12 @@ function revisar(guion, dic, op = {}){
     const sig = siguiente(i, 1), ant = siguiente(i, -1);
     for(const a of s.abre){
       const par = { '¿': '?', '¡': '!', '(': ')', '[': ']' }[a.c];
-      if(sig && /…\s*$/.test(f.dialogo) && sueltos[sig.i] && sueltos[sig.i].cierra.some(x => x.c === par)) continue;
+      if(sig && sigue(f, sig) && sueltos[sig.i] && sueltos[sig.i].cierra.some(x => x.c === par)) continue;
       poner(f, 'signosPares', 'error', 'Se abre «' + a.c + '» y no se cierra.', a.k, a.k + 1, par);
     }
     for(const c of s.cierra){
       const par = { '?': '¿', '!': '¡', ')': '(', ']': '[' }[c.c];
-      if(ant && /^\s*…/.test(f.dialogo) && sueltos[ant.i] && sueltos[ant.i].abre.some(x => x.c === par)) continue;
+      if(ant && sigue(ant, f) && sueltos[ant.i] && sueltos[ant.i].abre.some(x => x.c === par)) continue;
       poner(f, 'signosPares', 'error', 'Se cierra «' + c.c + '» sin haberse abierto («' + par + '»).', c.k, c.k + 1, par);
     }
   });
@@ -1108,21 +1167,24 @@ function contexto(res, guion){
 
 /**
  * Un texto suelto, el que se escribe en «Probar un diálogo». Cada línea es un
- * evento del mismo personaje, así que las continuaciones con «…» se miran
- * entre líneas. Lo que solo tiene sentido en el Excel (timecodes, columna
+ * evento, y las continuaciones e interrupciones se miran entre líneas. Si la
+ * línea empieza por «NOMBRE:» (en mayúsculas), ese es quien habla; si no,
+ * habla el mismo de la línea anterior. Lo que solo tiene sentido en el Excel (timecodes, columna
  * SOURCE, filas repetidas) no se revisa.
  * @returns lo mismo que revisar(), más `lineas`: [{ desde, texto }], dónde
  *          empieza cada evento dentro del texto.
  */
 function revisarTexto(texto, dic, op = {}){
   const lineas = [];
-  let pos = 0;
+  let pos = 0, quien = op.personaje || 'PRUEBA';
   for(const crudo of String(texto ?? '').split('\n')){
     const l = crudo.replace(/\r$/, '');
-    if(l.trim()) lineas.push({ desde: pos, texto: l });
+    const m = /^(\s*([\p{Lu}\d][\p{Lu}\d'’ .\-]{0,39}?)\s*:\s*)(\S.*)$/u.exec(l);
+    if(m && /\p{Lu}{2}/u.test(m[2])){ quien = m[2].trim(); lineas.push({ desde: pos + m[1].length, texto: m[3], personaje: quien }); }
+    else if(l.trim()) lineas.push({ desde: pos, texto: l, personaje: quien });
     pos += crudo.length + 1;
   }
-  const filas = lineas.map((l, k) => ({ fila: k + 1, tcIn: '', tcOut: '', source: op.personaje || 'PRUEBA', dialogo: l.texto,
+  const filas = lineas.map((l, k) => ({ fila: k + 1, tcIn: '', tcOut: '', source: l.personaje, dialogo: l.texto,
                                         anot: '', tags: op.tags || '', pantalla: '' }));
   const apagadas = new Set(op.apagadas || []);
   for(const id of ['timecode', 'personaje', 'pantalla', 'repetida', 'walla', 'anotacion']) apagadas.add(id);

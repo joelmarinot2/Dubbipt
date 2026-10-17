@@ -106,6 +106,8 @@ main{max-width:1180px;margin:0 auto;padding:24px 20px 80px}
 .dlg mark.aviso{background:var(--warn-soft);box-shadow:inset 0 -2px 0 var(--warn)}
 .dlg mark.sugerencia{background:var(--sug-soft);box-shadow:inset 0 -2px 0 var(--sug)}
 .inv{display:inline-block;font-size:10px;line-height:1;padding:2px 3px;border-radius:3px;background:var(--err);color:#fff;vertical-align:middle;font-family:var(--mono)}
+.vecina{font-size:14px;line-height:1.5;color:var(--muted);margin:0 0 8px;padding-left:10px;border-left:2px solid var(--line);white-space:pre-wrap;word-break:break-word}
+.vecina b{font-weight:600;font-size:12px;letter-spacing:.2px;margin-right:6px}
 .otra{font-family:var(--mono);font-size:13px;color:var(--muted);margin:0 0 10px}
 .hall{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .hall li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;padding:8px 10px;border-radius:10px;background:var(--soft)}
@@ -206,8 +208,8 @@ textarea{width:100%;min-height:140px;background:var(--soft);border:1px solid var
     </div>
     <section id="probar" class="probar" aria-labelledby="pTitulo">
       <div class="cab-p"><h3 id="pTitulo">Probar un diálogo</h3><span id="pVeredicto" class="veredicto oculto" role="status" aria-live="polite"></span></div>
-      <p class="nota">Escribe o pega un diálogo y te dice si está bien. Cada línea es un evento.<span id="pCtx"></span></p>
-      <textarea id="pTexto" spellcheck="false" aria-label="Diálogo para revisar" placeholder="Por ejemplo: Todo tus esfuerzos fueron en vano..."></textarea>
+      <p class="nota">Escribe o pega un diálogo y te dice si está bien. Cada línea es un evento y se mira con la de antes y la de después; para una conversación, empieza la línea con el personaje: <b>AMAR: Te iba a decir que…</b><span id="pCtx"></span></p>
+      <textarea id="pTexto" spellcheck="false" aria-label="Diálogo para revisar" placeholder="Por ejemplo:&#10;AMAR: Te iba a decir que&#10;RUDRA: ¡No quiero saberlo!&#10;AMAR: ya firmé el divorcio."></textarea>
       <div id="pResultado"></div>
     </section>
   </section>
@@ -419,6 +421,12 @@ function resaltar(texto, hs){
   return out;
 }
 
+/** Las filas de antes y de después que explican un aviso de puntuación. */
+function vecinasHtml(filas, hs, i, despues, rotulo){
+  const ids = Array.from(new Set(hs.flatMap(h => h.vecinas || []))).filter(j => despues ? j > i : j < i).sort((a, b) => a - b);
+  return ids.map(j => { const g = filas[j]; return '<p class="vecina"><b>' + esc(rotulo(g)) + '</b>' + esc(g.dialogo) + '</p>'; }).join('');
+}
+
 function pintarLista(){
   const q = estado.q.trim().toLowerCase();
   const filas = estado.res.filas;
@@ -446,12 +454,14 @@ function pintarLista(){
     return '<article class="fila" data-i="' + i + '">'
       + '<div class="cab"><span class="num">Fila ' + f.fila + '</span><span class="tc">' + esc(f.tcIn) + '</span><span class="pj">' + esc(f.source.trim()) + '</span>'
       + (f.tags ? '<span>' + esc(f.tags) + '</span>' : '') + '<button class="copiar" type="button" data-a="copiar">Copiar diálogo</button></div>'
+      + vecinasHtml(filas, hs, i, false, (g) => 'Fila ' + g.fila + ' · ' + g.source.trim())
       + '<p class="dlg">' + (f.dialogo ? resaltar(f.dialogo, hs) : '<i style="color:var(--muted)">(vacía)</i>') + '</p>'
+      + vecinasHtml(filas, hs, i, true, (g) => 'Fila ' + g.fila + ' · ' + g.source.trim())
       + (otra.length ? '<p class="otra">' + Array.from(new Set(otra)).join(' · ') + '</p>' : '')
       + '<ul class="hall">' + hs.map(h => {
         const r = M.REGLAS[h.regla];
         return '<li data-k="' + esc(claveH(h)) + '"><span class="sev ' + h.sev + '">' + SEV[h.sev] + '</span>'
-          + '<div class="txt">' + esc(h.msg) + (h.sug ? ' <span class="sug">' + esc(h.sug) + '</span>' : '')
+          + '<div class="txt">' + esc(h.msg) + (h.sug ? ' <span class="sug">' + esc(ROTULO[h.regla] || h.sug) + '</span>' : '')
           + '<small>' + esc(M.CATEGORIAS[r.cat]) + ' · ' + esc(r.titulo) + ' · ' + esc(r.fuente) + '</small></div>'
           + '<div class="acc">' + (h.palabra ? '<button class="mini" type="button" data-a="dic" data-w="' + esc(h.palabra) + '">Añadir al diccionario</button>' : '')
           + '<button class="mini" type="button" data-a="ign">Ignorar</button>'
@@ -512,8 +522,11 @@ function probar(){
     const suyos = hs.filter(h => h.i === i);
     const lugar = varias ? 'Línea ' + f.fila : 'El diálogo';
     if(!suyos.length) return '<div class="linea-ok"><b>✓</b>' + lugar + ': sin problemas.</div>';
-    return '<article class="fila"><div class="cab"><span class="num">' + lugar + '</span></div>'
-      + '<p class="dlg">' + resaltar(f.dialogo, suyos) + '</p><ul class="hall">' + suyos.map(h => {
+    const rot = (g) => 'Línea ' + g.fila + (g.source !== 'PRUEBA' ? ' · ' + g.source : '');
+    return '<article class="fila"><div class="cab"><span class="num">' + lugar + (f.source !== 'PRUEBA' ? ' · ' + esc(f.source) : '') + '</span></div>'
+      + vecinasHtml(pRes.filas, suyos, i, false, rot)
+      + '<p class="dlg">' + resaltar(f.dialogo, suyos) + '</p>'
+      + vecinasHtml(pRes.filas, suyos, i, true, rot) + '<ul class="hall">' + suyos.map(h => {
         const r = M.REGLAS[h.regla];
         const opciones = h.sug && h.desde >= 0 && !NO_APLICA.has(h.regla) ? h.sug.split(/ · | \/ /).filter(Boolean) : [];
         const k = hs.indexOf(h);

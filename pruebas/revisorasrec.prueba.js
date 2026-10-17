@@ -22,7 +22,8 @@ const PALABRAS = ('pero ya lo sabías las guardaban esa tierra para el templo de
   'admito que quizá tu belleza me impidió ver despiadada eres hace tiempo cientos de antepasadas lucharon como arqueros ' +
   'ejército reina otra vez esas zorras vayan adentro idiotas mi gente se ha negado a luchar por gesto dijiste vendrías ' +
   'no sé qué hacer cómo estás hizo haber si vienes fui mercado al bien solo quería este guion y hoy estamos aquí una más ' +
-  'para consagrar como protectora con las bendiciones guerrera sí era hola amigo').split(' ');
+  'para consagrar como protectora con las bendiciones guerrera sí era hola amigo iba decir quiero saberlo firmé divorcio ' +
+  'te esta del lo hermanas pagarán declaración redefinimos leyes pasamos linaje materno paterno sus venas corre sangre brasas ardientes').split(' ');
 
 function cargar(){
   const html = fs.readFileSync(path.join(RAIZ, 'revisor-asrec.html'), 'utf8').replace(/\r\n/g, '\n');
@@ -156,6 +157,26 @@ exports.pruebas = async function(t){
   p = M.revisarTexto('Rezaré a la diosa Makwathi.', dic, { contexto: ctx });
   t.ok('y avisa si el nombre va sin su guía', p.hallazgos.some(h => h.regla === 'sinGuia' && h.sug === 'Makwathi (matwáti)'));
   t.ok('lo que solo existe en el Excel no se revisa', !M.revisarTexto('Hola.', dic).hallazgos.some(h => h.regla === 'timecode' || h.regla === 'personaje'));
+
+  t.seccion('La puntuación mira la fila de antes y la de después');
+  p = M.revisarTexto('AMAR: Te iba a decir que\nRUDRA: ¡No quiero saberlo!\nAMAR: ya firmé el divorcio.', dic);
+  t.eq('«NOMBRE:» dice quién habla', p.filas.map(f => f.source), ['AMAR', 'RUDRA', 'AMAR']);
+  t.eq('y el texto empieza después del nombre', p.lineas.map(l => l.desde), [6, 32, 58]);
+  t.ok('si otro personaje interrumpe, la frase termina con «…»', p.hallazgos.some(h => h.fila === 1 && h.regla === 'contFin' && /interrumpe RUDRA/.test(h.msg) && h.sug === 'e…'));
+  t.ok('y se retoma con «…»', p.hallazgos.some(h => h.fila === 3 && h.regla === 'contIni' && h.sug === '…y'));
+  t.ok('el aviso dice qué filas lo explican', p.hallazgos.find(h => h.fila === 1 && h.regla === 'contFin').vecinas.join() === '1,2');
+  t.eq('bien puntuada, la interrupción no da nada', M.revisarTexto('AMAR: Te iba a decir que…\nRUDRA: ¡No quiero saberlo!\nAMAR: …ya firmé el divorcio.', dic).hallazgos.length, 0);
+  t.ok('«…Lo»: la continuación sigue en minúscula', M.revisarTexto('Admito que quizá tu belleza me impidió ver…\n…Lo despiadada que eres.', dic).hallazgos.some(h => h.regla === 'contMayus' && h.sug === 'lo'));
+  p = M.revisarTexto('Ya lo sabías.\n…las hermanas pagarán.', dic);
+  t.eq('si la anterior cerró con punto, sobra el «…» (y no se pide a la vez uno al final)', p.hallazgos.map(h => h.regla), ['contSobra']);
+  t.eq('y en minúscula, que empiece con mayúscula', M.revisarTexto('Ya lo sabías.\nlas hermanas pagarán.', dic).hallazgos.map(h => h.regla), ['inicioMinus']);
+  t.eq('los dos puntos pueden quedarse al final', M.revisarTexto('Con esta declaración, redefinimos las leyes:\npasamos del linaje materno al paterno.', dic).hallazgos.filter(h => h.fila === 1).length, 0);
+  t.ok('una coma que no sigue en la fila de después', M.revisarTexto('Por sus venas no corre sangre,\nY brasas ardientes.', dic).hallazgos.some(h => h.fila === 1 && h.regla === 'sinFinal'));
+  res = M.revisar({ info: {}, filas: [
+    fila(1, 'AMAR', 'Admito que quizá tu belleza me impidió ver', { tcOut: '00:00:01:10' }),
+    fila(2, 'AMAR', '…lo despiadada que eres.', { tcIn: '00:00:30:00', tcOut: '00:00:31:00' })
+  ] }, dic, {});
+  t.ok('con más de diez segundos por medio ya no es la misma frase', !reglas(res, 1).includes('contFin') && reglas(res, 1).includes('sinFinal'));
 
   t.seccion('El Excel, de ida y vuelta');
   const libro = M.xlsx([{ nombre: 'Dialogue List', filas: [
