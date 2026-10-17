@@ -7,6 +7,7 @@
  *   plantilla.html  la pantalla
  *   motor.js        las reglas (se prueba en pruebas/revisorasrec.prueba.js)
  *   diccionario/    el de LibreOffice en español (Hunspell), ya expandido
+ *   ocr/            Tesseract.js con el español, para leer capturas
  *
  * El diccionario de Hunspell son raíces con banderas de afijos («cantar/RED»).
  * Comprobar con afijos en el navegador obliga a meter un motor de Hunspell;
@@ -99,17 +100,31 @@ const es = expandir(path.join(D, 'es.aff'), path.join(D, 'es.dic'));
 const base = Array.from(mx).sort();
 const extra = Array.from(es).filter(w => !mx.has(w)).sort();
 
+/* El lector de capturas: Tesseract.js 5.1.1, su núcleo WebAssembly (con
+   SIMD, solo LSTM) y el español «best_int». Van comprimidos y la pantalla los
+   abre solo cuando alguien sube una captura. */
+const O = path.join(AQUI, 'ocr');
+const gz64 = (archivo) => zlib.gzipSync(fs.readFileSync(path.join(O, archivo)), { level: 9 }).toString('base64');
+const b64 = (archivo) => fs.readFileSync(path.join(O, archivo)).toString('base64');
+const OCR = {
+  '@@OCR_LIB@@': gz64('tesseract.min.js'),
+  '@@OCR_WORKER@@': gz64('worker.min.js'),
+  '@@OCR_CORE@@': b64('tesseract-core-simd-lstm.wasm.js.gz'),
+  '@@OCR_SPA@@': b64('spa.traineddata.gz')
+};
+
 const motor = fs.readFileSync(path.join(AQUI, 'motor.js'), 'utf8');
 const plantilla = fs.readFileSync(path.join(AQUI, 'plantilla.html'), 'utf8');
-for(const marca of ['/*@@MOTOR@@*/', '@@DIC_BASE@@', '@@DIC_EXTRA@@'])
+for(const marca of ['/*@@MOTOR@@*/', '@@DIC_BASE@@', '@@DIC_EXTRA@@', ...Object.keys(OCR)])
   if(!plantilla.includes(marca)) throw new Error('A plantilla.html le falta la marca ' + marca);
 if(motor.includes('</script')) throw new Error('motor.js no puede llevar «</script» dentro');
 
 /* Con funciones de reemplazo: un «$&» dentro del motor no debe interpretarse. */
-const html = plantilla
+let html = plantilla
   .replace('/*@@MOTOR@@*/', () => motor)
   .replace('@@DIC_BASE@@', () => empaquetar(base))
   .replace('@@DIC_EXTRA@@', () => empaquetar(extra));
+for(const [marca, datos] of Object.entries(OCR)) html = html.replace(marca, () => datos);
 
 fs.writeFileSync(SALIDA, html, 'utf8');
 console.log('revisor-asrec.html · ' + base.length + ' + ' + extra.length + ' palabras · '

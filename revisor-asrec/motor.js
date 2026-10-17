@@ -296,7 +296,8 @@ const R = {
   vacio:         ['asrec', 'Casilla de diálogo vacía', 'Guía ASR: «Rows with empty DIALOGUE column are not allowed». Se borra la fila o se escribe lo que se oye; si es una reacción, entre paréntesis: (GESTO).'],
   numeros:       ['asrec', 'Números', 'Guía de español: del 1 al 10 con letras, y también «cien» y «mil»; con letras al empezar la frase (salvo fechas y cifras largas); 2000 sin separador; 50 000 con espacio duro; decimales con punto en Latinoamérica (2.50) y con coma en España (2,50); las monedas, mejor con letras.'],
   abreviatura:   ['asrec', 'Abreviaturas', 'Guía de español: «Sr.» o «Dra.» solo justo delante de un nombre propio; solo, se escribe entero («¿Cuándo viene la señorita?»). Estados Unidos se abrevia «EE. UU.».'],
-  simbolos:      ['asrec', 'Símbolos', 'Los símbolos que se dicen (&, @, +, =…) van con palabras. La guía ASR admite a propósito / \\ ^ < > | para marcar pausas o indicaciones, y la de español admite # en etiquetas (#Amigos): esos no se avisan.'],
+  simbolos:      ['asrec', 'Símbolos', 'Los símbolos que se dicen (&, @, +, =…) van con palabras. La guía ASR admite a propósito \\ ^ < > | para marcar pausas o indicaciones, y la de español admite # en etiquetas (#Amigos): esos no se avisan. La «/» tiene su propia regla.'],
+  barra:         ['asrec', 'Barra «/» en el diálogo', 'Regla del estudio: la «/» para marcar una pausa es un error. Ojo: la guía ASR de Netflix sí la permite; si un cliente la acepta, apaga esta regla.'],
   mayusSostenidas:['asrec', 'Palabras en MAYÚSCULAS', 'Guía ASR: el diálogo va «in sentence case […] Do not use ALL CAPS». Las siglas (ONU, FBI) sí van en mayúsculas.'],
   reaccionSigno: ['asrec', 'Reacción sin paréntesis', 'Guía ASR: las reacciones y esfuerzos van entre ( ), [ ] o { }, «There are no exceptions to this rule».'],
   reaccionBorde: ['asrec', 'Evento que empieza o termina en reacción', 'Guía ASR: «Do not time events to begin or end with a reaction or effort». El evento se cronometra con la primera y la última palabra.'],
@@ -360,7 +361,7 @@ const R = {
    guía de estilo de español (Latinoamérica y España); «RAE»: la Ortografía y
    la gramática de la Academia; «guion»: el guion comparado consigo mismo. */
 const FUENTE = {
-  vacio: 'Netflix ASR', numeros: 'Netflix ES', abreviatura: 'Netflix ES', simbolos: 'Netflix ASR', mayusSostenidas: 'Netflix ASR',
+  barra: 'estudio', vacio: 'Netflix ASR', numeros: 'Netflix ES', abreviatura: 'Netflix ES', simbolos: 'Netflix ASR', mayusSostenidas: 'Netflix ASR',
   reaccionSigno: 'Netflix ASR', reaccionBorde: 'Netflix ASR', reaccionMayus: 'guion', reaccionIngles: 'guion', reaccionEstilo: 'guion',
   contFin: 'guion', contIni: 'guion', contMayus: 'RAE', contSobra: 'guion', sinFinal: 'Netflix ASR', inicioMinus: 'Netflix ASR', repetida: 'Netflix ASR',
   invisible: 'Netflix ES', tresPuntos: 'Netflix ES', espacios: 'guion', espacioSigno: 'RAE', suspensivos: 'Netflix ES', signosPares: 'RAE',
@@ -615,8 +616,10 @@ function revisar(guion, dic, op = {}){
     return null;
   };
   const siguiente = (i, dir) => { const v = vecina(i, dir); return v && v.f; };
-  const final = (t) => t.replace(/[\s»”"')\]]+$/u, '').slice(-1);
-  const primeraLetra = (t) => { const m = /^[\s¿¡«“"(\[—–-]*(\p{L})/u.exec(t); return m ? m[1] : ''; };
+  /* Las marcas de pausa que admite la guía ASR (/ \ ^ < > |) no son
+     puntuación: el principio y el final de la frase se miran sin ellas. */
+  const final = (t) => t.replace(/[\s»”"')\]\/\\^<>|]+$/u, '').slice(-1);
+  const primeraLetra = (t) => { const m = /^[\s¿¡«“"(\[—–\/\\^<>|-]*(\p{L})/u.exec(t); return m ? m[1] : ''; };
 
   let reaccParen = 0, reaccCorch = 0;
   const reacciones = [];
@@ -706,6 +709,13 @@ function revisar(guion, dic, op = {}){
     /* Dos personajes en el mismo evento: «- ¿Vienes? - Ya voy.». */
     if(/^\s*[-–—]\s+\S[\s\S]*?(?:\n|\s)[-–—]\s+\S/.test(t))
       poner(f, 'unPersonaje', 'aviso', 'Parece que hablan dos personajes en el mismo evento (guiones de diálogo): cada uno en su evento.', -1, -1);
+
+    /* La «/» de pausa: la guía ASR la permite, el estudio no. Se propone
+       quitarla con sus espacios, para que no quede un espacio doble. */
+    for(const m of t.matchAll(/\s*\/+\s*/g)){
+      const borde = m.index === 0 || m.index + m[0].length >= t.length;
+      poner(f, 'barra', 'error', 'Barra «/» en el diálogo: no se marcan pausas con «/».', m.index, m.index + m[0].length, borde ? 'borrar' : ' ');
+    }
 
     /* Puntos suspensivos. */
     for(const m of t.matchAll(/\.{3,}|…{2,}|…\.+|\.+…|\.\.(?!\.)/g))
@@ -864,7 +874,7 @@ function revisar(guion, dic, op = {}){
     const A = vecina(i, -1), S = vecina(i, 1);
     const ant = A && A.f, sig = S && S.f;
     const fin = ultimo(tr);
-    const hasta = t.trimEnd().length;
+    const hasta = t.replace(/[\s\/\\^<>|]+$/, '').length;
     const empiezaTres = /^[¿¡]?\s*…/.test(tr);
     const letra = primeraLetra(tr.replace(/^([¿¡]?)\s*…\s*/, '$1'));
     const sigCont = sig && sigue(f, sig);
@@ -1252,7 +1262,33 @@ function xlsx(hojas){
   return zip(archivos);
 }
 
-return { leerLibro, extraerGuion, crearDiccionario, sugerir, revisar, revisarTexto, contexto, xlsx, REGLAS, CATEGORIAS,
+/**
+ * El texto que sale de leer una captura, ordenado para «Probar un diálogo»:
+ *  · fuera los timecodes, los ON / OFF y las líneas sin letras;
+ *  · «...» pasa a «…»: en una imagen no se distinguen;
+ *  · «BHAVANI Ya recuperamos los clanes.» pasa a «BHAVANI: Ya recuperamos…»;
+ *  · una línea que empieza en minúscula y sigue a otra sin cerrar es la misma
+ *    casilla partida en dos: se juntan. Una continuación de verdad empieza
+ *    con «…».
+ */
+function limpiarCaptura(texto){
+  const out = [];
+  for(let l of String(texto ?? '').split(/\r?\n/)){
+    l = l.replace(/\b\d{1,2}[:;.]\d{2}[:;.]\d{2}[:;.]\d{2}\b/g, ' ')
+         .replace(/(?:^|\s)(?:ON|OFF|ON_OFF|OFF_ON)(?=\s|$)/g, ' ')
+         .replace(/\.\s?\.\s?\./g, '…').replace(/[‘’`´]/g, "'")
+         .replace(/\s+/g, ' ').trim();
+    if(!/\p{L}/u.test(l)) continue;
+    const m = /^([\p{Lu}][\p{Lu}\d'’ .\-]{1,40}?)\s+(?=[(\[]|[¿¡«"…]?\p{Lu}?\p{Ll})/u.exec(l);
+    if(m && /\p{Lu}{2}/u.test(m[1]) && !/[:]$/.test(m[1])) l = m[1].trim() + ': ' + l.slice(m[0].length);
+    const previa = out[out.length - 1];
+    if(previa && /^\p{Ll}/u.test(l) && !/[.?!…:]$/.test(previa)) out[out.length - 1] = previa + ' ' + l;
+    else out.push(l);
+  }
+  return out.join('\n');
+}
+
+return { leerLibro, extraerGuion, crearDiccionario, sugerir, revisar, revisarTexto, contexto, limpiarCaptura, xlsx, REGLAS, CATEGORIAS,
          _interno: { tapar, guiasDe, palabras, esReaccion, distancia, variantesTilde, leerZip } };
 })();
 

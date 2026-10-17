@@ -111,7 +111,12 @@ exports.pruebas = async function(t){
   t.ok('dice «Akka» sin la etiqueta MAIN TITLE IN DIALOGUE', reglas(res, 8).includes('titulo'));
   t.ok('lleva la etiqueta y no dice «Akka»', reglas(res, 9).includes('titulo'));
   t.ok('tres puntos en vez de «…»', reglas(res, 10).includes('tresPuntos'));
-  t.ok('/ y ^ son símbolos que la guía ASR admite', !reglas(res, 10).includes('simbolos'));
+  t.ok('/ y ^ no son «símbolos» que se dicen', !reglas(res, 10).includes('simbolos'));
+  t.ok('pero la «/» es un error del estudio, y se quita con sus espacios', res.hallazgos.some(h => h.fila === 10 && h.regla === 'barra' && h.sev === 'error' && h.sug === ' '));
+  t.eq('la «^» no es una «/»', res.hallazgos.filter(h => h.fila === 10 && h.regla === 'barra').length, 1);
+  const conBarra = M.revisarTexto('Te iba a decir que /', dic);
+  t.ok('una «/» al final no tapa que falta la puntuación', conBarra.hallazgos.some(h => h.regla === 'sinFinal' && h.sug === 'e.'));
+  t.ok('y se propone quitarla del todo', conBarra.hallazgos.some(h => h.regla === 'barra' && h.sug === 'borrar'));
   t.eq('del 1 al 10 con letras, y 20 en cifras (guía de español)', res.hallazgos.filter(h => h.fila === 11 && h.regla === 'numeros').map(h => h.sug), ['cinco']);
   t.ok('sin punto y coma', reglas(res, 13).includes('puntoYComa'));
   t.ok('sin «?!» juntos', reglas(res, 13).includes('dobleSigno'));
@@ -177,6 +182,16 @@ exports.pruebas = async function(t){
     fila(2, 'AMAR', '…lo despiadada que eres.', { tcIn: '00:00:30:00', tcOut: '00:00:31:00' })
   ] }, dic, {});
   t.ok('con más de diez segundos por medio ya no es la misma frase', !reglas(res, 1).includes('contFin') && reglas(res, 1).includes('sinFinal'));
+
+  t.seccion('Leer una captura');
+  t.eq('lo leído se ordena: sin timecodes ni ON, «...» → «…», el personaje delante y la casilla partida, junta',
+    M.limpiarCaptura('00:06:18:09 00:06:20:11 PANDIT Con esta declaración, ON\nredefinimos las leyes:\nYOUNG GURUAMMA Pero ya lo sabías... las Kathawa\nguardaban esa tierra.\nAMAR (GESTO)\n¡NO!\n…lo despiadada que eres.\n12'),
+    'PANDIT: Con esta declaración, redefinimos las leyes:\nYOUNG GURUAMMA: Pero ya lo sabías… las Kathawa guardaban esa tierra.\nAMAR: (GESTO)\n¡NO!\n…lo despiadada que eres.');
+  for(const id of ['ocr-lib', 'ocr-worker', 'ocr-core', 'ocr-spa']){
+    const b64 = (new RegExp('<script id="' + id + '" type="text/plain">([^<]{40})').exec(html) || [])[1];
+    const cab = b64 ? Buffer.from(b64.slice(0, 4), 'base64') : Buffer.alloc(0);
+    t.ok('el lector de capturas va dentro (' + id + ')', cab[0] === 0x1f && cab[1] === 0x8b);
+  }
 
   t.seccion('El Excel, de ida y vuelta');
   const libro = M.xlsx([{ nombre: 'Dialogue List', filas: [

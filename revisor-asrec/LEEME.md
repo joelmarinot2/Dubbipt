@@ -19,6 +19,10 @@ el lector de Excel; no carga nada de fuera y el archivo no sale del ordenador.
 | Etiquetas | MAIN TITLE IN DIALOGUE, SENSITIVE LANGUAGE, CONTEXT sin anotación |
 | Personajes y timecodes | KATHWA/KATHAWA, espacios en SOURCE, varios personajes en un evento, WALLA y NONE, timecodes |
 
+La **«/»** para marcar pausas sale como error: es una regla del estudio
+(fuente «estudio»). La guía ASR de Netflix sí la permite, así que se puede
+apagar en «Reglas y diccionario» si un cliente la acepta.
+
 Cada regla dice de dónde sale: **Netflix ASR** (As Recorded Dubbing Script Scope
 of Work), **Netflix ES** (Spanish (Latin America & Spain) Timed Text Style
 Guide), **RAE**, o **guion** (el guion comparado consigo mismo). En la pestaña
@@ -38,7 +42,10 @@ Cada aviso enseña las filas vecinas que lo explican.
 Excel abierto. Se escribe o se pega un diálogo, cada línea es un evento, y dice
 al momento si está bien o qué tiene mal, con botones para aplicar la
 corrección. Para una conversación, cada línea empieza con el personaje
-(`AMAR: Te iba a decir que…`). Con un Excel abierto, lo compara además con los nombres, las guías
+(`AMAR: Te iba a decir que…`). También lee **capturas**: con el botón «Leer una
+captura», pegándola con Ctrl+V o arrastrándola; el texto leído se limpia
+(timecodes, ON/OFF, el personaje delante) y se revisa. El lector (Tesseract.js
+con el español) va dentro del archivo: ver `ocr/LEEME.md`. Con un Excel abierto, lo compara además con los nombres, las guías
 de pronunciación y el título de ese guion.
 
 ## Cómo se construye
@@ -48,6 +55,7 @@ No se edita `revisor-asrec.html` a mano. Se editan estos y se reconstruye:
 - `motor.js`: las reglas, la lectura del Excel y el informe.
 - `plantilla.html`: la pantalla.
 - `diccionario/`: el diccionario de LibreOffice (es y es-MX), con su licencia.
+- `ocr/`: el lector de capturas (Tesseract.js y el español), con sus licencias.
 
 ```bash
 node revisor-asrec/construir.js
