@@ -24,8 +24,15 @@ of Work), **Netflix ES** (Spanish (Latin America & Spain) Timed Text Style
 Guide), **RAE**, o **guion** (el guion comparado consigo mismo). En la pestaña
 «Reglas y diccionario» se apagan una a una y se añaden palabras propias.
 
-El informe se descarga en `.xlsx` con tres hojas: hallazgos, nombres y guías, y
-resumen.
+El informe se descarga en `.xlsx` con tres hojas: hallazgos (empieza por el
+**timecode inicial** de cada fila), nombres y guías (con el timecode de la
+primera vez que sale cada nombre), y resumen.
+
+**Probar un diálogo**: en la pantalla de inicio, y en su pestaña cuando hay un
+Excel abierto. Se escribe o se pega un diálogo, cada línea es un evento, y dice
+al momento si está bien o qué tiene mal, con botones para aplicar la
+corrección. Con un Excel abierto, lo compara además con los nombres, las guías
+de pronunciación y el título de ese guion.
 
 ## Cómo se construye
 

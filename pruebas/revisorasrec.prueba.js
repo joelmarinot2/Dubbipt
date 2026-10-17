@@ -140,6 +140,23 @@ exports.pruebas = async function(t){
   t.ok('KATHWA es la forma rara de KATHAWA aunque no haya un KATHAWA WOMAN 1', res.hallazgos.some(h => h.fila === 6 && h.regla === 'personaje' && h.sug === 'KATHAWA WOMAN 1'));
   t.ok('YERUMA MAN y YERUMA WOMAN no son el mismo', !reglas(res, 7).concat(reglas(res, 8)).includes('personaje'));
 
+  t.seccion('Probar un diálogo');
+  t.ok('la primera vez que sale un nombre, con su timecode inicial', res.terminos.some(x => x.termino === 'Makwathi' && x.primera && x.primera.fila === 1 && x.primera.tc === '00:00:01:00'));
+  let p = M.revisarTexto('Todo tus esfuerzos fueron en vano', dic);
+  t.eq('un diálogo suelto se revisa', p.hallazgos.map(h => h.regla), ['todo', 'sinFinal']);
+  t.eq('y la sugerencia se puede aplicar tal cual', p.hallazgos.map(h => h.sug), ['Todos tus', 'o.']);
+  p = M.revisarTexto('Hola amigo.', dic);
+  t.eq('un diálogo bien escrito no da nada', p.hallazgos.length, 0);
+  p = M.revisarTexto('Admito que quizá tu belleza me impidió ver\r\n\n…lo despiadada que eres.', dic);
+  t.eq('cada línea es un evento, y se sabe dónde empieza', p.lineas.map(l => l.desde), [0, 45]);
+  t.ok('las continuaciones se miran entre líneas', p.hallazgos.some(h => h.regla === 'contFin' && h.sug === 'r…'));
+  const ctx = M.contexto(res, { info: { 'SHOW TITLE': 'Akka' } });
+  p = M.revisarTexto('Rezaré a la diosa Makwathi (Matwáti).', dic, { contexto: ctx });
+  t.ok('con un guion abierto, su guía de pronunciación manda', p.hallazgos.some(h => h.regla === 'guias' && h.sug === 'Makwathi (matwáti)'));
+  p = M.revisarTexto('Rezaré a la diosa Makwathi.', dic, { contexto: ctx });
+  t.ok('y avisa si el nombre va sin su guía', p.hallazgos.some(h => h.regla === 'sinGuia' && h.sug === 'Makwathi (matwáti)'));
+  t.ok('lo que solo existe en el Excel no se revisa', !M.revisarTexto('Hola.', dic).hallazgos.some(h => h.regla === 'timecode' || h.regla === 'personaje'));
+
   t.seccion('El Excel, de ida y vuelta');
   const libro = M.xlsx([{ nombre: 'Dialogue List', filas: [
     ['IN-TIMECODE', 'OUT-TIMECODE', 'SOURCE', 'TRANSCRIPTION', 'DIALOGUE', 'ANNOTATIONS', 'TAGS', 'SOURCE ONSCREEN'],

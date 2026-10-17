@@ -78,8 +78,10 @@ main{max-width:1180px;margin:0 auto;padding:24px 20px 80px}
 .cifra.err .n{color:var(--err)} .cifra.warn .n{color:var(--warn)} .cifra.sug .n{color:var(--sug)}
 .cifra[aria-pressed="false"]{opacity:.45}
 
-.pestanas{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px}
-.pestanas button{border:0;background:none;padding:10px 14px;border-bottom:2px solid transparent;color:var(--muted);font-weight:600}
+/* Con cuatro pestañas no caben en un móvil: se desplazan en su fila sin empujar la página. */
+.pestanas{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto;scrollbar-width:none}
+.pestanas::-webkit-scrollbar{display:none}
+.pestanas button{flex:none;white-space:nowrap;border:0;background:none;padding:10px 14px;border-bottom:2px solid transparent;color:var(--muted);font-weight:600}
 .pestanas button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
 
 .filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
@@ -139,6 +141,23 @@ table.t td.n{font-variant-numeric:tabular-nums;text-align:right}
 textarea{width:100%;min-height:140px;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px;font-family:var(--mono);font-size:13px}
 .nota{color:var(--muted);font-size:13px}
 
+.probar{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-top:20px}
+.probar .cab-p{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:4px}
+.probar h3{margin:0;font-size:17px;letter-spacing:-.2px}
+.probar .nota{margin:0 0 12px}
+.probar textarea{font-family:var(--sans);font-size:16px;line-height:1.55;min-height:110px;resize:vertical;background:var(--bg)}
+.probar textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.veredicto{font-size:13px;font-weight:700;border-radius:999px;padding:3px 12px}
+.veredicto.bien{background:var(--accent-soft);color:var(--accent)}
+.veredicto.mal{background:var(--err-soft);color:var(--err)}
+.veredicto.casi{background:var(--warn-soft);color:var(--warn)}
+#pResultado{margin-top:12px}
+#pResultado .fila{background:var(--bg)}
+.linea-ok{display:flex;gap:8px;align-items:baseline;font-size:14px;color:var(--muted);padding:6px 2px}
+.linea-ok b{color:var(--accent)}
+.mini.usar{color:var(--accent);border-color:var(--accent)}
+.mini.usar:hover{background:var(--accent);color:var(--accent-ink)}
+
 @media (max-width:720px){
   main{padding:16px 16px 60px}
   .barra{padding:10px 16px}
@@ -185,6 +204,12 @@ textarea{width:100%;min-height:140px;background:var(--soft);border:1px solid var
       <div><b>Gramática</b>Concordancias, «a el», «haber si», «he echo», dequeísmo, «habían muchas», formas de vosotros en latino.</div>
       <div><b>Coherencia</b>Guías de pronunciación distintas, nombres escritos de dos formas, «Diosa» y «diosa», etiquetas que no casan con el texto.</div>
     </div>
+    <section id="probar" class="probar" aria-labelledby="pTitulo">
+      <div class="cab-p"><h3 id="pTitulo">Probar un diálogo</h3><span id="pVeredicto" class="veredicto oculto" role="status" aria-live="polite"></span></div>
+      <p class="nota">Escribe o pega un diálogo y te dice si está bien. Cada línea es un evento.<span id="pCtx"></span></p>
+      <textarea id="pTexto" spellcheck="false" aria-label="Diálogo para revisar" placeholder="Por ejemplo: Todo tus esfuerzos fueron en vano..."></textarea>
+      <div id="pResultado"></div>
+    </section>
   </section>
 
   <section id="panel" class="oculto">
@@ -210,6 +235,7 @@ textarea{width:100%;min-height:140px;background:var(--soft);border:1px solid var
     <div class="pestanas" role="tablist">
       <button role="tab" aria-selected="true" data-v="vHall" type="button">Hallazgos</button>
       <button role="tab" aria-selected="false" data-v="vTerm" type="button">Nombres y guías</button>
+      <button role="tab" aria-selected="false" data-v="vProbar" type="button">Probar un diálogo</button>
       <button role="tab" aria-selected="false" data-v="vReglas" type="button">Reglas y diccionario</button>
     </div>
 
@@ -232,8 +258,10 @@ textarea{width:100%;min-height:140px;background:var(--soft);border:1px solid var
 
     <div id="vTerm" class="oculto">
       <p class="nota">Nombres propios del guion y sus guías de pronunciación. Una guía en ámbar significa que el mismo nombre se escribe con dos guías distintas.</p>
-      <div class="envoltorio"><table class="t"><thead><tr><th>Nombre</th><th>Guía de pronunciación</th><th class="n">Veces</th><th class="n">Sin guía</th></tr></thead><tbody id="terminos"></tbody></table></div>
+      <div class="envoltorio"><table class="t"><thead><tr><th>Nombre</th><th>Guía de pronunciación</th><th class="n">Veces</th><th class="n">Sin guía</th><th>Primera vez</th></tr></thead><tbody id="terminos"></tbody></table></div>
     </div>
+
+    <div id="vProbar" class="oculto"></div>
 
     <div id="vReglas" class="oculto">
       <div id="reglas" class="reglas"></div>
@@ -742,7 +770,7 @@ const EXPRESIONES = [
   { id: 'dequeismo', sev: 'aviso', re: re('\\b((?:me|te|se|nos)\\s+(?:di|diste|dio|dimos|dieron|doy|das|da|damos|dan)\\s+cuenta|(?:estoy|estás|está|estamos|están|estaba|estaban|estuve)\\s+segur[oa]s?|(?:me|te|se|nos)\\s+(?:acuerdo|acuerdas|acuerda|acordamos|acuerdan|acordé|acordó|enteré|enteró|enteramos|enteraron)|a pesar)\\s+que\\b'), msg: 'Queísmo: aquí falta el «de».', s: (m) => m[1] + ' de que' },
   { id: 'asiQue', sev: 'aviso', re: re('\\b([Aa])sí que,'), msg: 'Después de «así que» no va coma.', s: (m) => m[1] + 'sí que' },
   { id: 'posesivo', sev: 'sugerencia', re: re('\\b(detrás|delante|encima|debajo|cerca|enfrente|alrededor|dentro|fuera)\\s+(mío|mía|tuyo|tuya|suyo|suya|nuestro|nuestra)\\b'),
-    msg: 'En la norma culta: «detrás de mí», «cerca de ti».', s: (m) => m[1] + ' de ' + ({ mío: 'mí', mía: 'mí', tuyo: 'ti', tuya: 'ti', suyo: 'él / ella', suya: 'él / ella', nuestro: 'nosotros', nuestra: 'nosotras' })[m[2].toLowerCase()] },
+    msg: 'En la norma culta: «detrás de mí», «cerca de ti».', s: (m) => m[1] + ' de ' + ({ mío: 'mí', mía: 'mí', tuyo: 'ti', tuya: 'ti', suyo: 'él', suya: 'ella', nuestro: 'nosotros', nuestra: 'nosotras' })[m[2].toLowerCase()] },
   { id: 'diacritica', sev: 'aviso', re: re('(?<![,;]\\s)\\bmas\\b', 'gu'), msg: '¿«más» (cantidad)? «mas» sin tilde solo significa «pero».', s: () => 'más' },
   { id: 'diacritica', sev: 'aviso', re: re('\\b([Tt])u\\b(?=\\s*(?:[.,;:!?)]|$)|\\s+(?:eres|estás|tienes|sabes|puedes|quieres|vas|haces|dijiste|fuiste|serás|tendrás|misma|mismo|también|tampoco|no|sí|ya|nunca|siempre|lo|me|nos|le|les|y)\\b)', 'gu'), msg: 'Si es el pronombre, lleva tilde: «tú».', s: (m) => m[1] + 'ú' },
   { id: 'diacritica', sev: 'aviso', re: re('\\b([Tt])ú\\s+(madre|padre|hermano|hermana|hermanos|hermanas|casa|vida|gente|clan|familia|nombre|corazón|culpa|hijo|hija|hijos|hijas|amigo|amiga|pueblo|tierra|hermandad|esposo|esposa|marido|mujer|cara|voz|sangre|poder|cuerpo|alma|padres|madre)\\b', 'gu'), msg: 'Delante de un nombre es el posesivo, sin tilde: «tu».', s: (m) => m[1] + 'u ' + m[2] },
@@ -772,11 +800,13 @@ const EXPRESIONES = [
 /**
  * @param guion   lo que devuelve extraerGuion
  * @param dic     lo que devuelve crearDiccionario (o null: sin ortografía)
- * @param op      { variante: 'auto'|'latam'|'es', apagadas: Set de ids }
+ * @param op      { variante: 'auto'|'latam'|'es', apagadas: Set de ids,
+ *                  contexto: lo que devuelve contexto() de otro guion }
  * @returns { hallazgos, terminos, variante, filas }
  */
 function revisar(guion, dic, op = {}){
   const apagadas = op.apagadas || new Set();
+  const ctx = op.contexto || null;
   const filas = guion.filas;
   const hall = [];
   const poner = (f, id, sev, msg, desde, hasta, sug, extra) => {
@@ -800,12 +830,13 @@ function revisar(guion, dic, op = {}){
 
   const hablan = filas.filter(f => f.dialogo.trim() && !esReaccion(f.dialogo));
   const conTres = hablan.filter(f => /^\s*…/.test(f.dialogo)).length;
-  const estiloSuspensivos = conTres >= 2;   // el guion marca las continuaciones con «…»
+  const estiloSuspensivos = conTres >= 2 || !!(ctx && ctx.estiloSuspensivos);   // el guion marca las continuaciones con «…»
 
   /* Nombres que vienen de la columna SOURCE. */
   const nombres = new Set();
   for(const f of filas) for(const t of f.source.replace(/'s\b/gi, '').split(/[^\p{L}]+/u))
     if(t.length > 2 && !NO_NOMBRE.has(t.toLowerCase())) nombres.add(titulo(t));
+  if(ctx) for(const n of ctx.nombres) nombres.add(n);
 
   /* Guías de pronunciación: término → { guía → filas }. */
   const guias = new Map();
@@ -836,7 +867,7 @@ function revisar(guion, dic, op = {}){
     }
   });
   for(const t of guias.keys()) if(!propios.has(t)) propios.set(t, []);
-  const esNombre = (w) => propios.has(w) || guias.has(w) || nombres.has(w) || (dic && dic.propias.has(w));
+  const esNombre = (w) => propios.has(w) || guias.has(w) || nombres.has(w) || (dic && dic.propias.has(w)) || !!(ctx && ctx.propios.has(w));
 
   /* ── Fila a fila ── */
 
@@ -921,12 +952,12 @@ function revisar(guion, dic, op = {}){
         poner(f, 'numeros', 'aviso', 'Al empezar la frase, el número va con letras.', ini, fin);
       if(seps.length && grupos.slice(1).every(g => g.length === 3)){
         if(digitos.length === 4) poner(f, 'numeros', 'aviso', 'Con cuatro cifras, sin separador: «' + digitos + '».', ini, fin, digitos);
-        else if(seps.some(c => c !== '\u00A0')) poner(f, 'numeros', 'aviso', 'Desde cinco cifras, grupos de tres con espacio duro: «' + grupos.join(' ') + '».', ini, fin, grupos.join(' '));
+        else if(seps.some(c => c !== '\u00A0')) poner(f, 'numeros', 'aviso', 'Desde cinco cifras, grupos de tres con espacio duro: «' + grupos.join(' ') + '».', ini, fin, grupos.join('\u00A0'));
       }else if(seps.length === 1 && grupos[1].length <= 2){
         if(variante === 'latam' && seps[0] === ',') poner(f, 'numeros', 'aviso', 'En Latinoamérica el decimal va con punto: «' + grupos.join('.') + '».', ini, fin, grupos.join('.'));
         if(variante === 'es' && seps[0] === '.') poner(f, 'numeros', 'aviso', 'En España el decimal va con coma: «' + grupos.join(',') + '».', ini, fin, grupos.join(','));
       }else if(!seps.length && digitos.length >= 5)
-        poner(f, 'numeros', 'aviso', 'Desde cinco cifras, grupos de tres con espacio duro.', ini, fin, digitos.replace(/\B(?=(\d{3})+$)/g, ' '));
+        poner(f, 'numeros', 'aviso', 'Desde cinco cifras, grupos de tres con espacio duro.', ini, fin, digitos.replace(/\B(?=(\d{3})+$)/g, '\u00A0'));
       const unidad = /^( ?)(%|km|cm|mm|m|kg|g|l|ml)(?![\p{L}])/u.exec(despues);
       if(unidad && unidad[1] !== '\u00A0') poner(f, 'numeros', 'sugerencia', 'Entre la cifra y «' + unidad[2] + '», un espacio duro: «' + s + ' ' + unidad[2] + '».', ini, fin + unidad[0].length);
     }
@@ -1093,9 +1124,9 @@ function revisar(guion, dic, op = {}){
 
     /* La frase sigue en la fila siguiente (que empieza con «…»). */
     if(sigEmpiezaTres && fin !== '…')
-      poner(f, 'contFin', 'aviso', 'La frase sigue en la fila ' + sig.fila + ' (que empieza con «…»): termina esta con «…».', hasta - 1, hasta, '…');
+      poner(f, 'contFin', 'aviso', 'La frase sigue en la fila ' + sig.fila + ' (que empieza con «…»): termina esta con «…».', hasta - 1, hasta, /[,;:.]/.test(t[hasta - 1]) ? '…' : t[hasta - 1] + '…');
     else if(!/[.?!…:;,]/.test(fin) && !(sig && /^\p{Ll}/u.test(primeraLetra(sig.dialogo))))
-      poner(f, 'sinFinal', 'aviso', 'Falta la puntuación al final de la intervención.', hasta - 1, hasta, '.');
+      poner(f, 'sinFinal', 'aviso', 'Falta la puntuación al final de la intervención.', hasta - 1, hasta, t[hasta - 1] + '.');
 
     /* Empieza en minúscula sin «…». */
     if(!empiezaTres && /^\p{Ll}/u.test(letra) && !/^\s*[¿¡]?\s*…/.test(tr)){
@@ -1152,13 +1183,20 @@ function revisar(guion, dic, op = {}){
 
   /* Guías distintas para el mismo nombre. */
   const terminos = [];
+  const primera = (usos) => { const f = usos.reduce((a, u) => !a || u.f.i < a.i ? u.f : a, null); return f ? { fila: f.fila, tc: f.tcIn } : null; };
+  const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   for(const [termino, m] of guias){
     const lista = Array.from(m.entries()).map(([guia, usos]) => ({ guia, usos })).sort((a, b) => b.usos.length - a.usos.length);
     const total = lista.reduce((n, x) => n + x.usos.length, 0);
     let sinGuia = [];
     const reT = re('\\b' + termino.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b(?!\\s*[(\\[])', 'gu');
     for(const f of filas){ reT.lastIndex = 0; for(const x of f.dialogo.matchAll(reT)) sinGuia.push({ f, desde: x.index, hasta: x.index + termino.length }); }
-    terminos.push({ termino, guias: lista.map(x => ({ guia: x.guia, veces: x.usos.length })), veces: total, sinGuia: sinGuia.length });
+    terminos.push({ termino, guias: lista.map(x => ({ guia: x.guia, veces: x.usos.length })), veces: total, sinGuia: sinGuia.length,
+                    primera: primera(lista.flatMap(x => x.usos).concat(sinGuia)) });
+    /* Con un guion cargado de referencia, la guía buena es la suya. */
+    const deRef = ctx && ctx.guias.get(termino);
+    if(deRef) for(const x of lista) if(x.guia !== deRef) for(const u of x.usos)
+      poner(u.f, 'guias', 'aviso', 'En el guion, «' + termino + '» se escribe «' + termino + ' (' + deRef + ')».', u.g.desde, u.g.hasta, termino + ' (' + deRef + ')');
     if(lista.length > 1){
       const resumen = lista.map(x => '«(' + x.guia + ')» ×' + x.usos.length).join(', ');
       const soloCaja = new Set(lista.map(x => x.guia.toLowerCase())).size === 1;
@@ -1166,14 +1204,22 @@ function revisar(guion, dic, op = {}){
         poner(u.f, 'guias', 'aviso', (soloCaja ? 'La guía de «' + termino + '» se escribe con mayúsculas distintas: ' : '«' + termino + '» tiene guías distintas: ') + resumen + '.',
           u.g.desde, u.g.hasta, termino + ' (' + lista[0].guia + ')');
     }
-    if(sinGuia.length && total >= sinGuia.length)
+    if(sinGuia.length && (total >= sinGuia.length || deRef))
       for(const u of sinGuia) poner(u.f, 'sinGuia', 'sugerencia', '«' + termino + '» lleva guía en ' + total + ' filas y aquí no.', u.desde, u.hasta, termino + ' (' + lista[0].guia + ')');
   }
-  for(const [w, usos] of propios) if(!guias.has(w)) terminos.push({ termino: w, guias: [], veces: usos.length, sinGuia: usos.length });
+  for(const [w, usos] of propios) if(!guias.has(w)) terminos.push({ termino: w, guias: [], veces: usos.length, sinGuia: usos.length, primera: primera(usos) });
+  /* Nombres que en el guion de referencia llevan guía y aquí aparecen sin ella. */
+  if(ctx) for(const [termino, g] of ctx.guias){
+    if(guias.has(termino)) continue;
+    const reT = re('\\b' + escRe(termino) + '\\b(?!\\s*[(\\[])', 'gu');
+    for(const f of filas) for(const x of f.dialogo.matchAll(reT))
+      poner(f, 'sinGuia', 'sugerencia', 'En el guion, «' + termino + '» lleva su guía: «' + termino + ' (' + g + ')».', x.index, x.index + termino.length, termino + ' (' + g + ')');
+  }
 
   /* Nombres casi iguales. */
   const cuenta = new Map();
   for(const tm of terminos) cuenta.set(tm.termino, tm.veces + tm.sinGuia * (tm.guias.length ? 1 : 0));
+  if(ctx) for(const [w, n] of ctx.cuenta) cuenta.set(w, (cuenta.get(w) || 0) + n);
   const lista = Array.from(cuenta.keys()).filter(w => w.length >= 4);
   const parecidos = (a, b) => {
     if(a[0].toLowerCase() !== b[0].toLowerCase()) return false;
@@ -1322,7 +1368,46 @@ function revisar(guion, dic, op = {}){
   unicos.sort((a, b) => a.i - b.i || (a.desde < 0) - (b.desde < 0) || a.desde - b.desde || orden[a.sev] - orden[b.sev]);
   terminos.sort((a, b) => b.veces - a.veces || a.termino.localeCompare(b.termino, 'es'));
   for(const f of filas) delete f._signo;
-  return { hallazgos: unicos, terminos, variante, filas, estiloSuspensivos };
+  return { hallazgos: unicos, terminos, variante, filas, estiloSuspensivos, nombres };
+}
+
+/** Lo que un guion ya revisado enseña para revisar otro texto: sus nombres,
+ *  la guía de pronunciación de cada uno, el título y cómo marca las
+ *  continuaciones. */
+function contexto(res, guion){
+  const guias = new Map(), propios = new Set(), cuenta = new Map();
+  for(const t of res.terminos){
+    propios.add(t.termino);
+    cuenta.set(t.termino, t.veces + (t.guias.length ? t.sinGuia : 0));
+    if(t.guias.length) guias.set(t.termino, t.guias[0].guia);
+  }
+  return { nombres: new Set(res.nombres), guias, propios, cuenta, estiloSuspensivos: res.estiloSuspensivos, info: (guion && guion.info) || {} };
+}
+
+/**
+ * Un texto suelto, el que se escribe en «Probar un diálogo». Cada línea es un
+ * evento del mismo personaje, así que las continuaciones con «…» se miran
+ * entre líneas. Lo que solo tiene sentido en el Excel (timecodes, columna
+ * SOURCE, filas repetidas) no se revisa.
+ * @returns lo mismo que revisar(), más `lineas`: [{ desde, texto }], dónde
+ *          empieza cada evento dentro del texto.
+ */
+function revisarTexto(texto, dic, op = {}){
+  const lineas = [];
+  let pos = 0;
+  for(const crudo of String(texto ?? '').split('\n')){
+    const l = crudo.replace(/\r$/, '');
+    if(l.trim()) lineas.push({ desde: pos, texto: l });
+    pos += crudo.length + 1;
+  }
+  const filas = lineas.map((l, k) => ({ fila: k + 1, tcIn: '', tcOut: '', source: op.personaje || 'PRUEBA', dialogo: l.texto,
+                                        anot: '', tags: op.tags || '', pantalla: '' }));
+  const apagadas = new Set(op.apagadas || []);
+  for(const id of ['timecode', 'personaje', 'pantalla', 'repetida', 'walla', 'anotacion']) apagadas.add(id);
+  const info = op.info || (op.contexto && op.contexto.info) || {};
+  const res = revisar({ filas, info, hoja: '' }, dic, { variante: op.variante, apagadas, contexto: op.contexto });
+  res.lineas = lineas;
+  return res;
 }
 
 /* ═══ EXPORTAR: un .xlsx sin bibliotecas ═══════════════════════════════════
@@ -1383,7 +1468,7 @@ function xlsx(hojas){
   return zip(archivos);
 }
 
-return { leerLibro, extraerGuion, crearDiccionario, sugerir, revisar, xlsx, REGLAS, CATEGORIAS,
+return { leerLibro, extraerGuion, crearDiccionario, sugerir, revisar, revisarTexto, contexto, xlsx, REGLAS, CATEGORIAS,
          _interno: { tapar, guiasDe, palabras, esReaccion, distancia, variantesTilde, leerZip } };
 })();
 
@@ -1456,6 +1541,7 @@ async function abrir(file){
     estado.ignorados = new Set();
     await dicListo.catch(() => null);
     revisar();
+    $('#vProbar').appendChild($('#probar'));
     $('#inicio').classList.add('oculto');
     $('#panel').classList.remove('oculto');
     window.scrollTo(0, 0);
@@ -1478,7 +1564,9 @@ function revisar(){
     vari + (estado.variante === 'auto' ? ' (detectado)' : ''), !estado.dic && 'sin diccionario'].filter(Boolean).join(' · ');
   if(g.faltan.length) $('#meta').textContent += ' · faltan las columnas: ' + g.faltan.join(', ');
   $('#variante').value = estado.variante;
+  estado.contexto = M.contexto(estado.res, g);
   pintarTodo();
+  probar();
 }
 
 /* ── Pintar ── */
@@ -1574,8 +1662,9 @@ function pintarTerminos(){
   const ts = estado.res.terminos;
   $('#terminos').innerHTML = ts.length ? ts.map(t => '<tr><td><b>' + esc(t.termino) + '</b></td><td>'
     + (t.guias.length ? t.guias.map(g => '<span class="g' + (t.guias.length > 1 ? ' mal' : '') + '">(' + esc(g.guia) + ') ×' + g.veces + '</span>').join('') : '<span class="nota">sin guía</span>')
-    + '</td><td class="n">' + t.veces + '</td><td class="n">' + (t.guias.length ? t.sinGuia || '' : '') + '</td></tr>').join('')
-    : '<tr><td colspan="4" class="nota">No hay nombres propios ni guías de pronunciación.</td></tr>';
+    + '</td><td class="n">' + t.veces + '</td><td class="n">' + (t.guias.length ? t.sinGuia || '' : '') + '</td>'
+    + '<td><span class="tc" style="font-family:var(--mono);font-size:13px">' + esc(t.primera ? t.primera.tc : '') + '</span>' + (t.primera ? ' <span class="nota">fila ' + t.primera.fila + '</span>' : '') + '</td></tr>').join('')
+    : '<tr><td colspan="5" class="nota">No hay nombres propios ni guías de pronunciación.</td></tr>';
 }
 
 function pintarReglas(){
@@ -1594,26 +1683,90 @@ function pintarReglas(){
   if(estado.dic) $('#propias').value = Array.from(estado.dic.propias).sort((a, b) => a.localeCompare(b, 'es')).join('\n');
 }
 
+/* ── Probar un diálogo ──
+   Cada línea es un evento. Si hay un Excel abierto, se compara con él: sus
+   nombres, sus guías de pronunciación y su título. */
+const NO_APLICA = new Set(['signosPares', 'sensible', 'titulo', 'anotacion', 'reaccionBorde', 'reaccionIngles', 'vosotros', 'unPersonaje']);
+/* Las que reescriben la última letra («ver» → «ver…»): el botón dice qué hace. */
+const ROTULO = { sinFinal: 'Poner punto final', contFin: 'Terminar con «…»', contIni: 'Empezar con «…»' };
+let pRes = null;
+
+function probar(){
+  const texto = $('#pTexto').value;
+  const ver = $('#pVeredicto');
+  $('#pCtx').textContent = estado.guion ? ' Se compara con los nombres y las guías de «' + ($('#titulo').textContent || estado.nombre) + '».' : '';
+  if(!texto.trim()){ ver.classList.add('oculto'); $('#pResultado').innerHTML = ''; pRes = null; return; }
+  if(!estado.dic){ ver.className = 'veredicto casi'; ver.textContent = 'Cargando diccionario…'; return; }
+  pRes = M.revisarTexto(texto, estado.dic, { variante: estado.variante, apagadas: estado.apagadas, contexto: estado.contexto });
+  const hs = pRes.hallazgos;
+  const n = (s) => hs.filter(h => h.sev === s).length;
+  const partes = [n('error') && n('error') + ' error' + (n('error') > 1 ? 'es' : ''), n('aviso') && n('aviso') + ' aviso' + (n('aviso') > 1 ? 's' : ''),
+                  n('sugerencia') && n('sugerencia') + ' sugerencia' + (n('sugerencia') > 1 ? 's' : '')].filter(Boolean);
+  ver.className = 'veredicto ' + (n('error') ? 'mal' : n('aviso') ? 'casi' : 'bien');
+  ver.textContent = n('error') || n('aviso') ? '✗ Hay que corregir: ' + partes.join(' · ') : '✓ Está bien' + (partes.length ? ' · ' + partes.join(' · ') : '');
+  const varias = pRes.filas.length > 1;
+  $('#pResultado').innerHTML = pRes.filas.map((f, i) => {
+    const suyos = hs.filter(h => h.i === i);
+    const lugar = varias ? 'Línea ' + f.fila : 'El diálogo';
+    if(!suyos.length) return '<div class="linea-ok"><b>✓</b>' + lugar + ': sin problemas.</div>';
+    return '<article class="fila"><div class="cab"><span class="num">' + lugar + '</span></div>'
+      + '<p class="dlg">' + resaltar(f.dialogo, suyos) + '</p><ul class="hall">' + suyos.map(h => {
+        const r = M.REGLAS[h.regla];
+        const opciones = h.sug && h.desde >= 0 && !NO_APLICA.has(h.regla) ? h.sug.split(/ · | \/ /).filter(Boolean) : [];
+        const k = hs.indexOf(h);
+        return '<li><span class="sev ' + h.sev + '">' + SEV[h.sev] + '</span><div class="txt">' + esc(h.msg.replace(/\bfila(s?)\b/g, 'línea$1'))
+          + (h.sug && !opciones.length ? ' <span class="sug">' + esc(h.sug) + '</span>' : '')
+          + '<small>' + esc(M.CATEGORIAS[r.cat]) + ' · ' + esc(r.titulo) + ' · ' + esc(r.fuente) + '</small></div><div class="acc">'
+          + opciones.map((o, j) => '<button class="mini usar" type="button" data-h="' + k + '" data-o="' + j + '">' + esc(ROTULO[h.regla] || (o === 'borrar' ? 'Borrar' : 'Usar «' + o.replace(/\u00A0/g, ' ') + '»')) + '</button>').join('')
+          + (h.palabra ? '<button class="mini" type="button" data-a="dic" data-w="' + esc(h.palabra) + '">Añadir al diccionario</button>' : '')
+          + '</div></li>';
+      }).join('') + '</ul></article>';
+  }).join('');
+}
+
+let esperaP;
+$('#pTexto').addEventListener('input', () => { clearTimeout(esperaP); esperaP = setTimeout(probar, 180); });
+dicListo.then(probar, () => {});
+$('#pResultado').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if(!b || !pRes) return;
+  if(b.dataset.a === 'dic' && estado.dic){
+    estado.dic.poner(b.dataset.w);
+    guardado.poner('propias', Array.from(estado.dic.propias));
+    if(estado.guion) revisar(); else probar();
+    return;
+  }
+  const h = pRes.hallazgos[+b.dataset.h];
+  if(!h) return;
+  let o = h.sug.split(/ · | \/ /).filter(Boolean)[+b.dataset.o];
+  if(o === 'borrar') o = ''; else if(o === 'espacio normal') o = ' ';
+  const base = pRes.lineas[h.i].desde;
+  const area = $('#pTexto');
+  area.value = area.value.slice(0, base + h.desde) + o + area.value.slice(base + h.hasta);
+  probar();
+  area.focus();
+});
+
 /* ── Exportar ── */
 function informe(){
   const r = estado.res, g = estado.guion;
   const hs = visibles();
-  const hall = [['Fila', 'TC IN', 'Personaje', 'Diálogo', 'Gravedad', 'Categoría', 'Regla', 'Fuente', 'Problema', 'Fragmento', 'Sugerencia']];
+  const hall = [['Timecode inicial', 'Fila', 'Personaje', 'Diálogo', 'Gravedad', 'Categoría', 'Regla', 'Fuente', 'Problema', 'Fragmento', 'Sugerencia']];
   for(const h of hs){
     const f = r.filas[h.i], regla = M.REGLAS[h.regla];
-    hall.push([h.fila, f.tcIn, f.source.trim(), f.dialogo, SEV[h.sev], M.CATEGORIAS[regla.cat], regla.titulo, regla.fuente, h.msg,
+    hall.push([f.tcIn, h.fila, f.source.trim(), f.dialogo, SEV[h.sev], M.CATEGORIAS[regla.cat], regla.titulo, regla.fuente, h.msg,
       h.desde >= 0 && !h.donde ? f.dialogo.slice(h.desde, h.hasta) : h.donde === 'source' ? f.source : '', h.sug]);
   }
-  const term = [['Nombre', 'Guías de pronunciación', 'Veces', 'Sin guía']];
-  for(const t of r.terminos) term.push([t.termino, t.guias.map(x => '(' + x.guia + ') ×' + x.veces).join('  '), t.veces, t.guias.length ? t.sinGuia : 0]);
+  const term = [['Nombre', 'Guías de pronunciación', 'Veces', 'Sin guía', 'Timecode inicial (primera vez)', 'Fila']];
+  for(const t of r.terminos) term.push([t.termino, t.guias.map(x => '(' + x.guia + ') ×' + x.veces).join('  '), t.veces, t.guias.length ? t.sinGuia : 0,
+    t.primera ? t.primera.tc : '', t.primera ? t.primera.fila : '']);
   const res = [['Concepto', 'Valor'], ['Archivo', estado.nombre], ['Serie', g.info['SHOW TITLE'] || ''], ['Episodio', g.info['EPISODE TITLE'] || ''],
     ['Versión', g.info.VERSION || ''], ['Filas revisadas', g.filas.length], ['Variante', r.variante === 'es' ? 'Castellano' : 'Latinoamérica'],
     ['Errores', hs.filter(h => h.sev === 'error').length], ['Avisos', hs.filter(h => h.sev === 'aviso').length], ['Sugerencias', hs.filter(h => h.sev === 'sugerencia').length],
     ['Ignorados a mano', r.hallazgos.length - hs.length], ['Reglas apagadas', Array.from(estado.apagadas).map(id => M.REGLAS[id] ? M.REGLAS[id].titulo : id).join(', ')],
     ['Fecha', new Date().toLocaleString('es')]];
   const blob = M.xlsx([
-    { nombre: 'Hallazgos', filas: hall, anchos: [7, 13, 22, 60, 11, 18, 26, 12, 60, 24, 30] },
-    { nombre: 'Nombres y guías', filas: term, anchos: [22, 50, 8, 9] },
+    { nombre: 'Hallazgos', filas: hall, anchos: [16, 7, 22, 60, 11, 18, 26, 12, 60, 24, 30] },
+    { nombre: 'Nombres y guías', filas: term, anchos: [22, 50, 8, 9, 26, 7] },
     { nombre: 'Resumen', filas: res, anchos: [20, 70] }
   ]);
   const a = document.createElement('a');
@@ -1690,7 +1843,8 @@ $('#guardarPropias').addEventListener('click', () => {
 document.querySelector('.pestanas').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-v]'); if(!b) return;
   document.querySelectorAll('.pestanas button').forEach(x => x.setAttribute('aria-selected', x === b));
-  for(const id of ['vHall', 'vTerm', 'vReglas']) $('#' + id).classList.toggle('oculto', id !== b.dataset.v);
+  for(const id of ['vHall', 'vTerm', 'vProbar', 'vReglas']) $('#' + id).classList.toggle('oculto', id !== b.dataset.v);
+  if(b.dataset.v === 'vProbar') $('#pTexto').focus();
 });
 $('#tema').addEventListener('click', () => {
   const r = document.documentElement;

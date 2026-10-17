@@ -492,7 +492,7 @@ const EXPRESIONES = [
   { id: 'dequeismo', sev: 'aviso', re: re('\\b((?:me|te|se|nos)\\s+(?:di|diste|dio|dimos|dieron|doy|das|da|damos|dan)\\s+cuenta|(?:estoy|estás|está|estamos|están|estaba|estaban|estuve)\\s+segur[oa]s?|(?:me|te|se|nos)\\s+(?:acuerdo|acuerdas|acuerda|acordamos|acuerdan|acordé|acordó|enteré|enteró|enteramos|enteraron)|a pesar)\\s+que\\b'), msg: 'Queísmo: aquí falta el «de».', s: (m) => m[1] + ' de que' },
   { id: 'asiQue', sev: 'aviso', re: re('\\b([Aa])sí que,'), msg: 'Después de «así que» no va coma.', s: (m) => m[1] + 'sí que' },
   { id: 'posesivo', sev: 'sugerencia', re: re('\\b(detrás|delante|encima|debajo|cerca|enfrente|alrededor|dentro|fuera)\\s+(mío|mía|tuyo|tuya|suyo|suya|nuestro|nuestra)\\b'),
-    msg: 'En la norma culta: «detrás de mí», «cerca de ti».', s: (m) => m[1] + ' de ' + ({ mío: 'mí', mía: 'mí', tuyo: 'ti', tuya: 'ti', suyo: 'él / ella', suya: 'él / ella', nuestro: 'nosotros', nuestra: 'nosotras' })[m[2].toLowerCase()] },
+    msg: 'En la norma culta: «detrás de mí», «cerca de ti».', s: (m) => m[1] + ' de ' + ({ mío: 'mí', mía: 'mí', tuyo: 'ti', tuya: 'ti', suyo: 'él', suya: 'ella', nuestro: 'nosotros', nuestra: 'nosotras' })[m[2].toLowerCase()] },
   { id: 'diacritica', sev: 'aviso', re: re('(?<![,;]\\s)\\bmas\\b', 'gu'), msg: '¿«más» (cantidad)? «mas» sin tilde solo significa «pero».', s: () => 'más' },
   { id: 'diacritica', sev: 'aviso', re: re('\\b([Tt])u\\b(?=\\s*(?:[.,;:!?)]|$)|\\s+(?:eres|estás|tienes|sabes|puedes|quieres|vas|haces|dijiste|fuiste|serás|tendrás|misma|mismo|también|tampoco|no|sí|ya|nunca|siempre|lo|me|nos|le|les|y)\\b)', 'gu'), msg: 'Si es el pronombre, lleva tilde: «tú».', s: (m) => m[1] + 'ú' },
   { id: 'diacritica', sev: 'aviso', re: re('\\b([Tt])ú\\s+(madre|padre|hermano|hermana|hermanos|hermanas|casa|vida|gente|clan|familia|nombre|corazón|culpa|hijo|hija|hijos|hijas|amigo|amiga|pueblo|tierra|hermandad|esposo|esposa|marido|mujer|cara|voz|sangre|poder|cuerpo|alma|padres|madre)\\b', 'gu'), msg: 'Delante de un nombre es el posesivo, sin tilde: «tu».', s: (m) => m[1] + 'u ' + m[2] },
@@ -522,11 +522,13 @@ const EXPRESIONES = [
 /**
  * @param guion   lo que devuelve extraerGuion
  * @param dic     lo que devuelve crearDiccionario (o null: sin ortografía)
- * @param op      { variante: 'auto'|'latam'|'es', apagadas: Set de ids }
+ * @param op      { variante: 'auto'|'latam'|'es', apagadas: Set de ids,
+ *                  contexto: lo que devuelve contexto() de otro guion }
  * @returns { hallazgos, terminos, variante, filas }
  */
 function revisar(guion, dic, op = {}){
   const apagadas = op.apagadas || new Set();
+  const ctx = op.contexto || null;
   const filas = guion.filas;
   const hall = [];
   const poner = (f, id, sev, msg, desde, hasta, sug, extra) => {
@@ -550,12 +552,13 @@ function revisar(guion, dic, op = {}){
 
   const hablan = filas.filter(f => f.dialogo.trim() && !esReaccion(f.dialogo));
   const conTres = hablan.filter(f => /^\s*…/.test(f.dialogo)).length;
-  const estiloSuspensivos = conTres >= 2;   // el guion marca las continuaciones con «…»
+  const estiloSuspensivos = conTres >= 2 || !!(ctx && ctx.estiloSuspensivos);   // el guion marca las continuaciones con «…»
 
   /* Nombres que vienen de la columna SOURCE. */
   const nombres = new Set();
   for(const f of filas) for(const t of f.source.replace(/'s\b/gi, '').split(/[^\p{L}]+/u))
     if(t.length > 2 && !NO_NOMBRE.has(t.toLowerCase())) nombres.add(titulo(t));
+  if(ctx) for(const n of ctx.nombres) nombres.add(n);
 
   /* Guías de pronunciación: término → { guía → filas }. */
   const guias = new Map();
@@ -586,7 +589,7 @@ function revisar(guion, dic, op = {}){
     }
   });
   for(const t of guias.keys()) if(!propios.has(t)) propios.set(t, []);
-  const esNombre = (w) => propios.has(w) || guias.has(w) || nombres.has(w) || (dic && dic.propias.has(w));
+  const esNombre = (w) => propios.has(w) || guias.has(w) || nombres.has(w) || (dic && dic.propias.has(w)) || !!(ctx && ctx.propios.has(w));
 
   /* ── Fila a fila ── */
 
@@ -671,12 +674,12 @@ function revisar(guion, dic, op = {}){
         poner(f, 'numeros', 'aviso', 'Al empezar la frase, el número va con letras.', ini, fin);
       if(seps.length && grupos.slice(1).every(g => g.length === 3)){
         if(digitos.length === 4) poner(f, 'numeros', 'aviso', 'Con cuatro cifras, sin separador: «' + digitos + '».', ini, fin, digitos);
-        else if(seps.some(c => c !== '\u00A0')) poner(f, 'numeros', 'aviso', 'Desde cinco cifras, grupos de tres con espacio duro: «' + grupos.join(' ') + '».', ini, fin, grupos.join(' '));
+        else if(seps.some(c => c !== '\u00A0')) poner(f, 'numeros', 'aviso', 'Desde cinco cifras, grupos de tres con espacio duro: «' + grupos.join(' ') + '».', ini, fin, grupos.join('\u00A0'));
       }else if(seps.length === 1 && grupos[1].length <= 2){
         if(variante === 'latam' && seps[0] === ',') poner(f, 'numeros', 'aviso', 'En Latinoamérica el decimal va con punto: «' + grupos.join('.') + '».', ini, fin, grupos.join('.'));
         if(variante === 'es' && seps[0] === '.') poner(f, 'numeros', 'aviso', 'En España el decimal va con coma: «' + grupos.join(',') + '».', ini, fin, grupos.join(','));
       }else if(!seps.length && digitos.length >= 5)
-        poner(f, 'numeros', 'aviso', 'Desde cinco cifras, grupos de tres con espacio duro.', ini, fin, digitos.replace(/\B(?=(\d{3})+$)/g, ' '));
+        poner(f, 'numeros', 'aviso', 'Desde cinco cifras, grupos de tres con espacio duro.', ini, fin, digitos.replace(/\B(?=(\d{3})+$)/g, '\u00A0'));
       const unidad = /^( ?)(%|km|cm|mm|m|kg|g|l|ml)(?![\p{L}])/u.exec(despues);
       if(unidad && unidad[1] !== '\u00A0') poner(f, 'numeros', 'sugerencia', 'Entre la cifra y «' + unidad[2] + '», un espacio duro: «' + s + ' ' + unidad[2] + '».', ini, fin + unidad[0].length);
     }
@@ -843,9 +846,9 @@ function revisar(guion, dic, op = {}){
 
     /* La frase sigue en la fila siguiente (que empieza con «…»). */
     if(sigEmpiezaTres && fin !== '…')
-      poner(f, 'contFin', 'aviso', 'La frase sigue en la fila ' + sig.fila + ' (que empieza con «…»): termina esta con «…».', hasta - 1, hasta, '…');
+      poner(f, 'contFin', 'aviso', 'La frase sigue en la fila ' + sig.fila + ' (que empieza con «…»): termina esta con «…».', hasta - 1, hasta, /[,;:.]/.test(t[hasta - 1]) ? '…' : t[hasta - 1] + '…');
     else if(!/[.?!…:;,]/.test(fin) && !(sig && /^\p{Ll}/u.test(primeraLetra(sig.dialogo))))
-      poner(f, 'sinFinal', 'aviso', 'Falta la puntuación al final de la intervención.', hasta - 1, hasta, '.');
+      poner(f, 'sinFinal', 'aviso', 'Falta la puntuación al final de la intervención.', hasta - 1, hasta, t[hasta - 1] + '.');
 
     /* Empieza en minúscula sin «…». */
     if(!empiezaTres && /^\p{Ll}/u.test(letra) && !/^\s*[¿¡]?\s*…/.test(tr)){
@@ -902,13 +905,20 @@ function revisar(guion, dic, op = {}){
 
   /* Guías distintas para el mismo nombre. */
   const terminos = [];
+  const primera = (usos) => { const f = usos.reduce((a, u) => !a || u.f.i < a.i ? u.f : a, null); return f ? { fila: f.fila, tc: f.tcIn } : null; };
+  const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   for(const [termino, m] of guias){
     const lista = Array.from(m.entries()).map(([guia, usos]) => ({ guia, usos })).sort((a, b) => b.usos.length - a.usos.length);
     const total = lista.reduce((n, x) => n + x.usos.length, 0);
     let sinGuia = [];
     const reT = re('\\b' + termino.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b(?!\\s*[(\\[])', 'gu');
     for(const f of filas){ reT.lastIndex = 0; for(const x of f.dialogo.matchAll(reT)) sinGuia.push({ f, desde: x.index, hasta: x.index + termino.length }); }
-    terminos.push({ termino, guias: lista.map(x => ({ guia: x.guia, veces: x.usos.length })), veces: total, sinGuia: sinGuia.length });
+    terminos.push({ termino, guias: lista.map(x => ({ guia: x.guia, veces: x.usos.length })), veces: total, sinGuia: sinGuia.length,
+                    primera: primera(lista.flatMap(x => x.usos).concat(sinGuia)) });
+    /* Con un guion cargado de referencia, la guía buena es la suya. */
+    const deRef = ctx && ctx.guias.get(termino);
+    if(deRef) for(const x of lista) if(x.guia !== deRef) for(const u of x.usos)
+      poner(u.f, 'guias', 'aviso', 'En el guion, «' + termino + '» se escribe «' + termino + ' (' + deRef + ')».', u.g.desde, u.g.hasta, termino + ' (' + deRef + ')');
     if(lista.length > 1){
       const resumen = lista.map(x => '«(' + x.guia + ')» ×' + x.usos.length).join(', ');
       const soloCaja = new Set(lista.map(x => x.guia.toLowerCase())).size === 1;
@@ -916,14 +926,22 @@ function revisar(guion, dic, op = {}){
         poner(u.f, 'guias', 'aviso', (soloCaja ? 'La guía de «' + termino + '» se escribe con mayúsculas distintas: ' : '«' + termino + '» tiene guías distintas: ') + resumen + '.',
           u.g.desde, u.g.hasta, termino + ' (' + lista[0].guia + ')');
     }
-    if(sinGuia.length && total >= sinGuia.length)
+    if(sinGuia.length && (total >= sinGuia.length || deRef))
       for(const u of sinGuia) poner(u.f, 'sinGuia', 'sugerencia', '«' + termino + '» lleva guía en ' + total + ' filas y aquí no.', u.desde, u.hasta, termino + ' (' + lista[0].guia + ')');
   }
-  for(const [w, usos] of propios) if(!guias.has(w)) terminos.push({ termino: w, guias: [], veces: usos.length, sinGuia: usos.length });
+  for(const [w, usos] of propios) if(!guias.has(w)) terminos.push({ termino: w, guias: [], veces: usos.length, sinGuia: usos.length, primera: primera(usos) });
+  /* Nombres que en el guion de referencia llevan guía y aquí aparecen sin ella. */
+  if(ctx) for(const [termino, g] of ctx.guias){
+    if(guias.has(termino)) continue;
+    const reT = re('\\b' + escRe(termino) + '\\b(?!\\s*[(\\[])', 'gu');
+    for(const f of filas) for(const x of f.dialogo.matchAll(reT))
+      poner(f, 'sinGuia', 'sugerencia', 'En el guion, «' + termino + '» lleva su guía: «' + termino + ' (' + g + ')».', x.index, x.index + termino.length, termino + ' (' + g + ')');
+  }
 
   /* Nombres casi iguales. */
   const cuenta = new Map();
   for(const tm of terminos) cuenta.set(tm.termino, tm.veces + tm.sinGuia * (tm.guias.length ? 1 : 0));
+  if(ctx) for(const [w, n] of ctx.cuenta) cuenta.set(w, (cuenta.get(w) || 0) + n);
   const lista = Array.from(cuenta.keys()).filter(w => w.length >= 4);
   const parecidos = (a, b) => {
     if(a[0].toLowerCase() !== b[0].toLowerCase()) return false;
@@ -1072,7 +1090,46 @@ function revisar(guion, dic, op = {}){
   unicos.sort((a, b) => a.i - b.i || (a.desde < 0) - (b.desde < 0) || a.desde - b.desde || orden[a.sev] - orden[b.sev]);
   terminos.sort((a, b) => b.veces - a.veces || a.termino.localeCompare(b.termino, 'es'));
   for(const f of filas) delete f._signo;
-  return { hallazgos: unicos, terminos, variante, filas, estiloSuspensivos };
+  return { hallazgos: unicos, terminos, variante, filas, estiloSuspensivos, nombres };
+}
+
+/** Lo que un guion ya revisado enseña para revisar otro texto: sus nombres,
+ *  la guía de pronunciación de cada uno, el título y cómo marca las
+ *  continuaciones. */
+function contexto(res, guion){
+  const guias = new Map(), propios = new Set(), cuenta = new Map();
+  for(const t of res.terminos){
+    propios.add(t.termino);
+    cuenta.set(t.termino, t.veces + (t.guias.length ? t.sinGuia : 0));
+    if(t.guias.length) guias.set(t.termino, t.guias[0].guia);
+  }
+  return { nombres: new Set(res.nombres), guias, propios, cuenta, estiloSuspensivos: res.estiloSuspensivos, info: (guion && guion.info) || {} };
+}
+
+/**
+ * Un texto suelto, el que se escribe en «Probar un diálogo». Cada línea es un
+ * evento del mismo personaje, así que las continuaciones con «…» se miran
+ * entre líneas. Lo que solo tiene sentido en el Excel (timecodes, columna
+ * SOURCE, filas repetidas) no se revisa.
+ * @returns lo mismo que revisar(), más `lineas`: [{ desde, texto }], dónde
+ *          empieza cada evento dentro del texto.
+ */
+function revisarTexto(texto, dic, op = {}){
+  const lineas = [];
+  let pos = 0;
+  for(const crudo of String(texto ?? '').split('\n')){
+    const l = crudo.replace(/\r$/, '');
+    if(l.trim()) lineas.push({ desde: pos, texto: l });
+    pos += crudo.length + 1;
+  }
+  const filas = lineas.map((l, k) => ({ fila: k + 1, tcIn: '', tcOut: '', source: op.personaje || 'PRUEBA', dialogo: l.texto,
+                                        anot: '', tags: op.tags || '', pantalla: '' }));
+  const apagadas = new Set(op.apagadas || []);
+  for(const id of ['timecode', 'personaje', 'pantalla', 'repetida', 'walla', 'anotacion']) apagadas.add(id);
+  const info = op.info || (op.contexto && op.contexto.info) || {};
+  const res = revisar({ filas, info, hoja: '' }, dic, { variante: op.variante, apagadas, contexto: op.contexto });
+  res.lineas = lineas;
+  return res;
 }
 
 /* ═══ EXPORTAR: un .xlsx sin bibliotecas ═══════════════════════════════════
@@ -1133,7 +1190,7 @@ function xlsx(hojas){
   return zip(archivos);
 }
 
-return { leerLibro, extraerGuion, crearDiccionario, sugerir, revisar, xlsx, REGLAS, CATEGORIAS,
+return { leerLibro, extraerGuion, crearDiccionario, sugerir, revisar, revisarTexto, contexto, xlsx, REGLAS, CATEGORIAS,
          _interno: { tapar, guiasDe, palabras, esReaccion, distancia, variantesTilde, leerZip } };
 })();
 
