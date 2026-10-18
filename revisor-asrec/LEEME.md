@@ -22,6 +22,9 @@ el lector de Excel; no carga nada de fuera y el archivo no sale del ordenador.
 Reglas del **estudio** (fuente «estudio»), que se pueden apagar en «Reglas y
 diccionario» si un cliente pide otra cosa:
 - La **«/»** para marcar pausas es un error. La guía ASR de Netflix sí la permite.
+- Las **guías de pronunciación** entre ( ) o [ ] («Kathawa (katáwa)») son un error
+  y se quitan, con su espacio. La guía ASR de Netflix sí las permite. Mientras la
+  regla esté encendida no se avisa de nombres sin guía ni de guías distintas.
 - Una **pregunta o exclamación partida** en dos eventos se cierra en cada evento y
   se vuelve a abrir: «¿Creen que se ganarán nuestra admiración…?» / «¿…y
   conseguirán su independencia?». Se avisa la forma contraria (abierta en uno y

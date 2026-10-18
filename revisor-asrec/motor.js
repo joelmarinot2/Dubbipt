@@ -297,6 +297,7 @@ const R = {
   numeros:       ['asrec', 'Números', 'Guía de español: del 1 al 10 con letras, y también «cien» y «mil»; con letras al empezar la frase (salvo fechas y cifras largas); 2000 sin separador; 50 000 con espacio duro; decimales con punto en Latinoamérica (2.50) y con coma en España (2,50); las monedas, mejor con letras.'],
   abreviatura:   ['asrec', 'Abreviaturas', 'Guía de español: «Sr.» o «Dra.» solo justo delante de un nombre propio; solo, se escribe entero («¿Cuándo viene la señorita?»). Estados Unidos se abrevia «EE. UU.».'],
   simbolos:      ['asrec', 'Símbolos', 'Los símbolos que se dicen (&, @, +, =…) van con palabras. La guía ASR admite a propósito \\ ^ < > | para marcar pausas o indicaciones, y la de español admite # en etiquetas (#Amigos): esos no se avisan. La «/» tiene su propia regla.'],
+  guiaPronunciacion:['asrec', 'Guía de pronunciación en el diálogo', 'Regla del estudio: la pronunciación entre paréntesis o corchetes («Kathawa (katáwa)») es un error y se quita del guion. Ojo: la guía ASR de Netflix sí permite escribirla junto al nombre; si un cliente la acepta, apaga esta regla. Mientras esté encendida no se avisa de nombres sin guía ni de guías distintas.'],
   barra:         ['asrec', 'Barra «/» en el diálogo', 'Regla del estudio: la «/» para marcar una pausa es un error. Ojo: la guía ASR de Netflix sí la permite; si un cliente la acepta, apaga esta regla.'],
   mayusSostenidas:['asrec', 'Palabras en MAYÚSCULAS', 'Guía ASR: el diálogo va «in sentence case […] Do not use ALL CAPS». Las siglas (ONU, FBI) sí van en mayúsculas.'],
   reaccionSigno: ['asrec', 'Reacción sin paréntesis', 'Guía ASR: las reacciones y esfuerzos van entre ( ), [ ] o { }, «There are no exceptions to this rule».'],
@@ -362,7 +363,7 @@ const R = {
    guía de estilo de español (Latinoamérica y España); «RAE»: la Ortografía y
    la gramática de la Academia; «guion»: el guion comparado consigo mismo. */
 const FUENTE = {
-  barra: 'estudio', vacio: 'Netflix ASR', numeros: 'Netflix ES', abreviatura: 'Netflix ES', simbolos: 'Netflix ASR', mayusSostenidas: 'Netflix ASR',
+  guiaPronunciacion: 'estudio', barra: 'estudio', vacio: 'Netflix ASR', numeros: 'Netflix ES', abreviatura: 'Netflix ES', simbolos: 'Netflix ASR', mayusSostenidas: 'Netflix ASR',
   reaccionSigno: 'Netflix ASR', reaccionBorde: 'Netflix ASR', reaccionMayus: 'guion', reaccionIngles: 'guion', reaccionEstilo: 'guion',
   contFin: 'guion', contIni: 'guion', contMayus: 'RAE', contSobra: 'guion', preguntaPartida: 'estudio', sinFinal: 'Netflix ASR', inicioMinus: 'Netflix ASR', repetida: 'Netflix ASR',
   invisible: 'Netflix ES', tresPuntos: 'Netflix ES', espacios: 'guion', espacioSigno: 'RAE', suspensivos: 'Netflix ES', signosPares: 'RAE',
@@ -713,6 +714,12 @@ function revisar(guion, dic, op = {}){
     if(/^\s*[-–—]\s+\S[\s\S]*?(?:\n|\s)[-–—]\s+\S/.test(t))
       poner(f, 'unPersonaje', 'aviso', 'Parece que hablan dos personajes en el mismo evento (guiones de diálogo): cada uno en su evento.', -1, -1);
 
+    /* «Kathawa (katáwa)»: la guía de pronunciación se quita, con su espacio. */
+    for(const g of guiasDe(t)){
+      const ini = g.desde + g.termino.length;
+      poner(f, 'guiaPronunciacion', 'error', 'Guía de pronunciación «' + t.slice(ini, g.hasta).trim() + '» en el diálogo: se quita del guion.', ini, g.hasta, 'borrar');
+    }
+
     /* La «/» de pausa: la guía ASR la permite, el estudio no. Se propone
        quitarla con sus espacios, para que no quede un espacio doble. */
     for(const m of t.matchAll(/\s*\/+\s*/g)){
@@ -1007,6 +1014,8 @@ function revisar(guion, dic, op = {}){
 
   /* Guías distintas para el mismo nombre. */
   const terminos = [];
+  /* Si las guías son un error, no tiene sentido pedir que estén ni que sean iguales. */
+  const sinGuias = !apagadas.has('guiaPronunciacion');
   const primera = (usos) => { const f = usos.reduce((a, u) => !a || u.f.i < a.i ? u.f : a, null); return f ? { fila: f.fila, tc: f.tcIn } : null; };
   const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   for(const [termino, m] of guias){
@@ -1018,22 +1027,22 @@ function revisar(guion, dic, op = {}){
     terminos.push({ termino, guias: lista.map(x => ({ guia: x.guia, veces: x.usos.length })), veces: total, sinGuia: sinGuia.length,
                     primera: primera(lista.flatMap(x => x.usos).concat(sinGuia)) });
     /* Con un guion cargado de referencia, la guía buena es la suya. */
-    const deRef = ctx && ctx.guias.get(termino);
+    const deRef = !sinGuias && ctx && ctx.guias.get(termino);
     if(deRef) for(const x of lista) if(x.guia !== deRef) for(const u of x.usos)
       poner(u.f, 'guias', 'aviso', 'En el guion, «' + termino + '» se escribe «' + termino + ' (' + deRef + ')».', u.g.desde, u.g.hasta, termino + ' (' + deRef + ')');
-    if(lista.length > 1){
+    if(lista.length > 1 && !sinGuias){
       const resumen = lista.map(x => '«(' + x.guia + ')» ×' + x.usos.length).join(', ');
       const soloCaja = new Set(lista.map(x => x.guia.toLowerCase())).size === 1;
       for(const x of lista.slice(1)) for(const u of x.usos)
         poner(u.f, 'guias', 'aviso', (soloCaja ? 'La guía de «' + termino + '» se escribe con mayúsculas distintas: ' : '«' + termino + '» tiene guías distintas: ') + resumen + '.',
           u.g.desde, u.g.hasta, termino + ' (' + lista[0].guia + ')');
     }
-    if(sinGuia.length && (total >= sinGuia.length || deRef))
+    if(!sinGuias && sinGuia.length && (total >= sinGuia.length || deRef))
       for(const u of sinGuia) poner(u.f, 'sinGuia', 'sugerencia', '«' + termino + '» lleva guía en ' + total + ' filas y aquí no.', u.desde, u.hasta, termino + ' (' + lista[0].guia + ')');
   }
   for(const [w, usos] of propios) if(!guias.has(w)) terminos.push({ termino: w, guias: [], veces: usos.length, sinGuia: usos.length, primera: primera(usos) });
   /* Nombres que en el guion de referencia llevan guía y aquí aparecen sin ella. */
-  if(ctx) for(const [termino, g] of ctx.guias){
+  if(ctx && !sinGuias) for(const [termino, g] of ctx.guias){
     if(guias.has(termino)) continue;
     const reT = re('\\b' + escRe(termino) + '\\b(?!\\s*[(\\[])', 'gu');
     for(const f of filas) for(const x of f.dialogo.matchAll(reT))

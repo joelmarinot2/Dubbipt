@@ -139,6 +139,16 @@ exports.pruebas = async function(t){
     fila(4, 'KATHAWA WOMAN 2', '(GESTO)'), fila(5, 'KATHAWA WOMAN 3', '(GESTO)'), fila(6, 'KATHWA WOMAN 1', '(GESTO)'),
     fila(7, 'YERUMA MAN 8', '(GESTO)'), fila(8, 'YERUMA WOMAN 8', '(GESTO)')
   ] }, dic, {});
+  const guionGuias = res;
+  t.eq('las guías de pronunciación son un error del estudio, y se quitan con su espacio',
+    res.hallazgos.filter(h => h.regla === 'guiaPronunciacion').map(h => h.fila + ':' + res.filas[h.i].dialogo.slice(h.desde, h.hasta) + ':' + h.sev),
+    ['1: (katáwa):error', '1: (Matwáti):error', '2: (matwáti):error', '3: (matwáti):error']);
+  t.ok('y entonces no se comparan entre sí', !res.hallazgos.some(h => h.regla === 'guias' || h.regla === 'sinGuia'));
+  t.ok('un nombre con su guía sigue siendo un nombre', !res.hallazgos.some(h => h.regla === 'diccionario' && /áwa|áti/.test(h.palabra)));
+  t.eq('entre corchetes, igual', M.revisarTexto('Hola, Kathawa [katáwa].', dic).hallazgos.filter(h => h.regla === 'guiaPronunciacion').map(h => h.sug), ['borrar']);
+  t.eq('una reacción entre paréntesis no es una guía', M.revisarTexto('(GESTO)', dic).hallazgos.filter(h => h.regla === 'guiaPronunciacion').length, 0);
+  /* Con la regla apagada (un cliente que sí las quiere), vuelven las comparaciones. */
+  res = M.revisar({ info: {}, filas: guionGuias.filas.map(f => ({ ...f })) }, dic, { apagadas: new Set(['guiaPronunciacion']) });
   t.ok('la misma guía escrita con otra mayúscula', res.hallazgos.some(h => h.fila === 1 && h.regla === 'guias' && h.sug === 'Makwathi (matwáti)'));
   t.ok('«Diosa» y «diosa»', res.hallazgos.some(h => h.fila === 1 && h.regla === 'mayusculas'));
   t.ok('lo de dentro de una guía no se corrige', !res.hallazgos.some(h => h.regla === 'diccionario' && /áwa|áti/.test(h.palabra)));
@@ -157,9 +167,11 @@ exports.pruebas = async function(t){
   t.eq('cada línea es un evento, y se sabe dónde empieza', p.lineas.map(l => l.desde), [0, 45]);
   t.ok('las continuaciones se miran entre líneas', p.hallazgos.some(h => h.regla === 'contFin' && h.sug === 'r…'));
   const ctx = M.contexto(res, { info: { 'SHOW TITLE': 'Akka' } });
-  p = M.revisarTexto('Rezaré a la diosa Makwathi (Matwáti).', dic, { contexto: ctx });
+  const conGuias = { contexto: ctx, apagadas: new Set(['guiaPronunciacion']) };
+  p = M.revisarTexto('Rezaré a la diosa Makwathi (Matwáti).', dic, conGuias);
   t.ok('con un guion abierto, su guía de pronunciación manda', p.hallazgos.some(h => h.regla === 'guias' && h.sug === 'Makwathi (matwáti)'));
-  p = M.revisarTexto('Rezaré a la diosa Makwathi.', dic, { contexto: ctx });
+  p = M.revisarTexto('Rezaré a la diosa Makwathi.', dic, conGuias);
+  t.eq('con la regla del estudio encendida, no se pide la guía', M.revisarTexto('Rezaré a la diosa Makwathi.', dic, { contexto: ctx }).hallazgos.filter(h => h.regla === 'sinGuia').length, 0);
   t.ok('y avisa si el nombre va sin su guía', p.hallazgos.some(h => h.regla === 'sinGuia' && h.sug === 'Makwathi (matwáti)'));
   t.ok('lo que solo existe en el Excel no se revisa', !M.revisarTexto('Hola.', dic).hallazgos.some(h => h.regla === 'timecode' || h.regla === 'personaje'));
 
