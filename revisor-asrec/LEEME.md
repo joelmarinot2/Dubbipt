@@ -35,9 +35,16 @@ of Work), **Netflix ES** (Spanish (Latin America & Spain) Timed Text Style
 Guide), **RAE**, o **guion** (el guion comparado consigo mismo). En la pestaña
 «Reglas y diccionario» se apagan una a una y se añaden palabras propias.
 
+Cada hallazgo tiene un botón **«✓ Arreglado»** (y «✓ Toda la fila arreglada»)
+para llevar el control: lo marcado se ve tachado, con la fecha y la hora, y se
+puede deshacer. Arriba sale el progreso («12 de 126 arreglados») y se puede
+filtrar por pendientes o arreglados. Se guarda en el navegador para cada archivo
+(nombre, MOVIE ID y versión): al volver a abrir el mismo Excel sigue marcado.
+
 El informe se descarga en `.xlsx` con tres hojas: hallazgos (empieza por el
-**timecode inicial** de cada fila), nombres y guías (con el timecode de la
-primera vez que sale cada nombre), y resumen.
+**timecode inicial** de cada fila, y lleva el **estado**, Pendiente o Arreglado,
+y la fecha del arreglo), nombres y guías (con el timecode de la primera vez que
+sale cada nombre), y resumen (con arreglados y pendientes).
 
 **La puntuación de cada fila se mira con la de antes y la de después** del mismo
 personaje (hasta ocho filas y diez segundos de hueco): si la frase sigue, si la

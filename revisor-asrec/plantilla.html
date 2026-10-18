@@ -79,6 +79,20 @@ main{max-width:1180px;margin:0 auto;padding:24px 20px 80px}
 .cifra[aria-pressed="false"]{opacity:.45}
 
 /* Con cuatro pestañas no caben en un móvil: se desplazan en su fila sin empujar la página. */
+.progreso{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:-6px 0 18px;font-size:14px;color:var(--muted)}
+.progreso .barra{flex:1 1 200px;max-width:420px;height:8px;border-radius:4px;background:var(--soft);overflow:hidden}
+.progreso .barra i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.progreso b{color:var(--ink)}
+.hall li.hecho{background:var(--accent-soft)}
+.hall li.hecho .txt{text-decoration:line-through;text-decoration-color:var(--accent);color:var(--muted)}
+.hall li.hecho .sev{opacity:.45}
+.mini.hecho-btn{color:var(--accent);border-color:var(--accent);font-weight:600}
+.mini.hecho-btn:hover{background:var(--accent);color:var(--accent-ink)}
+.marca-hecho{font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;align-self:center}
+.fila.toda-hecha{opacity:.7}
+.fila.toda-hecha .dlg mark{background:none;box-shadow:none}
+.fila .cab .fila-hecha{border:1px solid var(--accent);color:var(--accent);background:none;border-radius:8px;padding:1px 8px;font-size:12px;font-weight:600}
+.fila .cab .fila-hecha:hover{background:var(--accent);color:var(--accent-ink)}
 .pestanas{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto;scrollbar-width:none}
 .pestanas::-webkit-scrollbar{display:none}
 .pestanas button{flex:none;white-space:nowrap;border:0;background:none;padding:10px 14px;border-bottom:2px solid transparent;color:var(--muted);font-weight:600}
@@ -247,6 +261,7 @@ textarea{width:100%;min-height:140px;background:var(--soft);border:1px solid var
       <button class="cifra warn" data-sev="aviso" type="button" aria-pressed="true"><div class="n" id="nAviso">0</div><div class="t">avisos</div></button>
       <button class="cifra sug" data-sev="sugerencia" type="button" aria-pressed="true"><div class="n" id="nSug">0</div><div class="t">sugerencias</div></button>
     </div>
+    <div id="progreso" class="progreso" role="status" aria-live="polite"></div>
 
     <div class="pestanas" role="tablist">
       <button role="tab" aria-selected="true" data-v="vHall" type="button">Hallazgos</button>
@@ -266,6 +281,11 @@ textarea{width:100%;min-height:140px;background:var(--soft);border:1px solid var
         <select id="orden" aria-label="Ordenar">
           <option value="fila">Por fila</option>
           <option value="grave">Lo más grave primero</option>
+        </select>
+        <select id="estadoF" aria-label="Arreglados o pendientes">
+          <option value="todos">Pendientes y arreglados</option>
+          <option value="pendientes">Solo pendientes</option>
+          <option value="arreglados">Solo arreglados</option>
         </select>
       </div>
       <div id="chips" class="chips"></div>
@@ -317,8 +337,20 @@ const estado = {
   variante: guardado.leer('variante', 'auto'),
   ignorados: new Set(),
   sev: new Set(['error', 'aviso', 'sugerencia']),
-  cat: null, q: '', orden: 'fila', limite: 150
+  cat: null, q: '', orden: 'fila', limite: 150,
+  arreglados: new Map(), estadoF: 'todos'
 };
+
+/* «✓ Arreglado»: lo que ya se corrigió en el guion. Se guarda en este
+   navegador para cada archivo (nombre, MOVIE ID y versión), así que al volver
+   a abrir el mismo Excel sigue marcado. La clave es la fila, la regla y el
+   sitio del texto: no cambia aunque cambie la redacción de un aviso. */
+const claveA = (h) => h.fila + '|' + h.regla + '|' + h.desde + '|' + h.hasta;
+const llaveArreglos = () => { const i = (estado.guion && estado.guion.info) || {}; return 'arreglos.' + estado.nombre + '|' + (i['MOVIE ID'] || '') + '|' + (i.VERSION || ''); };
+const cargarArreglos = () => { estado.arreglados = new Map(Object.entries(guardado.leer(llaveArreglos(), {}))); };
+const guardarArreglos = () => guardado.poner(llaveArreglos(), Object.fromEntries(estado.arreglados));
+const arreglado = (h) => estado.arreglados.has(claveA(h));
+const cuando = (iso) => new Date(iso).toLocaleString('es', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const SEV = { error: 'Error', aviso: 'Aviso', sugerencia: 'Sugerencia' };
@@ -366,6 +398,7 @@ async function abrir(file){
     estado.guion = M.extraerGuion(hojas);
     estado.nombre = file.name;
     estado.ignorados = new Set();
+    cargarArreglos();
     await dicListo.catch(() => null);
     revisar();
     $('#vProbar').appendChild($('#probar'));
@@ -406,6 +439,13 @@ function pintarTodo(){
   $('#nAviso').textContent = n('aviso');
   $('#nSug').textContent = n('sugerencia');
   $('#nFilas').textContent = new Set(hs.map(h => h.i)).size;
+  const hechos = hs.filter(arreglado).length;
+  const pend = (s) => hs.filter(h => h.sev === s && !arreglado(h)).length;
+  const etiqueta = (id, nombre, s) => { const el = document.querySelector('#' + id).nextElementSibling; el.textContent = nombre + (hechos ? (pend(s) ? ' · ' + pend(s) + ' pendiente' + (pend(s) > 1 ? 's' : '') : ' · todo arreglado') : ''); };
+  etiqueta('nError', 'errores', 'error'); etiqueta('nAviso', 'avisos', 'aviso'); etiqueta('nSug', 'sugerencias', 'sugerencia');
+  const pct = hs.length ? Math.round(hechos / hs.length * 100) : 0;
+  $('#progreso').innerHTML = hs.length ? '<span><b>' + hechos + '</b> de ' + hs.length + ' arreglados · <b>' + (hs.length - hechos) + '</b> pendientes</span>'
+    + '<span class="barra" aria-hidden="true"><i style="width:' + pct + '%"></i></span><span>' + pct + ' %</span>' : '';
   pintarChips(hs);
   pintarLista();
   pintarTerminos();
@@ -455,6 +495,7 @@ function pintarLista(){
   const porFila = new Map();
   for(const h of visibles()){
     if(!estado.sev.has(h.sev) || estado.cat && h.cat !== estado.cat) continue;
+    if(estado.estadoF === 'pendientes' && arreglado(h) || estado.estadoF === 'arreglados' && !arreglado(h)) continue;
     const f = filas[h.i];
     if(q && !(f.dialogo.toLowerCase().includes(q) || f.source.toLowerCase().includes(q) || h.msg.toLowerCase().includes(q) || String(h.fila) === q)) continue;
     if(!porFila.has(h.i)) porFila.set(h.i, []);
@@ -466,28 +507,35 @@ function pintarLista(){
     grupos.sort((a, b) => p(b[1]) - p(a[1]) || a[0] - b[0]);
   }
   if(!grupos.length){
-    $('#lista').innerHTML = '<p class="vacio">' + (estado.res.hallazgos.length ? 'Nada con estos filtros.' : 'Ningún problema encontrado. 🎉') + '</p>';
+    $('#lista').innerHTML = '<p class="vacio">' + (!estado.res.hallazgos.length ? 'Ningún problema encontrado. 🎉'
+      : estado.estadoF === 'pendientes' && visibles().every(arreglado) ? 'Todo arreglado. 🎉' : 'Nada con estos filtros.') + '</p>';
     return;
   }
   const html = grupos.slice(0, estado.limite).map(([i, hs]) => {
     const f = filas[i];
     const otra = hs.filter(h => h.donde).map(h => h.donde === 'source' ? 'SOURCE: «' + esc(f.source).replace(/ /g, '·') + '»'
       : h.donde === 'tc' ? 'TC: ' + esc(f.tcIn) + ' → ' + esc(f.tcOut) : 'SOURCE ONSCREEN: ' + esc(f.pantalla));
-    return '<article class="fila" data-i="' + i + '">'
+    const todos = hs.every(arreglado);
+    return '<article class="fila' + (todos ? ' toda-hecha' : '') + '" data-i="' + i + '">'
       + '<div class="cab"><span class="num">Fila ' + f.fila + '</span><span class="tc">' + esc(f.tcIn) + '</span><span class="pj">' + esc(f.source.trim()) + '</span>'
-      + (f.tags ? '<span>' + esc(f.tags) + '</span>' : '') + '<button class="copiar" type="button" data-a="copiar">Copiar diálogo</button></div>'
+      + (f.tags ? '<span>' + esc(f.tags) + '</span>' : '') + '<button class="copiar" type="button" data-a="copiar">Copiar diálogo</button>'
+      + (hs.length > 1 && !todos ? '<button class="fila-hecha" type="button" data-a="filaHecha">✓ Toda la fila arreglada</button>' : '') + '</div>'
       + vecinasHtml(filas, hs, i, false, (g) => 'Fila ' + g.fila + ' · ' + g.source.trim())
       + '<p class="dlg">' + (f.dialogo ? resaltar(f.dialogo, hs) : '<i style="color:var(--muted)">(vacía)</i>') + '</p>'
       + vecinasHtml(filas, hs, i, true, (g) => 'Fila ' + g.fila + ' · ' + g.source.trim())
       + (otra.length ? '<p class="otra">' + Array.from(new Set(otra)).join(' · ') + '</p>' : '')
       + '<ul class="hall">' + hs.map(h => {
         const r = M.REGLAS[h.regla];
-        return '<li data-k="' + esc(claveH(h)) + '"><span class="sev ' + h.sev + '">' + SEV[h.sev] + '</span>'
+        const hecho = estado.arreglados.get(claveA(h));
+        return '<li data-k="' + esc(claveH(h)) + '" data-ka="' + esc(claveA(h)) + '"' + (hecho ? ' class="hecho"' : '') + '><span class="sev ' + h.sev + '">' + SEV[h.sev] + '</span>'
           + '<div class="txt">' + esc(h.msg) + (h.sug ? ' <span class="sug">' + esc(ROTULO[h.regla] || h.sug) + '</span>' : '')
           + '<small>' + esc(M.CATEGORIAS[r.cat]) + ' · ' + esc(r.titulo) + ' · ' + esc(r.fuente) + '</small></div>'
-          + '<div class="acc">' + (h.palabra ? '<button class="mini" type="button" data-a="dic" data-w="' + esc(h.palabra) + '">Añadir al diccionario</button>' : '')
-          + '<button class="mini" type="button" data-a="ign">Ignorar</button>'
-          + '<button class="mini" type="button" data-a="regla" data-r="' + h.regla + '">Apagar regla</button></div></li>';
+          + '<div class="acc">' + (hecho
+            ? '<span class="marca-hecho">✓ Arreglado ' + esc(cuando(hecho)) + '</span><button class="mini" type="button" data-a="deshacer">Deshacer</button>'
+            : '<button class="mini hecho-btn" type="button" data-a="hecho">✓ Arreglado</button>'
+              + (h.palabra ? '<button class="mini" type="button" data-a="dic" data-w="' + esc(h.palabra) + '">Añadir al diccionario</button>' : '')
+              + '<button class="mini" type="button" data-a="ign">Ignorar</button>'
+              + '<button class="mini" type="button" data-a="regla" data-r="' + h.regla + '">Apagar regla</button>') + '</div></li>';
       }).join('') + '</ul></article>';
   }).join('');
   $('#lista').innerHTML = html + (grupos.length > estado.limite ? '<button id="mas" class="boton mas" type="button">Ver ' + Math.min(150, grupos.length - estado.limite) + ' filas más (quedan ' + (grupos.length - estado.limite) + ')</button>' : '');
@@ -726,10 +774,10 @@ zonaP.addEventListener('drop', (e) => {
 function informe(){
   const r = estado.res, g = estado.guion;
   const hs = visibles();
-  const hall = [['Timecode inicial', 'Fila', 'Personaje', 'Diálogo', 'Gravedad', 'Categoría', 'Regla', 'Fuente', 'Problema', 'Fragmento', 'Sugerencia']];
+  const hall = [['Timecode inicial', 'Fila', 'Estado', 'Arreglado el', 'Personaje', 'Diálogo', 'Gravedad', 'Categoría', 'Regla', 'Fuente', 'Problema', 'Fragmento', 'Sugerencia']];
   for(const h of hs){
-    const f = r.filas[h.i], regla = M.REGLAS[h.regla];
-    hall.push([f.tcIn, h.fila, f.source.trim(), f.dialogo, SEV[h.sev], M.CATEGORIAS[regla.cat], regla.titulo, regla.fuente, h.msg,
+    const f = r.filas[h.i], regla = M.REGLAS[h.regla], hecho = estado.arreglados.get(claveA(h));
+    hall.push([f.tcIn, h.fila, hecho ? 'Arreglado' : 'Pendiente', hecho ? new Date(hecho).toLocaleString('es') : '', f.source.trim(), f.dialogo, SEV[h.sev], M.CATEGORIAS[regla.cat], regla.titulo, regla.fuente, h.msg,
       h.desde >= 0 && !h.donde ? f.dialogo.slice(h.desde, h.hasta) : h.donde === 'source' ? f.source : '', h.sug]);
   }
   const term = [['Nombre', 'Guías de pronunciación', 'Veces', 'Sin guía', 'Timecode inicial (primera vez)', 'Fila']];
@@ -738,10 +786,12 @@ function informe(){
   const res = [['Concepto', 'Valor'], ['Archivo', estado.nombre], ['Serie', g.info['SHOW TITLE'] || ''], ['Episodio', g.info['EPISODE TITLE'] || ''],
     ['Versión', g.info.VERSION || ''], ['Filas revisadas', g.filas.length], ['Variante', r.variante === 'es' ? 'Castellano' : 'Latinoamérica'],
     ['Errores', hs.filter(h => h.sev === 'error').length], ['Avisos', hs.filter(h => h.sev === 'aviso').length], ['Sugerencias', hs.filter(h => h.sev === 'sugerencia').length],
+    ['Arreglados', hs.filter(arreglado).length], ['Pendientes', hs.filter(h => !arreglado(h)).length],
+    ['Errores pendientes', hs.filter(h => h.sev === 'error' && !arreglado(h)).length],
     ['Ignorados a mano', r.hallazgos.length - hs.length], ['Reglas apagadas', Array.from(estado.apagadas).map(id => M.REGLAS[id] ? M.REGLAS[id].titulo : id).join(', ')],
     ['Fecha', new Date().toLocaleString('es')]];
   const blob = M.xlsx([
-    { nombre: 'Hallazgos', filas: hall, anchos: [16, 7, 22, 60, 11, 18, 26, 12, 60, 24, 30] },
+    { nombre: 'Hallazgos', filas: hall, anchos: [16, 7, 12, 18, 22, 60, 11, 18, 26, 12, 60, 24, 30] },
     { nombre: 'Nombres y guías', filas: term, anchos: [22, 50, 8, 9, 26, 7] },
     { nombre: 'Resumen', filas: res, anchos: [20, 70] }
   ]);
@@ -782,6 +832,7 @@ let espera;
 $('#buscar').addEventListener('input', (e) => { clearTimeout(espera); espera = setTimeout(() => { estado.q = e.target.value; estado.limite = 150; pintarLista(); }, 150); });
 $('#variante').addEventListener('change', (e) => { estado.variante = e.target.value; guardado.poner('variante', estado.variante); revisar(); });
 $('#orden').addEventListener('change', (e) => { estado.orden = e.target.value; pintarLista(); });
+$('#estadoF').addEventListener('change', (e) => { estado.estadoF = e.target.value; estado.limite = 150; pintarLista(); });
 
 $('#lista').addEventListener('click', async (e) => {
   const b = e.target.closest('button'); if(!b) return;
@@ -791,6 +842,13 @@ $('#lista').addEventListener('click', async (e) => {
     const t = estado.res.filas[+art.dataset.i].dialogo;
     try{ await navigator.clipboard.writeText(t); b.textContent = 'Copiado'; }catch(err){ b.textContent = 'No se pudo copiar'; }
     setTimeout(() => { b.textContent = 'Copiar diálogo'; }, 1400);
+  }else if(b.dataset.a === 'hecho' || b.dataset.a === 'deshacer' || b.dataset.a === 'filaHecha'){
+    const ahora = new Date().toISOString();
+    if(b.dataset.a === 'hecho') estado.arreglados.set(li.dataset.ka, ahora);
+    else if(b.dataset.a === 'deshacer') estado.arreglados.delete(li.dataset.ka);
+    else art.querySelectorAll('li[data-ka]').forEach(x => { if(!estado.arreglados.has(x.dataset.ka)) estado.arreglados.set(x.dataset.ka, ahora); });
+    guardarArreglos();
+    pintarTodo();
   }else if(b.dataset.a === 'ign'){
     estado.ignorados.add(li.dataset.k); pintarTodo();
   }else if(b.dataset.a === 'dic' && estado.dic){

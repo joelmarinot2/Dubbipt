@@ -53,6 +53,7 @@ exports.pruebas = async function(t){
     const cab = b64 ? Buffer.from(b64.slice(0, 4), 'base64') : Buffer.alloc(0);
     t.ok('el diccionario ' + id + ' va dentro, comprimido en gzip', cab[0] === 0x1f && cab[1] === 0x8b);
   }
+  t.ok('el informe lleva el estado de cada arreglo', /'Estado', 'Arreglado el'/.test(html) && /data-a="hecho"/.test(html));
   t.ok('no carga nada de internet', !/<script[^>]+src=|<link[^>]+href=["']https?:/.test(html));
 
   const dic = M.crearDiccionario(PALABRAS, ['sabéis', 'vosotros']);
