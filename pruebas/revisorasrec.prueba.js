@@ -235,17 +235,19 @@ exports.pruebas = async function(t){
     t.ok('el lector de capturas va dentro (' + id + ')', cab[0] === 0x1f && cab[1] === 0x8b);
   }
 
-  t.seccion('Una pregunta partida en dos eventos');
+  t.seccion('Una pregunta partida en dos eventos (estilo del estudio)');
   const dicP = M.crearDiccionario('creen que se ganarán nuestra admiración y conseguirán su independencia me habrá traído el libro'.split(' '), []);
-  let pp = M.revisarTexto('FUKUDA: ¿Creen se ganarán nuestra admiración…?\nFUKUDA: ¿…y conseguirán su independencia?', dicP);
-  t.eq('se abre una vez y se cierra una vez: sobran el «?» de la primera y el «¿» de la segunda',
-    pp.hallazgos.filter(h => h.regla === 'preguntaPartida').map(h => h.fila + ':' + pp.filas[h.i].dialogo.slice(h.desde, h.hasta).trim()), ['1:?', '2:¿']);
-  t.ok('«creen se ganarán»: falta el «que»', pp.hallazgos.some(h => h.regla === 'dequeismo' && h.sug === 'Creen que se ganarán'));
-  t.ok('y no pregunta además si sobra el «…»', !pp.hallazgos.some(h => h.regla === 'contSobra'));
+  let pp = M.revisarTexto('FUKUDA: ¿Creen que se ganarán nuestra admiración…?\nFUKUDA: ¿…y conseguirán su independencia?', dicP);
+  t.eq('cerrada en cada evento y abierta otra vez: es lo correcto', pp.hallazgos.length, 0);
+  pp = M.revisarTexto('FUKUDA: ¿Creen se ganarán nuestra admiración…?\nFUKUDA: ¿…y conseguirán su independencia?', dicP);
+  t.eq('«creen se ganarán»: solo falta el «que»', pp.hallazgos.map(h => h.regla + ':' + h.sug), ['dequeismo:Creen que se ganarán']);
+  pp = M.revisarTexto('FUKUDA: ¿Creen que se ganarán nuestra admiración…\nFUKUDA: …y conseguirán su independencia?', dicP);
+  t.eq('abierta en uno y cerrada en otro: se cierra en el primero y se abre en el segundo',
+    pp.hallazgos.map(h => h.fila + ':' + h.regla + ':' + h.sug), ['1:preguntaPartida:…?', '2:preguntaPartida:¿…']);
+  t.ok('y no se avisa además «se abre y no se cierra»', !pp.hallazgos.some(h => h.regla === 'signosPares'));
   pp = M.revisarTexto('FUKUDA: ¿Creen que se ganarán nuestra admiración…\nFUKUDA: ¿…y conseguirán su independencia?', dicP);
-  t.eq('a medio corregir, el «¿» que sobra en la segunda (y no «se abre y no se cierra» en la primera)', pp.hallazgos.map(h => h.fila + ':' + h.regla), ['2:preguntaPartida']);
-  t.eq('bien puntuada, nada', M.revisarTexto('FUKUDA: ¿Creen que se ganarán nuestra admiración…\nFUKUDA: …y conseguirán su independencia?', dicP).hallazgos.length, 0);
-  t.eq('dos preguntas de verdad no son una partida', M.revisarTexto('¿Me habrá traído…?\n¿Y el libro?', dicP).hallazgos.filter(h => h.regla === 'preguntaPartida').length, 0);
+  t.eq('a medio corregir, cerrar la primera', pp.hallazgos.map(h => h.fila + ':' + h.regla + ':' + h.sug), ['1:preguntaPartida:…?']);
+  t.eq('dos preguntas de verdad, nada', M.revisarTexto('¿Me habrá traído…?\n¿Y el libro?', dicP).hallazgos.length, 0);
 
   t.seccion('El Excel, de ida y vuelta');
   const libro = M.xlsx([{ nombre: 'Dialogue List', filas: [

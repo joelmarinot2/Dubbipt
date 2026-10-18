@@ -307,7 +307,7 @@ const R = {
   contFin:       ['asrec', 'Continuación: «…» al final', 'Se mira la fila de antes y la de después. Cuando otro personaje interrumpe la frase, la guía de español pide «…» al final y al retomarla. Sin interrupción, Netflix no lo pide en subtítulos, pero si el guion marca así las continuaciones, se pide que sea siempre igual.'],
   contIni:       ['asrec', 'Continuación: «…» al principio', 'La fila que retoma una frase empieza con «…» si la interrumpió otro personaje, o si el guion marca así las continuaciones.'],
   sinFinal:      ['asrec', 'Falta la puntuación final', 'Guía ASR: «proper punctuation, even if a sentence is split across multiple events». Si la frase no sigue en la fila siguiente, termina con su signo.'],
-  preguntaPartida:['asrec', 'Pregunta o exclamación partida', 'Guía de español: una pregunta que sigue en el evento siguiente se abre una sola vez al principio y se cierra una sola vez al final («¿Te ha…» / «disparado?»). No «¿…admiración…?» / «¿…y conseguirán…?», que la convierte en dos.'],
+  preguntaPartida:['asrec', 'Pregunta o exclamación partida', 'Regla del estudio: la pregunta que sigue en el evento siguiente se cierra en cada evento y se vuelve a abrir, para que cada uno se lea entero: «¿Creen que se ganarán nuestra admiración…?» / «¿…y conseguirán su independencia?». Ojo: la guía de español de Netflix (para subtítulos) la abre una vez y la cierra una vez («¿Te ha…» / «disparado?»); si un cliente lo pide así, apaga esta regla.'],
   contMayus:     ['asrec', 'Continuación en mayúscula', 'La fila que continúa una frase sigue en minúscula: «…lo despiadada que eres», no «…Lo despiadada».'],
   contSobra:     ['asrec', '«…» al principio sin continuación', 'Si la fila anterior del personaje ya cerró la frase con punto, «?» o «!», la siguiente no empieza con «…» (salvo que la haya interrumpido otro personaje).'],
   inicioMinus:   ['asrec', 'Empieza en minúscula', 'Guía ASR: el diálogo va «in sentence case». Empieza con mayúscula salvo que continúe la frase anterior.'],
@@ -364,7 +364,7 @@ const R = {
 const FUENTE = {
   barra: 'estudio', vacio: 'Netflix ASR', numeros: 'Netflix ES', abreviatura: 'Netflix ES', simbolos: 'Netflix ASR', mayusSostenidas: 'Netflix ASR',
   reaccionSigno: 'Netflix ASR', reaccionBorde: 'Netflix ASR', reaccionMayus: 'guion', reaccionIngles: 'guion', reaccionEstilo: 'guion',
-  contFin: 'guion', contIni: 'guion', contMayus: 'RAE', contSobra: 'guion', preguntaPartida: 'Netflix ES', sinFinal: 'Netflix ASR', inicioMinus: 'Netflix ASR', repetida: 'Netflix ASR',
+  contFin: 'guion', contIni: 'guion', contMayus: 'RAE', contSobra: 'guion', preguntaPartida: 'estudio', sinFinal: 'Netflix ASR', inicioMinus: 'Netflix ASR', repetida: 'Netflix ASR',
   invisible: 'Netflix ES', tresPuntos: 'Netflix ES', espacios: 'guion', espacioSigno: 'RAE', suspensivos: 'Netflix ES', signosPares: 'RAE',
   puntoTrasSigno: 'Netflix ES', puntoYComa: 'Netflix ES', dobleSigno: 'Netflix ES', peroComa: 'Netflix ES', mayusPunto: 'RAE', comillas: 'Netflix ES',
   diccionario: 'Netflix ASR', rae2010: 'RAE', pegadas: 'RAE', interrogativa: 'RAE', diacritica: 'RAE', vosotros: 'Netflix ES',
@@ -907,20 +907,31 @@ function revisar(guion, dic, op = {}){
         hasta - 1, hasta, '.', vecinas(sig));
     }
 
-    /* «¿Creen que se ganarán nuestra admiración…?» / «¿…y conseguirán su
-       independencia?»: una sola pregunta cerrada y abierta en cada evento. Lo
-       delata el «…» justo antes del cierre y el «¿…» o «¿y» del siguiente. */
-    const cierraEn = /…\s*([?!])$/.exec(t.replace(/[\s\/\\^<>|]+$/, ''));
-    const partidaSig = sig && cierraEn && abreSeguida(sig) === (cierraEn[1] === '?' ? '¿' : '¡');
-    const partidaAnt = ant && abreSeguida(f) && (/…\s*[?!]$/.test(ant.dialogo.replace(/[\s\/\\^<>|]+$/, ''))
-      || /…$/.test(ultimo(ant.dialogo)) && sueltos[ant.i] && sueltos[ant.i].abre.some(x => x.c === abreSeguida(f)));
-    if(partidaSig)
-      poner(f, 'preguntaPartida', 'aviso', 'La ' + (cierraEn[1] === '?' ? 'pregunta' : 'exclamación') + ' sigue en la fila ' + sig.fila + ': aquí no se cierra, se cierra al final de esa.',
-        hasta - 1, hasta, 'borrar', vecinas(sig));
-    if(partidaAnt){
-      const m = /^\s*[¿¡]\s*/.exec(t);
-      poner(f, 'preguntaPartida', 'aviso', 'Continúa la ' + (m[0].includes('¿') ? 'pregunta' : 'exclamación') + ' de la fila ' + ant.fila + ': aquí no se vuelve a abrir.',
-        m.index, m.index + m[0].length, 'borrar', vecinas(ant));
+    /* Estilo del estudio: la pregunta (o la exclamación) que sigue en el
+       evento siguiente se cierra en cada evento y se vuelve a abrir, para que
+       cada evento se lea entero:
+         «¿Creen que se ganarán nuestra admiración…?» / «¿…y conseguirán su independencia?»
+       Eso es lo correcto. Se avisa la forma contraria: abierta en un evento y
+       cerrada en otro. */
+    const signo = (c) => c === '¿' || c === '?' ? 'pregunta' : 'exclamación';
+    const PAR = { '¿': '?', '¡': '!' };
+    const partidaAnt = ant && abreSeguida(f) && /…\s*[?!]$/.test(ant.dialogo.replace(/[\s\/\\^<>|]+$/, ''));
+    const abiertos = sueltos[i] ? sueltos[i].abre.filter(x => PAR[x.c]) : [];
+    if(abiertos.length && sig){
+      const c = abiertos[abiertos.length - 1].c;
+      const misma = abreSeguida(sig) === c || sigue(f, sig) && sueltos[sig.i] && sueltos[sig.i].cierra.some(x => x.c === PAR[c]);
+      const ult = t[hasta - 1];
+      if(misma) poner(f, 'preguntaPartida', 'aviso', 'La ' + signo(c) + ' sigue en la fila ' + sig.fila + ': cierra aquí con «…' + PAR[c] + '» (y en esa se vuelve a abrir con «' + c + '…»).',
+        hasta - 1, hasta, (/[…,;:.]/.test(ult) ? '' : ult) + '…' + PAR[c], vecinas(sig));
+    }
+    const cerrados = sueltos[i] ? sueltos[i].cierra.filter(x => x.c === '?' || x.c === '!') : [];
+    if(cerrados.length && ant && !abreSeguida(f) && sigue(ant, f)){
+      const c = cerrados[0].c === '?' ? '¿' : '¡';
+      if(sueltos[ant.i] && sueltos[ant.i].abre.some(x => x.c === c)){
+        const k0 = t.length - t.trimStart().length, m = /^\s*…\s*/.exec(t);
+        poner(f, 'preguntaPartida', 'aviso', 'Viene de la ' + signo(c) + ' de la fila ' + ant.fila + ': vuelve a abrirla aquí con «' + c + '…».',
+          m ? m.index : k0, m ? m.index + m[0].length : k0 + 1, m ? c + '…' : c + '…' + t[k0], vecinas(ant));
+      }
     }
 
     /* El principio. */

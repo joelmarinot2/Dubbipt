@@ -19,9 +19,13 @@ el lector de Excel; no carga nada de fuera y el archivo no sale del ordenador.
 | Etiquetas | MAIN TITLE IN DIALOGUE, SENSITIVE LANGUAGE, CONTEXT sin anotación |
 | Personajes y timecodes | KATHWA/KATHAWA, espacios en SOURCE, varios personajes en un evento, WALLA y NONE, timecodes |
 
-La **«/»** para marcar pausas sale como error: es una regla del estudio
-(fuente «estudio»). La guía ASR de Netflix sí la permite, así que se puede
-apagar en «Reglas y diccionario» si un cliente la acepta.
+Reglas del **estudio** (fuente «estudio»), que se pueden apagar en «Reglas y
+diccionario» si un cliente pide otra cosa:
+- La **«/»** para marcar pausas es un error. La guía ASR de Netflix sí la permite.
+- Una **pregunta o exclamación partida** en dos eventos se cierra en cada evento y
+  se vuelve a abrir: «¿Creen que se ganarán nuestra admiración…?» / «¿…y
+  conseguirán su independencia?». Se avisa la forma contraria (abierta en uno y
+  cerrada en otro), que es la de la guía de español de Netflix para subtítulos.
 
 Cada regla dice de dónde sale: **Netflix ASR** (As Recorded Dubbing Script Scope
 of Work), **Netflix ES** (Spanish (Latin America & Spain) Timed Text Style
