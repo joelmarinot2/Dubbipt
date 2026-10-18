@@ -208,6 +208,11 @@ exports.pruebas = async function(t){
   t.eq('tarjetas de Netflix: solo el personaje y su línea, sin etiquetas ni anotaciones', tarjetas && tarjetas.texto,
     'FUKUDA: Oí que se sumó como nueva intérprete.\nFUKUDA: Estuve muy ocupado. No pude pasar a saludarla.\nGA-KYUNG: Todo tus esfuerzos fueron en vano, y aunque lo intentaste mil veces.');
   t.eq('y el timecode de cada una', tarjetas && tarjetas.eventos.map(e => e.tc), ['00:36:43:06', '00:36:46:09', '00:36:50:04']);
+  const conTachado = M.ordenarTarjetas([
+    linea('00:49:01:17 - 00:49:03:10 01:17 0980', 10), linea('@ FUKUDA v On', 34), linea('¿Creen se ganarán nuestra admiración', 54, 13),
+    linea('¿Creen se ganarán nuestra admiración…?', 72, 26), linea('# Foreign Dialog', 112), linea('Z speaks Japanese', 132)
+  ], M.crearDiccionario('creen se ganarán nuestra admiración'.split(' '), []), [104]);
+  t.eq('la versión anterior, tachada y en pequeño encima, no es la línea', conTachado && conTachado.texto, 'FUKUDA: ¿Creen se ganarán nuestra admiración…?');
   t.eq('una cabecera de Excel no son tarjetas', M.ordenarTarjetas([linea('IN-TIMECODE OUT-TIMECODE SOURCE DIALOGUE', 0), linea('00:00:05:06 00:00:09:14 BHAVANI Hola.', 30)], dicT, []), null);
 
   /* El Excel: la cabecera dice qué columna es cada una. La casilla de RUDRA
@@ -229,6 +234,18 @@ exports.pruebas = async function(t){
     const cab = b64 ? Buffer.from(b64.slice(0, 4), 'base64') : Buffer.alloc(0);
     t.ok('el lector de capturas va dentro (' + id + ')', cab[0] === 0x1f && cab[1] === 0x8b);
   }
+
+  t.seccion('Una pregunta partida en dos eventos');
+  const dicP = M.crearDiccionario('creen que se ganarán nuestra admiración y conseguirán su independencia me habrá traído el libro'.split(' '), []);
+  let pp = M.revisarTexto('FUKUDA: ¿Creen se ganarán nuestra admiración…?\nFUKUDA: ¿…y conseguirán su independencia?', dicP);
+  t.eq('se abre una vez y se cierra una vez: sobran el «?» de la primera y el «¿» de la segunda',
+    pp.hallazgos.filter(h => h.regla === 'preguntaPartida').map(h => h.fila + ':' + pp.filas[h.i].dialogo.slice(h.desde, h.hasta).trim()), ['1:?', '2:¿']);
+  t.ok('«creen se ganarán»: falta el «que»', pp.hallazgos.some(h => h.regla === 'dequeismo' && h.sug === 'Creen que se ganarán'));
+  t.ok('y no pregunta además si sobra el «…»', !pp.hallazgos.some(h => h.regla === 'contSobra'));
+  pp = M.revisarTexto('FUKUDA: ¿Creen que se ganarán nuestra admiración…\nFUKUDA: ¿…y conseguirán su independencia?', dicP);
+  t.eq('a medio corregir, el «¿» que sobra en la segunda (y no «se abre y no se cierra» en la primera)', pp.hallazgos.map(h => h.fila + ':' + h.regla), ['2:preguntaPartida']);
+  t.eq('bien puntuada, nada', M.revisarTexto('FUKUDA: ¿Creen que se ganarán nuestra admiración…\nFUKUDA: …y conseguirán su independencia?', dicP).hallazgos.length, 0);
+  t.eq('dos preguntas de verdad no son una partida', M.revisarTexto('¿Me habrá traído…?\n¿Y el libro?', dicP).hallazgos.filter(h => h.regla === 'preguntaPartida').length, 0);
 
   t.seccion('El Excel, de ida y vuelta');
   const libro = M.xlsx([{ nombre: 'Dialogue List', filas: [

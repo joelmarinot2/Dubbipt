@@ -601,6 +601,7 @@ const R = {
   contFin:       ['asrec', 'Continuación: «…» al final', 'Se mira la fila de antes y la de después. Cuando otro personaje interrumpe la frase, la guía de español pide «…» al final y al retomarla. Sin interrupción, Netflix no lo pide en subtítulos, pero si el guion marca así las continuaciones, se pide que sea siempre igual.'],
   contIni:       ['asrec', 'Continuación: «…» al principio', 'La fila que retoma una frase empieza con «…» si la interrumpió otro personaje, o si el guion marca así las continuaciones.'],
   sinFinal:      ['asrec', 'Falta la puntuación final', 'Guía ASR: «proper punctuation, even if a sentence is split across multiple events». Si la frase no sigue en la fila siguiente, termina con su signo.'],
+  preguntaPartida:['asrec', 'Pregunta o exclamación partida', 'Guía de español: una pregunta que sigue en el evento siguiente se abre una sola vez al principio y se cierra una sola vez al final («¿Te ha…» / «disparado?»). No «¿…admiración…?» / «¿…y conseguirán…?», que la convierte en dos.'],
   contMayus:     ['asrec', 'Continuación en mayúscula', 'La fila que continúa una frase sigue en minúscula: «…lo despiadada que eres», no «…Lo despiadada».'],
   contSobra:     ['asrec', '«…» al principio sin continuación', 'Si la fila anterior del personaje ya cerró la frase con punto, «?» o «!», la siguiente no empieza con «…» (salvo que la haya interrumpido otro personaje).'],
   inicioMinus:   ['asrec', 'Empieza en minúscula', 'Guía ASR: el diálogo va «in sentence case». Empieza con mayúscula salvo que continúe la frase anterior.'],
@@ -657,7 +658,7 @@ const R = {
 const FUENTE = {
   barra: 'estudio', vacio: 'Netflix ASR', numeros: 'Netflix ES', abreviatura: 'Netflix ES', simbolos: 'Netflix ASR', mayusSostenidas: 'Netflix ASR',
   reaccionSigno: 'Netflix ASR', reaccionBorde: 'Netflix ASR', reaccionMayus: 'guion', reaccionIngles: 'guion', reaccionEstilo: 'guion',
-  contFin: 'guion', contIni: 'guion', contMayus: 'RAE', contSobra: 'guion', sinFinal: 'Netflix ASR', inicioMinus: 'Netflix ASR', repetida: 'Netflix ASR',
+  contFin: 'guion', contIni: 'guion', contMayus: 'RAE', contSobra: 'guion', preguntaPartida: 'Netflix ES', sinFinal: 'Netflix ASR', inicioMinus: 'Netflix ASR', repetida: 'Netflix ASR',
   invisible: 'Netflix ES', tresPuntos: 'Netflix ES', espacios: 'guion', espacioSigno: 'RAE', suspensivos: 'Netflix ES', signosPares: 'RAE',
   puntoTrasSigno: 'Netflix ES', puntoYComa: 'Netflix ES', dobleSigno: 'Netflix ES', peroComa: 'Netflix ES', mayusPunto: 'RAE', comillas: 'Netflix ES',
   diccionario: 'Netflix ASR', rae2010: 'RAE', pegadas: 'RAE', interrogativa: 'RAE', diacritica: 'RAE', vosotros: 'Netflix ES',
@@ -787,6 +788,8 @@ const EXPRESIONES = [
   { id: 'homofonos', sev: 'aviso', re: re('\\b(me|te|se|nos|les)\\s+a\\s+(' + PARTICIPIO + ')\\b'), msg: 'Con participio es el verbo: «ha».', s: (m) => m[1] + ' ha ' + m[2] },
   { id: 'dequeismo', sev: 'aviso', re: re('\\b(pienso|piensas|piensa|pensamos|piensan|pensé|pensó|creo|crees|cree|creemos|creen|creí|creyó|opino|opina|supongo|supone|imagino|imagina|parece|pareció|considero)\\s+de\\s+que\\b'), msg: 'Dequeísmo: sobra el «de».', s: (m) => m[1] + ' que' },
   { id: 'dequeismo', sev: 'aviso', re: re('\\b((?:me|te|se|nos)\\s+(?:di|diste|dio|dimos|dieron|doy|das|da|damos|dan)\\s+cuenta|(?:estoy|estás|está|estamos|están|estaba|estaban|estuve)\\s+segur[oa]s?|(?:me|te|se|nos)\\s+(?:acuerdo|acuerdas|acuerda|acordamos|acuerdan|acordé|acordó|enteré|enteró|enteramos|enteraron)|a pesar)\\s+que\\b'), msg: 'Queísmo: aquí falta el «de».', s: (m) => m[1] + ' de que' },
+  { id: 'dequeismo', sev: 'sugerencia', re: re('\\b(creo|crees|cree|creemos|creen|creí|creyó|creían|pienso|piensas|piensa|piensan|supongo|supone|suponen|imagino|imaginas|imagina|imaginan)\\s+(se|me|te|nos|le|les|lo|la|los|las)\\s+(\\p{L}+(?:rá|rán|rás|ré|remos|ría|rían|rías|ríamos))\\b'),
+    msg: '¿Falta el «que»? En el diálogo lo normal es «creen que se ganarán».', s: (m) => m[1] + ' que ' + m[2] + ' ' + m[3] },
   { id: 'asiQue', sev: 'aviso', re: re('\\b([Aa])sí que,'), msg: 'Después de «así que» no va coma.', s: (m) => m[1] + 'sí que' },
   { id: 'posesivo', sev: 'sugerencia', re: re('\\b(detrás|delante|encima|debajo|cerca|enfrente|alrededor|dentro|fuera)\\s+(mío|mía|tuyo|tuya|suyo|suya|nuestro|nuestra)\\b'),
     msg: 'En la norma culta: «detrás de mí», «cerca de ti».', s: (m) => m[1] + ' de ' + ({ mío: 'mí', mía: 'mí', tuyo: 'ti', tuya: 'ti', suyo: 'él', suya: 'ella', nuestro: 'nosotros', nuestra: 'nosotras' })[m[2].toLowerCase()] },
@@ -1160,6 +1163,8 @@ function revisar(guion, dic, op = {}){
   const sigue = (a, b) => !/[.?!]/.test(ultimo(a.dialogo)) && (/^\s*[¿¡]?\s*…/.test(b.dialogo) || /^\p{Ll}/u.test(primeraLetra(b.dialogo))
     || /[,;:]|\p{L}/u.test(ultimo(a.dialogo)) && !/^\p{Lu}/u.test(primeraLetra(b.dialogo.replace(/^\s*…\s*/, ''))));
   const quien = (g) => g.source.trim() + ' (fila ' + g.fila + ')';
+  /* «¿…y conseguirán…?» o «¿y conseguirán…?»: abre otra vez lo que venía de antes. */
+  const abreSeguida = (g) => { const m = /^\s*([¿¡])\s*(…|\p{Ll})/u.exec(g.dialogo); return m && m[1]; };
 
   filas.forEach((f, i) => {
     const t = f.dialogo;
@@ -1196,6 +1201,22 @@ function revisar(guion, dic, op = {}){
         hasta - 1, hasta, '.', vecinas(sig));
     }
 
+    /* «¿Creen que se ganarán nuestra admiración…?» / «¿…y conseguirán su
+       independencia?»: una sola pregunta cerrada y abierta en cada evento. Lo
+       delata el «…» justo antes del cierre y el «¿…» o «¿y» del siguiente. */
+    const cierraEn = /…\s*([?!])$/.exec(t.replace(/[\s\/\\^<>|]+$/, ''));
+    const partidaSig = sig && cierraEn && abreSeguida(sig) === (cierraEn[1] === '?' ? '¿' : '¡');
+    const partidaAnt = ant && abreSeguida(f) && (/…\s*[?!]$/.test(ant.dialogo.replace(/[\s\/\\^<>|]+$/, ''))
+      || /…$/.test(ultimo(ant.dialogo)) && sueltos[ant.i] && sueltos[ant.i].abre.some(x => x.c === abreSeguida(f)));
+    if(partidaSig)
+      poner(f, 'preguntaPartida', 'aviso', 'La ' + (cierraEn[1] === '?' ? 'pregunta' : 'exclamación') + ' sigue en la fila ' + sig.fila + ': aquí no se cierra, se cierra al final de esa.',
+        hasta - 1, hasta, 'borrar', vecinas(sig));
+    if(partidaAnt){
+      const m = /^\s*[¿¡]\s*/.exec(t);
+      poner(f, 'preguntaPartida', 'aviso', 'Continúa la ' + (m[0].includes('¿') ? 'pregunta' : 'exclamación') + ' de la fila ' + ant.fila + ': aquí no se vuelve a abrir.',
+        m.index, m.index + m[0].length, 'borrar', vecinas(ant));
+    }
+
     /* El principio. */
     if(!empiezaTres && /^\p{Ll}/u.test(letra)){
       if(antCont && (estiloSuspensivos || corteAnt))
@@ -1217,7 +1238,7 @@ function revisar(guion, dic, op = {}){
         poner(f, 'contMayus', 'aviso', 'Continúa la frase de la fila ' + ant.fila + ': sigue en minúscula.',
           m[1].length, m[1].length + m[2].length, m[2].toLowerCase(), vecinas(ant));
       /* «…» al principio cuando la anterior ya había cerrado con punto. */
-      if(/[.?!]/.test(cierre) && !corteAnt)
+      if(/[.?!]/.test(cierre) && !corteAnt && !partidaAnt)
         poner(f, 'contSobra', 'sugerencia', 'La fila ' + ant.fila + ' ya cerró la frase con «' + cierre + '»: ¿sobra el «…» del principio?',
           0, tr.indexOf('…') + 1, tr.slice(0, tr.indexOf('…')), vecinas(ant));
     }
@@ -1240,6 +1261,7 @@ function revisar(guion, dic, op = {}){
     for(const a of s.abre){
       const par = { '¿': '?', '¡': '!', '(': ')', '[': ']' }[a.c];
       if(sig && sigue(f, sig) && sueltos[sig.i] && sueltos[sig.i].cierra.some(x => x.c === par)) continue;
+      if(sig && sigue(f, sig) && abreSeguida(sig) === a.c) continue;   // lo avisa preguntaPartida en la fila siguiente
       poner(f, 'signosPares', 'error', 'Se abre «' + a.c + '» y no se cierra.', a.k, a.k + 1, par);
     }
     for(const c of s.cierra){
@@ -1779,25 +1801,33 @@ function ordenarTarjetas(lineas, dic, rayas){
     return !dic || !ws.length ? 1 : ws.filter(w => dic.tiene(w.toLowerCase())).length / ws.length;
   };
   const eventos = [];
-  let ev = null, fase = 'fuera', hDialogo = 0, finDialogo = 0, hNombre = 0;
+  let ev = null, fase = 'fuera', finDialogo = 0;
   for(const l of ls){
     if(soloTc(l.t)){ ev = { personaje: '', dialogo: [], tc: (RE_TC.exec(l.t) || [''])[0] }; eventos.push(ev); fase = 'nombre'; continue; }
     if(/^\W*\d{1,6}\W*$/.test(l.t)) continue;                       // el número del evento
     const nombre = nombreDeLinea(l.t);
     /* Un nombre abre la tarjeta. Con el diálogo empezado, solo si su letra es
        más pequeña (un «OK» en mayúsculas es diálogo). */
+    const hDialogo = ev && fase === 'dialogo' ? Math.max(0, ...ev.dialogo.map(x => x.h)) : 0;
     if(nombre && (fase !== 'dialogo' || (hDialogo && l.h < hDialogo * 0.85))){
       if(!ev || fase !== 'nombre'){ ev = { personaje: '', dialogo: [], tc: '' }; eventos.push(ev); }
-      ev.personaje = nombre; fase = 'dialogo'; hDialogo = 0; hNombre = l.h; finDialogo = l.y1;
+      ev.personaje = nombre; fase = 'dialogo'; finDialogo = l.y1;
       continue;
     }
     if(fase !== 'dialogo') continue;
+    /* Hasta la raya, las etiquetas o las anotaciones, todo es candidato. */
+    const mayor = Math.max(0, ...ev.dialogo.map(x => x.h));
     const nota = ETIQUETA_TARJETA.test(l.t) || /^[✎✏✐🖉🖊&]/u.test(l.t) || /^[Zz2]\s+\p{Ll}/u.test(l.t)
-      || (hDialogo && (l.h < hDialogo * 0.8 || rayaEntre(finDialogo, l.y0)))
-      || (ev.dialogo.length && espanol(l.t) < 0.3);
+      || (ev.dialogo.length && rayaEntre(finDialogo, l.y0))
+      || (mayor && l.h < mayor * 0.8 && espanol(l.t) < 0.3);
     if(nota){ fase = 'notas'; continue; }
-    ev.dialogo.push(l.t); finDialogo = l.y1;
-    if(!hDialogo) hDialogo = Math.max(l.h, hNombre);
+    ev.dialogo.push(l); finDialogo = l.y1;
+  }
+  /* La línea de diálogo es la de letra grande. Encima, en pequeño y tachada,
+     la herramienta enseña la versión anterior: esa no se revisa. */
+  for(const e of eventos){
+    const mayor = Math.max(0, ...e.dialogo.map(x => x.h));
+    e.dialogo = e.dialogo.filter(x => x.h >= mayor * 0.82).map(x => x.t);
   }
   const limpio = (t) => t.replace(/\.\s?\.\s?\./g, '…').replace(/[‘’`´]/g, "'").replace(/\s+([,.;:?!…)\]])/g, '$1').replace(/([¿¡(\[])\s+/g, '$1').trim();
   const fuera = eventos.map(e => ({ personaje: e.personaje, dialogo: arreglarInicio(limpio(e.dialogo.join(' ')), dic), tc: e.tc })).filter(e => e.personaje && /\p{L}/u.test(e.dialogo));
@@ -2041,7 +2071,7 @@ function pintarReglas(){
    nombres, sus guías de pronunciación y su título. */
 const NO_APLICA = new Set(['signosPares', 'sensible', 'titulo', 'anotacion', 'reaccionBorde', 'reaccionIngles', 'vosotros', 'unPersonaje']);
 /* Las que reescriben la última letra («ver» → «ver…»): el botón dice qué hace. */
-const ROTULO = { sinFinal: 'Poner punto final', contFin: 'Terminar con «…»', contIni: 'Empezar con «…»', barra: 'Quitar la «/»' };
+const ROTULO = { sinFinal: 'Poner punto final', contFin: 'Terminar con «…»', contIni: 'Empezar con «…»', barra: 'Quitar la «/»', preguntaPartida: 'Quitar el signo' };
 let pRes = null;
 
 function probar(){
