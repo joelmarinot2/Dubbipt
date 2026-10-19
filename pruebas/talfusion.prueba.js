@@ -35,7 +35,7 @@ exports.pruebas = async function(t){
   const D = { avisos: [], regs: [], base: [], editados: [], datos: null, pintadas: 0, confirmar: true, preguntas: [] };
   const M = montar([['/* ── Buscar y fusionar talentos (PRO-52)', '/* ── Ocupación: cada talento con sus programas en tarjetas']],
     ['csTalFiltrar', 'csTalSimil', 'csTalParecidos', 'csHtmlFusionTalentos', 'csFusionarTalentos', 'csTalRepetidas', 'csTalFichaDe'],
-    { castNorm: castNorm, csSimil: SIM.castSimil, CS: CS, CS_REGS: { lista: [1], ts: 5 },
+    { castNorm: castNorm, csEsMarca: (n) => ['ORIGINAL', 'X', 'TODOS', 'X ORIGINAL'].indexOf(castNorm(n)) >= 0, csSimil: SIM.castSimil, CS: CS, CS_REGS: { lista: [1], ts: 5 },
       csParecidoPersonaje: (q, n) => SIM.castSimil(castNorm(q), castNorm(n)),
       csEsc: (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), csIco: (n) => '<svg data-i="' + n + '"></svg>',
       castAviso: (m) => D.avisos.push(m), csRepintar: () => { D.pintadas++; }, fallo: () => {}, dcxRegistrar: () => {}, dcxEntrada: (x) => x,
