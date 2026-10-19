@@ -2136,6 +2136,21 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-oc-campos input:focus, .cs-oc-campos select:focus{ border-color:#4ADE80; }
 @media (max-width:760px){ .cs-oc-campos{ grid-template-columns:1fr 1fr; } .cs-oc-nombre{ grid-column:1 / -1; } }
 .cs-oc-pests{ margin-bottom:12px; }
+/* Talentos: buscar y fusionar (PRO-52) */
+.cs-tal-filtros .cs-oc-campos{ grid-template-columns:minmax(220px,1fr) repeat(3,minmax(120px,160px)); }
+.cs-tal-fila2{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:12px; }
+.cs-tal-orden{ display:inline-flex; align-items:center; gap:4px; margin:0; }
+.cs-tal-orden > .cs-tenue{ font-size:10.5px; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-right:4px; }
+.cs-b.cs-on{ border-color:rgba(251,146,60,.6); color:#FB923C; background:rgba(251,146,60,.08); }
+.cs-tal-filtros .cs-tfus-campos{ grid-template-columns:200px 1fr; }
+.cs-tfus-nota{ align-self:end; font-size:12px; text-transform:none; letter-spacing:0; }
+.cs-tfus{ display:flex; flex-direction:column; gap:8px; }
+.cs-tfus-par{ display:grid; grid-template-columns:54px 1fr 1fr auto; gap:10px; align-items:center; background:#101215; border:1px solid #23262b; border-radius:12px; padding:10px 12px; }
+.cs-tfus-pct{ font-weight:800; color:#FBBF24; font-size:15px; text-align:center; }
+.cs-tfus-lado{ display:flex; flex-direction:column; gap:4px; align-items:flex-start; min-width:0; }
+.cs-tfus-lado b{ color:#f2f3f5; text-transform:uppercase; overflow-wrap:anywhere; }
+.cs-tfus-lado .cs-tenue{ font-size:12px; }
+@media (max-width:760px){ .cs-tal-filtros .cs-oc-campos{ grid-template-columns:1fr 1fr; } .cs-tfus-par{ grid-template-columns:44px 1fr auto; } .cs-tfus-par .cs-tfus-lado + .cs-tfus-lado{ grid-column:2; } .cs-tal-filtros .cs-tfus-campos{ grid-template-columns:1fr; } }
 .cs-oc-lista{ display:flex; flex-direction:column; gap:12px; }
 .cs-oc-tal{ background:#101215; border:1px solid #23262b; border-radius:16px; overflow:hidden; }
 .cs-oc-cab{ display:flex; align-items:center; gap:12px; padding:13px 18px; border-bottom:1px solid #1d2026; }
@@ -2965,7 +2980,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.73.0-nube';
+const APP_VER_NUM = 'v11.74.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);

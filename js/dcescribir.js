@@ -170,6 +170,31 @@ function dcxSerieNueva(p, datos){
   return s;
 }
 
+/**
+ * Fusionar dos talentos (PRO-52): el que pasa se va y todo lo suyo es del que
+ * se queda. Sus asignaciones pasan al que se queda (si los dos tenían el mismo
+ * personaje en el mismo episodio, una sola); la ficha del que se queda toma
+ * lo que le faltaba (género, edad, tono, registro, correo). Devuelve si cambió.
+ */
+function dcxFusionarTalentos(p, quedaId, pasaId){
+  if(dcxMismo(quedaId, pasaId)) return false;
+  const tal = dcxLista(p, 'talents');
+  const q = tal.find(t => dcxMismo(t.id, quedaId)), x = tal.find(t => dcxMismo(t.id, pasaId));
+  if(!q || !x) return false;
+  const nuevo = Object.assign({}, q);
+  for(const k of DCX_CAMPOS_TALENTO) if(k !== 'name' && !nuevo[k] && x[k]) nuevo[k] = x[k];
+  p.talents = tal.filter(t => !dcxMismo(t.id, pasaId)).map(t => dcxMismo(t.id, quedaId) ? nuevo : t);
+  const vistos = new Set();
+  for(const c of dcxLista(p, 'castings')) if(dcxMismo(c.talent_id, quedaId)) vistos.add(String(c.episode_id) + ':' + String(c.character_id));
+  p.castings = dcxLista(p, 'castings').filter(c => {
+    if(!dcxMismo(c.talent_id, pasaId)) return true;
+    const k = String(c.episode_id) + ':' + String(c.character_id);
+    if(vistos.has(k)) return false;
+    vistos.add(k); return true;
+  }).map(c => dcxMismo(c.talent_id, pasaId) ? Object.assign({}, c, { talent_id: q.id }) : c);
+  return true;
+}
+
 function dcxTrailerNuevo(p, datos){
   const titulo = String((datos && datos.title) || '').trim();
   if(!titulo) return false;
