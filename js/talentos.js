@@ -165,6 +165,15 @@ async function talRenombrar(viejo, nuevo){
   return true;
 }
 
+/** Quitar un talento de la base (PRO-54): si está, se quita y se guarda. */
+async function talQuitar(nombre){
+  const k = castNorm(nombre);
+  if(!k || !TAL.claves || !TAL.claves.has(k)) return false;
+  talPoner(TAL.nombres.filter(x => castNorm(x) !== k), TAL.origen);
+  try{ await talGuardar(); }catch(e){ /* queda en este equipo */ }
+  return true;
+}
+
 /**
  * Carga la base. Primero la de este equipo -vale para todos los programas- y
  * si no hay, la que estuviera guardada en el programa abierto.

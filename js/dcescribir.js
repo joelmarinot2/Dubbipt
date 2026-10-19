@@ -195,6 +195,19 @@ function dcxFusionarTalentos(p, quedaId, pasaId){
   return true;
 }
 
+/**
+ * Borra talentos (PRO-54) y sus asignaciones: los personajes que hacían se
+ * quedan sin talento. Varios ids, por si el mismo nombre está repetido.
+ */
+function dcxBorrarTalentos(p, ids){
+  const fuera = (id) => (ids || []).some(x => dcxMismo(x, id));
+  const tal = dcxLista(p, 'talents');
+  if(!tal.some(t => fuera(t.id))) return false;
+  p.talents = tal.filter(t => !fuera(t.id));
+  p.castings = dcxLista(p, 'castings').filter(c => !fuera(c.talent_id));
+  return true;
+}
+
 function dcxTrailerNuevo(p, datos){
   const titulo = String((datos && datos.title) || '').trim();
   if(!titulo) return false;

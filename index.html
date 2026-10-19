@@ -2206,6 +2206,8 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-tal-modal-t{ display:flex; align-items:center; justify-content:space-between; gap:8px; color:#f2f3f5; font-size:14px; }
 .cs-tal-modal .cs-tal-campos{ grid-template-columns:1fr 1fr; margin-top:0; }
 .cs-tal-modal-b{ display:flex; justify-content:flex-end; gap:8px; }
+.cs-tal-modal-b .cs-borrar{ margin-right:auto; }
+.cs-tficha-t h2 .cs-borrar{ margin-left:4px; }
 .cs-marca{ font-style:italic; }
 @media (max-width:560px){ .cs-tal-modal .cs-tal-campos{ grid-template-columns:1fr; } }
 .cs-tkpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:14px; }
@@ -2994,7 +2996,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.75.0-nube';
+const APP_VER_NUM = 'v11.76.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -11134,8 +11136,9 @@ let _regT = 0;
 /** Apunta en el registro, pero esperando: asignar cinco seguidos no son cinco
     subidas a la nube. */
 /** Cambiar el nombre de un talento en el registro de casting de un programa (PRO-50): por personaje y en cada foto de capítulo; y en el capítulo abierto, si es de ese programa. */
-async function castRegRenombrarTalento(showId, viejo, nuevo){
-  if(!showId || !viejo || !nuevo) return false;
+async function castRegRenombrarTalento(showId, viejo, nuevo, quitar){
+  if(!showId || !viejo || (!nuevo && !quitar)) return false;
+  if(quitar) nuevo = '';
   const reg = await castRegCargar(showId), k = castNorm(viejo);
   if(!reg) return false;
   let tocado = false;
@@ -11167,6 +11170,9 @@ async function castRegRenombrarTalento(showId, viejo, nuevo){
   }catch(e){ /* el capítulo abierto se pone al día al reabrirlo */ }
   return true;
 }
+
+/** Quitar un talento del casting de un programa (PRO-54): sus personajes se quedan sin talento. */
+async function castRegQuitarTalento(showId, nombre){ return castRegRenombrarTalento(showId, nombre, '', true); }
 
 function castRegAnotarPronto(){
   clearTimeout(_regT);
