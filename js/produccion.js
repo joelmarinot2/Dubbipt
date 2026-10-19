@@ -696,7 +696,8 @@ function prodHtmlTalentos(d){
     const m = (papeles[t] = papeles[t] || {});
     (m[s.name] = m[s.name] || new Set()).add(p.name);
   });
-  const lista = d.talents.filter(t => t.name && (!f || castNorm(t.name).indexOf(f) >= 0)).sort((a, b) => a.name.localeCompare(b.name, 'es'));
+  /* ORIGINAL, X y TODOS no son talentos (PRO-53). */
+  const lista = d.talents.filter(t => t.name && !(typeof csEsMarca === 'function' && csEsMarca(t.name)) && (!f || castNorm(t.name).indexOf(f) >= 0)).sort((a, b) => a.name.localeCompare(b.name, 'es'));
   if(!lista.length) return '<div class="meta-nota">Ningún talento' + (f ? ' con «' + prodEsc(prodBuscar) + '»' : '') + '.</div>';
   return lista.map(t => {
     const pp = papeles[String(t.id)] || {};
