@@ -1613,7 +1613,8 @@ function csHtmlFichaTalento(f, d){
   const kpi = (n, t, cls) => '<div class="cs-tkpi cs-tkpi-' + cls + '"><b>' + n + '</b><span>' + t + '</span></div>';
   const t = f.t;
   return '<div class="cs-tficha-cab"><button class="cs-volver" data-cs="talCerrar">' + csIco('izquierda', 14) + '<span>Talentos</span></button>'
-    + '<div class="cs-tficha-t"><h2>' + csEsc(f.nombre) + '<button class="cs-b cs-b-icono cs-tficha-ren" data-cs="talEditar" data-v="' + csEsc(f.clave) + '" title="Editar el talento: nombre, género, edad y tono" aria-label="Editar a ' + csEsc(f.nombre) + '">' + csIco('editar', 14) + '</button>' + '</h2><div class="cs-tchips">' + csChipsFicha(t) + '<span class="cs-carga cs-carga-' + csCargaTalento(f.activos).clave + '">' + csCargaTalento(f.activos).texto + '</span></div></div></div>'
+    + '<div class="cs-tficha-t"><h2>' + csEsc(f.nombre) + '<button class="cs-b cs-b-icono cs-tficha-ren" data-cs="talEditar" data-v="' + csEsc(f.clave) + '" title="Editar el talento: nombre, género, edad y tono" aria-label="Editar a ' + csEsc(f.nombre) + '">' + csIco('editar', 14) + '</button>'
+      + '<button class="cs-b cs-b-icono cs-borrar" data-cs="talBorrar" data-v="' + csEsc(f.clave) + '" title="Eliminar el talento" aria-label="Eliminar a ' + csEsc(f.nombre) + '">' + csIco('borrar', 14) + '</button>' + '</h2><div class="cs-tchips">' + csChipsFicha(t) + '<span class="cs-carga cs-carga-' + csCargaTalento(f.activos).clave + '">' + csCargaTalento(f.activos).texto + '</span></div></div></div>'
     + '<div class="cs-tkpis">' + kpi(f.nProg, 'Programas', 'a') + kpi(f.nEps, 'Episodios', 'b') + kpi(f.nPer, 'Personajes', 'c') + kpi(f.lineas, 'Líneas', 'd') + '</div>'
     /* Fusionar este con otro, a mano (PRO-52). */
     + '<details class="cs-tal-ed cs-tal-fus"><summary>Fusionar con otro talento</summary><div class="cs-tal-campos">'
@@ -1697,7 +1698,8 @@ function csHtmlEditorTalento(f){
     +   '<label>Correo <input type="email" id="csTeCorreo" value="' + csEsc(t.email || '') + '" autocomplete="off"></label>'
     + '</div>'
     + (f.t ? '' : '<div class="cs-tenue">Todavía no tiene ficha: al guardar se le crea.</div>')
-    + '<div class="cs-tal-modal-b"><button class="cs-b" data-cs="talEdCerrar">Cancelar</button>'
+    + '<div class="cs-tal-modal-b"><button class="cs-b cs-borrar" data-cs="talBorrar" data-v="' + csEsc(f.clave) + '" title="Eliminar este talento">' + csIco('borrar', 13) + '<span>Eliminar talento</span></button>'
+    +   '<button class="cs-b" data-cs="talEdCerrar">Cancelar</button>'
     +   '<button class="cs-b cs-pri" data-cs="talEdGuardar" data-v="' + csEsc(f.clave) + '">' + csIco('hecho', 13) + '<span>Guardar</span></button></div>'
     + '</div></div>';
 }
@@ -1743,6 +1745,52 @@ async function csGuardarTalento(f, v){
     if(r2 === 'guardado') r = 'guardado';
   }
   return r;
+}
+
+/* ── Eliminar un talento (PRO-54) ────────────────────────────────────────
+   Pedido de sala: «que se puedan eliminar talentos». Desde «Editar talento»
+   o desde su ficha, preguntando antes y diciendo qué pasa: se quita su ficha
+   de Casting (todas, si el nombre está repetido), sus asignaciones, su nombre
+   en el casting de cada programa de Dubbipt y en la base de talentos. Los
+   personajes que hacía se quedan sin talento, para repartirlos de nuevo. Si
+   es el mismo que otro escrito distinto, lo que toca es «Fusionar». */
+
+async function csBorrarTalento(f, preguntar){
+  if(!f) return 'nada';
+  const d = csActual().datos;
+  const ids = ((d && d.talents) || []).filter(t => t && castNorm(t.name) === f.clave).map(t => t.id);
+  const asig = ids.length ? ((d && d.castings) || []).filter(c => ids.some(id => String(id) === String(c.talent_id))).length : 0;
+  const s = (n, uno, varios) => n + ' ' + (n === 1 ? uno : varios);
+  if(preguntar !== false && typeof DDL_UI !== 'undefined' && DDL_UI.confirmModal){
+    const ok = await DDL_UI.confirmModal({ title: 'Eliminar a «' + f.nombre + '»',
+      body: f.nPer
+        ? 'Hace ' + s(f.nPer, 'personaje', 'personajes') + ' en ' + s(f.nProg, 'programa', 'programas') + ': se quedarán sin talento, para volver a repartirlos. '
+          + 'Se quita también de la base de talentos. Si es el mismo que otro talento escrito de otra manera, mejor «Fusionar».'
+        : 'No tiene papeles. Se quita de Talentos y de la base de talentos.',
+      items: (f.programas || []).slice(0, 6).map(g => ({ label: g.programa, meta: s(g.personajes.length, 'personaje', 'personajes') })),
+      confirmLabel: 'Eliminar', cancelLabel: 'Cancelar', danger: true });
+    if(!ok) return 'cancelado';
+  }
+  if(ids.length){
+    const r = await csEditar(pl => dcxBorrarTalentos(pl, ids), 'Talento eliminado: ' + f.nombre + (asig ? ' (' + s(asig, 'asignación queda', 'asignaciones quedan') + ' sin talento)' : ''));
+    if(r === 'error') return r;
+  }else if(typeof prodPuede === 'function' && prodPuede()){
+    try{ dcxRegistrar(dcxEntrada('Talento eliminado: ' + f.nombre, null)); }catch(x){ /* sin apuntar */ }
+  }
+  let regs = 0;
+  try{
+    for(const sh of ((typeof sbShows === 'function') ? sbShows() : [])){
+      if(typeof castRegQuitarTalento === 'function' && await castRegQuitarTalento(sh.id, f.nombre)) regs++;
+    }
+  }catch(e){ fallo('castRegQuitarTalento · js/castingvistas.js', e, 'el casting de Dubbipt puede seguir con ese talento'); }
+  try{ if(typeof talQuitar === 'function') await talQuitar(f.nombre); }catch(e){ /* la base se arregla a mano */ }
+  if(CS.talAbierto && castNorm(CS.talAbierto) === f.clave) CS.talAbierto = null;
+  CS.talEditar = null;
+  if(typeof CS_REGS !== 'undefined' && CS_REGS){ CS_REGS.lista = null; CS_REGS.ts = 0; }
+  CS.registros = {};
+  castAviso('Talento eliminado: ' + f.nombre + (regs ? ' · quitado del casting de ' + s(regs, 'programa', 'programas') + ' de Dubbipt' : ''));
+  csRepintar();
+  return 'guardado';
 }
 
 /* ── Buscar y fusionar talentos (PRO-52) ─────────────────────────────────
@@ -3815,6 +3863,12 @@ function csCablear(vista){
       const i = document.getElementById('csTeNombre'); if(i && i.focus) i.focus();
     };
     else if(que === 'talEdCerrar') el.onclick = () => { CS.talEditar = null; csRepintar(); };
+    else if(que === 'talBorrar') el.onclick = (ev) => {
+      if(ev && ev.stopPropagation) ev.stopPropagation();
+      const x = a(), f = csFichasTalentos(x.datos, csRegistrosTodos(x.datos), x.lista).find(y => y.clave === v);
+      if(!f) return;
+      csBorrarTalento(f).catch(err => fallo('csBorrarTalento · js/castingvistas.js', err, 'el talento no se ha podido eliminar'));
+    };
     else if(que === 'talEdGuardar') el.onclick = () => {
       const x = a(), val = (idc) => { const i = document.getElementById(idc); return i ? i.value : ''; };
       const f = csFichasTalentos(x.datos, csRegistrosTodos(x.datos), x.lista).find(y => y.clave === v);
