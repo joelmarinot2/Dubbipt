@@ -1,4 +1,4 @@
-/* Contract Inventory desde DUBCARDs · especificacion 09, PRO-55 */
+/* Contract Inventory desde la DUBCARD unida · especificacion 09, PRO-55 */
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -6,7 +6,7 @@ const vm = require('vm');
 const zlib = require('zlib');
 const { INDEX } = require('./ayuda');
 
-exports.nombre = 'DUBCARDs: Contract Inventory, un Word por episodio';
+exports.nombre = 'Contract Inventory: un Word por episodio desde la DUBCARD unida';
 
 const RAIZ = path.dirname(INDEX);
 const PLANTILLA = path.join(RAIZ, 'dctools', 'contract-inventory.docx');
@@ -32,7 +32,9 @@ function unzip(buf){
 function cargar(){
   const V = { avisos: [], bajados: [], zips: [] };
   const ctx = vm.createContext({
-    console, Blob, TextDecoder, TextEncoder, setTimeout, clearTimeout, AbortController, atob, btoa, XLSX: {},
+    console, Blob, TextDecoder, TextEncoder, setTimeout, clearTimeout, AbortController, atob, btoa,
+    /* Un SheetJS de mentira: el «archivo» lleva ya sus hojas, como filas. */
+    XLSX: { read: (bytes) => bytes.buffer.__wb, utils: { sheet_to_json: (ws) => ws.filas } },
     fflate: { strToU8: (t) => new TextEncoder().encode(t), unzipSync: unzip, zipSync: (f) => { V.zips.push(f); return new Uint8Array(4); } },
     localStorage: { _d: {}, getItem(k){ return k in this._d ? this._d[k] : null; }, setItem(k, v){ this._d[k] = String(v); }, removeItem(k){ delete this._d[k]; } },
     castAviso: (t) => V.avisos.push(t), csRepintar(){}, csIco: (n) => '<svg data-i="' + n + '"></svg>',
@@ -74,7 +76,7 @@ exports.pruebas = async function(t){
   t.seccion('2 · quién va al main cast y quién al additional');
   {
     const D = cargar().D;
-    D.ST.dc.processed = SERIE;
+    D.ST.ci.eps = SERIE;
     t.eq('por defecto, los que salen en la mitad o más de los episodios', D.ciMain(SERIE).join(','), 'marlon,shawn,pops,tc');
     const r = D.ciReparto(SERIE[2], D.ciMain(SERIE));
     const fila = (x) => x.nombre + ' ' + x.apellido + '=' + x.personajes;
@@ -84,7 +86,7 @@ exports.pruebas = async function(t){
          'Gustavo Chajin=Mike | Camilo De Irisarri=Don | Maria Clara Mojica=Trish | Sofia Rubio=Toya');
     t.eq('sin talento no entra, y se dice; Original, Todos, X y Edicion ni se nombran', r.fuera.join(','), 'Rita');
     t.eq('un actor con dos personajes, en una fila', D.ciReparto(SERIE[0], D.ciMain(SERIE)).adicional.map(fila).join(' | '), 'Harold Leal=Norm / Padre | Yurany Rubio=Madre 1');
-    D.ST.dc.ci.main = ['marlon'];
+    D.ST.ci.main = ['marlon'];
     t.eq('lo que se desmarca pasa a additional', D.ciReparto(SERIE[2], D.ciMain(SERIE)).main.map(fila).join(' | '), 'Juan Perez=Marlon');
   }
 
@@ -109,17 +111,48 @@ exports.pruebas = async function(t){
     t.ok('una plantilla sin series title se dice, no se inventa', /Eps#/.test(error));
   }
 
-  t.seccion('4 · en pantalla y al descargar');
+  t.seccion('4 · el equipo: contacto, traductor, adaptador y director');
+  {
+    const D = cargar().D;
+    const xml = new TextDecoder().decode(unzip(fs.readFileSync(PLANTILLA))['word/document.xml']);
+    t.eq('se lee lo que trae la plantilla', JSON.stringify(D.ciEquipoDe(xml)),
+         '{"contacto":"Andrea Nieto","correo":"Andrea@centauro.com","traductor":"Sofía Rey","adaptador":"Jesús Rodriguez","director":"Wilfredo Hueso"}');
+    const r = { main: [], adicional: [] };
+    const out = D.ciLlenarXml(xml, r, 2, 13, { traductor: 'Ana Gómez', adaptador: 'Luis Paz', director: 'Wilfredo Hueso', contacto: 'Andrea Nieto', correo: 'a@b.co' });
+    t.eq('y se escribe lo nuevo, en las tres columnas', JSON.stringify(D.ciEquipoDe(out)),
+         '{"contacto":"Andrea Nieto","correo":"a@b.co","traductor":"Ana Gómez","adaptador":"Luis Paz","director":"Wilfredo Hueso"}');
+    const texto = (x) => (x.match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g) || []).map((s) => s.replace(/<[^>]+>/g, '')).join('|');
+    t.ok('Translator, tres veces; y Sofía Rey ya no está', texto(out).includes('Translator|Ana Gómez|Ana Gómez|Ana Gómez') && !texto(out).includes('Sofía Rey'));
+    t.ok('el Studio no se toca', texto(out).includes('Centauro Comunicaciones'));
+  }
+
+  t.seccion('5 · la DUBCARD unida: se sube, se lee y se baja');
   {
     const V = cargar(), D = V.D;
-    D.ST.dc.processed = SERIE;
-    const h = D.html('dubcards');
-    t.ok('el panel con la temporada, la plantilla, el main cast y el botón, sin emojis', /Contract Inventory/.test(h) && /data-dct="ciTemp"[^>]*value="2"/.test(h) && /data-dct="ciTplElegir"/.test(h) && /data-k="tc" checked/.test(h) && /data-dct="ciBajar"/.test(h) && !EMOJI.test(h));
-    t.ok('los de un solo episodio, escondidos hasta que se piden', !/data-k="toya"/.test(h) && /Ver todos/.test(h));
+    const hoja = (titulo, filas) => ({ filas: [['📋 PLAN DE COPIADO'], ['Personaje', 'Talento'], ['Ana', 'Luz'], ['📽️ ' + titulo], ['#', 'Personaje', 'Talento', 'Tipo', 'Nota']].concat(filas.map((f, i) => [String(i + 1)].concat(f))) });
+    const wb = { SheetNames: ['Producción', 'Matriz', 'THE WAYANS BROS 214', 'THE WAYANS BROS 213'], Sheets: {
+      'Producción': { filas: [['🎬 Equipo de Producción'], ['#', 'Rol', 'Nombre'], ['1', 'Dirección de Doblaje', 'Wilfredo Hueso']] },
+      'Matriz': { filas: [['🧩 Matriz de Recurrencia'], ['Personaje', 'EP 213'], ['Marlon', 'Juan D Perez']] },
+      'THE WAYANS BROS 213': hoja('THE WAYANS BROS 213', [['Marlon', 'Juan D Perez', 'Principal', ''], ['Narrador', 'Edicion', 'Principal', ''], ['Rita', 'Sin asignar', 'Principal', ''], ['Madre 1', 'Yurany Rubio', 'Adicional', '']]),
+      'THE WAYANS BROS 214': hoja('THE WAYANS BROS 214', [['Marlon', 'Juan D Perez', 'Principal', '🔁 EP 213'], ['Grupo Mixto', 'Todos', 'Adicional', '']]) } };
+    const buf = Object.assign(new ArrayBuffer(8), { __wb: wb });
+    await D.ciCargarDubcard({ name: 'DUBCARD_THE WAYANS BROS_213-214.xlsx', size: 8, arrayBuffer: async () => buf });
+    const C = D.ST.ci;
+    t.eq('una entrada por hoja de episodio, en orden; Producción y Matriz se saltan', C.eps.map((e) => e.cap + ':' + e.data.length).join(' '), 'THE WAYANS BROS 213:4 THE WAYANS BROS 214:2');
+    t.eq('«Sin asignar» es sin talento; Edicion y Todos no son actores', D.ciReparto(C.eps[0], D.ciMain(C.eps)).fuera.join(',') + ' · ' + C.eps[0].data.filter((r) => r.pseudo).length, 'Rita · 1');
+    const h = D.html('contratos');
+    t.ok('la sección: la DUBCARD, la temporada, la plantilla, el equipo, el main cast y el botón, sin emojis', /DUBCARD_THE WAYANS BROS_213-214\.xlsx · 2 episodios/.test(h) && /data-dct="ciTemp"[^>]*value="2"/.test(h) && /data-dct="ciTplElegir"/.test(h)
+      && /data-k="traductor" value="Sofía Rey"/.test(h) && /data-k="marlon" checked/.test(h) && /data-dct="ciBajar"/.test(h) && !EMOJI.test(h), (h.match(EMOJI) || [''])[0]);
+    t.ok('ya no está dentro de DUBCARDs', !/data-dct="ciBajar"/.test(D.html('dubcards')));
+    const vacia = cargar().D;
+    t.ok('sin DUBCARD, solo se pide subirla', /la DUBCARD unida/.test(vacia.html('contratos')) && !/data-dct="ciBajar"/.test(vacia.html('contratos')));
+    C.equipo.traductor = 'Ana Gómez';
     const docs = await D.ciDocumentos();
-    t.eq('un Word por episodio, con su nombre', docs.map((d) => d.nombre).join(' '),
-         'Contract_Inventory_THE_WAYANS_BROS_S2_Eps13.docx Contract_Inventory_THE_WAYANS_BROS_S2_Eps14.docx Contract_Inventory_THE_WAYANS_BROS_S2_Eps15.docx');
-    const z = V.zips[2];
-    t.ok('cada Word lleva la plantilla entera y su propio reparto', !!z['word/media/image1.png'] && /Eps#15/.test(new TextDecoder().decode(z['word/document.xml'])) && /Mojica/.test(new TextDecoder().decode(z['word/document.xml'])));
+    t.eq('un Word por episodio, con su nombre', docs.map((d) => d.nombre).join(' '), 'Contract_Inventory_THE_WAYANS_BROS_S2_Eps13.docx Contract_Inventory_THE_WAYANS_BROS_S2_Eps14.docx');
+    const z = new TextDecoder().decode(V.zips[1]['word/document.xml']);
+    t.ok('cada Word lleva la plantilla entera, su número, su reparto y el traductor escrito', !!V.zips[1]['word/media/image1.png'] && /Eps#14/.test(z) && /Perez/.test(z) && /Ana Gómez/.test(z) && !/Sofía Rey/.test(z));
+    const otra = cargar().D;
+    await otra.ciCargarDubcard({ name: 'notas.xlsx', size: 8, arrayBuffer: async () => Object.assign(new ArrayBuffer(8), { __wb: { SheetNames: ['Hoja1'], Sheets: { Hoja1: { filas: [['hola']] } } } }) });
+    t.ok('un Excel que no es una DUBCARD se dice', /no tiene hojas de episodio/.test(otra.ST.ci.err));
   }
 };

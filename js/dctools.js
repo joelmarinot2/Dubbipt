@@ -640,7 +640,7 @@ async function dcParseFile(en, addLog){
 async function dcProcesar(){
   const S = ST.dc;
   if(S.busy || !S.entries.length) return;
-  S.busy = true; S.logs = []; S.processed = []; S.warnings = []; S.ci.main = null; S.ci.temporada = ''; repintar();
+  S.busy = true; S.logs = []; S.processed = []; S.warnings = []; repintar();
   const addLog = (msg, cls) => S.logs.push({ msg, cls });
   try{
     const results = [];
@@ -741,7 +741,6 @@ function dcHtml(){
       + '<button class="cs-b cs-pri dct-ancho" data-dct="dcProcesar"' + (S.busy ? ' disabled' : '') + '>' + (S.busy ? 'Procesando…' : ico('actualizar', 14) + '<span>Procesar</span>') + '</button>' : '')
     + (S.logs.length ? '<div class="dct-log">' + S.logs.map(l => '<div class="dct-log-' + (l.cls || 'n') + '">' + E(l.msg) + '</div>').join('') + '</div>' : '')
     + (S.processed.length ? '<button class="cs-b cs-pri dct-ancho dct-bajar" data-dct="dcBajar">' + ico('bajar', 14) + '<span>Descargar Excel</span></button>'
-      + ciHtml()
       + (isNetflix && S.warnings.length ? '<div class="dct-alertas"><b>Revisa antes de cargar en Netflix</b> (evita crear talentos duplicados):' + S.warnings.map(w => '<div>' + E(w) + '</div>').join('') + '</div>' : '')
       + (isNetflix && S.processed.length > 1 ? dcMatrizHtml(S.processed) : '')
       + S.processed.map(en => {
@@ -793,23 +792,26 @@ function dcCablear(raiz){
     else if(que === 'dcBajar') el.onclick = () => dcDescargar();
   });
   if(input) input.onchange = () => { dcAnadir(input.files); input.value = ''; };
-  ciCablear(raiz);
 }
 
 /* ── Contract Inventory · PRO-55 ─────────────────────────────────────────────
  *
  * Pedido de sala: «replica el formato de Contract Inventory con los capítulos
  * 213 a 222; lo único que cambia es el main cast, el additional cast y la
- * numeración del series title». Y después: «que lo pueda hacer dentro de
- * Dubbipt, en la parte de DUBCARDs».
+ * numeración del series title». Después: «que lo pueda hacer dentro de
+ * Dubbipt», «que se haga por separado, que uno suba la DUBCARD unida» y «que
+ * se pueda poner el espacio del traductor».
  *
- * Un Word por episodio, sobre la plantilla (dctools/contract-inventory.docx o
- * la que se suba): se cambia el número de «[S2 – Episode [Eps#12]» y se
- * rellenan las dos tablas de reparto. Todo lo demás de la plantilla queda
- * tal cual. Las reglas son las que se acordaron con sala:
+ * Es su propia sección. Se sube la DUBCARD unida (el Excel que baja
+ * DUBCARDs: una hoja por episodio con Principales y Adicionales) y sale un
+ * Word por episodio sobre la plantilla (dctools/contract-inventory.docx o la
+ * que se suba): el número de «[S2 – Episode [Eps#12]», las dos tablas de
+ * reparto y, si se escriben, el contacto, el traductor, el adaptador y el
+ * director. Todo lo demás de la plantilla queda tal cual. Las reglas del
+ * reparto son las que se acordaron con sala:
  *   · Main cast: los personajes que se marquen (por defecto, los que salen en
- *     la mitad o más de los episodios procesados). Lo demás, a Additional cast,
- *     por orden alfabético de apellido.
+ *     la mitad o más de los episodios). Lo demás, a Additional cast, por
+ *     orden alfabético de apellido.
  *   · No entran las filas que no son un actor (Edicion, X, Todos, Original…)
  *     ni los personajes sin talento.
  *   · Un actor con varios personajes, en una sola fila: «Norm / Padre». Si uno
@@ -820,7 +822,16 @@ const CI_TPL_URL = './dctools/contract-inventory.docx';
 const CI_TPL_NOMBRE = 'Contract Inventory (Deluxe)';
 const CI_TPL_KEY = 'dc_ci_tpl_v1';
 const CI_MAIN_KEY = 'dc_ci_main_v1';
-ST.dc.ci = { main: null, temporada: '', tpl: null, busy: false, todos: false };
+const CI_EQUIPO_KEY = 'dc_ci_equipo_v1';
+/* Los datos del equipo que se pueden cambiar: en qué tabla y fila de la plantilla van. */
+const CI_EQUIPO = [
+  { k: 'contacto',  t: 'Contacto del estudio', tabla: /Email Address/i, fila: null, celdas: [0] },
+  { k: 'correo',    t: 'Correo del contacto',  tabla: /Email Address/i, fila: null, celdas: [1] },
+  { k: 'traductor', t: 'Traductor',            tabla: /Dubbing Director/i, fila: /^\s*Translator/i, celdas: [1, 2, 3] },
+  { k: 'adaptador', t: 'Adaptador',            tabla: /Dubbing Director/i, fila: /^\s*Adaptor/i, celdas: [1, 2, 3] },
+  { k: 'director',  t: 'Director de doblaje',  tabla: /Dubbing Director/i, fila: /^\s*Dubbing Director/i, celdas: [1, 2, 3] }
+];
+ST.ci = { archivo: '', eps: [], leyendo: false, err: '', main: null, temporada: '', tpl: null, xml: '', equipo: null, busy: false, todos: false };
 
 const ciLeerLocal = k => { try{ return JSON.parse(localStorage.getItem(k) || 'null'); }catch(e){ return null; } };
 const ciGuardarLocal = (k, v) => { try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ /* sin almacén: se usa igual, solo que no se recuerda */ } };
@@ -839,10 +850,37 @@ function ciNombre(talento){
   return { nombre: t.slice(0, corte).join(' '), apellido: t.slice(corte).join(' ') };
 }
 
+/**
+ * La DUBCARD unida, leída: una entrada por hoja de episodio, como las deja
+ * dcParseFile ({ cap, data }). El capítulo sale del título de la hoja
+ * («📽️ THE WAYANS BROS 213») y cada fila con tipo Principal o Adicional es un
+ * personaje. Las hojas de Producción, Matriz y Alertas no tienen ninguna y se saltan.
+ */
+function ciLeerDubcard(wb){
+  const eps = [];
+  wb.SheetNames.forEach(nombre => {
+    const filas = XLSX.utils.sheet_to_json(wb.Sheets[nombre], { header: 1, defval: '' }) || [];
+    let cap = '';
+    const data = [];
+    filas.forEach(f => {
+      const a = safe(f[0]).trim();
+      if(!cap && /^\P{L}*\u{1F4FD}/u.test(a)) cap = a.replace(/^[^\p{L}\p{N}]+/u, '').trim();
+      const tipo = safe(f[3]).trim(), personaje = safe(f[1]).trim();
+      if(!personaje || (tipo !== 'Principal' && tipo !== 'Adicional')) return;
+      let talento = safe(f[2]).trim();
+      if(/^sin asignar$/i.test(talento)) talento = '';
+      const pseudo = !!talento && dcIsPseudo(talento);
+      data.push({ personaje, talento, talentoKey: pseudo || !talento ? '' : dcNorm(talento), pseudo, tipo });
+    });
+    if(data.length) eps.push({ cap: cap || nombre, data });
+  });
+  return eps.sort((a, b) => dcEpNum(a.cap) - dcEpNum(b.cap));
+}
+
 /** Los personajes que pueden ir al main cast: principales con un actor de verdad, con en cuántos episodios salen. */
-function ciCandidatos(processed){
+function ciCandidatos(eps){
   const m = new Map();
-  processed.forEach(en => {
+  eps.forEach(en => {
     const vistos = new Set();
     en.data.forEach((r, i) => {
       if(r.tipo !== 'Principal' || !r.talento || r.pseudo) return;
@@ -852,17 +890,17 @@ function ciCandidatos(processed){
       const c = m.get(k); c.n++; c.pos += i / Math.max(1, en.data.length);
     });
   });
-  /* Los que salen en más episodios primero; a igualdad, los que van antes en el desglose (los protagonistas suelen abrirlo). */
+  /* Los que salen en más episodios primero; a igualdad, los que van antes en la hoja. */
   return [...m.values()].sort((a, b) => b.n - a.n || a.pos / a.n - b.pos / b.n || a.nombre.localeCompare(b.nombre));
 }
 
 /** El main cast marcado; si no se ha tocado, el que se usó la última vez con este programa o, si no, los que salen en la mitad o más de los episodios. */
-function ciMain(processed){
-  const S = ST.dc.ci, cands = ciCandidatos(processed);
+function ciMain(eps){
+  const S = ST.ci, cands = ciCandidatos(eps);
   if(Array.isArray(S.main)) return S.main.filter(k => cands.some(c => c.k === k));
-  const guardado = (ciLeerLocal(CI_MAIN_KEY) || {})[dcPrograma(processed)];
+  const guardado = (ciLeerLocal(CI_MAIN_KEY) || {})[dcPrograma(eps)];
   if(Array.isArray(guardado)) return cands.filter(c => guardado.includes(c.k)).map(c => c.k);
-  return cands.filter(c => processed.length < 2 || c.n * 2 >= processed.length).map(c => c.k);
+  return cands.filter(c => eps.length < 2 || c.n * 2 >= eps.length).map(c => c.k);
 }
 
 /** Temporada y episodio del series title: 213 es la temporada 2, episodio 13. Con números de una o dos cifras, la temporada la dice quien la escribe. */
@@ -901,10 +939,13 @@ function ciReparto(en, mainKeys){
 
 /* El Word, por texto: así no hace falta un DOM y la prueba ve lo mismo que el navegador. */
 const ciEsc = s => safe(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const ciTexto = x => (x.match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('');
+const ciTexto = x => (x.match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')).join('');
 const ciCeldas = tr => tr.match(/<w:tc[\s>][\s\S]*?<\/w:tc>/g) || [];
+const ciFilas = tbl => tbl.match(/<w:tr[\s>][\s\S]*?<\/w:tr>/g) || [];
+const ciTablas = xml => xml.match(/<w:tbl[\s>][\s\S]*?<\/w:tbl>/g) || [];
+const ciRPr = tc => (tc.match(/<w:r(?:\s[^>]*)?>\s*(<w:rPr>[\s\S]*?<\/w:rPr>)/) || [])[1] || '';
 
-/** Una celda con otro texto: conserva su formato y el del texto que tenía la fila modelo. */
+/** Una celda con otro texto: conserva su formato y el del texto modelo. */
 function ciCelda(tc, texto, rPr){
   const run = texto ? '<w:r>' + rPr + '<w:t xml:space="preserve">' + ciEsc(texto) + '</w:t></w:r>' : '';
   let hecho = false;
@@ -917,41 +958,75 @@ function ciCelda(tc, texto, rPr){
   return hecho ? out : out.replace(/<\/w:tc>$/, '<w:p>' + run + '</w:p></w:tc>');
 }
 
+/** Una fila con otros textos en las celdas que se digan (las demás, tal cual). Cada celda conserva su propio formato. */
+function ciFila(tr, valores, rPrs){
+  let c = 0;
+  return tr.replace(/<w:tc[\s>][\s\S]*?<\/w:tc>/g, tc => {
+    const i = c++;
+    if(!(i in valores)) return tc;
+    return ciCelda(tc, valores[i] || '', (rPrs && rPrs[i]) || ciRPr(tc));
+  });
+}
+
 /** Una tabla de reparto rellena: debajo de la fila «First Name», una fila por actor; si no caben, se añaden. */
 function ciTabla(tbl, filas){
-  const trs = tbl.match(/<w:tr[\s>][\s\S]*?<\/w:tr>/g) || [];
+  const trs = ciFilas(tbl);
   const iCab = trs.findIndex(tr => /First Name/i.test(ciTexto(tr)));
   const datos = trs.slice(iCab + 1);
   if(iCab < 0 || !datos.length) throw new Error('La plantilla no tiene la tabla de reparto como se espera');
-  const rPr = ciCeldas(datos[0]).map(tc => (tc.match(/<w:r(?:\s[^>]*)?>\s*(<w:rPr>[\s\S]*?<\/w:rPr>)/) || [])[1] || '');
+  const rPr = ciCeldas(datos[0]).map(ciRPr);
+  rPr.forEach((x, i) => { if(!x) rPr[i] = rPr[0] || ''; });
   while(datos.length < filas.length) datos.push(datos[datos.length - 1]);
   const nuevas = datos.map((tr, i) => {
-    const f = filas[i], v = f ? [f.nombre, f.apellido, '', '', f.personajes, ''] : ['', '', '', '', '', ''];
-    let c = 0;
-    return tr.replace(/<w:tc[\s>][\s\S]*?<\/w:tc>/g, tc => { const r = ciCelda(tc, v[c] || '', rPr[c] || rPr[0] || ''); c++; return r; });
+    const f = filas[i];
+    return ciFila(tr, f ? [f.nombre, f.apellido, '', '', f.personajes, ''] : ['', '', '', '', '', ''], rPr);
   });
   const ini = tbl.indexOf(datos[0]), fin = tbl.lastIndexOf('</w:tr>') + '</w:tr>'.length;
   return tbl.slice(0, ini) + nuevas.join('') + tbl.slice(fin);
 }
 
-/** El document.xml de la plantilla, con la numeración y el reparto de un episodio. */
-function ciLlenarXml(xml, reparto, temporada, ep){
+/** Dónde va un dato del equipo: la tabla y la fila de la plantilla. La del contacto es la fila de debajo de «Email Address». */
+function ciDondeEquipo(xml, campo){
+  const tbl = ciTablas(xml).find(t => campo.tabla.test(ciTexto(t)));
+  if(!tbl) return null;
+  const trs = ciFilas(tbl);
+  const i = campo.fila ? trs.findIndex(tr => campo.fila.test(ciTexto(ciCeldas(tr)[0] || ''))) : trs.findIndex(tr => /Email Address/i.test(ciTexto(tr))) + 1;
+  return i > 0 && trs[i] ? { tbl, tr: trs[i] } : null;
+}
+
+/** Lo que la plantilla trae escrito en el contacto, el traductor, el adaptador y el director. */
+function ciEquipoDe(xml){
+  const out = {};
+  CI_EQUIPO.forEach(c => { const d = ciDondeEquipo(xml, c); out[c.k] = d ? ciTexto(ciCeldas(d.tr)[c.celdas[0]] || '').trim() : ''; });
+  return out;
+}
+
+/** El document.xml de la plantilla, con la numeración, el reparto de un episodio y, si se da, el equipo. */
+function ciLlenarXml(xml, reparto, temporada, ep, equipo){
   let titulo = false;
   xml = xml.replace(/(<w:t(?:\s[^>]*)?>)([^<]*Eps#\s*\d+[^<]*)(<\/w:t>)/, (m, a, t, b) => {
     titulo = true;
     return a + t.replace(/S\d+/, 'S' + temporada).replace(/Eps#\s*\d+/, 'Eps#' + ep) + b;
   });
   if(!titulo) throw new Error('La plantilla no tiene el «Eps#» del series title');
-  const tablas = xml.match(/<w:tbl[\s>][\s\S]*?<\/w:tbl>/g) || [];
-  const reparto2 = tablas.filter(t => /First Name/i.test(ciTexto(t)) && /Character/i.test(ciTexto(t)));
+  if(equipo) CI_EQUIPO.forEach(c => {
+    if(equipo[c.k] == null) return;
+    const d = ciDondeEquipo(xml, c);
+    if(!d) return;
+    const v = {}; c.celdas.forEach(i => { v[i] = safe(equipo[c.k]).trim(); });
+    const nuevaFila = ciFila(d.tr, v), nuevaTbl = d.tbl.replace(d.tr, () => nuevaFila);
+    xml = xml.replace(d.tbl, () => nuevaTbl);
+  });
+  const reparto2 = ciTablas(xml).filter(t => /First Name/i.test(ciTexto(t)) && /Character/i.test(ciTexto(t)));
   if(reparto2.length < 2) throw new Error('La plantilla no tiene las tablas de Main cast y Additional cast');
-  xml = xml.replace(reparto2[0], () => ciTabla(reparto2[0], reparto.main));
-  return xml.replace(reparto2[1], () => ciTabla(reparto2[1], reparto.adicional));
+  const main = ciTabla(reparto2[0], reparto.main), adic = ciTabla(reparto2[1], reparto.adicional);
+  xml = xml.replace(reparto2[0], () => main);
+  return xml.replace(reparto2[1], () => adic);
 }
 
 /** Los bytes de la plantilla: la que se subió o la incluida. */
 async function ciPlantilla(){
-  const S = ST.dc.ci;
+  const S = ST.ci;
   if(!S.tpl){ const g = ciLeerLocal(CI_TPL_KEY); if(g && g.b64) S.tpl = { nombre: g.nombre, bytes: Uint8Array.from(atob(g.b64), c => c.charCodeAt(0)) }; }
   if(S.tpl) return S.tpl.bytes;
   const res = await fetch(CI_TPL_URL);
@@ -959,34 +1034,70 @@ async function ciPlantilla(){
   return new Uint8Array(await res.arrayBuffer());
 }
 
-/** Un Word por episodio procesado: [{ nombre, bytes }]. */
+/** El document.xml de la plantilla en uso, leído una vez. */
+async function ciXml(){
+  const S = ST.ci;
+  if(S.xml) return S.xml;
+  const f = fflate.unzipSync(await ciPlantilla())['word/document.xml'];
+  if(!f) throw new Error('La plantilla no es un Word (.docx)');
+  S.xml = new TextDecoder().decode(f);
+  return S.xml;
+}
+
+/** El equipo de este programa: lo que se escribió la última vez, o lo que trae la plantilla. */
+function ciEquipo(){
+  const S = ST.ci;
+  if(S.equipo) return S.equipo;
+  const g = (ciLeerLocal(CI_EQUIPO_KEY) || {})[S.eps.length ? dcPrograma(S.eps) : ''];
+  const base = S.xml ? ciEquipoDe(S.xml) : {};
+  S.equipo = Object.assign({}, base, g || {});
+  return S.equipo;
+}
+
+/** Un Word por episodio: [{ nombre, n, bytes }]. */
 async function ciDocumentos(){
-  const processed = ST.dc.processed, mainKeys = ciMain(processed);
+  const S = ST.ci, eps = S.eps, mainKeys = ciMain(eps);
   const tpl = fflate.unzipSync(await ciPlantilla());
-  if(!tpl['word/document.xml']) throw new Error('La plantilla no es un Word (.docx)');
-  const xml = new TextDecoder().decode(tpl['word/document.xml']);
-  const prog = dcPrograma(processed).replace(/\s+/g, '_');
-  return processed.map(en => {
-    const n = ciNumero(en.cap, ST.dc.ci.temporada);
-    const files = Object.assign({}, tpl, { 'word/document.xml': fflate.strToU8(ciLlenarXml(xml, ciReparto(en, mainKeys), n.temporada, n.ep)) });
+  const xml = await ciXml(), equipo = ciEquipo();
+  const prog = dcPrograma(eps).replace(/\s+/g, '_');
+  return eps.map(en => {
+    const n = ciNumero(en.cap, S.temporada);
+    const files = Object.assign({}, tpl, { 'word/document.xml': fflate.strToU8(ciLlenarXml(xml, ciReparto(en, mainKeys), n.temporada, n.ep, equipo)) });
     return { nombre: ('Contract_Inventory_' + prog + '_S' + n.temporada + '_Eps' + n.ep).replace(/[\\/:*?"<>|]+/g, '') + '.docx', n, bytes: fflate.zipSync(files) };
   });
 }
 
+/** Sube la DUBCARD unida y la lee. */
+async function ciCargarDubcard(file){
+  const S = ST.ci;
+  if(!file) return;
+  if(!/\.(xlsx|xlsm|xls)$/i.test(file.name)){ aviso('Sube la DUBCARD en Excel (.xlsx)'); return; }
+  S.leyendo = true; S.err = ''; repintar();
+  try{
+    const wb = XLSX.read(new Uint8Array(await readFileBuffer(file)), { type: 'array' });
+    const eps = ciLeerDubcard(wb);
+    if(!eps.length) throw new Error('no tiene hojas de episodio con Principales y Adicionales. ¿Es la DUBCARD que baja DUBCARDs?');
+    Object.assign(S, { archivo: file.name, eps, main: null, temporada: '', equipo: null, todos: false });
+    try{ await ciXml(); }catch(e){ S.err = e.message; }
+  }catch(e){ S.err = 'No se pudo leer «' + file.name + '»: ' + e.message; }
+  finally{ S.leyendo = false; repintar(); }
+}
+
 const CI_DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-/** Descarga los Word: uno suelto, o todos en un .zip. */
+/** Descarga los Word: uno suelto, o todos en un .zip. Se recuerdan el main cast y el equipo de este programa. */
 async function ciDescargar(){
-  const S = ST.dc, C = S.ci;
-  if(!S.processed.length){ aviso('Primero procesa los archivos'); return; }
+  const C = ST.ci;
+  if(!C.eps.length){ aviso('Primero sube la DUBCARD'); return; }
   if(C.busy) return;
   C.busy = true; repintar();
   try{
-    const docs = await ciDocumentos();
-    const g = ciLeerLocal(CI_MAIN_KEY) || {}; g[dcPrograma(S.processed)] = ciMain(S.processed); ciGuardarLocal(CI_MAIN_KEY, g);
+    const docs = await ciDocumentos(), prog = dcPrograma(C.eps);
+    const g = ciLeerLocal(CI_MAIN_KEY) || {}; g[prog] = ciMain(C.eps); ciGuardarLocal(CI_MAIN_KEY, g);
+    const e = ciLeerLocal(CI_EQUIPO_KEY) || {}; e[prog] = ciEquipo(); ciGuardarLocal(CI_EQUIPO_KEY, e);
     if(docs.length === 1){ bdDownload(new Blob([docs[0].bytes], { type: CI_DOCX }), docs[0].nombre); aviso('⬇ ' + docs[0].nombre); return; }
     const zip = {}; docs.forEach(d => { zip[d.nombre] = d.bytes; });
     const eps = docs.map(d => d.n.ep);
-    const nombre = ('Contract_Inventory_' + dcPrograma(S.processed).replace(/\s+/g, '_') + '_S' + docs[0].n.temporada + '_Eps' + eps[0] + '-' + eps[eps.length - 1]).replace(/[\\/:*?"<>|]+/g, '') + '.zip';
+    const nombre = ('Contract_Inventory_' + prog.replace(/\s+/g, '_') + '_S' + docs[0].n.temporada + '_Eps' + eps[0] + '-' + eps[eps.length - 1]).replace(/[\\/:*?"<>|]+/g, '') + '.zip';
     bdDownload(new Blob([fflate.zipSync(zip, { level: 0 })], { type: 'application/zip' }), nombre);
     aviso('⬇ ' + nombre + ' (' + docs.length + ' Word)');
   }catch(e){ aviso('No se pudo armar el Contract Inventory: ' + e.message); }
@@ -995,15 +1106,16 @@ async function ciDescargar(){
 
 /** Subir otra plantilla: tiene que ser .docx y tener el series title y las dos tablas. */
 async function ciSubirPlantilla(file){
-  const C = ST.dc.ci;
+  const C = ST.ci;
   if(!file) return;
   if(!/\.docx$/i.test(file.name)){ aviso(/\.doc$/i.test(file.name) ? 'Ábrela en Word y guárdala como .docx (el .doc antiguo no se puede leer aquí)' : 'La plantilla tiene que ser un Word .docx'); return; }
   try{
     const bytes = new Uint8Array(await readFileBuffer(file));
-    const xml = fflate.unzipSync(bytes)['word/document.xml'];
-    if(!xml) throw new Error('no es un Word (.docx)');
-    ciLlenarXml(new TextDecoder().decode(xml), { main: [], adicional: [] }, 1, 1);
-    C.tpl = { nombre: file.name, bytes };
+    const f = fflate.unzipSync(bytes)['word/document.xml'];
+    if(!f) throw new Error('no es un Word (.docx)');
+    const xml = new TextDecoder().decode(f);
+    ciLlenarXml(xml, { main: [], adicional: [] }, 1, 1);
+    C.tpl = { nombre: file.name, bytes }; C.xml = xml; C.equipo = null;
     let b = ''; for(let i = 0; i < bytes.length; i += 0x8000) b += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
     ciGuardarLocal(CI_TPL_KEY, { nombre: file.name, b64: btoa(b) });
     aviso('Plantilla: ' + file.name);
@@ -1012,27 +1124,35 @@ async function ciSubirPlantilla(file){
 }
 
 function ciHtml(){
-  const S = ST.dc, C = S.ci, processed = S.processed;
-  const cands = ciCandidatos(processed), mainKeys = ciMain(processed);
+  const C = ST.ci, eps = C.eps;
+  const subir = '<div class="dct-drop' + (eps.length ? ' dct-drop-ok' : '') + '" data-dct="ciElegir">' + ico('subir', 22)
+    + '<b>' + (C.leyendo ? 'Leyendo…' : eps.length ? E(C.archivo) + ' · ' + eps.length + ' episodios' : 'Haz clic o arrastra la DUBCARD unida') + '</b>'
+    + '<span>' + (eps.length ? 'Pulsa para cambiarla' : 'El Excel que baja DUBCARDs (DUBCARD_PROGRAMA_213-214-….xlsx), con una hoja por episodio') + '</span>'
+    + '<input type="file" id="dctCiDub" accept=".xlsx,.xlsm,.xls" hidden></div>';
+  const err = C.err ? '<div class="dct-mal">' + E(C.err) + '</div>' : '';
+  if(!eps.length) return '<div class="dct">' + subir + err + '</div>';
+  const cands = ciCandidatos(eps), mainKeys = ciMain(eps);
   /* Con varios episodios, los de un solo episodio no suelen ser fijos: se esconden salvo que se pidan. */
-  const vis = cands.filter(c => C.todos || processed.length < 2 || c.n > 1 || mainKeys.includes(c.k));
-  const n0 = ciNumero(processed[0].cap, C.temporada);
-  const tpl = C.tpl || ciLeerLocal(CI_TPL_KEY);
+  const vis = cands.filter(c => C.todos || eps.length < 2 || c.n > 1 || mainKeys.includes(c.k));
+  const n0 = ciNumero(eps[0].cap, C.temporada);
+  const tpl = C.tpl || ciLeerLocal(CI_TPL_KEY), equipo = ciEquipo();
   const filas = rows => rows.length ? '<div class="dct-tabla-w"><table class="dct-tabla"><thead><tr><th>First Name</th><th>Last Name</th><th>Character(s)</th></tr></thead><tbody>'
     + rows.map(r => '<tr style="background:#e5e7eb"><td>' + E(r.nombre) + '</td><td>' + E(r.apellido) + '</td><td>' + E(r.personajes) + '</td></tr>').join('') + '</tbody></table></div>' : '<div class="dct-tenue">Nadie</div>';
-  return '<div class="dct-caja dct-ci">'
-    + '<div class="dct-res-cab"><b>Contract Inventory</b><span class="dct-tenue">Un Word por episodio: cambian el número del series title, el Main cast y el Additional cast</span></div>'
+  return '<div class="dct">' + subir + err
+    + '<div class="dct-caja dct-ci">'
     + '<div class="dct-fila dct-cab2">'
     +   '<label>Temporada<input type="number" min="1" data-dct="ciTemp" value="' + E(C.temporada || n0.temporada) + '" style="width:80px"></label>'
     +   '<div class="dct-crece dct-tenue">Plantilla: <b>' + E(tpl ? tpl.nombre : CI_TPL_NOMBRE) + '</b></div>'
     +   '<button class="cs-b" data-dct="ciTplElegir">' + ico('subir', 13) + '<span>Usar otra plantilla (.docx)</span></button>'
     +   (tpl ? '<button class="cs-b" data-dct="ciTplQuitar">' + ico('cerrar', 13) + '<span>Volver a la incluida</span></button>' : '')
     +   '<input type="file" id="dctCiTpl" accept=".docx" hidden></div>'
+    + '<div class="dct-sub">Equipo: va igual en todos los episodios (se recuerda por programa)</div>'
+    + '<div class="dct-fila dct-ci-equipo">' + CI_EQUIPO.map(c => '<label class="dct-crece">' + E(c.t) + '<input type="text" data-dct="ciEquipo" data-k="' + c.k + '" value="' + E(equipo[c.k] || '') + '"></label>').join('') + '</div>'
     + '<div class="dct-sub">Main cast: marca los personajes fijos (los demás van a Additional cast)</div>'
     + '<div class="dct-ci-main">' + vis.map(c => '<label class="dct-check"><input type="checkbox" data-dct="ciMain" data-k="' + E(c.k) + '"' + (mainKeys.includes(c.k) ? ' checked' : '') + '> '
-        + E(c.nombre) + ' <i>' + c.n + '/' + processed.length + '</i></label>').join('')
+        + E(c.nombre) + ' <i>' + c.n + '/' + eps.length + '</i></label>').join('')
     +   (vis.length < cands.length || C.todos ? '<button class="cs-b" data-dct="ciTodos">' + E(C.todos ? 'Solo los que se repiten' : 'Ver todos (' + cands.length + ')') + '</button>' : '') + '</div>'
-    + processed.map(en => {
+    + eps.map(en => {
         const n = ciNumero(en.cap, C.temporada), r = ciReparto(en, mainKeys);
         return '<details class="dct-ci-ep"><summary>' + E(en.cap) + ' · S' + n.temporada + ' – Episode ' + n.ep + ' · ' + r.main.length + ' main · ' + r.adicional.length + ' additional'
           + (r.fuera.length ? ' · <span class="dct-mal">' + r.fuera.length + ' sin talento</span>' : '') + '</summary>'
@@ -1041,28 +1161,41 @@ function ciHtml(){
           + (r.fuera.length ? '<div class="dct-mal">Sin talento, no entran: ' + E(r.fuera.join(', ')) + '</div>' : '')
           + '</details>';
       }).join('')
-    + '<button class="cs-b cs-pri dct-ancho" data-dct="ciBajar"' + (C.busy ? ' disabled' : '') + '>' + (C.busy ? 'Armando…' : ico('bajar', 14) + '<span>Descargar Contract Inventory (' + processed.length + ' Word)</span>') + '</button>'
-    + '</div>';
+    + '<button class="cs-b cs-pri dct-ancho" data-dct="ciBajar"' + (C.busy ? ' disabled' : '') + '>' + (C.busy ? 'Armando…' : ico('bajar', 14) + '<span>Descargar Contract Inventory (' + eps.length + ' Word)</span>') + '</button>'
+    + '</div></div>';
 }
 
 function ciCablear(raiz){
-  const C = ST.dc.ci, input = raiz.querySelector('#dctCiTpl');
+  const C = ST.ci, q = s => raiz.querySelector(s);
+  const dub = q('#dctCiDub'), tpl = q('#dctCiTpl');
   raiz.querySelectorAll('[data-dct]').forEach(el => {
     const que = el.getAttribute('data-dct');
-    if(que === 'ciTemp') el.onchange = () => { C.temporada = String(el.value || '').trim(); repintar(); };
+    if(que === 'ciElegir'){
+      el.onclick = (ev) => { if(ev.target !== dub && dub) dub.click(); };
+      el.ondragover = (ev) => { ev.preventDefault(); };
+      el.ondrop = (ev) => { ev.preventDefault(); ciCargarDubcard(ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0]); };
+    }
+    else if(que === 'ciTemp') el.onchange = () => { C.temporada = String(el.value || '').trim(); repintar(); };
+    /* Al escribir no se repinta (se perdería el foco); solo se apunta. */
+    else if(que === 'ciEquipo') el.oninput = () => { ciEquipo()[el.getAttribute('data-k')] = el.value; };
     else if(que === 'ciMain') el.onchange = () => {
-      const k = el.getAttribute('data-k'), cands = ciCandidatos(ST.dc.processed).map(c => c.k);
-      const sel = new Set(ciMain(ST.dc.processed));
+      const k = el.getAttribute('data-k'), cands = ciCandidatos(C.eps).map(c => c.k);
+      const sel = new Set(ciMain(C.eps));
       if(el.checked) sel.add(k); else sel.delete(k);
       C.main = cands.filter(x => sel.has(x));
       repintar();
     };
     else if(que === 'ciTodos') el.onclick = () => { C.todos = !C.todos; repintar(); };
-    else if(que === 'ciTplElegir') el.onclick = () => { if(input) input.click(); };
-    else if(que === 'ciTplQuitar') el.onclick = () => { C.tpl = null; try{ localStorage.removeItem(CI_TPL_KEY); }catch(e){ /* sin almacén */ } repintar(); };
+    else if(que === 'ciTplElegir') el.onclick = () => { if(tpl) tpl.click(); };
+    else if(que === 'ciTplQuitar') el.onclick = () => {
+      C.tpl = null; C.xml = ''; C.equipo = null;
+      try{ localStorage.removeItem(CI_TPL_KEY); }catch(e){ /* sin almacén */ }
+      ciXml().catch(e => { C.err = e.message; }).then(repintar);
+    };
     else if(que === 'ciBajar') el.onclick = () => { ciDescargar(); };
   });
-  if(input) input.onchange = () => { const f = input.files && input.files[0]; input.value = ''; ciSubirPlantilla(f); };
+  if(dub) dub.onchange = () => { const f = dub.files && dub.files[0]; dub.value = ''; ciCargarDubcard(f); };
+  if(tpl) tpl.onchange = () => { const f = tpl.files && tpl.files[0]; tpl.value = ''; ciSubirPlantilla(f); };
 }
 
 /* ── Breakdowns ───────────────────────────────────────────────────────────── */
@@ -1293,7 +1426,8 @@ function pgCablear(raiz){
 
 /* ── Hacia fuera ──────────────────────────────────────────────────────────── */
 
-const TITULOS = { dubcards: ['DUBCARDs', 'Procesador de casting: el plan de copiado de Netflix, la matriz de recurrencia, sus alertas y el Contract Inventory'],
+const TITULOS = { dubcards: ['DUBCARDs', 'Procesador de casting: el plan de copiado de Netflix, la matriz de recurrencia y sus alertas'],
+                  contratos: ['Contract Inventory', 'Un Word por episodio desde la DUBCARD unida: Main cast, Additional cast, numeración y equipo'],
                   breakdowns: ['Breakdowns', 'Análisis de libretos con un modelo de lenguaje'],
                   pegado: ['Pegado de casting', 'Rellena la columna del actor de un desglose con el reparto vigente'] };
 
@@ -1304,6 +1438,7 @@ function html(vista){
   try{
     if(vista === 'dubcards') return cab + dcHtml();
     if(vista === 'breakdowns') return cab + bdHtml();
+    if(vista === 'contratos') return cab + ciHtml();
     return cab + pgHtml();
   }catch(e){ return cab + '<div class="cs-nada">No se pudo pintar: ' + E(e.message) + '</div>'; }
 }
@@ -1312,11 +1447,13 @@ function cablear(raiz, vista){
   if(vista === 'dubcards') dcCablear(raiz);
   else if(vista === 'breakdowns') bdCablear(raiz);
   else if(vista === 'pegado') pgCablear(raiz);
+  else if(vista === 'contratos') ciCablear(raiz);
 }
 
 return { html: html, cablear: cablear, ST: ST, dcParseFile: dcParseFile, dcProcesar: dcProcesar, bdDocHtml: bdDocHtml, bdGuardados: bdGuardados, bdGuardar: bdGuardar,
          bdEndpoint: bdEndpoint, BD_PROVIDERS: BD_PROVIDERS, bdMakeDocx: bdMakeDocx, bdExtractText: bdExtractText, dcSplitRows: dcSplitRows,
-         ciNombre: ciNombre, ciReparto: ciReparto, ciMain: ciMain, ciNumero: ciNumero, ciLlenarXml: ciLlenarXml, ciDocumentos: ciDocumentos };
+         ciNombre: ciNombre, ciReparto: ciReparto, ciMain: ciMain, ciNumero: ciNumero, ciLlenarXml: ciLlenarXml, ciDocumentos: ciDocumentos,
+         ciLeerDubcard: ciLeerDubcard, ciCargarDubcard: ciCargarDubcard, ciEquipoDe: ciEquipoDe };
 })();
 
 /* ═══ FIN DE HERRAMIENTAS DE DUBLAJECAST EN DUBBIPT ═══ */
