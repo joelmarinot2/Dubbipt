@@ -340,6 +340,7 @@ const R = {
   haberImpers:   ['gramatica', '«haber» impersonal', '«había muchas personas», no «habían»; «hubo», no «hubieron».'],
   homofonos:     ['gramatica', 'Homófonos', '«a ver» / «haber», «hecho» / «echo», «has» / «haz», «vaya» / «valla», «ay» / «hay», «a» / «ha».'],
   dequeismo:     ['gramatica', 'Dequeísmo y queísmo', '«creo que», no «creo de que»; «me di cuenta de que», no «me di cuenta que».'],
+  comaVerbo:     ['gramatica', 'Coma entre el verbo y lo que sigue', 'RAE: no se separa con coma el verbo de su complemento: «Yo no sé cómo se le habrá ocurrido», no «Yo no sé, cómo…». Se mira también cuando la frase sigue en la fila siguiente.'],
   asiQue:        ['gramatica', 'Coma después de «así que»', '«Así que no me culpen», sin coma: «así que» no es un inciso.'],
   repeticion:    ['gramatica', 'Palabra repetida', '«de de», «que que»… Si es intencionado («no, no»), lleva coma.'],
   posesivo:      ['gramatica', '«detrás mío», «cerca tuyo»', 'En la norma culta: «detrás de mí», «cerca de ti».'],
@@ -370,7 +371,7 @@ const FUENTE = {
   invisible: 'Netflix ES', tresPuntos: 'Netflix ES', espacios: 'guion', espacioSigno: 'RAE', suspensivos: 'Netflix ES', signosPares: 'RAE',
   puntoTrasSigno: 'Netflix ES', puntoYComa: 'Netflix ES', dobleSigno: 'Netflix ES', peroComa: 'Netflix ES', mayusPunto: 'RAE', comillas: 'Netflix ES',
   diccionario: 'Netflix ASR', rae2010: 'RAE', pegadas: 'RAE', interrogativa: 'RAE', diacritica: 'RAE', vosotros: 'Netflix ES',
-  todo: 'RAE', contraccion: 'RAE', haberImpers: 'RAE', homofonos: 'RAE', dequeismo: 'RAE', asiQue: 'RAE', repeticion: 'RAE', posesivo: 'RAE',
+  todo: 'RAE', contraccion: 'RAE', haberImpers: 'RAE', homofonos: 'RAE', dequeismo: 'RAE', asiQue: 'RAE', comaVerbo: 'RAE', repeticion: 'RAE', posesivo: 'RAE',
   guias: 'Netflix ASR', sinGuia: 'guion', variantes: 'guion', mayusculas: 'RAE', titulo: 'Netflix ASR', sensible: 'Netflix ASR', anotacion: 'Netflix ASR',
   personaje: 'Netflix ASR', unPersonaje: 'Netflix ASR', walla: 'Netflix ASR', pantalla: 'Netflix ASR', timecode: 'Netflix ASR'
 };
@@ -402,21 +403,26 @@ const esReaccion = (t) => /^\s*(?:[(\[{][^()\[\]{}]*[)\]}]\s*)+$/.test(t);
 /* La guía de pronunciación: una palabra y, entre ( ) o [ ], cómo se dice.
    «Kathawa (katáwa)». Una sola palabra dentro y con alguna minúscula: lo de
    dentro de «(GESTO)» es una reacción, y «(en voz baja)» es una acotación. */
-const RE_GUIA = /([\p{L}][\p{L}'’\-]*)(\s*)[(\[]([\p{L}'’\-·]*\p{Ll}[\p{L}'’\-·]*)[)\]]/gu;
+const RE_GUIA = /([\p{L}][\p{L}'’\-]*)(\s*)[(\[]([\p{L}'’\-·]*\p{Ll}[\p{L}'’\-·]*(?: [\p{L}'’\-·]+){0,3})[)\]]/gu;
+/* «(en voz baja)» es una acotación, no una guía: lleva palabras de las de
+   siempre. Una guía son sílabas sueltas: «(sá-to ji déo)», «(kum só-ji)». */
+const NO_GUIA = /(^|\s)(en|de|del|la|el|los|las|un|una|a|al|con|por|para|que|se|su|voz|baja|alta|sin|lo|le|y|o|muy|como)(?=\s|$)/i;
 const RE_PALABRA = /[\p{L}]+(?:['’\-][\p{L}]+)*/gu;
 const ES_MAYUS = /^\p{Lu}/u;
 
 /** El texto con las guías y los paréntesis tapados por espacios, para que la
  *  ortografía y la gramática no los lean. Las posiciones no cambian. */
 function tapar(t){
-  return t.replace(RE_GUIA, (m, w, esp, g) => w + esp + ' '.repeat(g.length + 2))
+  return t.replace(RE_GUIA, (m, w, esp, g) => /\s/.test(g) && NO_GUIA.test(g) ? m : w + esp + ' '.repeat(g.length + 2))
           .replace(/[(\[{][^()\[\]{}]*[)\]}]/g, (m) => ' '.repeat(m.length));
 }
 
 function guiasDe(t){
   const out = [];
-  for(const m of t.matchAll(RE_GUIA))
+  for(const m of t.matchAll(RE_GUIA)){
+    if(/\s/.test(m[3]) && NO_GUIA.test(m[3])) continue;
     out.push({ termino: m[1], guia: m[3], espacio: m[2], desde: m.index, hasta: m.index + m[0].length });
+  }
   return out;
 }
 
@@ -476,6 +482,8 @@ const TODO = { todo: 'ms', toda: 'fs', todos: 'mp', todas: 'fp' };
 
 const PARTICIPIO = '(?:visto|hecho|dicho|puesto|vuelto|escrito|roto|abierto|muerto|cubierto|resuelto|sido|estado|ido|\\p{L}+[aií]do)';
 
+const VERBO_SABER = 'sé|sabe|sabes|sabemos|saben|sabía|sabías|sabían|pregunto|pregunta|preguntó|preguntan|entiendo|entiende|imagino|imagina|dime|dígame|explícame|explíqueme|averigua|averigüe|recuerdo|recuerda';
+
 /* Las reglas que se pueden decir con una expresión. `s`: la corrección. */
 const EXPRESIONES = [
   { id: 'contraccion', sev: 'error', re: re('\\b([Aa]) el\\b(?!\\s*\\p{Lu})', 'gu'), msg: '«a el» se contrae en «al» (o, si es el pronombre, «a él»).', s: (m) => m[1] + 'l / ' + m[1] + ' él' },
@@ -498,6 +506,8 @@ const EXPRESIONES = [
   { id: 'dequeismo', sev: 'aviso', re: re('\\b((?:me|te|se|nos)\\s+(?:di|diste|dio|dimos|dieron|doy|das|da|damos|dan)\\s+cuenta|(?:estoy|estás|está|estamos|están|estaba|estaban|estuve)\\s+segur[oa]s?|(?:me|te|se|nos)\\s+(?:acuerdo|acuerdas|acuerda|acordamos|acuerdan|acordé|acordó|enteré|enteró|enteramos|enteraron)|a pesar)\\s+que\\b'), msg: 'Queísmo: aquí falta el «de».', s: (m) => m[1] + ' de que' },
   { id: 'dequeismo', sev: 'sugerencia', re: re('\\b(creo|crees|cree|creemos|creen|creí|creyó|creían|pienso|piensas|piensa|piensan|supongo|supone|suponen|imagino|imaginas|imagina|imaginan)\\s+(se|me|te|nos|le|les|lo|la|los|las)\\s+(\\p{L}+(?:rá|rán|rás|ré|remos|ría|rían|rías|ríamos))\\b'),
     msg: '¿Falta el «que»? En el diálogo lo normal es «creen que se ganarán».', s: (m) => m[1] + ' que ' + m[2] + ' ' + m[3] },
+  { id: 'comaVerbo', sev: 'aviso', re: re('\\b(' + VERBO_SABER + '),(?=\\s+(?:qué|cómo|dónde|cuándo|quién|quiénes|cuál|cuáles|cuánto|cuánta|cuántos|cuántas|por qué|si)\\b)', 'giu'),
+    msg: 'Sobra la coma: el verbo no se separa de lo que sigue («no sé cómo…»).', s: (m) => m[1] },
   { id: 'asiQue', sev: 'aviso', re: re('\\b([Aa])sí que,'), msg: 'Después de «así que» no va coma.', s: (m) => m[1] + 'sí que' },
   { id: 'posesivo', sev: 'sugerencia', re: re('\\b(detrás|delante|encima|debajo|cerca|enfrente|alrededor|dentro|fuera)\\s+(mío|mía|tuyo|tuya|suyo|suya|nuestro|nuestra)\\b'),
     msg: 'En la norma culta: «detrás de mí», «cerca de ti».', s: (m) => m[1] + ' de ' + ({ mío: 'mí', mía: 'mí', tuyo: 'ti', tuya: 'ti', suyo: 'él', suya: 'ella', nuestro: 'nosotros', nuestra: 'nosotras' })[m[2].toLowerCase()] },
@@ -916,6 +926,12 @@ function revisar(guion, dic, op = {}){
         hasta - 1, hasta, '.', vecinas(sig));
     }
 
+    /* «Ah, yo no sé,» / «cómo se le habrá ocurrido…»: la coma que separa el
+       verbo de lo que sigue en la fila siguiente. */
+    if(sigCont && re('\\b(' + VERBO_SABER + '),\\s*$', 'iu').test(t.replace(/[\s\/\\^<>|]+$/, ''))
+       && re('^\\s*(?:qué|cómo|dónde|cuándo|quién|quiénes|cuál|cuáles|cuánto|cuánta|cuántos|cuántas|por qué|si)\\b', 'iu').test(sig.dialogo))
+      poner(f, 'comaVerbo', 'aviso', 'Sobra la coma: el verbo no se separa de lo que sigue en la fila ' + sig.fila + '.', hasta - 1, hasta, 'borrar', vecinas(sig));
+
     /* Estilo del estudio: la pregunta (o la exclamación) que sigue en el
        evento siguiente se cierra en cada evento y se vuelve a abrir, para que
        cada evento se lea entero:
@@ -999,15 +1015,26 @@ function revisar(guion, dic, op = {}){
     const s = sueltos[i];
     if(!s) return;
     const sig = siguiente(i, 1), ant = siguiente(i, -1);
+    /* «¡Les quitan» / «la oportunidad» / «de ser súbditos…!»: se sigue la
+       frase fila a fila hasta encontrar el cierre (o el principio). */
+    const enLaFrase = (dir, c) => {
+      let a = filas[i], b = siguiente(i, dir);
+      for(let n = 0; b && n < 6; n++){
+        if(!(dir > 0 ? sigue(a, b) : sigue(b, a))) return false;
+        if(sueltos[b.i] && sueltos[b.i][dir > 0 ? 'cierra' : 'abre'].some(x => x.c === c)) return true;
+        a = b; b = siguiente(b.i, dir);
+      }
+      return false;
+    };
     for(const a of s.abre){
       const par = { '¿': '?', '¡': '!', '(': ')', '[': ']' }[a.c];
-      if(sig && sigue(f, sig) && sueltos[sig.i] && sueltos[sig.i].cierra.some(x => x.c === par)) continue;
+      if(enLaFrase(1, par)) continue;
       if(sig && sigue(f, sig) && abreSeguida(sig) === a.c) continue;   // lo avisa preguntaPartida en la fila siguiente
       poner(f, 'signosPares', 'error', 'Se abre «' + a.c + '» y no se cierra.', a.k, a.k + 1, par);
     }
     for(const c of s.cierra){
       const par = { '?': '¿', '!': '¡', ')': '(', ']': '[' }[c.c];
-      if(ant && sigue(ant, f) && sueltos[ant.i] && sueltos[ant.i].abre.some(x => x.c === par)) continue;
+      if(enLaFrase(-1, par)) continue;
       poner(f, 'signosPares', 'error', 'Se cierra «' + c.c + '» sin haberse abierto («' + par + '»).', c.k, c.k + 1, par);
     }
   });

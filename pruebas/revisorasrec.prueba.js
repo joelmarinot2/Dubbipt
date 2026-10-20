@@ -147,6 +147,8 @@ exports.pruebas = async function(t){
     ['1: (katáwa):error', '1: (Matwáti):error', '2: (matwáti):error', '3: (matwáti):error']);
   t.ok('y entonces no se comparan entre sí', !res.hallazgos.some(h => h.regla === 'guias' || h.regla === 'sinGuia'));
   t.ok('un nombre con su guía sigue siendo un nombre', !res.hallazgos.some(h => h.regla === 'diccionario' && /áwa|áti/.test(h.palabra)));
+  t.eq('una guía de varias sílabas sueltas: «Sato Hideo (sá-to ji déo)»', M.revisarTexto('Soy Sato Hideo (sá-to ji déo).', dic).hallazgos.filter(h => h.regla === 'guiaPronunciacion').length, 1);
+  t.eq('«(en voz baja)» es una acotación, no una guía', M.revisarTexto('Hola (en voz baja).', dic).hallazgos.filter(h => h.regla === 'guiaPronunciacion').length, 0);
   t.eq('entre corchetes, igual', M.revisarTexto('Hola, Kathawa [katáwa].', dic).hallazgos.filter(h => h.regla === 'guiaPronunciacion').map(h => h.sug), ['borrar']);
   t.eq('una reacción entre paréntesis no es una guía', M.revisarTexto('(GESTO)', dic).hallazgos.filter(h => h.regla === 'guiaPronunciacion').length, 0);
   /* Con la regla apagada (un cliente que sí las quiere), vuelven las comparaciones. */
@@ -264,6 +266,14 @@ exports.pruebas = async function(t){
   pp = M.revisarTexto('FUKUDA: ¿Creen que se ganarán nuestra admiración…\nFUKUDA: ¿…y conseguirán su independencia?', dicP);
   t.eq('a medio corregir, cerrar la primera', pp.hallazgos.map(h => h.fila + ':' + h.regla + ':' + h.sug), ['1:preguntaPartida:…?']);
   t.eq('dos preguntas de verdad, nada', M.revisarTexto('¿Me habrá traído…?\n¿Y el libro?', dicP).hallazgos.length, 0);
+
+  t.seccion('Lo que salió de los FN de 100 Days of Deception');
+  const dicF = M.crearDiccionario('les quitan la oportunidad de ser súbditos del gran imperio japonés ah yo no sé cómo se le habrá ocurrido ponerme ese nombre'.split(' '), []);
+  t.eq('una exclamación repartida en tres eventos, abierta y cerrada una vez, no es error',
+    M.revisarTexto('¡Les quitan\nla oportunidad\nde ser súbditos del gran Imperio japonés!', dicF).hallazgos.filter(h => h.regla === 'signosPares').length, 0);
+  t.ok('«Ah, yo no sé,» / «cómo se le habrá ocurrido…»: sobra la coma',
+    M.revisarTexto('Ah, yo no sé,\ncómo se le habrá ocurrido ponerme ese nombre.', dicF).hallazgos.some(h => h.fila === 1 && h.regla === 'comaVerbo' && h.sug === 'borrar'));
+  t.ok('y en la misma línea también', M.revisarTexto('Ah, yo no sé, cómo se le habrá ocurrido.', dicF).hallazgos.some(h => h.regla === 'comaVerbo'));
 
   t.seccion('El Excel, de ida y vuelta');
   const libro = M.xlsx([{ nombre: 'Dialogue List', filas: [
