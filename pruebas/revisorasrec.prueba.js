@@ -23,7 +23,7 @@ const PALABRAS = ('pero ya lo sabías las guardaban esa tierra para el templo de
   'ejército reina otra vez esas zorras vayan adentro idiotas mi gente se ha negado a luchar por gesto dijiste vendrías ' +
   'no sé qué hacer cómo estás hizo haber si vienes fui mercado al bien solo quería este guion y hoy estamos aquí una más ' +
   'para consagrar como protectora con las bendiciones guerrera sí era hola amigo iba decir quiero saberlo firmé divorcio ' +
-  'te esta del lo hermanas pagarán declaración redefinimos leyes pasamos linaje materno paterno sus venas corre sangre brasas ardientes').split(' ');
+  'sino te esta del lo hermanas pagarán declaración redefinimos leyes pasamos linaje materno paterno sus venas corre sangre brasas ardientes').split(' ');
 
 function cargar(){
   const html = fs.readFileSync(path.join(RAIZ, 'revisor-asrec.html'), 'utf8').replace(/\r\n/g, '\n');
@@ -103,7 +103,8 @@ exports.pruebas = async function(t){
     fila(21, 'AMAR', '- ¿Vienes? - Ya voy.'),
     fila(22, 'AMAR', 'Habla con el FBI.')
   ] }, dic, {});
-  t.ok('la frase que sigue en otra fila termina con «…»', reglas(res, 1).includes('contFin'));
+  t.ok('la continuación de una frase no empieza con «…» (guía de español)', reglas(res, 2).includes('contTres'));
+  t.ok('y la fila que se parte puede quedarse sin signo', !reglas(res, 1).includes('contFin') && !reglas(res, 1).includes('sinFinal'));
   t.ok('los caracteres invisibles se ven', reglas(res, 3).includes('invisible'));
   t.eq('«(GESTO)» está bien', reglas(res, 4), []);
   t.ok('«(gesto)» va en mayúsculas', reglas(res, 5).includes('reaccionMayus'));
@@ -166,7 +167,7 @@ exports.pruebas = async function(t){
   t.eq('un diálogo bien escrito no da nada', p.hallazgos.length, 0);
   p = M.revisarTexto('Admito que quizá tu belleza me impidió ver\r\n\n…lo despiadada que eres.', dic);
   t.eq('cada línea es un evento, y se sabe dónde empieza', p.lineas.map(l => l.desde), [0, 45]);
-  t.ok('las continuaciones se miran entre líneas', p.hallazgos.some(h => h.regla === 'contFin' && h.sug === 'r…'));
+  t.ok('las continuaciones se miran entre líneas', p.hallazgos.some(h => h.fila === 2 && h.regla === 'contTres' && h.sug === 'borrar'));
   const ctx = M.contexto(res, { info: { 'SHOW TITLE': 'Akka' } });
   const conGuias = { contexto: ctx, apagadas: new Set(['guiaPronunciacion']) };
   p = M.revisarTexto('Rezaré a la diosa Makwathi (Matwáti).', dic, conGuias);
@@ -189,7 +190,9 @@ exports.pruebas = async function(t){
   t.eq('si la anterior cerró con punto, sobra el «…» (y no se pide a la vez uno al final)', p.hallazgos.map(h => h.regla), ['contSobra']);
   t.eq('y en minúscula, que empiece con mayúscula', M.revisarTexto('Ya lo sabías.\nlas hermanas pagarán.', dic).hallazgos.map(h => h.regla), ['inicioMinus']);
   t.eq('los dos puntos pueden quedarse al final', M.revisarTexto('Con esta declaración, redefinimos las leyes:\npasamos del linaje materno al paterno.', dic).hallazgos.filter(h => h.fila === 1).length, 0);
-  t.ok('una coma que no sigue en la fila de después', M.revisarTexto('Por sus venas no corre sangre,\nY brasas ardientes.', dic).hallazgos.some(h => h.fila === 1 && h.regla === 'sinFinal'));
+  t.eq('una coma nunca cierra: lo que sigue va en minúscula', M.revisarTexto('Por sus venas no corre sangre,\nSino brasas ardientes.', dic).hallazgos.map(h => h.fila + ':' + h.regla + ':' + h.sug), ['2:contMayus:sino']);
+  t.eq('«Algunos tenemos que pensar» / «en esas cosas.»: bien, sin «…»', M.revisarTexto('Hola amigo\nlo despiadada que eres.', dic).hallazgos.length, 0);
+  t.eq('«Me pasa algo raro…» / «pero…»: el «…» al final de una pausa está bien', M.revisarTexto('Hola amigo…\nlo despiadada que eres.', dic).hallazgos.length, 0);
   res = M.revisar({ info: {}, filas: [
     fila(1, 'AMAR', 'Admito que quizá tu belleza me impidió ver', { tcOut: '00:00:01:10' }),
     fila(2, 'AMAR', '…lo despiadada que eres.', { tcIn: '00:00:30:00', tcOut: '00:00:31:00' })

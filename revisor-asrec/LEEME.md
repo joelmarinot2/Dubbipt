@@ -47,9 +47,11 @@ y la fecha del arreglo), nombres y guías (con el timecode de la primera vez que
 sale cada nombre), y resumen (con arreglados y pendientes).
 
 **La puntuación de cada fila se mira con la de antes y la de después** del mismo
-personaje (hasta ocho filas y diez segundos de hueco): si la frase sigue, si la
-interrumpe otro personaje («…» al cortar y al retomar), si la anterior ya la
-cerró (sobra el «…», va mayúscula) o si la continuación empieza en mayúscula.
+personaje (hasta ocho filas y diez segundos de hueco). Como en la guía de
+español de Netflix, la continuación de una frase **no empieza con «…»**
+(«Algunos tenemos que pensar» / «en esas cosas.»): solo si la interrumpe otro
+personaje van «…» al cortar y al retomar. También avisa si la anterior ya cerró
+la frase (sobra el «…», va mayúscula) o si la continuación empieza en mayúscula.
 Cada aviso enseña las filas vecinas que lo explican.
 
 **Probar un diálogo**: en la pantalla de inicio, y en su pestaña cuando hay un

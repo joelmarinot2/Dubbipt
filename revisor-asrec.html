@@ -619,11 +619,12 @@ const R = {
   reaccionMayus: ['asrec', 'Reacciones escritas igual', 'Todas las reacciones del guion se escriben del mismo modo: si casi todas van en mayúsculas, (GESTO), las demás también.'],
   reaccionIngles:['asrec', 'Reacciones en inglés', 'En el guion en español las reacciones van en español: (RISA), no (LAUGHS).'],
   reaccionEstilo:['asrec', 'Signos de las reacciones', 'Todas las reacciones del guion se marcan con el mismo signo: paréntesis, corchetes o llaves, sin mezclar.'],
-  contFin:       ['asrec', 'Continuación: «…» al final', 'Se mira la fila de antes y la de después. Cuando otro personaje interrumpe la frase, la guía de español pide «…» al final y al retomarla. Sin interrupción, Netflix no lo pide en subtítulos, pero si el guion marca así las continuaciones, se pide que sea siempre igual.'],
-  contIni:       ['asrec', 'Continuación: «…» al principio', 'La fila que retoma una frase empieza con «…» si la interrumpió otro personaje, o si el guion marca así las continuaciones.'],
+  contTres:      ['asrec', 'Continuación sin «…» al principio', 'Guía de español: «Do not use ellipses or dashes when an ongoing sentence is split between two or more continuous subtitles» y «do not use an ellipsis at the beginning of the second subtitle, unless the pause (2 seconds or more) was caused by an interruption». La continuación no empieza con «…» («Algunos tenemos que pensar» / «en esas cosas.»), salvo que otro personaje la haya interrumpido. «¿…» al volver a abrir una pregunta partida es estilo del estudio.'],
+  contFin:       ['asrec', 'Interrupción: «…» al final', 'Guía de español: si otro personaje interrumpe la frase, «…» al final del evento cortado y al principio del que la retoma («Te iba a decir que…» / «¡No quiero saberlo!» / «…ya firmé el divorcio.»).'],
+  contIni:       ['asrec', 'Interrupción: «…» al principio', 'Guía de español: la fila que retoma una frase después de que hable otro personaje empieza con «…».'],
   sinFinal:      ['asrec', 'Falta la puntuación final', 'Guía ASR: «proper punctuation, even if a sentence is split across multiple events». Si la frase no sigue en la fila siguiente, termina con su signo.'],
   preguntaPartida:['asrec', 'Pregunta o exclamación partida', 'Regla del estudio: la pregunta que sigue en el evento siguiente se cierra en cada evento y se vuelve a abrir, para que cada uno se lea entero: «¿Creen que se ganarán nuestra admiración…?» / «¿…y conseguirán su independencia?». Ojo: la guía de español de Netflix (para subtítulos) la abre una vez y la cierra una vez («¿Te ha…» / «disparado?»); si un cliente lo pide así, apaga esta regla.'],
-  contMayus:     ['asrec', 'Continuación en mayúscula', 'La fila que continúa una frase sigue en minúscula: «…lo despiadada que eres», no «…Lo despiadada».'],
+  contMayus:     ['asrec', 'Continuación en mayúscula', 'La fila que continúa una frase que la anterior no cerró sigue en minúscula: «en esas cosas», no «En esas cosas».'],
   contSobra:     ['asrec', '«…» al principio sin continuación', 'Si la fila anterior del personaje ya cerró la frase con punto, «?» o «!», la siguiente no empieza con «…» (salvo que la haya interrumpido otro personaje).'],
   inicioMinus:   ['asrec', 'Empieza en minúscula', 'Guía ASR: el diálogo va «in sentence case». Empieza con mayúscula salvo que continúe la frase anterior.'],
   repetida:      ['asrec', 'Línea repetida', 'El mismo personaje dice exactamente lo mismo pocas filas después. Puede ser intencionado; la guía ASR pide quitar los eventos «redundant, or unnecessary».'],
@@ -679,7 +680,7 @@ const R = {
 const FUENTE = {
   guiaPronunciacion: 'estudio', barra: 'estudio', vacio: 'Netflix ASR', numeros: 'Netflix ES', abreviatura: 'Netflix ES', simbolos: 'Netflix ASR', mayusSostenidas: 'Netflix ASR',
   reaccionSigno: 'Netflix ASR', reaccionBorde: 'Netflix ASR', reaccionMayus: 'guion', reaccionIngles: 'guion', reaccionEstilo: 'guion',
-  contFin: 'guion', contIni: 'guion', contMayus: 'RAE', contSobra: 'guion', preguntaPartida: 'estudio', sinFinal: 'Netflix ASR', inicioMinus: 'Netflix ASR', repetida: 'Netflix ASR',
+  contTres: 'Netflix ES', contFin: 'Netflix ES', contIni: 'Netflix ES', contMayus: 'RAE', contSobra: 'guion', preguntaPartida: 'estudio', sinFinal: 'Netflix ASR', inicioMinus: 'Netflix ASR', repetida: 'Netflix ASR',
   invisible: 'Netflix ES', tresPuntos: 'Netflix ES', espacios: 'guion', espacioSigno: 'RAE', suspensivos: 'Netflix ES', signosPares: 'RAE',
   puntoTrasSigno: 'Netflix ES', puntoYComa: 'Netflix ES', dobleSigno: 'Netflix ES', peroComa: 'Netflix ES', mayusPunto: 'RAE', comillas: 'Netflix ES',
   diccionario: 'Netflix ASR', rae2010: 'RAE', pegadas: 'RAE', interrogativa: 'RAE', diacritica: 'RAE', vosotros: 'Netflix ES',
@@ -1185,9 +1186,10 @@ function revisar(guion, dic, op = {}){
 
   const ultimo = (t) => final(t.trim().replace(/\s*[(\[][^()\[\]]*\p{Ll}[^()\[\]]*[)\]]$/u, ''));   // sin la guía final
   /* ¿La frase de `a` sigue en `b`? No, si `a` la cerró con punto, «?» o «!».
-     Sí, si `b` empieza con «…» o en minúscula, o si `a` se queda sin cerrar
-     (coma, dos puntos o sin signo) y `b` no empieza otra frase. */
-  const sigue = (a, b) => !/[.?!]/.test(ultimo(a.dialogo)) && (/^\s*[¿¡]?\s*…/.test(b.dialogo) || /^\p{Ll}/u.test(primeraLetra(b.dialogo))
+     Sí, si `b` empieza con «…» o en minúscula, si `a` termina en coma (una
+     coma nunca cierra una frase), o si `a` se queda sin cerrar (dos puntos o
+     sin signo) y `b` no empieza otra frase. */
+  const sigue = (a, b) => !/[.?!]/.test(ultimo(a.dialogo)) && (/^\s*[¿¡]?\s*…/.test(b.dialogo) || /^\p{Ll}/u.test(primeraLetra(b.dialogo)) || ultimo(a.dialogo) === ','
     || /[,;:]|\p{L}/u.test(ultimo(a.dialogo)) && !/^\p{Lu}/u.test(primeraLetra(b.dialogo.replace(/^\s*…\s*/, ''))));
   const quien = (g) => g.source.trim() + ' (fila ' + g.fila + ')';
   /* «¿…y conseguirán…?» o «¿y conseguirán…?»: abre otra vez lo que venía de antes. */
@@ -1209,13 +1211,13 @@ function revisar(guion, dic, op = {}){
     const corteAnt = A && A.entre.length ? A.entre[A.entre.length - 1] : null;
     const vecinas = (...gs) => ({ vecinas: gs.filter(Boolean).map(g => g.i) });
 
-    /* El final: «…» si la frase sigue (y siempre si alguien la interrumpe);
-       si no sigue, su punto, su «?» o su «!». */
-    /* Los dos puntos sí pueden quedarse al final: anuncian lo que sigue. */
-    if(sigCont && fin !== '…' && fin !== ':' && (/^\s*[¿¡]?\s*…/.test(sig.dialogo) || estiloSuspensivos || corteSig))
-      poner(f, 'contFin', 'aviso', corteSig
-        ? 'La interrumpe ' + quien(corteSig) + ' y la frase sigue en la fila ' + sig.fila + ': termina esta con «…».'
-        : 'La frase sigue en la fila ' + sig.fila + ': termina esta con «…».',
+    /* El final. Si la frase sigue en la fila siguiente, puede quedarse sin
+       signo («Algunos tenemos que pensar» / «en esas cosas.»): la guía de
+       español no pone «…» al partir una frase. Solo si la interrumpe otro
+       personaje, «…» al cortar y al retomar. Si no sigue, su punto, su «?» o
+       su «!». Los dos puntos sí pueden quedarse al final: anuncian lo que sigue. */
+    if(sigCont && corteSig && fin !== '…' && fin !== ':')
+      poner(f, 'contFin', 'aviso', 'La interrumpe ' + quien(corteSig) + ' y la frase sigue en la fila ' + sig.fila + ': termina esta con «…».',
         hasta - 1, hasta, /[,;:.]/.test(t[hasta - 1]) ? '…' : t[hasta - 1] + '…', vecinas(corteSig, sig));
     else if(!sigCont && !/[.?!…:;,]/.test(fin) && fin !== ':'){
       const otro = filas.slice(i + 1).find(g => g.dialogo.trim() && !esReaccion(g.dialogo));
@@ -1246,26 +1248,41 @@ function revisar(guion, dic, op = {}){
         hasta - 1, hasta, (/[…,;:.]/.test(ult) ? '' : ult) + '…' + PAR[c], vecinas(sig));
     }
     const cerrados = sueltos[i] ? sueltos[i].cierra.filter(x => x.c === '?' || x.c === '!') : [];
+    let reabre = false;
     if(cerrados.length && ant && !abreSeguida(f) && sigue(ant, f)){
       const c = cerrados[0].c === '?' ? '¿' : '¡';
       if(sueltos[ant.i] && sueltos[ant.i].abre.some(x => x.c === c)){
+        reabre = true;
         const k0 = t.length - t.trimStart().length, m = /^\s*…\s*/.exec(t);
         poner(f, 'preguntaPartida', 'aviso', 'Viene de la ' + signo(c) + ' de la fila ' + ant.fila + ': vuelve a abrirla aquí con «' + c + '…».',
           m ? m.index : k0, m ? m.index + m[0].length : k0 + 1, m ? c + '…' : c + '…' + t[k0], vecinas(ant));
       }
     }
 
-    /* El principio. */
+    /* El principio. La continuación de una frase no empieza con «…» (guía de
+       español: «do not use an ellipsis at the beginning of the second
+       subtitle, unless the pause … was caused by an interruption»). Solo la
+       que retoma la frase después de que hable otro personaje. «¿…» o «¡…»
+       al volver a abrir una pregunta partida es el estilo del estudio. */
+    if(empiezaTres && !/^[¿¡]/.test(tr) && ant && antCont && !corteAnt && !reabre){
+      const m = /^…\s*/.exec(tr);
+      poner(f, 'contTres', 'aviso', 'Continúa la frase de la fila ' + ant.fila + ': la continuación no empieza con «…» (solo si la interrumpe otro personaje).',
+        t.indexOf('…'), t.indexOf('…') + m[0].length, 'borrar', vecinas(ant));
+    }
     if(!empiezaTres && /^\p{Ll}/u.test(letra)){
-      if(antCont && (estiloSuspensivos || corteAnt))
-        poner(f, 'contIni', 'aviso', corteAnt
-          ? 'Retoma la frase de la fila ' + ant.fila + ' después de que hable ' + quien(corteAnt) + ': empieza con «…».'
-          : 'Continúa la frase de la fila ' + ant.fila + ': en este guion la continuación empieza con «…».',
+      if(antCont && corteAnt)
+        poner(f, 'contIni', 'aviso', 'Retoma la frase de la fila ' + ant.fila + ' después de que hable ' + quien(corteAnt) + ': empieza con «…».',
           0, 1, '…' + tr[0], vecinas(ant, corteAnt));
       else if(!antCont)
         poner(f, 'inicioMinus', 'aviso', ant && /[.?!]$/.test(ultimo(ant.dialogo))
           ? 'La fila ' + ant.fila + ' cerró la frase: esta empieza con mayúscula.'
           : 'La intervención empieza en minúscula.', 0, 1, tr[0].toUpperCase(), vecinas(ant));
+    }
+    if(!empiezaTres && ant && !corteAnt && /[,]|\p{L}/u.test(ultimo(ant.dialogo))){
+      const m = /^([\s¿¡]*)(\p{L}+)/u.exec(t);
+      if(m && ES_MAYUS.test(m[2]) && m[2] !== m[2].toUpperCase() && dic && dic.tiene(m[2].toLowerCase()) && !esNombre(m[2]) && !/^[¿¡]/.test(m[1].trim()))
+        poner(f, 'contMayus', 'aviso', 'Continúa la frase de la fila ' + ant.fila + ' (que no la cerró): sigue en minúscula.',
+          m[1].length, m[1].length + m[2].length, m[2].toLowerCase(), vecinas(ant));
     }
     if(empiezaTres && ant){
       const cierre = ultimo(ant.dialogo);
@@ -1277,8 +1294,8 @@ function revisar(guion, dic, op = {}){
           m[1].length, m[1].length + m[2].length, m[2].toLowerCase(), vecinas(ant));
       /* «…» al principio cuando la anterior ya había cerrado con punto. */
       if(/[.?!]/.test(cierre) && !corteAnt && !partidaAnt)
-        poner(f, 'contSobra', 'sugerencia', 'La fila ' + ant.fila + ' ya cerró la frase con «' + cierre + '»: ¿sobra el «…» del principio?',
-          0, tr.indexOf('…') + 1, tr.slice(0, tr.indexOf('…')), vecinas(ant));
+        poner(f, 'contSobra', 'aviso', 'La fila ' + ant.fila + ' ya cerró la frase con «' + cierre + '»: sobra el «…» del principio.',
+          t.indexOf('…'), t.indexOf('…') + /^…\s*/.exec(t.slice(t.indexOf('…')))[0].length, 'borrar', vecinas(ant));
     }
 
     /* Repetida pocas filas después. */
