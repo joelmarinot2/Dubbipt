@@ -76,13 +76,13 @@ function talLeerXlsx(buf){
     const col = m[1], fila = +m[2], attrs = m[3], cuerpo = m[4];
     let v = '';
     if(/t="s"/.test(attrs)){
-      const i = (cuerpo.match(/<v>(\d+)<\/v>/) || [])[1];
+      const i = (cuerpo.match(/<v(?:\s[^>]*)?>(\d+)<\/v>/) || [])[1];
       if(i != null) v = compartidas[+i] || '';
     }else if(/t="inlineStr"/.test(attrs)){
       for(const t of cuerpo.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)) v += t[1];
       v = talDesEsc(v);
     }else{
-      v = talDesEsc((cuerpo.match(/<v>([\s\S]*?)<\/v>/) || [])[1] || '');
+      v = talDesEsc((cuerpo.match(/<v(?:\s[^>]*)?>([\s\S]*?)<\/v>/) || [])[1] || '');
     }
     v = String(v).trim();
     if(!v) continue;

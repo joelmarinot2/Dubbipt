@@ -21,3 +21,5 @@ Dubbipt-main/
 local/
 *.cmd
 protools-overlay/
+# fuentes del revisor ASREC: se publica solo el revisor-asrec.html construido
+revisor-asrec/

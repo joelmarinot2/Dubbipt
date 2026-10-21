@@ -1,0 +1,96 @@
+# Revisor ASREC
+
+`revisor-asrec.html` (en la raíz) es un programa de un solo archivo: se abre con
+doble clic, **sin internet**, se suelta el Excel del guion de doblaje y revisa
+las casillas **DIALOGUE** de la hoja **Dialogue List**.
+
+Lleva dentro el diccionario de español de LibreOffice (unas 660 000 formas) y
+el lector de Excel; no carga nada de fuera y el archivo no sale del ordenador.
+
+## Qué revisa
+
+| Grupo | Ejemplos |
+|---|---|
+| Formato ASREC | casilla vacía, reacciones sin paréntesis, MAYÚSCULAS sostenidas, números y abreviaturas, continuaciones con «…» |
+| Puntuación | «...» en vez de «…», espacios, ¿? ¡!, punto y coma, «?!» juntos, «Pero, ¿…?», comillas, caracteres invisibles |
+| Ortografía | diccionario, RAE 2010 (solo, este, guion), qué/cómo/dónde, tú/mí/él/sé/sí, «vosotros» en latino |
+| Gramática | «todo tus», «a el», «haber si», «he echo», «habían muchas», dequeísmo, «así que,» |
+| Coherencia | guías de pronunciación distintas para el mismo nombre, nombres escritos de dos formas, «Diosa»/«diosa» |
+| Etiquetas | MAIN TITLE IN DIALOGUE, SENSITIVE LANGUAGE, CONTEXT sin anotación |
+| Personajes y timecodes | KATHWA/KATHAWA, espacios en SOURCE, varios personajes en un evento, WALLA y NONE, timecodes |
+
+Reglas del **estudio** (fuente «estudio»), que se pueden apagar en «Reglas y
+diccionario» si un cliente pide otra cosa:
+- La **«/»** para marcar pausas es un error. La guía ASR de Netflix sí la permite.
+- Las **guías de pronunciación** entre ( ) o [ ] («Kathawa (katáwa)») son un error
+  y se quitan, con su espacio. La guía ASR de Netflix sí las permite. Mientras la
+  regla esté encendida no se avisa de nombres sin guía ni de guías distintas.
+- Una **pregunta o exclamación partida** en dos eventos se cierra en cada evento y
+  se vuelve a abrir: «¿Creen que se ganarán nuestra admiración…?» / «¿…y
+  conseguirán su independencia?». Se avisa la forma contraria (abierta en uno y
+  cerrada en otro), que es la de la guía de español de Netflix para subtítulos.
+
+Cada regla dice de dónde sale: **Netflix ASR** (As Recorded Dubbing Script Scope
+of Work), **Netflix ES** (Spanish (Latin America & Spain) Timed Text Style
+Guide), **RAE**, o **guion** (el guion comparado consigo mismo). En la pestaña
+«Reglas y diccionario» se apagan una a una y se añaden palabras propias.
+
+Cada hallazgo tiene un botón **«✓ Arreglado»** (y «✓ Toda la fila arreglada»)
+para llevar el control: lo marcado se ve tachado, con la fecha y la hora, y se
+puede deshacer. Arriba sale el progreso («12 de 126 arreglados») y se puede
+filtrar por pendientes o arreglados. Se guarda en el navegador para cada archivo
+(nombre, MOVIE ID y versión): al volver a abrir el mismo Excel sigue marcado.
+
+El informe se descarga en `.xlsx` con tres hojas: hallazgos (empieza por el
+**timecode inicial** de cada fila, y lleva el **estado**, Pendiente o Arreglado,
+y la fecha del arreglo), nombres y guías (con el timecode de la primera vez que
+sale cada nombre), y resumen (con arreglados y pendientes).
+
+**La puntuación de cada fila se mira con la de antes y la de después** del mismo
+personaje (hasta ocho filas y diez segundos de hueco). Como en la guía de
+español de Netflix, la continuación de una frase **no empieza con «…»**
+(«Algunos tenemos que pensar» / «en esas cosas.»): solo si la interrumpe otro
+personaje van «…» al cortar y al retomar. También avisa si la anterior ya cerró
+la frase (sobra el «…», va mayúscula) o si la continuación empieza en mayúscula.
+Cada aviso enseña las filas vecinas que lo explican.
+
+**Probar un diálogo**: en la pantalla de inicio, y en su pestaña cuando hay un
+Excel abierto. Se escribe o se pega un diálogo, cada línea es un evento, y dice
+al momento si está bien o qué tiene mal, con botones para aplicar la
+corrección. Para una conversación, cada línea empieza con el personaje
+(`AMAR: Te iba a decir que…`). También lee **capturas**: con el botón «Leer una
+captura», pegándola con Ctrl+V o arrastrándola. De la captura solo saca **el
+personaje y su línea de diálogo**, y deja fuera timecodes, transcripción,
+etiquetas y anotaciones. Reconoce:
+- las **tarjetas de la herramienta de guiones de Netflix** (timecodes, «FUKUDA ▾
+  On», la línea en letra grande y, tras la raya, «# Foreign Dialog» y las
+  anotaciones);
+- el **Excel** o cualquier tabla con cabecera (SOURCE / PERSONAJE y DIALOGUE /
+  DIÁLOGO), aunque una casilla tenga dos líneas;
+- **tablas sin cabecera**: el personaje es la columna en mayúsculas y el diálogo,
+  la que más palabras en español tiene (no la transcripción en inglés);
+- tarjetas con el nombre encima del diálogo, y texto suelto línea a línea. El lector (Tesseract.js
+con el español) va dentro del archivo: ver `ocr/LEEME.md`. Con un Excel abierto, lo compara además con los nombres, las guías
+de pronunciación y el título de ese guion.
+
+## Cómo se construye
+
+No se edita `revisor-asrec.html` a mano. Se editan estos y se reconstruye:
+
+- `motor.js`: las reglas, la lectura del Excel y el informe.
+- `plantilla.html`: la pantalla.
+- `diccionario/`: el diccionario de LibreOffice (es y es-MX), con su licencia.
+- `ocr/`: el lector de capturas (Tesseract.js y el español), con sus licencias.
+
+```bash
+node revisor-asrec/construir.js
+node pruebas/correr.js
+```
+
+La prueba `pruebas/revisorasrec.prueba.js` comprueba que el HTML construido
+lleva el `motor.js` de ahora: si se olvida reconstruir, sale en rojo.
+
+## Licencia del diccionario
+
+El diccionario es de LibreOffice (rla-es, Santiago Bosio y colaboradores), con
+triple licencia GPL 3 / LGPL 3 / MPL 1.1. Ver `diccionario/LICENCIA.txt`.
