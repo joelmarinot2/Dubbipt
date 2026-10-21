@@ -126,6 +126,19 @@ exports.pruebas = function(t){
   const leidoE = X.castLeerColumna(hoja(), 'E');
   t.eq('E13', leidoE[13], '7');
   t.eq('E14', leidoE[14], '3');
+  /* Copiado del desglose de CHIME TRAVELERS 107: el personaje acaba en espacio
+     y Excel guarda el valor como <v xml:space="preserve">. Buscando solo «<v>»
+     no se leía ni un personaje y el casting salía con la columna del actor
+     entera en blanco. */
+  const chime = '<row r="13"><c r="A13" s="99" t="str"><f>IF(DESGLOCE!A17="","",DESGLOCE!A17)</f><v xml:space="preserve">GRÁFICA </v></c>'
+    + '<c r="D13" s="99"/></row><row r="14"><c r="A14" s="99" t="str"><f>IF(DESGLOCE!A18="","",DESGLOCE!A18)</f><v xml:space="preserve">KATIA (VO) </v></c>'
+    + '<c r="D14" s="323"/></row><row r="15"><c r="A15" s="99" t="str"><f>IF(DESGLOCE!A19="","",DESGLOCE!A19)</f><v>JUAN &amp; MARÍA</v></c></row>'
+    + '<row r="17"><c r="A17" s="99" t="str"><f>IF(DESGLOCE!A21="","",DESGLOCE!A21)</f><v/></c></row>';
+  const leidoChime = X.castLeerColumna(chime, 'A');
+  t.eq('el valor con xml:space="preserve" se lee (sin el espacio del final)', leidoChime[13], 'GRÁFICA');
+  t.eq('todos los de esa forma', leidoChime[14], 'KATIA (VO)');
+  t.eq('los caracteres escapados vuelven a ser lo que eran', leidoChime[15], 'JUAN & MARÍA');
+  t.ok('una fórmula que da vacío (<v/>) no es un personaje', !(17 in leidoChime));
 
   /* ── XLS-5, XLS-6 y XLS-N2 ──────────────────────────────────────────── */
   t.seccion('7 · XLS-5 · los numeros se escriben como numeros');
