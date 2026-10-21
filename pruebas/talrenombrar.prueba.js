@@ -24,7 +24,7 @@ exports.pruebas = async function(t){
       const datos = { talents: [{ id: 1, name: 'ANA ROJAS' }, { id: 2, name: 'BEATRIZ SOL' }] };
       D.ctx = { CS: { talAbierto: 'ANA ROJAS', registros: { s1: {} } }, CS_REGS: { lista: [1], ts: 9 } };
       D.M = montar([['/* ── Cambiar el nombre de un talento', '/* ── Un episodio nuevo entra en Producción']], ['csRenombrarTalento'],
-        { castNorm: castNorm, CS: D.ctx.CS, CS_REGS: D.ctx.CS_REGS, castAviso: (m) => D.avisos.push(m), csRepintar: () => { D.pintadas++; }, fallo: () => {},
+        { castNorm: castNorm, csEsMarca: (n) => ['ORIGINAL', 'X', 'TODOS', 'X ORIGINAL'].indexOf(castNorm(n)) >= 0, CS: D.ctx.CS, CS_REGS: D.ctx.CS_REGS, castAviso: (m) => D.avisos.push(m), csRepintar: () => { D.pintadas++; }, fallo: () => {},
           dcxNombreTalento: (n) => castNorm(n),
           dcxTalento: (pl, id, c) => { if(pl.talents.some(x => x.id !== id && castNorm(x.name) === castNorm(c.name))) throw new Error('ya hay un talento que se llama «' + c.name + '»'); const x = pl.talents.find(y => y.id === id); x.name = c.name; return true; },
           csEditar: async (cambio, que) => { try{ const r = cambio(datos); D.cambios.push(que); return r ? 'guardado' : 'igual'; }catch(e){ D.avisos.push('No se pudo guardar: ' + e.message); return 'error'; } },
@@ -73,8 +73,8 @@ exports.pruebas = async function(t){
   t.seccion('4 · dónde está');
   {
     const CV = fs.readFileSync(path.join(RAIZ, 'js', 'castingvistas.js'), 'utf8');
-    t.ok('el lápiz en la tarjeta (solo con ficha) y junto al nombre en la ficha', /cs-tcard-ren" data-cs="talRen" data-v="' \+ csEsc\(f\.t\.id\)/.test(CV) && /cs-tficha-ren" data-cs="talRen" data-v="' \+ csEsc\(t\.id\)/.test(CV));
-    t.ok('el campo Nombre de «Editar ficha» pasa por el mismo camino', /if\(campo === 'name'\)\{[\s\S]{0,300}csRenombrarTalento\(t, valor\)/.test(CV) && /que === 'talRen'/.test(CV));
+    t.ok('el lápiz en la tarjeta y junto al nombre en la ficha (abren «Editar talento», PRO-53)', /cs-tcard-ren" data-cs="talEditar" data-v="' \+ csEsc\(f\.clave\)/.test(CV) && /cs-tficha-ren" data-cs="talEditar" data-v="' \+ csEsc\(f\.clave\)/.test(CV));
+    t.ok('el campo Nombre de «Editar ficha» pasa por el mismo camino', /if\(campo === 'name'\)\{[\s\S]{0,300}csRenombrarTalento\(t, valor\)/.test(CV) && /que === 'talEditar'/.test(CV));
     t.ok('con sus estilos', /\.cs-tcard-ren\{/.test(fs.readFileSync(INDEX, 'utf8')));
   }
 };

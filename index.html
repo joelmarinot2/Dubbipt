@@ -873,6 +873,12 @@ h1,h2,h3,.sec-title,.stat b,.card h3,.ccard h3,.pla-head h2{ font-family:'Inter'
 .card .ctal-input::placeholder{ color:#6b7280; }
 /* Nombre que no esta en la base: se ve al momento, no solo en el aviso. */
 .card .ctal-input.ctal-mal{ border-color:#F472B6; background:#1a0f16; }
+/* ORIGINAL, X y TODOS a un clic: marcas, no talentos (PRO-53) */
+.card .tal:has(.ctal-marcas){ flex-wrap:wrap; }
+.card .ctal-marcas{ display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; flex-basis:100%; }
+.card .ctal-marca{ background:#15181c; border:1px dashed #3a3f47; color:#cbd0d6; border-radius:7px; padding:3px 8px; font:600 11px 'Inter',sans-serif; cursor:pointer; }
+.card .ctal-marca:hover, .card .ctal-marca:focus-visible{ border-color:#A78BFA; color:#ede9fe; outline:none; }
+.card .ctal-nomarca{ color:#8b8f97; font-size:10.5px; font-weight:500; margin-left:8px; }
 .card .cline{ display:none; }
 .card .cbtn{ display:block; width:calc(100% + 36px); margin:14px -18px 0; padding:12px 18px;
   background:transparent; border:none; border-top:1px solid #1c1e22;
@@ -2024,6 +2030,11 @@ body.cs-on #progHeader{ display:none !important; }
 .bd-guia b{ color:#38BDF8; font-style:normal; font-size:10.5px; margin-right:4px; }
 .dct-marco{ width:100%; min-height:calc(100vh - 230px); border:none; border-radius:12px; background:#fff; }
 .dct-pegado-completa .dct-marco{ min-height:calc(100vh - 90px); }
+.dct-ci-main{ display:flex; flex-wrap:wrap; gap:6px 16px; align-items:center; }
+.dct .dct-ci-main label.dct-check i{ font-style:normal; color:#8b8f97; font-size:11px; }
+.dct-ci-ep{ background:#0c0e11; border:1px solid #23262b; border-radius:10px; padding:8px 12px; font-size:12.5px; color:#e5e7eb; }
+.dct-ci-ep summary{ cursor:pointer; font-weight:600; }
+.dct-ci-ep[open] summary{ margin-bottom:6px; }
 .cs-tal-modos{ margin:0 0 12px; }
 /* Producción Casting, como en DublajeCast (js/csproduccion.js, PRO-42). */
 .cp-c-curso{ color:#A78BFA; } .cp-c-hecho{ color:#4ADE80; }
@@ -2136,6 +2147,21 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-oc-campos input:focus, .cs-oc-campos select:focus{ border-color:#4ADE80; }
 @media (max-width:760px){ .cs-oc-campos{ grid-template-columns:1fr 1fr; } .cs-oc-nombre{ grid-column:1 / -1; } }
 .cs-oc-pests{ margin-bottom:12px; }
+/* Talentos: buscar y fusionar (PRO-52) */
+.cs-tal-filtros .cs-oc-campos{ grid-template-columns:minmax(220px,1fr) repeat(3,minmax(120px,160px)); }
+.cs-tal-fila2{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:12px; }
+.cs-tal-orden{ display:inline-flex; align-items:center; gap:4px; margin:0; }
+.cs-tal-orden > .cs-tenue{ font-size:10.5px; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-right:4px; }
+.cs-b.cs-on{ border-color:rgba(251,146,60,.6); color:#FB923C; background:rgba(251,146,60,.08); }
+.cs-tal-filtros .cs-tfus-campos{ grid-template-columns:200px 1fr; }
+.cs-tfus-nota{ align-self:end; font-size:12px; text-transform:none; letter-spacing:0; }
+.cs-tfus{ display:flex; flex-direction:column; gap:8px; }
+.cs-tfus-par{ display:grid; grid-template-columns:54px 1fr 1fr auto; gap:10px; align-items:center; background:#101215; border:1px solid #23262b; border-radius:12px; padding:10px 12px; }
+.cs-tfus-pct{ font-weight:800; color:#FBBF24; font-size:15px; text-align:center; }
+.cs-tfus-lado{ display:flex; flex-direction:column; gap:4px; align-items:flex-start; min-width:0; }
+.cs-tfus-lado b{ color:#f2f3f5; text-transform:uppercase; overflow-wrap:anywhere; }
+.cs-tfus-lado .cs-tenue{ font-size:12px; }
+@media (max-width:760px){ .cs-tal-filtros .cs-oc-campos{ grid-template-columns:1fr 1fr; } .cs-tfus-par{ grid-template-columns:44px 1fr auto; } .cs-tfus-par .cs-tfus-lado + .cs-tfus-lado{ grid-column:2; } .cs-tal-filtros .cs-tfus-campos{ grid-template-columns:1fr; } }
 .cs-oc-lista{ display:flex; flex-direction:column; gap:12px; }
 .cs-oc-tal{ background:#101215; border:1px solid #23262b; border-radius:16px; overflow:hidden; }
 .cs-oc-cab{ display:flex; align-items:center; gap:12px; padding:13px 18px; border-bottom:1px solid #1d2026; }
@@ -2179,6 +2205,16 @@ body.cs-on #progHeader{ display:none !important; }
 .cs-tcard-w .cs-tcard{ flex:1; }
 .cs-tcard-ren{ position:absolute; top:8px; right:8px; opacity:.55; }
 .cs-tcard-w:hover .cs-tcard-ren{ opacity:1; }
+/* Editar un talento: el cuadro del lápiz (PRO-53) */
+.cs-tal-modal{ position:fixed; inset:0; z-index:60; background:rgba(5,6,8,.62); display:flex; align-items:center; justify-content:center; padding:16px; }
+.cs-tal-modal-c{ background:#121418; border:1px solid #2b2f36; border-radius:14px; padding:16px 18px; width:min(560px,100%); max-height:calc(100vh - 32px); overflow:auto; display:flex; flex-direction:column; gap:10px; box-shadow:0 18px 50px rgba(0,0,0,.45); }
+.cs-tal-modal-t{ display:flex; align-items:center; justify-content:space-between; gap:8px; color:#f2f3f5; font-size:14px; }
+.cs-tal-modal .cs-tal-campos{ grid-template-columns:1fr 1fr; margin-top:0; }
+.cs-tal-modal-b{ display:flex; justify-content:flex-end; gap:8px; }
+.cs-tal-modal-b .cs-borrar{ margin-right:auto; }
+.cs-tficha-t h2 .cs-borrar{ margin-left:4px; }
+.cs-marca{ font-style:italic; }
+@media (max-width:560px){ .cs-tal-modal .cs-tal-campos{ grid-template-columns:1fr; } }
 .cs-tkpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:14px; }
 .cs-tkpi{ background:#101215; border:1px solid #23262b; border-left:3px solid #A78BFA; border-radius:13px; padding:14px 16px; display:flex; flex-direction:column; gap:3px; }
 .cs-tkpi b{ font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; }
@@ -2965,7 +3001,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.73.1-nube';
+const APP_VER_NUM = 'v11.78.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -7965,7 +8001,7 @@ function renderCards(){
       ? `<button class="gestbtn" title="En este capítulo solo hace gestos — pulsa para dejarlo original (no se dobla)" aria-label="Verificar que ${esc(c.display)} solo hace gestos">✓ verificar</button>`
       : '';
     const talDisplay = (c.talent
-      ? `<b>${esc(c.talent)}</b>` + (c.heredado && !soloGestos
+      ? `<b>${esc(c.talent)}</b>` + (c.noRec ? '<small class="ctal-nomarca" title="No es un talento: no cuenta en Talentos ni en la ocupación">no es un talento</small>' : '') + (c.heredado && !soloGestos
           ? `<button class="verbtn" title="Viene de otro capítulo — pulsa para darlo por bueno" aria-label="Verificar el talento de ${esc(c.display)}">✓ verificar</button>`
           : '')
       : (soloGestos ? '<span class="ng">Solo gestos</span>' : '<span class="ng">Sin asignar</span>')) + gestBtn;
@@ -8058,6 +8094,18 @@ function renderCards(){
       }catch(e){}
       inp.setAttribute('aria-label', 'Talento para '+c.display);
       talDiv.appendChild(inp);
+      /* ORIGINAL, X y TODOS a un clic (PRO-53): se ponen en el casting, pero
+         no son talentos -no salen en Talentos ni cuentan en la ocupación-. */
+      const marcas = document.createElement('div');
+      marcas.className = 'ctal-marcas';
+      [['ORIGINAL','Se deja el audio original'],['X','No se graba'],['TODOS','Lo graban todos']].forEach(m=>{
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'ctal-marca'; b.textContent = m[0]; b.title = m[1] + ' · no es un talento';
+        b.addEventListener('mousedown', ev=> ev.preventDefault());   // que el campo no pierda el foco y no se guarde lo escrito antes
+        b.addEventListener('click', ev=>{ ev.stopPropagation(); inp.value = m[0]; save(true); });
+        marcas.appendChild(b);
+      });
+      talDiv.appendChild(marcas);
       inp.focus(); inp.select();
       cb.textContent = 'Guardar';
 
@@ -11101,8 +11149,9 @@ let _regT = 0;
 /** Apunta en el registro, pero esperando: asignar cinco seguidos no son cinco
     subidas a la nube. */
 /** Cambiar el nombre de un talento en el registro de casting de un programa (PRO-50): por personaje y en cada foto de capítulo; y en el capítulo abierto, si es de ese programa. */
-async function castRegRenombrarTalento(showId, viejo, nuevo){
-  if(!showId || !viejo || !nuevo) return false;
+async function castRegRenombrarTalento(showId, viejo, nuevo, quitar){
+  if(!showId || !viejo || (!nuevo && !quitar)) return false;
+  if(quitar) nuevo = '';
   const reg = await castRegCargar(showId), k = castNorm(viejo);
   if(!reg) return false;
   let tocado = false;
@@ -11134,6 +11183,9 @@ async function castRegRenombrarTalento(showId, viejo, nuevo){
   }catch(e){ /* el capítulo abierto se pone al día al reabrirlo */ }
   return true;
 }
+
+/** Quitar un talento del casting de un programa (PRO-54): sus personajes se quedan sin talento. */
+async function castRegQuitarTalento(showId, nombre){ return castRegRenombrarTalento(showId, nombre, '', true); }
 
 function castRegAnotarPronto(){
   clearTimeout(_regT);

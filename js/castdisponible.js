@@ -59,6 +59,7 @@ function dispFilas(o){
   const fila = (nombre) => {
     const k = castNorm(nombre);
     if(!k) return null;
+    if(typeof csEsMarca === 'function' && csEsMarca(nombre)) return null;   // ORIGINAL, X, TODOS: no son talentos (PRO-53)
     let f = por.get(k);
     if(!f){ f = { nombre: String(nombre).replace(/\s+/g, ' ').trim(), clave: k, ficha: '', enPrograma: [], enCap: [], lineasCap: 0, programas: [], personajes: 0, lineas: 0, nivel: null, historial: [], _h: new Map() }; por.set(k, f); }
     return f;

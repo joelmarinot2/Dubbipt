@@ -40,7 +40,7 @@ const CS = { vista: 'programas', buscar: '', soloAlertas: false, programa: '',
              repVista: 'talento', repBuscar: '', repOrden: 'lineas', repGenero: '', repAbierto: null,
              ocBuscar: '', ocGenero: '', ocEdad: '', ocTono: '', ocModo: 'curso',
              trForm: null, trEstado: '', trTipo: '', trEtapa: '',
-             talModo: 'talentos', buscarPer: '', talAbierto: null, tempCerradas: {} };
+             talModo: 'talentos', buscarPer: '', talAbierto: null, talGenero: '', talEdad: '', talTono: '', talSinCat: false, talOrden: 'az', talUmbral: 80, talEditar: null, tempCerradas: {} };
 
 /* Iconos de trazo, como los de Dubbipt (ICO). Ningún emoji. */
 const CS_ICO = {
@@ -52,6 +52,7 @@ const CS_ICO = {
   produccion: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
   dubcards:   '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h6"/>',
   pegado:     '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2h3"/>',
+  contratos:  '<path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6"/><circle cx="10" cy="13" r="2"/><path d="M7 18a3 3 0 016 0M15 13h2M15 16h2"/>',
   breakdowns: '<path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
   externo:    '<path d="M14 3h7v7"/><path d="M10 14L21 3"/><path d="M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5"/>',
   actualizar: '<path d="M21 12a9 9 0 11-2.64-6.36"/><path d="M21 3.5V8h-4.5"/>',
@@ -91,11 +92,27 @@ const CS_SECCIONES = [
   { v: 'trailers',   t: 'Tráilers' },
   { v: 'produccion', t: 'Producción' },
   { v: 'dubcards',   t: 'DUBCARDs',          dc: 'dubcards',   dice: 'Prepara las DUBCARD de cada capítulo desde el casting: el plan de copiado de Netflix, la matriz de recurrencia y sus alertas.' },
+  { v: 'contratos',  t: 'Contract Inventory', dc: 'contratos', dice: 'Sube la DUBCARD unida y saca un Word de Contract Inventory por episodio: Main cast, Additional cast, numeración y equipo.' },
   { v: 'pegado',     t: 'Pegado de casting', dc: 'pegado',     dice: 'Rellena la columna del actor de un desglose con el reparto vigente de su programa.' },
   { v: 'breakdowns', t: 'Breakdowns',        dc: 'breakdowns', dice: 'Escribe los breakdowns de los personajes a partir del libreto y la guía del programa, con su IA.' }
 ];
 
 function csEsc(s){ return (typeof esc === 'function') ? esc(String(s == null ? '' : s)) : String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+
+/* ── ORIGINAL, X y TODOS no son talentos (PRO-53) ───────────────────────
+   Pedido de sala: «el talento ORIGINAL, X, TODOS no es un talento: solo es
+   cuando un personaje no se graba o se deja original». Se ponen al hacer el
+   casting, pero no salen en el directorio de Talentos ni en la ocupación, la
+   disponibilidad o la fusión, ni se cuentan como talentos. */
+const CS_MARCAS = [['ORIGINAL', 'Se deja el audio original'], ['X', 'No se graba'], ['TODOS', 'Lo graban todos']];
+/** ¿Lo escrito es una marca de producción (ORIGINAL, X, TODOS…) y no un talento? */
+function csEsMarca(nombre){
+  const k = castNorm(nombre);
+  if(!k) return false;
+  if(k === 'X ORIGINAL' || CS_MARCAS.some(m => m[0] === k)) return true;
+  if(typeof talEsMarca === 'function' && talEsMarca(nombre)) return true;
+  return typeof castEsActor === 'function' && !castEsActor(nombre);
+}
 
 /* ── Las cuentas (sin pantalla: se prueban solas) ──────────────────────── */
 
@@ -175,7 +192,7 @@ function csResumen(d, hoy){
   out.programas = d.series.length;
   out.enCurso = d.series.filter(s => s.status === 'en_curso').length;
   out.capitulos = d.episodes.length;
-  out.talentos = d.talents.length;
+  out.talentos = d.talents.filter(t => t && t.name && !csEsMarca(t.name)).length;
   const asignado = new Set(d.castings.map(c => String(c.episode_id) + ':' + String(c.character_id)));
   out.asignaciones = asignado.size;
   out.sinTalento = d.appearances.filter(a => !asignado.has(String(a.episode_id) + ':' + String(a.character_id))).length;
@@ -212,7 +229,7 @@ function csOcupacion(d, programa){
     if(vistos.has(clave)) continue;
     vistos.add(clave);
     const t = ix.talent[String(c.talent_id)], e = ix.ep[String(c.episode_id)], ch = ix.char[String(c.character_id)];
-    if(!t || !t.name || !e || !ch) continue;
+    if(!t || !t.name || csEsMarca(t.name) || !e || !ch) continue;
     const s = ix.serie[String(e.series_id)];
     if(programa != null && programa !== '' && String(e.series_id) !== String(programa)) continue;
     const o = (por[String(t.id)] = por[String(t.id)] || { talento: t.name, personajes: new Set(), capitulos: new Set(), lineas: 0, programas: new Set() });
@@ -239,7 +256,7 @@ function csTalentos(d, buscar){
     const m = (papeles[String(c.talent_id)] = papeles[String(c.talent_id)] || {});
     (m[s.name] = m[s.name] || new Set()).add(ch.name);
   }
-  return d.talents.filter(t => t.name && (!f || castNorm(t.name).indexOf(f) >= 0))
+  return d.talents.filter(t => t.name && !csEsMarca(t.name) && (!f || castNorm(t.name).indexOf(f) >= 0))
     .map(t => {
       const pp = papeles[String(t.id)] || {};
       return { id: t.id, nombre: t.name, ficha: prodFichaTexto(t), correo: t.email || '', genero: t.genero || '', edad: t.edad_aparente || '', tono: t.tono_de_voz || '', registro: t.registro || '',
@@ -1528,7 +1545,7 @@ function csFichasTalentos(d, regs, lista){
 }
 function csFichasTalentosHacer(d, regs, lista, papeles){
   const fichas = {};
-  if(d) for(const t of d.talents) if(t && t.name) fichas[castNorm(t.name)] = t;
+  if(d) for(const t of d.talents) if(t && t.name && !csEsMarca(t.name)) fichas[castNorm(t.name)] = t;
   const progDe = {};
   for(const p of (lista || [])) progDe[p.clave] = p;
   const por = new Map();
@@ -1541,7 +1558,7 @@ function csFichasTalentosHacer(d, regs, lista, papeles){
   };
   for(const k of Object.keys(fichas)) talento(fichas[k].name);
   for(const pp of papeles){
-    if(!pp.talento) continue;
+    if(!pp.talento || csEsMarca(pp.talento)) continue;
     const x = talento(pp.talento);
     if(!x) continue;
     let g = x.progs.get(pp.progClave);
@@ -1586,8 +1603,8 @@ function csHtmlTarjetaTalento(f){
     + (f.programas.length ? '<div class="cs-tprogs">' + f.programas.map(g => '<span class="cs-tprog' + (g.estado === 'completo' ? ' cs-tprog-fin' : '') + '">' + csEsc(g.programa) + '</span>').join('') + '</div>' : '<div class="cs-tenue">Sin papeles todavía</div>')
     + (c.clave === 'alto' ? '<div class="cs-talerta">' + csIco('aviso', 12) + 'Alta carga: ' + f.activos + ' programas en curso</div>' : '')
     + '</button>'
-    /* Cambiar el nombre, desde la tarjeta (PRO-50): solo los que tienen ficha en Casting. */
-    + (f.t ? '<button class="cs-b cs-b-icono cs-tcard-ren" data-cs="talRen" data-v="' + csEsc(f.t.id) + '" title="Cambiar el nombre de ' + csEsc(f.nombre) + '" aria-label="Cambiar el nombre de ' + csEsc(f.nombre) + '">' + csIco('editar', 14) + '</button>' : '')
+    /* Editar, desde la tarjeta: el nombre (PRO-50) y el género, la edad y el tono (PRO-53). */
+    + '<button class="cs-b cs-b-icono cs-tcard-ren" data-cs="talEditar" data-v="' + csEsc(f.clave) + '" title="Editar a ' + csEsc(f.nombre) + ': nombre, género, edad y tono" aria-label="Editar a ' + csEsc(f.nombre) + '">' + csIco('editar', 14) + '</button>'
     + '</div>';
 }
 
@@ -1598,8 +1615,15 @@ function csHtmlFichaTalento(f, d){
   const kpi = (n, t, cls) => '<div class="cs-tkpi cs-tkpi-' + cls + '"><b>' + n + '</b><span>' + t + '</span></div>';
   const t = f.t;
   return '<div class="cs-tficha-cab"><button class="cs-volver" data-cs="talCerrar">' + csIco('izquierda', 14) + '<span>Talentos</span></button>'
-    + '<div class="cs-tficha-t"><h2>' + csEsc(f.nombre) + (t ? '<button class="cs-b cs-b-icono cs-tficha-ren" data-cs="talRen" data-v="' + csEsc(t.id) + '" title="Cambiar el nombre del talento" aria-label="Cambiar el nombre de ' + csEsc(f.nombre) + '">' + csIco('editar', 14) + '</button>' : '') + '</h2><div class="cs-tchips">' + csChipsFicha(t) + '<span class="cs-carga cs-carga-' + csCargaTalento(f.activos).clave + '">' + csCargaTalento(f.activos).texto + '</span></div></div></div>'
+    + '<div class="cs-tficha-t"><h2>' + csEsc(f.nombre) + '<button class="cs-b cs-b-icono cs-tficha-ren" data-cs="talEditar" data-v="' + csEsc(f.clave) + '" title="Editar el talento: nombre, género, edad y tono" aria-label="Editar a ' + csEsc(f.nombre) + '">' + csIco('editar', 14) + '</button>'
+      + '<button class="cs-b cs-b-icono cs-borrar" data-cs="talBorrar" data-v="' + csEsc(f.clave) + '" title="Eliminar el talento" aria-label="Eliminar a ' + csEsc(f.nombre) + '">' + csIco('borrar', 14) + '</button>' + '</h2><div class="cs-tchips">' + csChipsFicha(t) + '<span class="cs-carga cs-carga-' + csCargaTalento(f.activos).clave + '">' + csCargaTalento(f.activos).texto + '</span></div></div></div>'
     + '<div class="cs-tkpis">' + kpi(f.nProg, 'Programas', 'a') + kpi(f.nEps, 'Episodios', 'b') + kpi(f.nPer, 'Personajes', 'c') + kpi(f.lineas, 'Líneas', 'd') + '</div>'
+    /* Fusionar este con otro, a mano (PRO-52). */
+    + '<details class="cs-tal-ed cs-tal-fus"><summary>Fusionar con otro talento</summary><div class="cs-tal-campos">'
+    +   '<label>El otro talento <input type="text" id="csTalFusOtro" list="csListaTalentos" placeholder="Escribe su nombre…" autocomplete="off"></label>'
+    +   '<button class="cs-b" data-cs="talFusionar" data-v="' + csEsc(f.clave) + '">' + csIco('fusionar', 13) + '<span>Fusionar en este</span></button>'
+    +   '<span class="cs-tenue">El otro pasa a ser «' + csEsc(f.nombre) + '»: sus asignaciones, su ficha y su nombre en el casting de cada programa.</span>'
+    + '</div></details>'
     + (t ? '<details class="cs-tal-ed"><summary>Editar ficha</summary><div class="cs-tal-campos">'
           +   '<label>Nombre <input type="text" data-cs="talCampo" data-id="' + csEsc(t.id) + '" data-campo="name" value="' + csEsc(t.name) + '"></label>'
           +   '<label>Género ' + csSelect('genero', t.genero || '', CS_OP_GENERO, { cs: 'talCampo', id: t.id }) + '</label>'
@@ -1616,26 +1640,309 @@ function csHtmlFichaTalento(f, d){
         + '<div class="cs-tdpers">' + g.personajes.map(y => '<div class="cs-tdper"><b>' + csEsc(y.nombre) + (y.principal ? ' <i class="cs-tdest">' + csIco('estrella', 11) + '</i>' : '') + '</b>'
             + (y.eps.length ? '<span class="cs-tenue">Ep. ' + csEsc(csTramoTexto(y.eps)) + '</span>' : '') + (y.lineas ? '<span class="cs-tdlin">' + y.lineas + ' lín.</span>' : '') + '</div>').join('') + '</div>'
         + '</div>').join('') + '</div>'
-      : '<div class="cs-nada">Todavía no tiene papeles en ningún programa.</div>');
+      : '<div class="cs-nada">Todavía no tiene papeles en ningún programa.</div>')
+    + csListaTalentos(d);
 }
 
 function csHtmlTalentos(d, vivo){
   const modo = (k, t, ico) => '<button class="cs-pest' + (CS.talModo === k ? ' on' : '') + '" data-cs="talModo" data-v="' + k + '">' + csIco(ico, 13) + ' ' + t + '</button>';
-  const pests = '<div class="cs-pests cs-tal-modos">' + modo('talentos', 'Talentos', 'talentos') + modo('personajes', 'Buscar personaje', 'buscar') + '</div>';
+  const pests = '<div class="cs-pests cs-tal-modos">' + modo('talentos', 'Talentos', 'talentos') + modo('personajes', 'Buscar personaje', 'buscar') + modo('fusion', 'Fusionar', 'fusionar') + '</div>';
   if(CS.talModo === 'personajes')
     return csCabecera('Talentos', 'Qué programa y qué talento hizo cada personaje', vivo) + pests + csHtmlBuscarPersonaje(d);
   const regs = csRegistrosTodos(d);
   const fichas = csFichasTalentos(d, regs, csActual().lista);
   const abierta = CS.talAbierto ? fichas.find(f => f.clave === CS.talAbierto) : null;
-  if(abierta) return csHtmlFichaTalento(abierta, d);
-  const q = castNorm(CS.buscar);
-  const vistos = fichas.filter(f => !q || f.clave.indexOf(q) >= 0 || f.programas.some(g => castNorm(g.programa).indexOf(q) >= 0));
-  return csCabecera('Talentos', fichas.length + ' talentos con su ficha y sus papeles', vivo) + pests
+  const editor = CS.talEditar ? csHtmlEditorTalento(fichas.find(f => f.clave === CS.talEditar)) : '';
+  if(abierta) return csHtmlFichaTalento(abierta, d) + editor;
+  if(CS.talModo === 'fusion') return csCabecera('Talentos', 'Los que parecen el mismo talento escrito de dos maneras', vivo) + pests + csHtmlFusionTalentos(fichas, d);
+  const vistos = csTalFiltrar(fichas, { buscar: CS.buscar, genero: CS.talGenero, edad: CS.talEdad, tono: CS.talTono, sinCat: CS.talSinCat, orden: CS.talOrden });
+  const sel = (campo, valor, ops) => '<select data-cs="talFiltro" data-campo="' + campo + '"><option value="">— Todos —</option>'
+    + ops.filter(x => x[0]).map(x => '<option value="' + csEsc(x[0]) + '"' + (valor === x[0] ? ' selected' : '') + '>' + csEsc(x[1]) + '</option>').join('') + '</select>';
+  const orden = (k, t) => '<button class="cs-pest' + (CS.talOrden === k ? ' on' : '') + '" data-cs="talOrden" data-v="' + k + '">' + t + '</button>';
+  const hayFiltro = !!(CS.buscar || CS.talGenero || CS.talEdad || CS.talTono || CS.talSinCat || CS.talOrden !== 'az');
+  return csCabecera('Talentos', vistos.length + ' de ' + fichas.length + ' en el directorio', vivo) + pests + editor
     + (d ? '<div class="cs-nuevo"><input type="text" id="csTalNuevo" placeholder="Nombre del talento nuevo"><button class="cs-b cs-pri" data-cs="talNuevo">' + csIco('mas', 14) + '<span>Añadir talento</span></button></div>' : '')
-    + '<label class="cs-buscar">' + csIco('buscar', 14) + '<input type="text" data-cs="buscar" placeholder="Buscar talento o programa…" value="' + csEsc(CS.buscar) + '"></label>'
+    /* Buscar y filtrar, como en el directorio de Casting (PRO-52). */
+    + '<div class="cs-oc-filtros cs-tal-filtros"><div class="cs-oc-campos">'
+    +   '<label class="cs-oc-nombre">Buscar<input type="text" data-cs="buscar" placeholder="Nombre del talento o programa (aunque esté mal escrito)…" value="' + csEsc(CS.buscar) + '" autocomplete="off"></label>'
+    +   '<label>Género' + sel('talGenero', CS.talGenero, CS_OP_GENERO) + '</label>'
+    +   '<label>Edad' + sel('talEdad', CS.talEdad, CS_OP_EDAD) + '</label>'
+    +   '<label>Tono de voz' + sel('talTono', CS.talTono, CS_OP_TONO) + '</label>'
+    + '</div><div class="cs-tal-fila2">'
+    +   '<div class="cs-pests cs-tal-orden"><span class="cs-tenue">Ordenar</span>' + orden('az', 'A→Z') + orden('za', 'Z→A') + orden('mas', 'Más activos') + orden('menos', 'Menos activos') + '</div>'
+    +   '<button class="cs-b' + (CS.talSinCat ? ' cs-on' : '') + '" data-cs="talSinCat" title="Los que no tienen género, edad ni tono en su ficha">' + csIco('aviso', 13) + '<span>Sin categorizar</span></button>'
+    +   (hayFiltro ? '<button class="cs-b" data-cs="talLimpiar">' + csIco('cerrar', 13) + '<span>Limpiar filtros</span></button>' : '')
+    + '</div></div>'
     + (CS_REGS.yendo && !CS_REGS.lista ? '<div class="cs-tenue">Leyendo el casting de los programas de Dubbipt…</div>' : '')
     + (vistos.length ? '<div class="cs-tgrid">' + vistos.map(csHtmlTarjetaTalento).join('') + '</div>'
-      : (fichas.length ? '<div class="cs-nada">Ningún talento con «' + csEsc(CS.buscar) + '».</div>' : (d ? '<div class="cs-nada">Todavía no hay talentos.</div>' : csVacio())));
+      : (fichas.length ? '<div class="cs-nada">Ningún talento con ' + ((CS.talGenero || CS.talEdad || CS.talTono || CS.talSinCat) ? 'esos filtros' + (CS.buscar ? ' y «' + csEsc(CS.buscar) + '»' : '') : '«' + csEsc(CS.buscar) + '»') + '.</div>' : (d ? '<div class="cs-nada">Todavía no hay talentos.</div>' : csVacio())));
+}
+
+/* ── Editar un talento: nombre, género, edad y tono (PRO-53) ────────────
+   Pedido de sala: «que a los talentos, en el botón de editar, se le puedan
+   cambiar sus atributos como género, edad, tono». El lápiz de cada tarjeta y
+   el de la ficha abren este cuadro; a quien aún no tiene ficha en Casting
+   (solo sale en el casting de Dubbipt), al guardar se le crea. */
+
+/** El cuadro de editar un talento. */
+function csHtmlEditorTalento(f){
+  if(!f) return '';
+  const t = f.t || {};
+  const sel = (id, campo, ops) => '<select id="' + id + '">' + ops.map(o => '<option value="' + csEsc(o[0]) + '"' + (String(t[campo] || '') === o[0] ? ' selected' : '') + '>' + csEsc(o[1]) + '</option>').join('') + '</select>';
+  return '<div class="cs-tal-modal" role="dialog" aria-modal="true" aria-label="Editar a ' + csEsc(f.nombre) + '"><div class="cs-tal-modal-c">'
+    + '<div class="cs-tal-modal-t"><b>Editar talento</b><button class="cs-b cs-b-icono" data-cs="talEdCerrar" title="Cerrar sin guardar" aria-label="Cerrar sin guardar">' + csIco('cerrar', 14) + '</button></div>'
+    + '<div class="cs-tal-campos">'
+    +   '<label>Nombre <input type="text" id="csTeNombre" value="' + csEsc(f.nombre) + '" autocomplete="off"></label>'
+    +   '<label>Género ' + sel('csTeGenero', 'genero', CS_OP_GENERO) + '</label>'
+    +   '<label>Edad ' + sel('csTeEdad', 'edad_aparente', CS_OP_EDAD) + '</label>'
+    +   '<label>Tono de voz ' + sel('csTeTono', 'tono_de_voz', CS_OP_TONO) + '</label>'
+    +   '<label>Registro <input type="text" id="csTeRegistro" value="' + csEsc(t.registro || '') + '" autocomplete="off"></label>'
+    +   '<label>Correo <input type="email" id="csTeCorreo" value="' + csEsc(t.email || '') + '" autocomplete="off"></label>'
+    + '</div>'
+    + (f.t ? '' : '<div class="cs-tenue">Todavía no tiene ficha: al guardar se le crea.</div>')
+    + '<div class="cs-tal-modal-b"><button class="cs-b cs-borrar" data-cs="talBorrar" data-v="' + csEsc(f.clave) + '" title="Eliminar este talento">' + csIco('borrar', 13) + '<span>Eliminar talento</span></button>'
+    +   '<button class="cs-b" data-cs="talEdCerrar">Cancelar</button>'
+    +   '<button class="cs-b cs-pri" data-cs="talEdGuardar" data-v="' + csEsc(f.clave) + '">' + csIco('hecho', 13) + '<span>Guardar</span></button></div>'
+    + '</div></div>';
+}
+
+/* Los campos de la ficha que se editan aquí, con su nombre para el historial. */
+const CS_TAL_CAMPOS = [['genero', 'género', 'genero'], ['edad_aparente', 'edad', 'edad'], ['tono_de_voz', 'tono', 'tono'], ['registro', 'registro', ''], ['email', 'correo', '']];
+
+/**
+ * Guarda lo del cuadro: primero la ficha (y si no la tenía, se le crea) y
+ * luego, si cambió, el nombre, por el camino de siempre (PRO-50). Devuelve
+ * 'guardado', 'igual', 'error' o 'nada'.
+ */
+async function csGuardarTalento(f, v){
+  if(!f) return 'nada';
+  const nombre = String((v && v.name) || '').replace(/\s+/g, ' ').trim();
+  if(!nombre){ castAviso('El nombre del talento no puede quedar vacío'); return 'error'; }
+  if(csEsMarca(nombre)){ castAviso('«' + nombre + '» no es un talento: es una marca de producción (no se graba o se deja original)'); return 'error'; }
+  const valor = (k) => String((v && v[k]) || '').trim();
+  let t = f.t, r = 'igual';
+  if(!t){
+    const ficha = { name: f.nombre };
+    for(const c of CS_TAL_CAMPOS) if(valor(c[0])) ficha[c[0]] = valor(c[0]);
+    r = await csEditar(pl => dcxTalentoNuevo(pl, ficha), 'Ficha de talento creada: ' + dcxNombreTalento(f.nombre));
+    if(r === 'error') return r;
+    const dd = csActual().datos;
+    t = ((dd && dd.talents) || []).find(x => castNorm(x.name) === castNorm(f.nombre)) || null;
+  }else{
+    const cambios = {}, dicho = [];
+    for(const c of CS_TAL_CAMPOS){
+      if(String(t[c[0]] || '') === valor(c[0])) continue;
+      cambios[c[0]] = valor(c[0]);
+      const et = c[2] && PROD_ET[c[2]] ? (PROD_ET[c[2]][valor(c[0])] || valor(c[0])) : valor(c[0]);
+      dicho.push(c[1] + ' = ' + (et || '—'));
+    }
+    if(dicho.length){
+      r = await csEditar(pl => dcxTalento(pl, t.id, cambios), 'Ficha de ' + t.name + ': ' + dicho.join(', '));
+      if(r === 'error') return r;
+    }
+  }
+  if(t && dcxNombreTalento(nombre) !== t.name){
+    const r2 = await csRenombrarTalento(t, nombre);
+    if(r2 === 'error') return r2;
+    if(r2 === 'guardado') r = 'guardado';
+  }
+  return r;
+}
+
+/* ── Eliminar un talento (PRO-54) ────────────────────────────────────────
+   Pedido de sala: «que se puedan eliminar talentos». Desde «Editar talento»
+   o desde su ficha, preguntando antes y diciendo qué pasa: se quita su ficha
+   de Casting (todas, si el nombre está repetido), sus asignaciones, su nombre
+   en el casting de cada programa de Dubbipt y en la base de talentos. Los
+   personajes que hacía se quedan sin talento, para repartirlos de nuevo. Si
+   es el mismo que otro escrito distinto, lo que toca es «Fusionar». */
+
+async function csBorrarTalento(f, preguntar){
+  if(!f) return 'nada';
+  const d = csActual().datos;
+  const ids = ((d && d.talents) || []).filter(t => t && castNorm(t.name) === f.clave).map(t => t.id);
+  const asig = ids.length ? ((d && d.castings) || []).filter(c => ids.some(id => String(id) === String(c.talent_id))).length : 0;
+  const s = (n, uno, varios) => n + ' ' + (n === 1 ? uno : varios);
+  if(preguntar !== false && typeof DDL_UI !== 'undefined' && DDL_UI.confirmModal){
+    const ok = await DDL_UI.confirmModal({ title: 'Eliminar a «' + f.nombre + '»',
+      body: f.nPer
+        ? 'Hace ' + s(f.nPer, 'personaje', 'personajes') + ' en ' + s(f.nProg, 'programa', 'programas') + ': se quedarán sin talento, para volver a repartirlos. '
+          + 'Se quita también de la base de talentos. Si es el mismo que otro talento escrito de otra manera, mejor «Fusionar».'
+        : 'No tiene papeles. Se quita de Talentos y de la base de talentos.',
+      items: (f.programas || []).slice(0, 6).map(g => ({ label: g.programa, meta: s(g.personajes.length, 'personaje', 'personajes') })),
+      confirmLabel: 'Eliminar', cancelLabel: 'Cancelar', danger: true });
+    if(!ok) return 'cancelado';
+  }
+  if(ids.length){
+    const r = await csEditar(pl => dcxBorrarTalentos(pl, ids), 'Talento eliminado: ' + f.nombre + (asig ? ' (' + s(asig, 'asignación queda', 'asignaciones quedan') + ' sin talento)' : ''));
+    if(r === 'error') return r;
+  }else if(typeof prodPuede === 'function' && prodPuede()){
+    try{ dcxRegistrar(dcxEntrada('Talento eliminado: ' + f.nombre, null)); }catch(x){ /* sin apuntar */ }
+  }
+  let regs = 0;
+  try{
+    for(const sh of ((typeof sbShows === 'function') ? sbShows() : [])){
+      if(typeof castRegQuitarTalento === 'function' && await castRegQuitarTalento(sh.id, f.nombre)) regs++;
+    }
+  }catch(e){ fallo('castRegQuitarTalento · js/castingvistas.js', e, 'el casting de Dubbipt puede seguir con ese talento'); }
+  try{ if(typeof talQuitar === 'function') await talQuitar(f.nombre); }catch(e){ /* la base se arregla a mano */ }
+  if(CS.talAbierto && castNorm(CS.talAbierto) === f.clave) CS.talAbierto = null;
+  CS.talEditar = null;
+  if(typeof CS_REGS !== 'undefined' && CS_REGS){ CS_REGS.lista = null; CS_REGS.ts = 0; }
+  CS.registros = {};
+  castAviso('Talento eliminado: ' + f.nombre + (regs ? ' · quitado del casting de ' + s(regs, 'programa', 'programas') + ' de Dubbipt' : ''));
+  csRepintar();
+  return 'guardado';
+}
+
+/* ── Buscar y fusionar talentos (PRO-52) ─────────────────────────────────
+   Pedido de sala, con una captura del directorio de talentos de Casting:
+   «que la sección de Talentos tenga una herramienta de búsqueda y de fusión
+   de talentos». Buscar: por nombre o programa, aunque esté mal escrito; por
+   género, edad y tono; los que no tienen ficha («Sin categorizar»); y en
+   orden. Fusionar: los nombres que se parecen por encima de un umbral (80%
+   por omisión, como en Casting) salen por parejas, y con un clic el que
+   sobra pasa al que se queda: en los datos de Casting (sus asignaciones y lo
+   que faltaba de su ficha), en el registro de casting de cada programa de
+   Dubbipt y en la base de talentos. «No son el mismo» la quita de la lista. */
+
+/** Buscar, filtrar y ordenar las fichas de los talentos. */
+function csTalFiltrar(fichas, o){
+  o = o || {};
+  const q = castNorm(o.buscar);
+  let l = (fichas || []).filter(f => {
+    const t = f.t || {};
+    if(o.genero && t.genero !== o.genero) return false;
+    if(o.edad && t.edad_aparente !== o.edad) return false;
+    if(o.tono && t.tono_de_voz !== o.tono) return false;
+    if(o.sinCat && (t.genero || t.edad_aparente || t.tono_de_voz)) return false;
+    return true;
+  });
+  if(q){
+    l = l.map(f => {
+      let sc = (f.clave.indexOf(q) >= 0) ? 1 : 0;
+      if(!sc && f.programas.some(g => castNorm(g.programa).indexOf(q) >= 0)) sc = 0.99;
+      /* Aproximada (faltas de ortografía), con tres letras o más: con menos, casaría con cualquiera. */
+      if(!sc && q.replace(/ /g, '').length >= 3) sc = csParecidoPersonaje(o.buscar, f.nombre);
+      return { f: f, sc: sc };
+    }).filter(x => x.sc >= 0.75).sort((a, b) => b.sc - a.sc || a.f.nombre.localeCompare(b.f.nombre, 'es')).map(x => x.f);
+    if(o.orden === 'az') return l;
+  }
+  const act = (f) => f.nEps * 100000 + f.lineas;
+  const cmp = { az: (a, b) => a.nombre.localeCompare(b.nombre, 'es'), za: (a, b) => b.nombre.localeCompare(a.nombre, 'es'),
+                mas: (a, b) => act(b) - act(a) || a.nombre.localeCompare(b.nombre, 'es'), menos: (a, b) => act(a) - act(b) || a.nombre.localeCompare(b.nombre, 'es') }[o.orden || 'az'];
+  return l.slice().sort(cmp);
+}
+
+/** Cuánto se parecen dos nombres de talento, de 0 a 1: el nombre entero, las palabras en otro orden, o uno dentro del otro («CARMEN FRANCO» y «CARMEN R FRANCO»). */
+function csTalSimil(a, b){
+  const na = castNorm(a), nb = castNorm(b);
+  if(!na || !nb) return 0;
+  if(na === nb) return 1;
+  const orden = (n) => n.split(' ').filter(Boolean).sort().join(' ');
+  let s = Math.max(csSimil(na, nb), csSimil(orden(na), orden(nb)), csSimil(na.replace(/ /g, ''), nb.replace(/ /g, '')));
+  const pa = na.split(' ').filter(w => w.length > 1), pb = nb.split(' ').filter(w => w.length > 1);
+  const corto = pa.length <= pb.length ? pa : pb, largo = pa.length <= pb.length ? pb : pa;
+  if(corto.length >= 2 && corto.every(w => largo.indexOf(w) >= 0)) s = Math.max(s, 0.9);
+  return s;
+}
+
+/** Las parejas que parecen el mismo talento, de más a menos parecidas. Sin las que ya se dijo que no son. */
+const CS_TAL_PAREJAS = { fichas: null, umbral: null, distintos: null, out: null };
+function csTalParecidos(fichas, umbral, distintos){
+  const u = Math.max(0.5, Math.min(1, (+umbral || 80) / 100));
+  const no = new Set((distintos || []).map(String));
+  const M = CS_TAL_PAREJAS;
+  const firmaNo = Array.from(no).join('|');
+  if(M.out && M.fichas === fichas && M.umbral === u && M.distintos === firmaNo) return M.out;
+  const l = (fichas || []).filter(f => f && f.clave), out = [];
+  for(let i = 0; i < l.length; i++) for(let j = i + 1; j < l.length; j++){
+    const sc = csTalSimil(l[i].nombre, l[j].nombre);
+    if(sc < u) continue;
+    if(no.has(csTalParClave(l[i], l[j]))) continue;
+    out.push({ a: l[i], b: l[j], sc: sc });
+  }
+  out.sort((x, y) => y.sc - x.sc || x.a.nombre.localeCompare(y.a.nombre, 'es'));
+  M.fichas = fichas; M.umbral = u; M.distintos = firmaNo; M.out = out;
+  return out;
+}
+function csTalParClave(a, b){ return [a.clave, b.clave].sort().join('|'); }
+
+/**
+ * Fichas de Casting repetidas con el MISMO nombre salvo acentos o signos
+ * («CARLOS RUIZ» y «CARLOS RUÍZ»): en la lista de Talentos se ven como uno
+ * solo, así que no saldrían como pareja. Cada una con su clave «id:…».
+ */
+function csTalRepetidas(d){
+  const tal = (d && Array.isArray(d.talents)) ? d.talents : [];
+  const por = {}, out = [];
+  const asig = {};
+  for(const c of ((d && Array.isArray(d.castings)) ? d.castings : [])) asig[String(c.talent_id)] = (asig[String(c.talent_id)] || 0) + 1;
+  for(const t of tal){ const k = castNorm(t && t.name); if(k && !csEsMarca(t.name)) (por[k] = por[k] || []).push(t); }
+  for(const k of Object.keys(por)){
+    const l = por[k];
+    if(l.length < 2) continue;
+    const f = (t) => ({ clave: 'id:' + t.id, nombre: t.name, t: t, programas: [], nProg: 0, nEps: asig[String(t.id)] || 0, lineas: 0, asignaciones: asig[String(t.id)] || 0 });
+    for(let i = 1; i < l.length; i++) out.push({ a: f(l[0]), b: f(l[i]), sc: 1 });
+  }
+  return out;
+}
+/** La ficha de una clave de la pestaña «Fusionar»: de la lista de Talentos, o una ficha repetida («id:…»). */
+function csTalFichaDe(fichas, d, clave){
+  const k = String(clave || '');
+  if(k.indexOf('id:') === 0){ for(const x of csTalRepetidas(d)) for(const f of [x.a, x.b]) if(f.clave === k) return f; return null; }
+  return (fichas || []).find(f => f.clave === k) || null;
+}
+
+/** La pestaña «Fusionar»: las parejas, cada una con su cifra y con qué nombre quedarse. */
+function csHtmlFusionTalentos(fichas, d){
+  const distintos = (d && Array.isArray(d.talentosDistintos)) ? d.talentosDistintos : [];
+  const no = new Set(distintos.map(String));
+  const pares = csTalRepetidas(d).filter(x => !no.has(csTalParClave(x.a, x.b))).concat(csTalParecidos(fichas, CS.talUmbral, distintos));
+  const lado = (f, otro, par) => '<div class="cs-tfus-lado"><b>' + csEsc(f.nombre) + '</b>'
+    + '<span class="cs-tenue">' + (f.asignaciones != null ? f.asignaciones + ' asignaci' + (f.asignaciones === 1 ? 'ón' : 'ones') + ' · ficha repetida' : f.nProg + ' prog. · ' + f.nEps + ' ep. · ' + f.lineas + ' líneas' + (f.t ? '' : ' · sin ficha')) + '</span>'
+    + '<button class="cs-b" data-cs="talFusionarPar" data-v="' + csEsc(par) + '" data-queda="' + csEsc(f.clave) + '" data-pasa="' + csEsc(otro.clave) + '">' + csIco('fusionar', 13) + '<span>Quedarse con este</span></button></div>';
+  return '<div class="cs-oc-filtros cs-tal-filtros"><div class="cs-oc-campos cs-tfus-campos">'
+    + '<label>Umbral de parecido %<input type="number" min="50" max="100" step="1" data-cs="talUmbral" value="' + csEsc(CS.talUmbral) + '"></label>'
+    + '<span class="cs-tenue cs-tfus-nota">Dos nombres que se parecen al menos esto salen aquí. Al fusionar, el otro pasa al que eliges: sus asignaciones, su ficha y su nombre en el casting de cada programa.</span>'
+    + '</div></div>'
+    + (pares.length ? '<div class="cs-tfus">' + pares.map(x => {
+        const par = csTalParClave(x.a, x.b);
+        return '<div class="cs-tfus-par"><span class="cs-tfus-pct">' + Math.round(x.sc * 100) + '%</span>' + lado(x.a, x.b, par) + lado(x.b, x.a, par)
+          + '<button class="cs-b cs-b-icono" data-cs="talDistintos" data-v="' + csEsc(par) + '" title="No son el mismo talento: que no vuelva a salir" aria-label="No son el mismo talento">' + csIco('cerrar', 14) + '</button></div>';
+      }).join('') + '</div>'
+      : '<div class="cs-nada">Ningún par de talentos se parece al menos un ' + csEsc(CS.talUmbral) + '%.</div>');
+}
+
+/** Fusiona el talento `pasa` en `queda` (dos fichas de la lista de Talentos). Pregunta antes. */
+async function csFusionarTalentos(queda, pasa, preguntar){
+  if(!queda || !pasa || queda.clave === pasa.clave) return 'nada';
+  if(preguntar !== false && typeof DDL_UI !== 'undefined' && DDL_UI.confirmModal){
+    const ok = await DDL_UI.confirmModal({ title: 'Fusionar talentos',
+      body: '«' + pasa.nombre + '» pasa a ser «' + queda.nombre + '»: sus asignaciones (' + pasa.nEps + ' ep. en ' + pasa.nProg + ' programa' + (pasa.nProg === 1 ? '' : 's') + '), lo que falte de su ficha y su nombre en el casting de cada programa de Dubbipt. «' + pasa.nombre + '» deja de existir.',
+      confirmLabel: 'Fusionar', cancelLabel: 'Cancelar', danger: true });
+    if(!ok) return 'cancelado';
+  }
+  const que = 'Talentos fusionados: ' + pasa.nombre + ' → ' + queda.nombre;
+  let r = 'igual';
+  if(pasa.t && queda.t) r = await csEditar(pl => dcxFusionarTalentos(pl, queda.t.id, pasa.t.id), que);
+  else if(pasa.t) r = await csEditar(pl => dcxTalento(pl, pasa.t.id, { name: queda.nombre }), que);
+  if(r === 'error' || r === 'sesion') return r;
+  let regs = 0;
+  try{
+    for(const sh of ((typeof sbShows === 'function') ? sbShows() : [])){
+      if(pasa.nombre === queda.nombre) break;
+      if(typeof castRegRenombrarTalento === 'function' && await castRegRenombrarTalento(sh.id, pasa.nombre, queda.nombre)) regs++;
+    }
+  }catch(e){ fallo('castRegRenombrarTalento · js/castingvistas.js:csFusionarTalentos', e, 'el casting de Dubbipt puede seguir con el nombre de antes'); }
+  try{ if(typeof talRenombrar === 'function') await talRenombrar(pasa.nombre, queda.nombre); }catch(e){ /* la base se arregla al escribirlo */ }
+  if(r !== 'guardado'){ try{ if(typeof dcxRegistrar === 'function') dcxRegistrar(dcxEntrada(que, null)); }catch(e){ /* sin apuntar */ } castAviso(que); }
+  if(CS.talAbierto === pasa.clave) CS.talAbierto = queda.clave;
+  if(typeof CS_REGS !== 'undefined' && CS_REGS){ CS_REGS.lista = null; CS_REGS.ts = 0; }
+  CS.registros = {};
+  if(regs) castAviso('También en el casting de ' + regs + ' programa' + (regs === 1 ? '' : 's') + ' de Dubbipt');
+  csRepintar();
+  return 'guardado';
 }
 
 /* ── Ocupación: cada talento con sus programas en tarjetas ───────────────────
@@ -1664,7 +1971,7 @@ function csOcupacionDatos(d, regs, lista){
 }
 function csOcupacionDatosHacer(d, regs, lista, papeles){
   const fichas = {};
-  if(d) for(const t of d.talents) if(t && t.name) fichas[castNorm(t.name)] = t;
+  if(d) for(const t of d.talents) if(t && t.name && !csEsMarca(t.name)) fichas[castNorm(t.name)] = t;
   const progDe = {}, estadoEp = {};
   for(const p of (lista || [])){
     progDe[p.clave] = p;
@@ -1673,7 +1980,7 @@ function csOcupacionDatosHacer(d, regs, lista, papeles){
   }
   const por = new Map();
   for(const pp of papeles){
-    if(!pp.talento) continue;
+    if(!pp.talento || csEsMarca(pp.talento)) continue;
     const k = castNorm(pp.talento);
     if(!k) continue;
     let x = por.get(k);
@@ -2120,7 +2427,7 @@ function csRepartoPorTalento(rep, d){
   if(d) for(const t of d.talents) fichas[castNorm(t.name)] = t;
   const por = new Map();
   for(const r of rep) for(const tr of r.tramos){
-    if(!tr.talento) continue;
+    if(!tr.talento || csEsMarca(tr.talento)) continue;
     const k = castNorm(tr.talento);
     let g = por.get(k);
     if(!g){ const t = fichas[k] || null; g = { clave: k, talento: tr.talento, ficha: t, genero: (t && t.genero) || '', personajes: [], lineas: 0, apariciones: 0, principal: false }; por.set(k, g); }
@@ -2596,19 +2903,27 @@ function csBajarCopia(id){
 function csListaTalentos(d){
   const vistos = new Set(), nombres = [];
   const mas = (n) => { const k = castNorm(n); if(!k || vistos.has(k)) return; vistos.add(k); nombres.push(n); };
-  if(d) d.talents.forEach(t => t.name && mas(t.name));
-  if(typeof TAL !== 'undefined' && TAL && Array.isArray(TAL.nombres)) TAL.nombres.forEach(mas);
-  if(!nombres.length) return '';
-  return '<datalist id="csListaTalentos">' + nombres.map(n => '<option value="' + csEsc(n) + '">').join('') + '</datalist>';
+  if(d) d.talents.forEach(t => t.name && !csEsMarca(t.name) && mas(t.name));
+  if(typeof TAL !== 'undefined' && TAL && Array.isArray(TAL.nombres)) TAL.nombres.forEach(n => !csEsMarca(n) && mas(n));
+  /* Y las marcas, al final y con lo que significan: se ponen, pero no son talentos (PRO-53). */
+  return '<datalist id="csListaTalentos">' + nombres.map(n => '<option value="' + csEsc(n) + '">').join('')
+    + CS_MARCAS.map(m => '<option value="' + m[0] + '">' + csEsc(m[1]) + '</option>').join('') + '</datalist>';
 }
 
 /**
  * La celda del talento: editable cuando el personaje y el episodio están en
  * Casting (se guarda allí); si no, el texto. Si Dubbipt dice otro, se ve.
  */
+/** Junto a una casilla con ORIGINAL, X o TODOS: qué quiere decir, que no es un talento (PRO-53). */
+function csNotaMarca(valor){
+  if(!csEsMarca(valor)) return '';
+  const m = CS_MARCAS.find(x => x[0] === castNorm(valor));
+  return ' <small class="cs-tenue cs-marca" title="No es un talento: no cuenta en Talentos ni en la ocupación">' + csEsc(m ? m[1] : 'No se graba') + '</small>';
+}
 function csTalentoCelda(f, dcEp, e){
   const nota = (f.choca ? ' <small class="cs-aviso" title="En el registro de Dubbipt pone otro talento: al realizar el casting manda el de Dubbipt">' + csIco('aviso', 12) + 'en Dubbipt: ' + csEsc(f.dubbipt) + '</small>'
-             : (!f.dc && f.dubbipt ? ' <small class="cs-tenue">de Dubbipt</small>' : ''));
+             : (!f.dc && f.dubbipt ? ' <small class="cs-tenue">de Dubbipt</small>' : ''))
+    + csNotaMarca(f.dc || f.dubbipt || f.talento);
   if(dcEp && f.charId != null)
     return '<input class="cs-tal-in" list="csListaTalentos" data-cs="talento" data-ep="' + csEsc(dcEp.id) + '" data-ch="' + csEsc(f.charId) + '" data-per="' + csEsc(f.personaje) + '" data-antes="' + csEsc(f.dc || '') + '" value="' + csEsc(f.dc || '') + '" placeholder="Asignar…">' + nota;
   if(e && e.ep)
@@ -3103,6 +3418,7 @@ async function csRenombrarTalento(t, nombre){
   const nuevo = (typeof dcxNombreTalento === 'function') ? dcxNombreTalento(nombre) : String(nombre || '').replace(/\s+/g, ' ').trim().toUpperCase();
   const viejo = String(t.name || '');
   if(!nuevo || nuevo === viejo) return 'nada';
+  if(csEsMarca(nuevo)){ castAviso('«' + nuevo + '» no es un talento: es una marca de producción (no se graba o se deja original)'); return 'error'; }
   const r = await csEditar(pl => dcxTalento(pl, t.id, { name: nuevo }), 'Talento renombrado: ' + viejo + ' → ' + nuevo);
   if(r !== 'guardado') return r;
   let regs = 0;
@@ -3353,6 +3669,28 @@ function csCablear(vista){
     else if(que === 'buscarPer') el.oninput = () => escribir('buscarPer');
     else if(que === 'ocBuscar') el.oninput = () => escribir('ocBuscar');
     else if(que === 'ocFiltro') el.onchange = () => { CS[at('campo')] = el.value; csRepintar(); };
+    /* ── Talentos: buscar y fusionar (PRO-52) ── */
+    else if(que === 'talFiltro') el.onchange = () => { CS[at('campo')] = el.value; csRepintar(); };
+    else if(que === 'talOrden') el.onclick = () => { CS.talOrden = v; csRepintar(); };
+    else if(que === 'talSinCat') el.onclick = () => { CS.talSinCat = !CS.talSinCat; csRepintar(); };
+    else if(que === 'talLimpiar') el.onclick = () => { CS.buscar = ''; CS.talGenero = ''; CS.talEdad = ''; CS.talTono = ''; CS.talSinCat = false; CS.talOrden = 'az'; csRepintar(); };
+    else if(que === 'talUmbral') el.onchange = () => { const n = Math.round(+el.value); CS.talUmbral = isFinite(n) ? Math.max(50, Math.min(100, n)) : 80; csRepintar(); };
+    else if(que === 'talFusionarPar') el.onclick = () => {
+      const d = a().datos, fichas = csFichasTalentos(d, csRegistrosTodos(d), a().lista);
+      const queda = csTalFichaDe(fichas, d, at('queda')), pasa = csTalFichaDe(fichas, d, at('pasa'));
+      csFusionarTalentos(queda, pasa).catch(err => fallo('csFusionarTalentos · js/castingvistas.js', err, 'los talentos no se han podido fusionar'));
+    };
+    else if(que === 'talDistintos') el.onclick = () => {
+      csEditar(pl => { const l = Array.isArray(pl.talentosDistintos) ? pl.talentosDistintos.slice() : []; if(l.indexOf(v) >= 0) return false; l.push(v); pl.talentosDistintos = l; return true; }, null);
+    };
+    else if(que === 'talFusionar') el.onclick = () => {
+      const fichas = csFichasTalentos(a().datos, csRegistrosTodos(a().datos), a().lista);
+      const queda = fichas.find(f => f.clave === v), i = document.getElementById('csTalFusOtro');
+      const otro = i ? castNorm(i.value) : '';
+      const pasa = otro ? fichas.find(f => f.clave === otro) : null;
+      if(!pasa){ castAviso(otro ? 'No hay ningún talento que se llame «' + i.value.trim() + '»' : 'Escribe el nombre del otro talento'); return; }
+      csFusionarTalentos(queda, pasa).catch(err => fallo('csFusionarTalentos · js/castingvistas.js', err, 'los talentos no se han podido fusionar'));
+    };
     else if(que === 'ocModo') el.onclick = () => { CS.ocModo = v; csRepintar(); };
     else if(que === 'talAbrir') el.onclick = () => { CS.talAbierto = v; csRepintar(); try{ window.scrollTo(0, 0); }catch(err){ /* sin desplazar */ } };
     else if(que === 'talCerrar') el.onclick = () => { CS.talAbierto = null; csRepintar(); };
@@ -3509,6 +3847,7 @@ function csCablear(vista){
     else if(que === 'talNuevo') el.onclick = () => {
       const i = document.getElementById('csTalNuevo'), nombre = i ? i.value.trim() : '';
       if(!nombre){ castAviso('Escribe el nombre del talento'); return; }
+      if(csEsMarca(nombre)){ castAviso('«' + nombre + '» no es un talento: es una marca de producción. Se pone al hacer el casting'); return; }
       csEditar(pl => dcxTalentoNuevo(pl, { name: nombre }), 'Talento añadido: ' + dcxNombreTalento(nombre));
     };
     else if(que === 'talCampo') el.onchange = () => {
@@ -3520,10 +3859,31 @@ function csCablear(vista){
       }
       csEditar(pl => dcxTalento(pl, tid, { [campo]: valor }), 'Ficha de talento: ' + campo + ' = ' + (valor || '—'));
     };
-    else if(que === 'talRen') el.onclick = () => {
-      const t = ((a().datos && a().datos.talents) || []).find(x => String(x.id) === String(v)); if(!t) return;
-      const n = csPedirNombre('Nuevo nombre del talento:', t.name); if(n == null) return;
-      csRenombrarTalento(t, n).catch(err => fallo('csRenombrarTalento · js/castingvistas.js', err, 'el nombre no se ha podido cambiar'));
+    else if(que === 'talEditar') el.onclick = (ev) => {
+      if(ev && ev.stopPropagation) ev.stopPropagation();
+      CS.talEditar = v; csRepintar();
+      const i = document.getElementById('csTeNombre'); if(i && i.focus) i.focus();
+    };
+    else if(que === 'talEdCerrar') el.onclick = () => { CS.talEditar = null; csRepintar(); };
+    else if(que === 'talBorrar') el.onclick = (ev) => {
+      if(ev && ev.stopPropagation) ev.stopPropagation();
+      const x = a(), f = csFichasTalentos(x.datos, csRegistrosTodos(x.datos), x.lista).find(y => y.clave === v);
+      if(!f) return;
+      csBorrarTalento(f).catch(err => fallo('csBorrarTalento · js/castingvistas.js', err, 'el talento no se ha podido eliminar'));
+    };
+    else if(que === 'talEdGuardar') el.onclick = () => {
+      const x = a(), val = (idc) => { const i = document.getElementById(idc); return i ? i.value : ''; };
+      const f = csFichasTalentos(x.datos, csRegistrosTodos(x.datos), x.lista).find(y => y.clave === v);
+      if(!f){ CS.talEditar = null; csRepintar(); return; }
+      const vals = { name: val('csTeNombre'), genero: val('csTeGenero'), edad_aparente: val('csTeEdad'), tono_de_voz: val('csTeTono'), registro: val('csTeRegistro'), email: val('csTeCorreo') };
+      el.disabled = true;
+      csGuardarTalento(f, vals).then(r => {
+        el.disabled = false;
+        if(r === 'error') return;
+        CS.talEditar = null;
+        if(r === 'igual') castAviso('Sin cambios en ' + f.nombre);
+        csRepintar();
+      }).catch(err => { el.disabled = false; fallo('csGuardarTalento · js/castingvistas.js', err, 'el talento no se ha podido guardar'); });
     };
     /* ── Tráilers & Teasers ── */
     else if(que === 'trAgregar') el.onclick = () => { CS.trForm = { type: 'trailer', etapa: '', title: '', series_id: '', received_at: '', deadline: '', status: 'pendiente' }; csRepintar(); };

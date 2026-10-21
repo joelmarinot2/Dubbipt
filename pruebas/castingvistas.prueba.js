@@ -142,11 +142,11 @@ exports.pruebas = async function(t){
   const d = PR.prodNormalizar(VOLCADO);
 
   t.seccion('1 · las secciones de Casting, en su orden');
-  t.eq('las nueve, como en su barra', M.CS_SECCIONES.map(s => s.t).join(' · '), 'Dashboard · Programas · Talentos · Ocupación · Tráilers · Producción · DUBCARDs · Pegado de casting · Breakdowns');
-  t.eq('las tres que procesan archivos, todavía la herramienta de allí', M.CS_SECCIONES.filter(s => s.dc).map(s => s.v + '>' + s.dc).join(' '), 'dubcards>dubcards pegado>pegado breakdowns>breakdowns');
+  t.eq('las diez, como en su barra', M.CS_SECCIONES.map(s => s.t).join(' · '), 'Dashboard · Programas · Talentos · Ocupación · Tráilers · Producción · DUBCARDs · Contract Inventory · Pegado de casting · Breakdowns');
+  t.eq('las cuatro que procesan archivos, herramientas de Casting', M.CS_SECCIONES.filter(s => s.dc).map(s => s.v + '>' + s.dc).join(' '), 'dubcards>dubcards contratos>contratos pegado>pegado breakdowns>breakdowns');
   const nav = M.csNavHtml('talentos');
   t.ok('la activa, marcada; las de Casting, distinguidas', /class="cs-nav-b on" data-v="talentos"/.test(nav) && /class="cs-nav-b cs-nav-dc" data-v="pegado"/.test(nav) && (nav.match(/ on"/g) || []).length === 1);
-  t.ok('cada una con su icono de trazo', (nav.match(/<svg [^>]*stroke="currentColor"/g) || []).length === 9);
+  t.ok('cada una con su icono de trazo', (nav.match(/<svg [^>]*stroke="currentColor"/g) || []).length === 10);
   t.ok('todos los iconos dibujados', M.CS_SECCIONES.every(s => M.CS_ICO[s.v]) && ['externo', 'actualizar', 'aviso', 'estrella', 'entrar', 'cerrar', 'derecha', 'abajo', 'mas', 'subir', 'bajar', 'traer'].every(k => M.CS_ICO[k]));
   t.eq('un icono que no existe, vacío pero sin romper', /<svg[^>]*><\/svg>/.test(M.csIco('nada')), true);
 
@@ -168,7 +168,7 @@ exports.pruebas = async function(t){
        talents: [{ id: 1, name: 'ZOE' }, { id: 2, name: 'ANA' }], appearances: [{ character_id: 1, episode_id: 1, line_count: 100 }, { character_id: 2, episode_id: 1, line_count: 10 }],
        castings: [{ character_id: 1, talent_id: 1, episode_id: 1 }, { character_id: 2, talent_id: 2, episode_id: 1 }] })).map(o => o.talento).join(','), 'ZOE,ANA');
   t.eq('limitada a un programa', M.csOcupacion(d, 2).map(o => o.talento).join(',') + ' · ' + M.csOcupacion(d, '1').map(o => o.talento).join(','), 'CARLOS RUIZ · ANA ROJAS,BEATRIZ SOL');
-  t.eq('un mismo nombre de personaje en dos programas son dos personajes', M.csOcupacion(PR.prodNormalizar({ series: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }], episodes: [{ id: 1, series_id: 1 }, { id: 2, series_id: 2 }], characters: [{ id: 9, canonical_name: 'MAMÁ' }], talents: [{ id: 1, name: 'X' }], castings: [{ character_id: 9, talent_id: 1, episode_id: 1 }, { character_id: 9, talent_id: 1, episode_id: 2 }] }))[0].personajes, 2);
+  t.eq('un mismo nombre de personaje en dos programas son dos personajes', M.csOcupacion(PR.prodNormalizar({ series: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }], episodes: [{ id: 1, series_id: 1 }, { id: 2, series_id: 2 }], characters: [{ id: 9, canonical_name: 'MAMÁ' }], talents: [{ id: 1, name: 'LUZ MAR' }], castings: [{ character_id: 9, talent_id: 1, episode_id: 1 }, { character_id: 9, talent_id: 1, episode_id: 2 }] }))[0].personajes, 2);
   t.eq('sin datos, vacía', M.csOcupacion(null).length, 0);
 
   t.seccion('4 · los Talentos');
@@ -217,7 +217,7 @@ exports.pruebas = async function(t){
   t.eq('el casting de un episodio: Casting y el registro de Dubbipt', M.csCastingDe(eps1[0], d, REGISTRO).map(f => f.personaje + '=' + f.talento + (f.choca ? '!' : '')).join(' '), 'ALLY=ANA ROJAS JANA=LUZ MAR! TITO BOY=');
 
   t.seccion('7 · lo que se pinta: con los datos, sin ellos, y sin emojis');
-  const vistas = ['dashboard', 'talentos', 'ocupacion', 'trailers', 'produccion', 'dubcards', 'pegado', 'breakdowns'];
+  const vistas = ['dashboard', 'talentos', 'ocupacion', 'trailers', 'produccion', 'dubcards', 'contratos', 'pegado', 'breakdowns'];
   const html = {}; vistas.forEach(v => { html[v] = M.csHtml(v, HOY); });
   t.ok('cada sección con su título y de dónde salen los datos', ['Dashboard', 'Talentos', 'Ocupación', 'Tráilers &amp; Teasers', 'Producción'].every((n, i) => html[vistas[i]].indexOf('<h2>' + n + '</h2>') >= 0 && /Datos de Casting de Dubbipt · 6\/10\/2026/.test(html[vistas[i]])));
   t.ok('el Dashboard, con sus números y sus listas', /<b>2<\/b><span>programas en curso<\/span>/.test(html.dashboard) && /cs-kpi cs-kpi-aviso"><b>1<\/b><span>personajes sin talento/.test(html.dashboard) && /Miami vencida hace 1 d/.test(html.dashboard) && /Tráiler oficial/.test(html.dashboard));
@@ -225,7 +225,7 @@ exports.pruebas = async function(t){
        /data-cs="ocBuscar"/.test(html.ocupacion) && /data-cs="ocFiltro" data-campo="ocGenero"/.test(html.ocupacion) && /data-cs="ocModo" data-v="curso"/.test(html.ocupacion)
        && /<div class="cs-oc-tal">[\s\S]*?<div class="cs-oc-prog/.test(html.ocupacion));
   t.ok('Producción, con su filtro', /<input type="checkbox" data-cs="soloAlertas">/.test(html.produccion));
-  t.ok('las herramientas de Casting, con su explicación (sin js/dctools.js cargado, se dice)', /Prepara las DUBCARD/.test(html.dubcards) && ['dubcards', 'pegado', 'breakdowns'].every(v => /no está cargada/.test(html[v])));
+  t.ok('las herramientas de Casting, con su explicación (sin js/dctools.js cargado, se dice)', /Prepara las DUBCARD/.test(html.dubcards) && ['dubcards', 'contratos', 'pegado', 'breakdowns'].every(v => /no está cargada/.test(html[v])));
   t.ok('ni un emoji en ninguna', vistas.every(v => !EMOJI.test(html[v])) && !EMOJI.test(M.csNavHtml('dashboard')), vistas.filter(v => EMOJI.test(html[v])).join(','));
   {
     const N = armar({ datos: null });
