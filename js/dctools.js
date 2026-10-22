@@ -573,7 +573,8 @@ const bdSafeName=t=>t.replace(/[\\/:*?"<>|]+/g,"").slice(0,80);
 /* ═══ La interfaz, en Dubbipt ════════════════════════════════════════════════ */
 
 const ST = {
-  dc: { entries: [], client: null, processed: [], warnings: [], logs: [], busy: false },
+  dc: { entries: [], client: null, processed: [], warnings: [], logs: [], busy: false, modo: 'general' },
+  pm: { entries: [], eps: [], logs: [], busy: false, cfg: null },
   bd: { script: null, guide: null, reading: '', name: '', isMovie: false, ep: '', notes: '', withSeries: true,
         busy: false, live: '', result: null, err: '', abort: null, openId: null, cfgOpen: false, cfgMsg: '', locales: [] },
   pg: { completa: false }
@@ -722,10 +723,19 @@ function dcMatrizHtml(eps){
     + '</tbody></table></div></div>';
 }
 
+/* Dos secciones: la de siempre (Netflix y otras casas) y el formato Paramount (PRO-55). */
+function dcModos(){
+  const b = (k, t) => '<button class="cs-pest' + (ST.dc.modo === k ? ' on' : '') + '" data-dct="dcModo" data-v="' + k + '">' + E(t) + '</button>';
+  return '<div class="cs-pests dct-modos">' + b('general', 'Netflix y otras casas') + b('paramount', 'Formato Paramount') + '</div>';
+}
+
+const dcModoClic = el => () => { ST.dc.modo = el.getAttribute('data-v') === 'paramount' ? 'paramount' : 'general'; repintar(); };
+
 function dcHtml(){
+  if(ST.dc.modo === 'paramount'){ if(!ST.pm.cfg) ST.pm.cfg = pmCfgCargar(); return dcModos() + pmHtml(); }
   const S = ST.dc, isNetflix = !S.client || S.client.kind === 'netflix';
   const cli = S.client || lastClient() || { kind: 'netflix', name: 'Netflix' };
-  return '<div class="dct">'
+  return dcModos() + '<div class="dct">'
     + '<div class="dct-drop" data-dct="dcElegir">' + ico('subir', 22) + '<b>Haz clic o arrastra los desgloses de cada episodio</b><span>.xlsm · .xlsx · .xls · varios a la vez (hojas DESGLOCE + CASTING)</span>'
     +   '<input type="file" id="dctDcFiles" multiple accept=".xlsm,.xlsx,.xls" hidden></div>'
     + (S.entries.length ? '<div class="dct-lista">' + S.entries.map((e, i) => '<div class="dct-arch"><span class="dct-arch-n">' + E(e.name) + '</span>'
@@ -762,6 +772,7 @@ function dcAnadir(files){
 
 function dcCablear(raiz){
   const S = ST.dc;
+  if(S.modo === 'paramount'){ pmCablear(raiz); return; }
   const q = s => raiz.querySelector(s);
   const input = q('#dctDcFiles');
   raiz.querySelectorAll('[data-dct]').forEach(el => {
@@ -786,8 +797,356 @@ function dcCablear(raiz){
       dcProcesar().catch(e => aviso('No se pudo procesar: ' + e.message));
     };
     else if(que === 'dcBajar') el.onclick = () => dcDescargar();
+    else if(que === 'dcModo') el.onclick = dcModoClic(el);
   });
   if(input) input.onchange = () => { dcAnadir(input.files); input.value = ''; };
+}
+
+/* ── DUBCARD en formato Paramount (PRO-55) ─────────────────────────────────
+   Pedido de sala, con el DUBCARD entregado de «Big John's Bosh Family» 101 y
+   el desglose de ese episodio: «en la sección de DUBCARD, otra sección que sea
+   DUBCARD formato Paramount; se tiene que entregar así, partiendo de los
+   archivos del presupuesto». Se suben los desgloses (.xlsm, con su hoja
+   CASTING) y sale, por episodio, la plantilla de Paramount: título de la
+   serie, idioma, número y título del episodio, créditos técnicos y el reparto
+   -el personaje en CHARACTER si es un nombre propio, en TRANSLATION si es un
+   papel traducido («Doctora», «Hombre bingo 1»)-, en orden alfabético. Lo que
+   no es un talento (ORIGINAL, TODOS, X…) no entra. Todo se puede corregir
+   antes de descargar, y los créditos y la serie se recuerdan en este equipo. */
+
+const PM_KEY = 'dc_paramount_v1';
+const PM_CREDITOS = [['supervisor', 'Creative Supervisor'], ['estudio', 'Dubbing Studio'], ['colaboracion', 'In Collaboration with'],
+  ['director', 'Dubbing Director'], ['estudioMezcla', 'Mixing Studio'], ['mezcla', 'Mixer'], ['ingeniero', 'Sound Engineer'], ['editor', 'Editor'], ['adaptador', 'Adaptor']];
+const PM_CFG_BASE = { serie: '', serieTrad: '', idioma: 'Versión en español latinoamericano',
+  creditos: { supervisor: 'Henry Perez', estudio: 'Centauro Comunicacions', colaboracion: '', director: '', estudioMezcla: '', mezcla: 'Edwin Rodriguez', ingeniero: '', editor: '', adaptador: '' } };
+function pmCfgCargar(){
+  let g = null;
+  try{ g = JSON.parse(localStorage.getItem(PM_KEY) || 'null'); }catch(e){ g = null; }
+  const c = Object.assign({}, PM_CFG_BASE, g || {});
+  c.creditos = Object.assign({}, PM_CFG_BASE.creditos, (g && g.creditos) || {});
+  return c;
+}
+function pmCfgGuardar(c){ try{ localStorage.setItem(PM_KEY, JSON.stringify(c)); }catch(e){ /* sin almacén: vale para esta vez */ } }
+
+/* Palabras de un papel en español («Hombre de barba», «Doctora»): esos van en TRANSLATION. */
+const PM_ES = new Set(('DE DEL LA LAS LOS EL Y CON EN SIN POR PARA AL UN UNA UNO '
+  + 'HOMBRE HOMBRES MUJER MUJERES NINO NINA NINOS NINAS CHICO CHICA CHICOS CHICAS SENOR SENORA SENORITA VOZ VOCES GRUPO '
+  + 'COMENTARISTA DOCTOR DOCTORA ENTREVISTADOR ENTREVISTADORA PRESENTADOR PRESENTADORA TAXISTA GRAFICA GRAFICAS GORDA GORDO '
+  + 'POLICIA MESERO MESERA CAMARERO CAMARERA ENFERMERO ENFERMERA NARRADOR NARRADORA REPORTERO REPORTERA PERIODISTA LOCUTOR LOCUTORA '
+  + 'CONDUCTOR CONDUCTORA VENDEDOR VENDEDORA CLIENTE CLIENTA GUARDIA SOLDADO JUEZ JUEZA ARBITRO MEDICO MEDICA PROFESOR PROFESORA '
+  + 'MAESTRO MAESTRA ESTUDIANTE ALUMNO ALUMNA ANCIANO ANCIANA JOVEN BEBE MAMA PAPA MADRE PADRE ABUELO ABUELA TIO TIA HERMANO HERMANA '
+  + 'AMIGO AMIGA VECINO VECINA CHOFER PILOTO OPERADOR OPERADORA RECEPCIONISTA SECRETARIA SECRETARIO JEFE JEFA GERENTE EMPLEADO EMPLEADA '
+  + 'TRABAJADOR TRABAJADORA PUBLICO MULTITUD AMBIENTE INSERTO TEXTO LETRERO CARTEL ROTULO ANUNCIO ESPOSA ESPOSO NOVIA NOVIO HIJO HIJA '
+  + 'CAJERO CAJERA CANTANTE BAILARIN BAILARINA AFICIONADO AFICIONADA PERSONA GENTE ESPECTADOR ESPECTADORA ENTRENADOR ENTRENADORA '
+  + 'LUCHADOR LUCHADORA BOXEADOR ANFITRION ANFITRIONA INVITADO INVITADA').split(' '));
+const pmSinTildes = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '');
+/** ¿El nombre del personaje es un papel traducido (va en TRANSLATION) y no un nombre propio (CHARACTER)? */
+function pmEsTraduccion(nombre){
+  const t = String(nombre == null ? '' : nombre).trim();
+  if(!t) return false;
+  if(/\d/.test(t) || /[áéíóúñü]/i.test(t)) return true;
+  return pmSinTildes(t).toUpperCase().split(/[^A-Z]+/).filter(Boolean).some(w => PM_ES.has(w));
+}
+/** «BIG JOHN» → «Big John»; «JOHN'S» → «John's». */
+const pmPropio = s => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase().replace(/(^|[\s\-.])(\p{L})/gu, (m, p, c) => p + c.toUpperCase());
+/** «COMENTARISTA DE LA PELEA» → «Comentarista de la pelea». */
+const pmFrase = s => { const t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
+/** Un título en inglés: «MEET THE FISHERS» → «Meet the Fishers». */
+const PM_MENUDAS = new Set(['a', 'an', 'the', 'and', 'or', 'but', 'of', 'in', 'on', 'at', 'to', 'for', 'by', 'with', 'from', 'vs']);
+const pmTituloIngles = s => pmPropio(s).split(' ').map((w, i) => (i && PM_MENUDAS.has(w.toLowerCase())) ? w.toLowerCase() : w).join(' ');
+
+/**
+ * Lo que el DUBCARD necesita de un desglose, de sus filas (como las da
+ * SheetJS con header:1): el título, el director, el técnico y el reparto de
+ * la hoja CASTING. `desglose` (la hoja DESGLOCE) solo por si CASTING no trae título.
+ */
+function pmDatosDeHojas(casting, desglose){
+  const filas = Array.isArray(casting) ? casting : [];
+  const txt = v => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  const tras = (fila, i) => { for(let j = i + 1; j < fila.length; j++) if(txt(fila[j])) return txt(fila[j]); return ''; };
+  let titulo = '', director = '', tecnico = '', cab = -1, colP = 0, colT = 3;
+  for(let r = 0; r < Math.min(filas.length, 20) && cab < 0; r++){
+    const f = filas[r] || [];
+    for(let i = 0; i < f.length; i++){
+      const v = pmSinTildes(txt(f[i])).toUpperCase();
+      if(!v) continue;
+      if(/^DIRECTOR\b/.test(v) && !director) director = tras(f, i);
+      else if(/^TECNICO\b/.test(v) && !tecnico) tecnico = tras(f, i);
+      else if(/^TITULO\b/.test(v) && !titulo && !/ESPANOL/.test(v)) titulo = tras(f, i);
+      else if(v.indexOf('NOMBRE DEL ACTOR') >= 0){ cab = r; colT = i; const p = f.findIndex(x => /^(LOCUTOR|PERSONAJE)/i.test(txt(x))); colP = p >= 0 ? p : 0; }
+    }
+  }
+  if(!titulo && Array.isArray(desglose) && desglose[8]) titulo = txt(desglose[8][7]);
+  const reparto = [], vistos = new Map();
+  for(let r = cab + 1; cab >= 0 && r < filas.length; r++){
+    const f = filas[r] || [], p = txt(f[colP]), t = txt(f[colT]);
+    if(!p) continue;
+    const k = pmSinTildes(p).toUpperCase();
+    if(vistos.has(k)){ const x = vistos.get(k); if(!x.talento && t) x.talento = t; continue; }
+    const x = { personaje: p, talento: t };
+    vistos.set(k, x); reparto.push(x);
+  }
+  return { titulo: titulo, director: director, tecnico: tecnico, reparto: reparto, sinCabecera: cab < 0 };
+}
+
+/** De un libro de SheetJS: sus hojas CASTING (la de ese nombre, si hay varias) y DESGLOCE. */
+function pmDatosDeLibro(wb){
+  const nombres = (wb && wb.SheetNames) || [];
+  const cs = nombres.find(n => n.trim().toUpperCase() === 'CASTING') || nombres.find(n => /CASTING/i.test(n));
+  const ds = nombres.find(n => /DESGLO/i.test(n));
+  if(!cs) return null;
+  const filas = n => n ? (XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, defval: '' }) || []) : [];
+  return pmDatosDeHojas(filas(cs), filas(ds));
+}
+
+/**
+ * El episodio para el DUBCARD: número y título (del título del desglose,
+ * quitando la serie si se conoce), créditos del desglose y el reparto en
+ * orden, sin lo que no es un talento.
+ */
+function pmEpisodio(datos, archivo, serie){
+  const tit = String(datos.titulo || '').replace(/\s+/g, ' ').trim();
+  const m = tit.match(/(\d{1,4})\s*$/);
+  let numero = m ? m[1] : '';
+  if(!numero){ const n = extractEpNum(archivo); numero = n != null ? String(n) : ''; }
+  let resto = m ? tit.slice(0, m.index).trim() : tit;
+  const s = String(serie || '').trim();
+  if(s && pmSinTildes(resto).toUpperCase().indexOf(pmSinTildes(s).toUpperCase()) === 0) resto = resto.slice(s.length).trim();
+  else if(s) resto = '';
+  const filas = [], fuera = [];
+  for(const x of datos.reparto){
+    if(x.talento && dcIsPseudo(x.talento)){ fuera.push(pmFrase(x.personaje) + ' (' + x.talento.toUpperCase() + ')'); continue; }
+    const trad = pmEsTraduccion(x.personaje);
+    filas.push({ nombre: trad ? pmFrase(x.personaje) : pmPropio(x.personaje), col: trad ? 'C' : 'B', actor: pmPropio(x.talento) });
+  }
+  pmOrdenar(filas);
+  return { archivo: archivo || '', tituloDesglose: tit, numero: numero, titulo: resto ? pmTituloIngles(resto) : '', tituloTrad: '',
+           director: pmPropio(datos.director), tecnico: pmPropio(datos.tecnico), filas: filas, fuera: fuera, serieAdivinada: s ? '' : resto };
+}
+const pmOrdenar = filas => filas.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+
+/* ── El Excel, a mano con fflate: SheetJS sin estilos no da el formato ── */
+
+const pmX = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const PM_ESTILOS = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+  + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+  + '<fonts count="5"><font><sz val="11"/><name val="Calibri"/><family val="2"/></font><font><b/><sz val="15"/><name val="Calibri"/><family val="2"/></font>'
+  + '<font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font><font><sz val="12"/><name val="Book Antiqua"/><family val="1"/></font><font><sz val="10"/><name val="Book Antiqua"/><family val="1"/></font></fonts>'
+  + '<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill></fills>'
+  + '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border></borders>'
+  + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+  + '<cellXfs count="9">'
+  +   '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+  +   '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'
+  +   '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
+  +   '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="left"/></xf>'
+  +   '<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>'
+  +   '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment wrapText="1"/></xf>'
+  +   '<xf numFmtId="0" fontId="3" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1"/></xf>'
+  +   '<xf numFmtId="0" fontId="4" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment wrapText="1"/></xf>'
+  +   '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>'
+  + '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+
+/** La hoja de un episodio, en XML: la plantilla de Paramount, celda a celda. */
+function pmHojaXml(ep, cfg){
+  const filas = [];
+  const fila = (n, celdas, alto) => filas.push('<row r="' + n + '"' + (alto ? ' ht="' + alto + '" customHeight="1"' : '') + '>' + celdas.join('') + '</row>');
+  const c = (ref, v, s) => {
+    if(v === '' || v == null) return '<c r="' + ref + '"' + (s ? ' s="' + s + '"' : '') + '/>';
+    if(typeof v === 'number') return '<c r="' + ref + '"' + (s ? ' s="' + s + '"' : '') + '><v>' + v + '</v></c>';
+    return '<c r="' + ref + '"' + (s ? ' s="' + s + '"' : '') + ' t="inlineStr"><is><t xml:space="preserve">' + pmX(v) + '</t></is></c>';
+  };
+  const cr = cfg.creditos || {};
+  const num = /^\d+$/.test(String(ep.numero || '')) ? +ep.numero : (ep.numero || '');
+  fila(1, [c('A1', '***PLEASE COPY THIS TEMPLATE AND ADD A NEW TAB FOR EACH EPISODE***', 1)], 45.95);
+  fila(2, [c('A2', 'SERIES TITLE:', 2), c('B2', cfg.serie || '', 3)]);
+  fila(3, [c('A3', 'TRANSLATED SERIES TITLE (IF APPLICABLE):', 2), c('B3', cfg.serieTrad || '', 3)]);
+  fila(4, [c('A4', 'LANGUAGE VERSION (Must be written in localized language)', 2), c('B4', cfg.idioma || '', 3)]);
+  fila(5, [c('A5', 'EPISODE NUMBER', 2), c('B5', num, 3)]);
+  fila(6, [c('A6', 'EPISODE TITLE', 2), c('B6', ep.titulo || '', 3)]);
+  fila(7, [c('A7', 'TRANSLATED EPISODE TITLE ', 2), c('B7', ep.tituloTrad || '', 3)]);
+  fila(9, [c('A9', 'Technical Credits (if applicable)', 2)]);
+  fila(10, [c('A10', 'TITLE', 4), c('B10', 'TRANSLATIONS FOR TITLES LISTED IN THE "TITLE" COLUMN', 4), c('C10', 'NAME TO APPEAR IN CREDITS ', 4), c('D10', 'NAME IN ROMAN LETTERS (if applicable)', 4)], 32.1);
+  PM_CREDITOS.forEach((k, i) => {
+    const n = 11 + i;
+    const nombre = k[0] === 'director' ? (cr.director || ep.director || '') : k[0] === 'ingeniero' ? (cr.ingeniero || ep.tecnico || '') : (cr[k[0]] || '');
+    fila(n, [c('A' + n, k[1], 5), c('B' + n, '', 8), c('C' + n, nombre, 6), c('D' + n, '', 8)], 15.75);
+  });
+  fila(23, [c('A23', 'Cast information', 2)]);
+  fila(24, [c('A24', 'ORIGINAL ACTOR', 4), c('B24', 'CHARACTER', 4), c('C24', 'TRANSLATION', 4), c('D24', 'NAME TO APPEAR IN CREDITS (Local Voice Actor)', 4), c('E24', 'NAME IN ROMAN LETTERS (if applicable)', 4)], 33.75);
+  (ep.filas || []).forEach((x, i) => {
+    const n = 25 + i;
+    fila(n, [c('A' + n, '', 7), c('B' + n, x.col === 'B' ? x.nombre : '', 7), c('C' + n, x.col === 'C' ? x.nombre : '', 7), c('D' + n, x.actor || '', 7), c('E' + n, '', 7)]);
+  });
+  const ult = 24 + Math.max(1, (ep.filas || []).length);
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+    + '<dimension ref="A1:E' + ult + '"/><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="15"/>'
+    + '<cols><col min="1" max="1" width="49.375" customWidth="1"/><col min="2" max="2" width="36.375" customWidth="1"/><col min="3" max="3" width="43.875" customWidth="1"/>'
+    + '<col min="4" max="4" width="35.5" customWidth="1"/><col min="5" max="5" width="35.875" customWidth="1"/></cols>'
+    + '<sheetData>' + filas.join('') + '</sheetData><mergeCells count="1"><mergeCell ref="A1:E1"/></mergeCells>'
+    + '<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>';
+}
+
+/** El nombre de una hoja: el número del episodio, sin lo que Excel no admite y sin repetirse. */
+function pmNombresHojas(eps){
+  const usados = new Set();
+  return eps.map((ep, i) => {
+    const base = (String(ep.numero || '').replace(/[\\\/?*\[\]:]/g, '').trim() || 'Episodio ' + (i + 1)).slice(0, 28);
+    let n = base, k = 2;
+    while(usados.has(n.toUpperCase())) n = base + ' (' + k++ + ')';
+    usados.add(n.toUpperCase());
+    return n;
+  });
+}
+
+/** Los archivos del .xlsx (ruta → texto): una hoja por episodio. */
+function pmArchivosXlsx(eps, cfg){
+  const nombres = pmNombresHojas(eps);
+  const f = {
+    '[Content_Types].xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+      + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
+      + '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+      + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+      + eps.map((_, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')
+      + '</Types>',
+    '_rels/.rels': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    'xl/workbook.xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+      + '<bookViews><workbookView/></bookViews><sheets>' + nombres.map((n, i) => '<sheet name="' + pmX(n) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>').join('') + '</sheets></workbook>',
+    'xl/_rels/workbook.xml.rels': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + eps.map((_, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join('')
+      + '<Relationship Id="rId' + (eps.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+    'xl/styles.xml': PM_ESTILOS
+  };
+  eps.forEach((ep, i) => { f['xl/worksheets/sheet' + (i + 1) + '.xml'] = pmHojaXml(ep, cfg); });
+  return f;
+}
+
+/** El nombre del archivo, como el de Paramount: «BigJohnsBoshFamily_101_dubcard_es.xlsx». */
+function pmNombreArchivo(serie, eps){
+  const s = pmSinTildes(serie).replace(/['’`]/g, '').split(/[^A-Za-z0-9]+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('') || 'Serie';
+  const nums = eps.map(e => String(e.numero || '').trim()).filter(Boolean);
+  return s + '_' + (nums.length ? nums.join('-') : 'episodio') + '_dubcard_es.xlsx';
+}
+
+/** Descarga el DUBCARD de unos episodios (uno, o todos en un libro con una hoja por episodio). */
+function pmDescargar(eps){
+  const S = ST.pm;
+  if(!eps.length){ aviso('Primero procesa los desgloses'); return; }
+  if(!String(S.cfg.serie || '').trim()){ aviso('Escribe el título de la serie (SERIES TITLE)'); return; }
+  try{
+    const f = pmArchivosXlsx(eps, S.cfg), z = {};
+    for(const k of Object.keys(f)) z[k] = fflate.strToU8(f[k]);
+    const blob = new Blob([fflate.zipSync(z, { level: 6 })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const nombre = pmNombreArchivo(S.cfg.serie, eps);
+    bdDownload(blob, nombre);
+    aviso('Descargado: ' + nombre);
+  }catch(e){ aviso('No se pudo armar el DUBCARD: ' + e.message); }
+}
+
+/** La serie, si el título del desglose empieza por el nombre de un programa que ya conoce Dubbipt o Casting (el más largo), escrita como en el desglose. */
+function pmSerieConocida(titulo){
+  const orig = String(titulo == null ? '' : titulo).replace(/\s+/g, ' ').trim(), t = pmSinTildes(orig).toUpperCase();
+  let nombres = [];
+  try{ if(typeof sbShows === 'function') nombres = nombres.concat(sbShows().map(s => s && s.name)); }catch(e){ /* sin programas de Dubbipt */ }
+  try{ const d = (typeof csDatos === 'function') ? csDatos().datos : null; if(d && Array.isArray(d.series)) nombres = nombres.concat(d.series.map(s => s && s.name)); }catch(e){ /* sin Casting */ }
+  let mejor = '';
+  for(const n of nombres){
+    const k = pmSinTildes(n).toUpperCase().replace(/\s+/g, ' ').trim();
+    if(k && k.length > mejor.length && t.indexOf(k) === 0 && t.length > k.length && /[\s\-_:]/.test(t.charAt(k.length))) mejor = orig.slice(0, k.length);
+  }
+  return mejor;
+}
+
+/** Lee los desgloses subidos. */
+async function pmProcesar(){
+  const S = ST.pm;
+  if(S.busy || !S.entries.length) return;
+  S.busy = true; S.logs = []; S.eps = []; repintar();
+  try{
+    for(const en of S.entries){
+      try{
+        const wb = XLSX.read(new Uint8Array(await readFileBuffer(en.file)), { type: 'array', bookVBA: true });
+        const d = pmDatosDeLibro(wb);
+        if(!d){ S.logs.push({ msg: en.name + ': no tiene hoja CASTING', cls: 'err' }); continue; }
+        if(d.sinCabecera){ S.logs.push({ msg: en.name + ': la hoja CASTING no tiene la columna NOMBRE DEL ACTOR', cls: 'err' }); continue; }
+        if(!S.cfg.serie){ const s = pmSerieConocida(d.titulo); if(s){ S.cfg.serie = s; pmCfgGuardar(S.cfg); } }
+        const ep = pmEpisodio(d, en.name, S.cfg.serie);
+        if(!S.cfg.serie && ep.serieAdivinada){ S.cfg.serie = ep.serieAdivinada; pmCfgGuardar(S.cfg); ep.titulo = ''; }
+        S.eps.push(ep);
+        const sin = ep.filas.filter(x => !x.actor).length;
+        S.logs.push({ msg: en.name + ': episodio ' + (ep.numero || '?') + ' · ' + ep.filas.length + ' personajes' + (ep.fuera.length ? ' · ' + ep.fuera.length + ' fuera (no son talentos)' : '') + (sin ? ' · ' + sin + ' sin actor' : ''), cls: sin ? 'err' : 'ok' });
+      }catch(e){ S.logs.push({ msg: en.name + ': ' + e.message, cls: 'err' }); }
+    }
+    S.eps.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+  }finally{ S.busy = false; repintar(); }
+}
+
+function pmHtml(){
+  const S = ST.pm, cfg = S.cfg, cr = cfg.creditos;
+  const campo = (k, et, v, ph) => '<label>' + E(et) + '<input type="text" data-dct="pmCfg" data-k="' + k + '" value="' + E(v || '') + '"' + (ph ? ' placeholder="' + E(ph) + '"' : '') + ' autocomplete="off"></label>';
+  return '<div class="dct">'
+    + '<div class="dct-drop" data-dct="pmElegir">' + ico('subir', 22) + '<b>Haz clic o arrastra los desgloses (presupuesto) de cada episodio</b><span>.xlsm · .xlsx · varios a la vez (hoja CASTING con el NOMBRE DEL ACTOR)</span>'
+    +   '<input type="file" id="dctPmFiles" multiple accept=".xlsm,.xlsx,.xls" hidden></div>'
+    + (S.entries.length ? '<div class="dct-lista">' + S.entries.map((e, i) => '<div class="dct-arch"><span class="dct-arch-n">' + E(e.name) + '</span><button class="cs-b cs-b-icono cs-borrar" data-dct="pmQuitar" data-i="' + i + '" title="Quitar">' + ico('cerrar', 13) + '</button></div>').join('') + '</div>' : '')
+    + '<div class="dct-pm-cfg"><div class="dct-sec-t">Serie y créditos técnicos <i>(se recuerdan en este equipo)</i></div>'
+    +   '<div class="dct-pm-campos">' + campo('serie', 'Series title', cfg.serie, "BIG JOHN'S BOSH FAMILY") + campo('serieTrad', 'Translated series title', cfg.serieTrad, 'Si aplica') + campo('idioma', 'Language version', cfg.idioma) + '</div>'
+    +   '<div class="dct-pm-campos">' + PM_CREDITOS.map(k => campo('cr.' + k[0], k[1], cr[k[0]], k[0] === 'director' || k[0] === 'ingeniero' ? 'El del desglose' : '')).join('') + '</div></div>'
+    + (S.entries.length ? '<button class="cs-b cs-pri dct-ancho" data-dct="pmProcesar"' + (S.busy ? ' disabled' : '') + '>' + (S.busy ? 'Procesando…' : ico('actualizar', 14) + '<span>Procesar</span>') + '</button>' : '')
+    + (S.logs.length ? '<div class="dct-log">' + S.logs.map(l => '<div class="dct-log-' + (l.cls || 'n') + '">' + E(l.msg) + '</div>').join('') + '</div>' : '')
+    + (S.eps.length ? (S.eps.length > 1 ? '<button class="cs-b cs-pri dct-ancho dct-bajar" data-dct="pmBajarTodo">' + ico('bajar', 14) + '<span>Descargar los ' + S.eps.length + ' episodios (una hoja por episodio)</span></button>' : '')
+      + S.eps.map((ep, i) => '<div class="dct-ep dct-pm-ep"><div class="dct-pm-cab"><div class="dct-ep-t">' + E(ep.tituloDesglose || ep.archivo) + '</div>'
+          + '<button class="cs-b cs-pri" data-dct="pmBajar" data-i="' + i + '">' + ico('bajar', 14) + '<span>Descargar DUBCARD ' + E(ep.numero) + '</span></button></div>'
+          + '<div class="dct-pm-campos">'
+          +   '<label>Episode number<input type="text" data-dct="pmEp" data-i="' + i + '" data-k="numero" value="' + E(ep.numero) + '"></label>'
+          +   '<label>Episode title<input type="text" data-dct="pmEp" data-i="' + i + '" data-k="titulo" value="' + E(ep.titulo) + '" placeholder="Meet the Fishers"></label>'
+          +   '<label>Translated episode title<input type="text" data-dct="pmEp" data-i="' + i + '" data-k="tituloTrad" value="' + E(ep.tituloTrad) + '" placeholder="Si aplica"></label></div>'
+          + '<div class="dct-tabla-w"><table class="dct-pm-tabla"><thead><tr><th>#</th><th>Personaje</th><th>Columna</th><th>Actor (name to appear in credits)</th><th></th></tr></thead><tbody>'
+          + ep.filas.map((x, j) => '<tr' + (x.actor ? '' : ' class="dct-pm-sin"') + '><td>' + (j + 1) + '</td>'
+              + '<td><input type="text" data-dct="pmFila" data-i="' + i + '" data-j="' + j + '" data-k="nombre" value="' + E(x.nombre) + '"></td>'
+              + '<td><select data-dct="pmFila" data-i="' + i + '" data-j="' + j + '" data-k="col"><option value="B"' + (x.col === 'B' ? ' selected' : '') + '>Character (nombre propio)</option><option value="C"' + (x.col === 'C' ? ' selected' : '') + '>Translation (papel traducido)</option></select></td>'
+              + '<td><input type="text" data-dct="pmFila" data-i="' + i + '" data-j="' + j + '" data-k="actor" value="' + E(x.actor) + '" placeholder="Sin actor"></td>'
+              + '<td><button class="cs-b cs-b-icono cs-borrar" data-dct="pmFilaQuitar" data-i="' + i + '" data-j="' + j + '" title="Quitar esta fila">' + ico('cerrar', 12) + '</button></td></tr>').join('')
+          + '</tbody></table></div>'
+          + (ep.fuera.length ? '<div class="dct-tenue">No entran (no son talentos): ' + E(ep.fuera.join(', ')) + '</div>' : '')
+          + '</div>').join('') : '')
+    + '</div>';
+}
+
+function pmAnadir(files){
+  const S = ST.pm;
+  Array.from(files || []).filter(f => /\.(xlsm|xlsx|xls)$/i.test(f.name)).forEach(f => { if(!S.entries.find(e => e.name === f.name)) S.entries.push({ file: f, name: f.name }); });
+  repintar();
+}
+
+function pmCablear(raiz){
+  const S = ST.pm;
+  const input = raiz.querySelector('#dctPmFiles');
+  raiz.querySelectorAll('[data-dct]').forEach(el => {
+    const que = el.getAttribute('data-dct'), i = +el.getAttribute('data-i'), j = +el.getAttribute('data-j'), k = el.getAttribute('data-k');
+    if(que === 'pmElegir'){
+      el.onclick = (ev) => { if(ev.target !== input && input) input.click(); };
+      el.ondragover = (ev) => { ev.preventDefault(); };
+      el.ondrop = (ev) => { ev.preventDefault(); pmAnadir(ev.dataTransfer && ev.dataTransfer.files); };
+    }
+    else if(que === 'dcModo') el.onclick = dcModoClic(el);
+    else if(que === 'pmQuitar') el.onclick = () => { S.entries.splice(i, 1); repintar(); };
+    else if(que === 'pmCfg') el.oninput = () => {
+      if(k.indexOf('cr.') === 0) S.cfg.creditos[k.slice(3)] = el.value; else S.cfg[k] = el.value;
+      pmCfgGuardar(S.cfg);
+    };
+    else if(que === 'pmProcesar') el.onclick = () => { pmProcesar().catch(e => aviso('No se pudo procesar: ' + e.message)); };
+    else if(que === 'pmEp') el.oninput = () => { if(S.eps[i]) S.eps[i][k] = el.value; };
+    else if(que === 'pmFila'){
+      const fn = () => { const x = S.eps[i] && S.eps[i].filas[j]; if(x) x[k] = el.value; };
+      if(el.tagName === 'SELECT') el.onchange = fn; else el.oninput = fn;
+    }
+    else if(que === 'pmFilaQuitar') el.onclick = () => { if(S.eps[i]){ S.eps[i].filas.splice(j, 1); repintar(); } };
+    else if(que === 'pmBajar') el.onclick = () => { if(S.eps[i]){ pmOrdenar(S.eps[i].filas); pmDescargar([S.eps[i]]); } };
+    else if(que === 'pmBajarTodo') el.onclick = () => { S.eps.forEach(ep => pmOrdenar(ep.filas)); pmDescargar(S.eps); };
+  });
+  if(input) input.onchange = () => { pmAnadir(input.files); input.value = ''; };
 }
 
 /* ── Breakdowns ───────────────────────────────────────────────────────────── */
@@ -1018,7 +1377,7 @@ function pgCablear(raiz){
 
 /* ── Hacia fuera ──────────────────────────────────────────────────────────── */
 
-const TITULOS = { dubcards: ['DUBCARDs', 'Procesador de casting: el plan de copiado de Netflix, la matriz de recurrencia y sus alertas'],
+const TITULOS = { dubcards: ['DUBCARDs', 'Procesador de casting: el plan de copiado de Netflix, la matriz de recurrencia y sus alertas; y el DUBCARD en formato Paramount'],
                   breakdowns: ['Breakdowns', 'Análisis de libretos con un modelo de lenguaje'],
                   pegado: ['Pegado de casting', 'Rellena la columna del actor de un desglose con el reparto vigente'] };
 
@@ -1040,7 +1399,8 @@ function cablear(raiz, vista){
 }
 
 return { html: html, cablear: cablear, ST: ST, dcParseFile: dcParseFile, dcProcesar: dcProcesar, bdDocHtml: bdDocHtml, bdGuardados: bdGuardados, bdGuardar: bdGuardar,
-         bdEndpoint: bdEndpoint, BD_PROVIDERS: BD_PROVIDERS, bdMakeDocx: bdMakeDocx, bdExtractText: bdExtractText, dcSplitRows: dcSplitRows };
+         bdEndpoint: bdEndpoint, BD_PROVIDERS: BD_PROVIDERS, bdMakeDocx: bdMakeDocx, bdExtractText: bdExtractText, dcSplitRows: dcSplitRows,
+         pmDatosDeHojas: pmDatosDeHojas, pmEpisodio: pmEpisodio, pmEsTraduccion: pmEsTraduccion, pmArchivosXlsx: pmArchivosXlsx, pmNombreArchivo: pmNombreArchivo, pmProcesar: pmProcesar, pmCfgCargar: pmCfgCargar, pmSerieConocida: pmSerieConocida };
 })();
 
 /* ═══ FIN DE HERRAMIENTAS DE DUBLAJECAST EN DUBBIPT ═══ */
