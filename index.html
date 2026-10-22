@@ -2005,6 +2005,21 @@ body.cs-on #progHeader{ display:none !important; }
 .dct-chip-add{ background:rgba(52,211,153,.15); color:#34D399; } .dct-chip-del{ background:rgba(251,113,133,.15); color:#FB7185; } .dct-chip-re{ background:rgba(251,146,60,.18); color:#FB923C; }
 .dct-sec{ display:flex; flex-direction:column; gap:5px; }
 .dct-sec-t{ color:#4ADE80; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+/* DUBCARD en formato Paramount (PRO-56) */
+.dct-modos{ margin-bottom:12px; }
+.dct-sec-t i{ font-style:normal; text-transform:none; letter-spacing:0; color:#8b8f97; font-weight:500; }
+.dct-pm-cfg{ background:#101215; border:1px solid #23262b; border-radius:12px; padding:12px 14px; display:flex; flex-direction:column; gap:10px; }
+.dct-pm-campos{ display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:8px; }
+.dct-pm-campos input{ width:100%; box-sizing:border-box; }
+.dct-pm-cab{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.dct-pm-cab .dct-ep-t{ flex:1; min-width:200px; }
+.dct-pm-tabla{ width:100%; border-collapse:collapse; font-size:12px; }
+.dct-pm-tabla th{ text-align:left; color:#8b8f97; font-weight:600; font-size:11px; padding:6px; border-bottom:1px solid #23262b; }
+.dct-pm-tabla td{ padding:4px 6px; border-bottom:1px solid #1a1d21; color:#cbd5e1; }
+.dct-pm-tabla td:first-child{ color:#6b7280; width:28px; }
+.dct-pm-tabla input, .dct-pm-tabla select{ width:100%; box-sizing:border-box; background:#0d0f12; border:1px solid #2b2f36; color:#f2f3f5; border-radius:7px; padding:5px 8px; font:12px 'Inter',sans-serif; outline:none; }
+.dct-pm-tabla input:focus, .dct-pm-tabla select:focus{ border-color:#4ADE80; }
+.dct-pm-sin input[data-k="actor"]{ border-color:#F472B6; }
 .dct-tabla-w{ overflow-x:auto; border-radius:8px; }
 .dct-tabla{ width:100%; border-collapse:collapse; font-size:11.5px; color:#111; }
 .dct-tabla th{ background:#16181c; color:#9aa3ad; padding:7px 10px; text-align:left; font-weight:600; font-size:10px; text-transform:uppercase; }
@@ -3001,7 +3016,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.78.1-nube';
+const APP_VER_NUM = 'v11.79.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
