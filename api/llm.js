@@ -1,7 +1,11 @@
 /* DublajeCast — proxy mínimo para APIs de modelos compatibles con OpenAI que no permiten CORS (NVIDIA NIM).
    - La clave la envía el navegador en Authorization y sólo se reenvía al proveedor; no se guarda nada en el servidor.
    - Sólo se permiten los proveedores y rutas listados abajo.
-   - Edge runtime: reenvía el streaming (SSE) tal cual. */
+   - Edge runtime: reenvía el streaming (SSE) tal cual.
+   - Contenido confidencial (ENT-22): solo reenvía si la llamada trae la cabecera
+     x-dubbipt-ia, que Dubbipt pone únicamente cuando un administrador permitió la
+     IA externa con la autorización escrita del cliente. La copia vieja de
+     DublajeCast (/dublajecast) no la pone: desde ahí ya no sale ningún libreto. */
 export const config = { runtime: "edge" };
 
 const PROVIDERS = {
@@ -19,6 +23,8 @@ export default async function handler(req) {
   const url = new URL(req.url);
   const provider = url.searchParams.get("provider") || "";
   const path = url.searchParams.get("path") || "/chat/completions";
+  if ((req.headers.get("x-dubbipt-ia") || "") !== "autorizada")
+    return json(403, { error: { message: "IA externa bloqueada: los libretos son confidenciales. Un administrador puede permitirla en Dubbipt → Breakdowns, con la autorización escrita del cliente." } });
   if (!PROVIDERS[provider]) return json(400, { error: { message: "Proveedor no permitido: " + provider } });
   if (!PATHS.has(path)) return json(400, { error: { message: "Ruta no permitida: " + path } });
   if (req.method !== "POST" && req.method !== "GET") return json(405, { error: { message: "Método no permitido" } });

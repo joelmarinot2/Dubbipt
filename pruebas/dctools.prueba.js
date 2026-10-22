@@ -93,6 +93,7 @@ exports.pruebas = async function(t){
     await D.bdMakeDocx('# BREAKDOWN_X_EP01\n## RESUMEN\nTexto.');
     t.ok('el Word se arma con fflate, no con JSZip', V.zips.length === 1 && 'word/document.xml' in V.zips[0] && /BREAKDOWN_X_EP01/.test(new TextDecoder().decode(V.zips[0]['word/document.xml'])));
     t.eq('el breakdown en pantalla, con su jerarquía', D.bdDocHtml('# T\n## RESUMEN\n**Edad:** 30\n- uno'), '<div class="bd-doc"><div class="bd-h1">T</div><div class="bd-h2">RESUMEN</div><div class="bd-f"><b>Edad:</b> 30</div><ul><li>uno</li></ul></div>');
+    V.datos.ajustes = { iaExterna: { permitida: true, proveedor: 'nvidia', autorizacion: 'Correo de prueba', quien: 'Admin', cuando: '2026-10-01T00:00:00Z' } };
     const h = D.html('breakdowns');
     t.ok('sin clave, se pide; y el libreto, el show guide, la serie y el episodio', /Falta la clave de API/.test(h) && /data-k="script"/.test(h) && /data-k="guide"/.test(h) && /data-dct="bdNombre"/.test(h) && /data-dct="bdGenerar" disabled/.test(h) && !EMOJI.test(h));
   }
@@ -108,6 +109,7 @@ exports.pruebas = async function(t){
     /* Generar, de punta a punta, con un proveedor de mentira que contesta sin streaming. */
     const V = cargar({ fetch: async (url, init) => ({ ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ({ model: 'modelo-x', choices: [{ message: { content: '# BREAKDOWN_MI_SERIE_EP03\n## RESUMEN DEL EPISODIO\nAlgo.' }, finish_reason: 'stop' }] }), _url: url }) });
     V.ctx.localStorage.setItem('dc_breakdown_cfg_v1', JSON.stringify({ provider: 'groq', apiKey: 'k', model: 'modelo-x' }));
+    V.datos.ajustes = { iaExterna: { permitida: true, proveedor: 'groq', autorizacion: 'Correo de prueba', quien: 'Admin', cuando: '2026-10-01T00:00:00Z' } };
     Object.assign(V.D.ST.bd, { script: { name: 'lib.docx', text: 'x'.repeat(300), chars: 300 }, name: 'Mi serie', ep: '3', isMovie: false });
     t.ok('con libreto, nombre, episodio y clave, se puede generar', /data-dct="bdGenerar">/.test(V.D.html('breakdowns')));
     const botones = [];
@@ -116,6 +118,54 @@ exports.pruebas = async function(t){
     const res = V.D.ST.bd.result;
     t.eq('genera, se guarda y se ve', res && (res.title + ' · ' + res.model + ' · ' + V.datos.breakdowns.length), 'BREAKDOWN_MI_SERIE_EP03 · modelo-x · 1');
     t.ok('con Word, .txt e imprimir', /data-dct="bdWord"/.test(V.D.html('breakdowns')) && /data-dct="bdTxt"/.test(V.D.html('breakdowns')) && /data-dct="bdImprimir"/.test(V.D.html('breakdowns')));
+  }
+
+  t.seccion('2b · contenido confidencial: la IA externa, bloqueada (ENT-22)');
+  {
+    const llamadas = [];
+    const V = cargar({ fetch: async (url, init) => { llamadas.push({ url, init }); return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => ({ model: 'm', choices: [{ message: { content: 'OK' }, finish_reason: 'stop' }] }) }; } });
+    const D = V.D;
+    V.ctx.localStorage.setItem('dc_breakdown_cfg_v1', JSON.stringify({ provider: 'groq', apiKey: 'k', model: 'm' }));
+    Object.assign(D.ST.bd, { script: { name: 'lib.docx', text: 'x'.repeat(300), chars: 300 }, name: 'Mi serie', ep: '3', isMovie: false });
+    let h = D.html('breakdowns');
+    t.ok('de entrada, bloqueada: se explica por qué, sin subir libreto ni generar', /IA externa bloqueada · contenido confidencial/.test(h) && /Netflix/.test(h) && !/data-k="script"/.test(h) && !/data-dct="bdGenerar"/.test(h) && /data-dct="bdIaPedir"/.test(h) && /Breakdowns guardados/.test(h));
+    let err = '';
+    try{ await D.bdGenerate({ cfg: { provider: 'groq', apiKey: 'k' }, system: 's', user: 'LIBRETO' }); }catch(e){ err = e.message; }
+    t.eq('y la propia llamada se niega: no sale nada', /bloqueada/.test(err) + ' ' + llamadas.length, 'true 0');
+    D.ST.bd.iaForm = { proveedor: 'groq', autorizacion: '', confirmo: false, err: '' };
+    h = D.html('breakdowns');
+    t.ok('permitirla pide proveedor, autorización escrita y confirmarlo; los gratuitos, avisados', /data-dct="bdIaProv"/.test(h) && /data-dct="bdIaAut"/.test(h) && /data-dct="bdIaConfirmo"/.test(h) && /gratuito: puede guardar o usar lo que recibe/.test(h) && !/value="custom"/.test(h));
+    const r = await D.bdIaCambiar(true, 'groq', 'Correo de Netflix del 12/10, ref. 4471');
+    const a = V.datos.ajustes.iaExterna;
+    t.eq('se guarda en la nube, con quién, cuándo, el proveedor y la autorización, y se apunta', r + ' · ' + a.permitida + ' ' + a.proveedor + ' ' + a.autorizacion + ' · ' + !!a.cuando + ' · ' + V.editados.slice(-1)[0],
+         'guardado · true groq Correo de Netflix del 12/10, ref. 4471 · true · IA externa permitida para breakdowns: Groq — gratis (console.groq.com) · autorización: Correo de Netflix del 12/10, ref. 4471');
+    D.ST.bd.iaForm = null;
+    h = D.html('breakdowns');
+    t.ok('con permiso: se dice quién y con qué autorización, solo ese proveedor, y se puede generar', /IA externa permitida/.test(h) && /ref\. 4471/.test(h) && /data-dct="bdIaBloquear"/.test(h) && /data-dct="bdGenerar">/.test(h));
+    err = '';
+    try{ await D.bdGenerate({ cfg: { provider: 'nvidia', apiKey: 'k' }, system: 's', user: 'LIBRETO' }); }catch(e){ err = e.message; }
+    t.eq('otro proveedor, no', /Solo está autorizado/.test(err) + ' ' + llamadas.length, 'true 0');
+    await D.bdGenerate({ cfg: { provider: 'groq', apiKey: 'k', model: 'm' }, system: 's', user: 'LIBRETO' });
+    t.eq('el autorizado, sí, con la cabecera que pide el proxy', llamadas.length + ' ' + llamadas[0].init.headers['x-dubbipt-ia'], '1 autorizada');
+    await D.bdIaCambiar(false);
+    t.eq('volver a bloquear', D.bdIaPermiso() + ' ' + /IA externa bloqueada/.test(D.html('breakdowns')), 'null true');
+  }
+  {
+    /* El proxy del sitio: sin la cabecera de Dubbipt no reenvía nada (la copia de DublajeCast no la pone). */
+    const src = fs.readFileSync(path.join(RAIZ, 'api', 'llm.js'), 'utf8');
+    const mod = await import('data:text/javascript,' + encodeURIComponent(src));
+    const antes = globalThis.fetch, fuera = [];
+    globalThis.fetch = async (u) => { fuera.push(u); return new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }); };
+    try{
+      const pide = (h) => mod.default(new Request('https://dubbipt.app/api/llm?provider=groq&path=%2Fchat%2Fcompletions', { method: 'POST', headers: Object.assign({ authorization: 'Bearer k' }, h || {}), body: '{"messages":[]}' }));
+      const r1 = await pide();
+      const r2 = await pide({ 'x-dubbipt-ia': 'autorizada' });
+      t.eq('el proxy: sin la cabecera, 403 y nada sale; con ella, reenvía', r1.status + ' ' + r2.status + ' ' + fuera.join(), '403 200 https://api.groq.com/openai/v1/chat/completions');
+    }finally{ globalThis.fetch = antes; }
+    const VJ = JSON.parse(fs.readFileSync(path.join(RAIZ, 'vercel.json'), 'utf8'));
+    const csp = (VJ.headers.find(h => h.source === '/dublajecast(.*)').headers.find(x => x.key === 'Content-Security-Policy') || {}).value || '';
+    const conn = (csp.match(/connect-src[^;]*/) || [''])[0];
+    t.ok('la copia de DublajeCast ya no puede llamar a una IA directamente', !/ https: /.test(conn + ' ') && !/anthropic|groq|openrouter|nvidia/.test(conn) && /fhzxfbxrwnjwucgtjkar\.supabase\.co/.test(conn));
   }
 
   t.seccion('3 · sin Pegado de casting (PRO-57), y dónde está todo');
