@@ -142,11 +142,11 @@ exports.pruebas = async function(t){
   const d = PR.prodNormalizar(VOLCADO);
 
   t.seccion('1 · las secciones de Casting, en su orden');
-  t.eq('las ocho, como en su barra (Contract Inventory dentro de Dubcards y sin Pegado de casting, PRO-57)', M.CS_SECCIONES.map(s => s.t).join(' · '), 'Dashboard · Programas · Talentos · Ocupación · Tráilers · Producción · Dubcards · Breakdowns');
+  t.eq('las nueve, como en su barra (Contract Inventory dentro de Dubcards, sin Pegado de casting, PRO-57; y Accesos, ENT-24)', M.CS_SECCIONES.map(s => s.t).join(' · '), 'Dashboard · Programas · Talentos · Ocupación · Tráilers · Producción · Dubcards · Accesos · Breakdowns');
   t.eq('las dos que procesan archivos, herramientas de Casting', M.CS_SECCIONES.filter(s => s.dc).map(s => s.v + '>' + s.dc).join(' '), 'dubcards>dubcards breakdowns>breakdowns');
   const nav = M.csNavHtml('talentos');
   t.ok('la activa, marcada; las de Casting, distinguidas', /class="cs-nav-b on" data-v="talentos"/.test(nav) && /class="cs-nav-b cs-nav-dc" data-v="dubcards"/.test(nav) && (nav.match(/ on"/g) || []).length === 1);
-  t.ok('cada una con su icono de trazo', (nav.match(/<svg [^>]*stroke="currentColor"/g) || []).length === 8);
+  t.ok('cada una con su icono de trazo', (nav.match(/<svg [^>]*stroke="currentColor"/g) || []).length === 9);
   t.ok('todos los iconos dibujados', M.CS_SECCIONES.every(s => M.CS_ICO[s.v]) && ['externo', 'actualizar', 'aviso', 'estrella', 'entrar', 'cerrar', 'derecha', 'abajo', 'mas', 'subir', 'bajar', 'traer'].every(k => M.CS_ICO[k]));
   t.eq('un icono que no existe, vacío pero sin romper', /<svg[^>]*><\/svg>/.test(M.csIco('nada')), true);
 

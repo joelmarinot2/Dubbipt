@@ -132,6 +132,15 @@ Desde v11.82.0 viene **bloqueado** (ENT-22):
 | `api/llm.js` | El proxy devuelve 403 sin la cabecera `x-dubbipt-ia` |
 | `vercel.json` | La copia de DublajeCast (`/dublajecast`) ya no puede conectar con ninguna IA |
 
+## Paso 15 · Registro de accesos (v11.84.0)
+
+Para poder responder «quién vio el guion X y cuándo» (ENT-24). Ejecutar
+`sql/seguridad-14-registro-accesos.sql` en **Supabase → SQL Editor**. Hasta
+entonces cada equipo guarda lo que registra y lo manda en cuanto la tabla existe.
+Se consulta en Dubbipt → Casting → **Accesos** (solo administradores), con
+exportación a CSV. Las filas no caducan solas: el archivo SQL trae la línea para
+borrar las de más de un año si el cliente pide un plazo de conservación.
+
 ## Pendiente
 
 - `ddl:library` sigue siendo un canal **global**: transporta ids de programa y
