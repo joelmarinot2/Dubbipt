@@ -1438,19 +1438,41 @@ function pmNombreArchivo(serie, eps){
   return s + '_' + (nums.length ? nums.join('-') : 'episodio') + '_dubcard_es.xlsx';
 }
 
-/** Descarga el DUBCARD de unos episodios (uno, o todos en un libro con una hoja por episodio). */
-function pmDescargar(eps){
+/** Descarga el DUBCARD de un episodio. Devuelve el nombre del archivo (o null); `callado`, sin aviso. */
+function pmDescargar(eps, callado){
   const S = ST.pm;
-  if(!eps.length){ aviso('Primero procesa los desgloses'); return; }
-  if(!String(S.cfg.serie || '').trim()){ aviso('Escribe el título de la serie (SERIES TITLE)'); return; }
+  if(!eps.length){ aviso('Primero procesa los desgloses'); return null; }
+  if(!String(S.cfg.serie || '').trim()){ aviso('Escribe el título de la serie (SERIES TITLE)'); return null; }
   try{
     const f = pmArchivosXlsx(eps, S.cfg), z = {};
     for(const k of Object.keys(f)) z[k] = fflate.strToU8(f[k]);
     const blob = new Blob([fflate.zipSync(z, { level: 6 })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const nombre = pmNombreArchivo(S.cfg.serie, eps);
     bdDownload(blob, nombre);
-    aviso('Descargado: ' + nombre);
-  }catch(e){ aviso('No se pudo armar el DUBCARD: ' + e.message); }
+    if(!callado) aviso('Descargado: ' + nombre);
+    return nombre;
+  }catch(e){ aviso('No se pudo armar el DUBCARD: ' + e.message); return null; }
+}
+
+/**
+ * Paramount los quiere por separado: un archivo por capítulo (pedido de sala,
+ * «van separados por capítulos, un archivo diferente cada uno»). Se bajan uno
+ * tras otro, con una pausa para que el navegador no se salte ninguno; la
+ * primera vez puede pedir permiso para descargar varios archivos.
+ */
+async function pmDescargarVarios(eps){
+  const S = ST.pm;
+  if(!eps.length){ aviso('Primero procesa los desgloses'); return []; }
+  if(!String(S.cfg.serie || '').trim()){ aviso('Escribe el título de la serie (SERIES TITLE)'); return []; }
+  const hechos = [];
+  for(let i = 0; i < eps.length; i++){
+    if(i) await new Promise(r => setTimeout(r, S.pausa == null ? 700 : S.pausa));
+    pmOrdenar(eps[i].filas);
+    const n = pmDescargar([eps[i]], true);
+    if(n) hechos.push(n);
+  }
+  if(hechos.length) aviso(hechos.length + (hechos.length === 1 ? ' DUBCARD descargado: ' : ' DUBCARDs descargados, uno por episodio: ') + hechos.join(', '));
+  return hechos;
 }
 
 /** La serie, si el título del desglose empieza por el nombre de un programa que ya conoce Dubbipt o Casting (el más largo), escrita como en el desglose. */
@@ -1471,6 +1493,7 @@ function pmSerieConocida(titulo){
 async function pmProcesar(){
   const S = ST.pm;
   if(S.busy || !S.entries.length) return;
+  if(!S.cfg) S.cfg = pmCfgCargar();
   S.busy = true; S.logs = []; S.eps = []; repintar();
   try{
     for(const en of S.entries){
@@ -1503,7 +1526,7 @@ function pmHtml(){
     +   '<div class="dct-pm-campos">' + PM_CREDITOS.map(k => campo('cr.' + k[0], k[1], cr[k[0]], k[0] === 'director' || k[0] === 'ingeniero' ? 'El del desglose' : '')).join('') + '</div></div>'
     + (S.entries.length ? '<button class="cs-b cs-pri dct-ancho" data-dct="pmProcesar"' + (S.busy ? ' disabled' : '') + '>' + (S.busy ? 'Procesando…' : ico('actualizar', 14) + '<span>Procesar</span>') + '</button>' : '')
     + (S.logs.length ? '<div class="dct-log">' + S.logs.map(l => '<div class="dct-log-' + (l.cls || 'n') + '">' + E(l.msg) + '</div>').join('') + '</div>' : '')
-    + (S.eps.length ? (S.eps.length > 1 ? '<button class="cs-b cs-pri dct-ancho dct-bajar" data-dct="pmBajarTodo">' + ico('bajar', 14) + '<span>Descargar los ' + S.eps.length + ' episodios (una hoja por episodio)</span></button>' : '')
+    + (S.eps.length ? (S.eps.length > 1 ? '<button class="cs-b cs-pri dct-ancho dct-bajar" data-dct="pmBajarTodo">' + ico('bajar', 14) + '<span>Descargar los ' + S.eps.length + ' DUBCARDs (un archivo por episodio)</span></button>' : '')
       + S.eps.map((ep, i) => '<div class="dct-ep dct-pm-ep"><div class="dct-pm-cab"><div class="dct-ep-t">' + E(ep.tituloDesglose || ep.archivo) + '</div>'
           + '<button class="cs-b cs-pri" data-dct="pmBajar" data-i="' + i + '">' + ico('bajar', 14) + '<span>Descargar DUBCARD ' + E(ep.numero) + '</span></button></div>'
           + '<div class="dct-pm-campos">'
@@ -1552,7 +1575,7 @@ function pmCablear(raiz){
     }
     else if(que === 'pmFilaQuitar') el.onclick = () => { if(S.eps[i]){ S.eps[i].filas.splice(j, 1); repintar(); } };
     else if(que === 'pmBajar') el.onclick = () => { if(S.eps[i]){ pmOrdenar(S.eps[i].filas); pmDescargar([S.eps[i]]); } };
-    else if(que === 'pmBajarTodo') el.onclick = () => { S.eps.forEach(ep => pmOrdenar(ep.filas)); pmDescargar(S.eps); };
+    else if(que === 'pmBajarTodo') el.onclick = () => { pmDescargarVarios(S.eps.slice()).catch(e => aviso('No se pudieron descargar: ' + e.message)); };
   });
   if(input) input.onchange = () => { pmAnadir(input.files); input.value = ''; };
 }
@@ -1813,7 +1836,7 @@ return { html: html, cablear: cablear, ST: ST, dcParseFile: dcParseFile, dcProce
          bdEndpoint: bdEndpoint, BD_PROVIDERS: BD_PROVIDERS, bdMakeDocx: bdMakeDocx, bdExtractText: bdExtractText, dcSplitRows: dcSplitRows,
          ciNombre: ciNombre, ciReparto: ciReparto, ciMain: ciMain, ciNumero: ciNumero, ciLlenarXml: ciLlenarXml, ciDocumentos: ciDocumentos,
          ciLeerDubcard: ciLeerDubcard, ciCargarDubcard: ciCargarDubcard, ciEquipoDe: ciEquipoDe,
-         pmDatosDeHojas: pmDatosDeHojas, pmEpisodio: pmEpisodio, pmEsTraduccion: pmEsTraduccion, pmArchivosXlsx: pmArchivosXlsx, pmNombreArchivo: pmNombreArchivo, pmProcesar: pmProcesar, pmCfgCargar: pmCfgCargar, pmSerieConocida: pmSerieConocida };
+         pmDatosDeHojas: pmDatosDeHojas, pmEpisodio: pmEpisodio, pmEsTraduccion: pmEsTraduccion, pmArchivosXlsx: pmArchivosXlsx, pmNombreArchivo: pmNombreArchivo, pmProcesar: pmProcesar, pmCfgCargar: pmCfgCargar, pmSerieConocida: pmSerieConocida, pmDescargarVarios: pmDescargarVarios };
 })();
 
 /* ═══ FIN DE HERRAMIENTAS DE DUBLAJECAST EN DUBBIPT ═══ */
