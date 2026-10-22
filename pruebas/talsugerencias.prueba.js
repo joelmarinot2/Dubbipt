@@ -31,7 +31,7 @@ exports.pruebas = async function(t){
 
   t.seccion('1 · de dónde salen los nombres');
   t.eq('la base, el directorio de Talentos y los registros de casting; sin repetir y sin marcas', M.talNombres().join(', '), 'ANA ROJAS, Beatriz Sol, Carlos Ruiz, Diana Paz');
-  t.eq('en la lista, después, ORIGINAL, TODOS y X', M.talSugerencias().slice(-3).join(','), 'ORIGINAL,TODOS,X');
+  t.eq('en la lista, después, ORIGINAL, TODOS, X y EDICIÓN', M.talSugerencias().slice(-4).join(','), 'ORIGINAL,TODOS,X,EDICION');
   t.eq('y valen al guardar: un nombre del directorio ya no es «desconocido»', [M.talValidar('beatriz sol').nombre, M.talValidar('beatriz sol').tipo, M.talValidar('Nadie Aqui').tipo].join(' '), 'Beatriz Sol talento desconocido');
   PROD.datos = { talents: [{ name: 'Beatriz Sol Vega' }] };
   t.eq('un cambio en el directorio (renombrar, fusionar, borrar) se ve al momento', M.talNombres().join(', '), 'ANA ROJAS, Beatriz Sol Vega, Carlos Ruiz, Diana Paz');
@@ -41,7 +41,7 @@ exports.pruebas = async function(t){
     const T2 = { nombres: [], claves: new Set(), ts: 0 };
     const M2 = montar([['const TAL_MARCAS = {', '/* ── Leer el Excel de la base'], ['function talValidar(txt){', '/* ── Personajes que NUNCA se doblan']],
       ['talHayBase', 'talValidar', 'talSugerencias'], { TAL: T2, PROD: { datos: null }, CS_REGS: { lista: null }, castNorm: castNorm, castSimil: () => 0, CAST_TALENTOS: ['Elena Mar'] });
-    t.eq('se sugiere el catálogo del desglose y no se restringe nada', M2.talHayBase() + ' · ' + M2.talSugerencias().join(',') + ' · ' + M2.talValidar('Cualquiera').tipo, 'false · Elena Mar,ORIGINAL,TODOS,X · libre');
+    t.eq('se sugiere el catálogo del desglose y no se restringe nada', M2.talHayBase() + ' · ' + M2.talSugerencias().join(',') + ' · ' + M2.talValidar('Cualquiera').tipo, 'false · Elena Mar,ORIGINAL,TODOS,X,EDICION · libre');
   }
 
   t.seccion('3 · dónde se usa');

@@ -28,7 +28,8 @@ const TAL = { nombres: [], claves: new Set(), ts: 0, origen: '', cargada: false 
 const TAL_MARCAS = {
   'ORIGINAL': 'no se dobla · se deja el audio original',
   'TODOS':    'lo graban todos los talentos',
-  'X':        'ese parlamento no se hace'
+  'X':        'ese parlamento no se hace',
+  'EDICION':  'se resuelve en edición · no se graba'   // pedido de sala: «edición no es un talento»
 };
 
 /** ¿Lo escrito es una marca de produccion y no una persona? */
