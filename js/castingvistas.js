@@ -9,12 +9,12 @@
  *
  * Con el perfil Casting (y el administrador, PRO-8), la biblioteca lleva
  * arriba las secciones de Casting en su mismo orden: Dashboard, Programas,
- * Talentos, Ocupación, Tráilers, Producción, DUBCARDs, Pegado de casting y
- * Breakdowns. Las que enseñan datos se pintan aquí, con el aspecto de Dubbipt,
+ * Talentos, Ocupación, Tráilers, Producción, Dubcards (con el Contract
+ * Inventory) y Breakdowns. Las que enseñan datos se pintan aquí, con el aspecto de Dubbipt,
  * sobre los datos de Casting (en vivo si su pantalla está abierta con
  * sesión; si no, lo traído a Producción). Programas es la lista de siempre de
  * Dubbipt, con el casting de cada capítulo (js/dublajecast.js). Las tres que
- * procesan archivos -DUBCARDs, Pegado de casting, Breakdowns- abren todavía la
+ * procesan archivos -Dubcards, Breakdowns- abren todavía la
  * herramienta de Casting.
  *
  * Es un script clásico, no un módulo: comparte el ámbito global con los
@@ -51,7 +51,6 @@ const CS_ICO = {
   trailers:   '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/>',
   produccion: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
   dubcards:   '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h6"/>',
-  pegado:     '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 00-2-2H5a2 2 0 00-2 2v9a2 2 0 002 2h3"/>',
   contratos:  '<path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6"/><circle cx="10" cy="13" r="2"/><path d="M7 18a3 3 0 016 0M15 13h2M15 16h2"/>',
   breakdowns: '<path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
   externo:    '<path d="M14 3h7v7"/><path d="M10 14L21 3"/><path d="M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5"/>',
@@ -91,9 +90,8 @@ const CS_SECCIONES = [
   { v: 'ocupacion',  t: 'Ocupación' },
   { v: 'trailers',   t: 'Tráilers' },
   { v: 'produccion', t: 'Producción' },
-  { v: 'dubcards',   t: 'DUBCARDs',          dc: 'dubcards',   dice: 'Prepara las DUBCARD de cada capítulo desde el casting: el plan de copiado de Netflix, la matriz de recurrencia y sus alertas.' },
-  { v: 'contratos',  t: 'Contract Inventory', dc: 'contratos', dice: 'Sube la DUBCARD unida y saca un Word de Contract Inventory por episodio: Main cast, Additional cast, numeración y equipo.' },
-  { v: 'pegado',     t: 'Pegado de casting', dc: 'pegado',     dice: 'Rellena la columna del actor de un desglose con el reparto vigente de su programa.' },
+  /* Contract Inventory va dentro de Dubcards, y Pegado de casting ya no está (PRO-57). */
+  { v: 'dubcards',   t: 'Dubcards',          dc: 'dubcards',   dice: 'Prepara las DUBCARD de cada capítulo desde el casting (Netflix y otras casas, formato Paramount) y el Contract Inventory.' },
   { v: 'breakdowns', t: 'Breakdowns',        dc: 'breakdowns', dice: 'Escribe los breakdowns de los personajes a partir del libreto y la guía del programa, con su IA.' }
 ];
 
@@ -2231,7 +2229,7 @@ function csHtmlProduccion(d, hoy, vivo){
 }
 
 function csHtmlHerramienta(sec){
-  /* DUBCARDs, Breakdowns y Pegado, dentro de Dubbipt (js/dctools.js, PRO-38). Sin ese archivo, como antes: abrir Casting. */
+  /* Dubcards y Breakdowns, dentro de Dubbipt (js/dctools.js, PRO-38). Sin ese archivo, como antes: abrir Casting. */
   if(typeof DCT !== 'undefined' && DCT && typeof DCT.html === 'function'){ const h = DCT.html(sec.v); if(h) return h; }
   return '<div class="cs-cab"><div class="cs-cab-t"><h2>' + csEsc(sec.t) + '</h2><div class="cs-cab-sub">Herramienta de Casting</div></div></div>'
     + '<div class="cs-herr"><span class="cs-herr-ic">' + csIco(sec.v, 26) + '</span><div><p>' + csEsc(sec.dice) + '</p>'

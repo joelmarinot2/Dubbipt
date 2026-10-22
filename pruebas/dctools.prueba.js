@@ -118,15 +118,14 @@ exports.pruebas = async function(t){
     t.ok('con Word, .txt e imprimir', /data-dct="bdWord"/.test(V.D.html('breakdowns')) && /data-dct="bdTxt"/.test(V.D.html('breakdowns')) && /data-dct="bdImprimir"/.test(V.D.html('breakdowns')));
   }
 
-  t.seccion('3 · Pegado de casting, y dónde está todo');
+  t.seccion('3 · sin Pegado de casting (PRO-57), y dónde está todo');
   {
     const V = cargar();
-    const h = V.D.html('pegado');
-    t.ok('Pegado de casting se abre aquí, en un marco, con su página', /<iframe class="dct-marco" title="Pegado de casting" src="\.\/dctools\/pegado-casting\.html"/.test(h) && fs.existsSync(path.join(RAIZ, 'dctools', 'pegado-casting.html')));
+    t.ok('Pegado de casting ya no está: ni sección, ni página', V.D.html('pegado') === '' && !fs.existsSync(path.join(RAIZ, 'dctools', 'pegado-casting.html')));
     t.eq('una sección que no es de estas, nada', V.D.html('ocupacion'), '');
   }
   const HTML = fs.readFileSync(INDEX, 'utf8'), SW = fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8'), CV = fs.readFileSync(path.join(RAIZ, 'js', 'castingvistas.js'), 'utf8');
-  t.ok('el archivo, cargado y en la caché, con la página de Pegado', /<script src="\.\/js\/dctools\.js"><\/script>/.test(HTML) && /'\.\/js\/dctools\.js'/.test(SW) && /'\.\/dctools\/pegado-casting\.html'/.test(SW));
+  t.ok('el archivo, cargado y en la caché, ya sin la página de Pegado', /<script src="\.\/js\/dctools\.js"><\/script>/.test(HTML) && /'\.\/js\/dctools\.js'/.test(SW) && !/pegado-casting/.test(SW));
   t.ok('la vista de Casting las pinta y las engancha, en vez de abrir Casting', /if\(typeof DCT !== 'undefined' && DCT && typeof DCT\.html === 'function'\)\{ const h = DCT\.html\(sec\.v\); if\(h\) return h; \}/.test(CV) && /DCT\.cablear\(vista, CS\.vista\)/.test(CV));
   const DCTJS = fs.readFileSync(path.join(RAIZ, 'js', 'dctools.js'), 'utf8');
   t.ok('sin JSZip ni React: lo de Dubbipt', !/new JSZip|JSZip\.loadAsync|React\.|useState/.test(DCTJS));

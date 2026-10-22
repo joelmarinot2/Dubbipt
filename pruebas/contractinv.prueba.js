@@ -140,12 +140,17 @@ exports.pruebas = async function(t){
     const C = D.ST.ci;
     t.eq('una entrada por hoja de episodio, en orden; Producción y Matriz se saltan', C.eps.map((e) => e.cap + ':' + e.data.length).join(' '), 'THE WAYANS BROS 213:4 THE WAYANS BROS 214:2');
     t.eq('«Sin asignar» es sin talento; Edicion y Todos no son actores', D.ciReparto(C.eps[0], D.ciMain(C.eps)).fuera.join(',') + ' · ' + C.eps[0].data.filter((r) => r.pseudo).length, 'Rita · 1');
-    const h = D.html('contratos');
+    D.ST.dc.modo = 'contratos';
+    const h = D.html('dubcards');
     t.ok('la sección: la DUBCARD, la temporada, la plantilla, el equipo, el main cast y el botón, sin emojis', /DUBCARD_THE WAYANS BROS_213-214\.xlsx · 2 episodios/.test(h) && /data-dct="ciTemp"[^>]*value="2"/.test(h) && /data-dct="ciTplElegir"/.test(h)
       && /data-k="traductor" value="Sofía Rey"/.test(h) && /data-k="marlon" checked/.test(h) && /data-dct="ciBajar"/.test(h) && !EMOJI.test(h), (h.match(EMOJI) || [''])[0]);
-    t.ok('ya no está dentro de DUBCARDs', !/data-dct="ciBajar"/.test(D.html('dubcards')));
+    t.ok('es una pestaña de Dubcards (PRO-57), no una sección aparte', /<h2>Dubcards<\/h2>/.test(h) && /class="cs-pest on" data-dct="dcModo" data-v="contratos">Contract Inventory/.test(h) && D.html('contratos') === '');
+    D.ST.dc.modo = 'general';
+    t.ok('en las otras pestañas no sale', !/data-dct="ciBajar"/.test(D.html('dubcards')));
+    D.ST.dc.modo = 'contratos';
     const vacia = cargar().D;
-    t.ok('sin DUBCARD, solo se pide subirla', /la DUBCARD unida/.test(vacia.html('contratos')) && !/data-dct="ciBajar"/.test(vacia.html('contratos')));
+    vacia.ST.dc.modo = 'contratos';
+    t.ok('sin DUBCARD, solo se pide subirla', /la DUBCARD unida/.test(vacia.html('dubcards')) && !/data-dct="ciBajar"/.test(vacia.html('dubcards')));
     C.equipo.traductor = 'Ana Gómez';
     const docs = await D.ciDocumentos();
     t.eq('un Word por episodio, con su nombre', docs.map((d) => d.nombre).join(' '), 'Contract_Inventory_THE_WAYANS_BROS_S2_Eps13.docx Contract_Inventory_THE_WAYANS_BROS_S2_Eps14.docx');

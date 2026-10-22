@@ -1,4 +1,4 @@
-/* DUBCARDs, Breakdowns y Pegado de casting, dentro de Dubbipt · especificacion 09, PRO-38
+/* Dubcards (con el formato Paramount y el Contract Inventory) y Breakdowns, dentro de Dubbipt · especificacion 09, PRO-38
  *
  * Pedido de sala: «quiero que las herramientas de dubcards, breakdowns,
  * producción y tráiler estén dentro de Dubbipt, que no sea un link».
@@ -14,8 +14,7 @@
  *   · Los breakdowns se guardan donde los guarda Casting (su lista
  *     `breakdowns`), así se ven en los dos sitios. La clave de API se guarda
  *     en este equipo con la misma clave de almacenamiento que Casting.
- *   · Pegado de casting es una página aparte (dctools/pegado-casting.html,
- *     la misma que Casting lleva dentro) que se abre aquí, en un marco.
+ *   · Pegado de casting se quitó (PRO-57): sala ya no lo usa.
  *
  * Todo va dentro de una función para que sus nombres (safe, lev, normN…)
  * no choquen con los de Dubbipt. Hacia fuera: DCT.html(vista), DCT.cablear(raiz, vista).
@@ -576,8 +575,7 @@ const ST = {
   dc: { entries: [], client: null, processed: [], warnings: [], logs: [], busy: false, modo: 'general' },
   pm: { entries: [], eps: [], logs: [], busy: false, cfg: null },
   bd: { script: null, guide: null, reading: '', name: '', isMovie: false, ep: '', notes: '', withSeries: true,
-        busy: false, live: '', result: null, err: '', abort: null, openId: null, cfgOpen: false, cfgMsg: '', locales: [] },
-  pg: { completa: false }
+        busy: false, live: '', result: null, err: '', abort: null, openId: null, cfgOpen: false, cfgMsg: '', locales: [] }
 };
 /* Sin emojis en pantalla (PRO-N6): los textos de Casting los traen; aquí se quitan al pintar. */
 const SIN_EMOJI = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{20E3}]/gu;
@@ -727,16 +725,18 @@ function dcMatrizHtml(eps){
     + '</tbody></table></div></div>';
 }
 
-/* Dos secciones: la de siempre (Netflix y otras casas) y el formato Paramount (PRO-56). */
+/* Las pestañas de Dubcards: la de siempre (Netflix y otras casas), el formato Paramount (PRO-56) y el Contract Inventory, que ya no es una sección aparte (PRO-57). */
+const DC_MODOS = [['general', 'Netflix y otras casas'], ['paramount', 'Formato Paramount'], ['contratos', 'Contract Inventory']];
 function dcModos(){
   const b = (k, t) => '<button class="cs-pest' + (ST.dc.modo === k ? ' on' : '') + '" data-dct="dcModo" data-v="' + k + '">' + E(t) + '</button>';
-  return '<div class="cs-pests dct-modos">' + b('general', 'Netflix y otras casas') + b('paramount', 'Formato Paramount') + '</div>';
+  return '<div class="cs-pests dct-modos">' + DC_MODOS.map(m => b(m[0], m[1])).join('') + '</div>';
 }
 
-const dcModoClic = el => () => { ST.dc.modo = el.getAttribute('data-v') === 'paramount' ? 'paramount' : 'general'; repintar(); };
+const dcModoClic = el => () => { const v = el.getAttribute('data-v'); ST.dc.modo = DC_MODOS.some(m => m[0] === v) ? v : 'general'; repintar(); };
 
 function dcHtml(){
   if(ST.dc.modo === 'paramount'){ if(!ST.pm.cfg) ST.pm.cfg = pmCfgCargar(); return dcModos() + pmHtml(); }
+  if(ST.dc.modo === 'contratos') return dcModos() + ciHtml();
   const S = ST.dc, isNetflix = !S.client || S.client.kind === 'netflix';
   const cli = S.client || lastClient() || { kind: 'netflix', name: 'Netflix' };
   return dcModos() + '<div class="dct">'
@@ -777,6 +777,7 @@ function dcAnadir(files){
 function dcCablear(raiz){
   const S = ST.dc;
   if(S.modo === 'paramount'){ pmCablear(raiz); return; }
+  if(S.modo === 'contratos'){ ciCablear(raiz); return; }
   const q = s => raiz.querySelector(s);
   const input = q('#dctDcFiles');
   raiz.querySelectorAll('[data-dct]').forEach(el => {
@@ -814,8 +815,9 @@ function dcCablear(raiz){
  * Dubbipt», «que se haga por separado, que uno suba la DUBCARD unida» y «que
  * se pueda poner el espacio del traductor».
  *
- * Es su propia sección. Se sube la DUBCARD unida (el Excel que baja
- * DUBCARDs: una hoja por episodio con Principales y Adicionales) y sale un
+ * Es una pestaña de Dubcards (PRO-57; antes, una sección aparte). Se sube la
+ * DUBCARD unida (el Excel de la pestaña «Netflix y otras casas»: una hoja por
+ * episodio con Principales y Adicionales) y sale un
  * Word por episodio sobre la plantilla (dctools/contract-inventory.docx o la
  * que se suba): el número de «[S2 – Episode [Eps#12]», las dos tablas de
  * reparto y, si se escriben, el contacto, el traductor, el adaptador y el
@@ -1088,7 +1090,7 @@ async function ciCargarDubcard(file){
   try{
     const wb = XLSX.read(new Uint8Array(await readFileBuffer(file)), { type: 'array' });
     const eps = ciLeerDubcard(wb);
-    if(!eps.length) throw new Error('no tiene hojas de episodio con Principales y Adicionales. ¿Es la DUBCARD que baja DUBCARDs?');
+    if(!eps.length) throw new Error('no tiene hojas de episodio con Principales y Adicionales. ¿Es la DUBCARD de la pestaña «Netflix y otras casas»?');
     Object.assign(S, { archivo: file.name, eps, main: null, temporada: '', equipo: null, todos: false });
     try{ await ciXml(); }catch(e){ S.err = e.message; }
   }catch(e){ S.err = 'No se pudo leer «' + file.name + '»: ' + e.message; }
@@ -1139,7 +1141,7 @@ function ciHtml(){
   const C = ST.ci, eps = C.eps;
   const subir = '<div class="dct-drop' + (eps.length ? ' dct-drop-ok' : '') + '" data-dct="ciElegir">' + ico('subir', 22)
     + '<b>' + (C.leyendo ? 'Leyendo…' : eps.length ? E(C.archivo) + ' · ' + eps.length + ' episodios' : 'Haz clic o arrastra la DUBCARD unida') + '</b>'
-    + '<span>' + (eps.length ? 'Pulsa para cambiarla' : 'El Excel que baja DUBCARDs (DUBCARD_PROGRAMA_213-214-….xlsx), con una hoja por episodio') + '</span>'
+    + '<span>' + (eps.length ? 'Pulsa para cambiarla' : 'El Excel de la pestaña «Netflix y otras casas» (DUBCARD_PROGRAMA_213-214-….xlsx), con una hoja por episodio') + '</span>'
     + '<input type="file" id="dctCiDub" accept=".xlsx,.xlsm,.xls" hidden></div>';
   const err = C.err ? '<div class="dct-mal">' + E(C.err) + '</div>' : '';
   if(!eps.length) return '<div class="dct">' + subir + err + '</div>';
@@ -1187,6 +1189,7 @@ function ciCablear(raiz){
       el.ondragover = (ev) => { ev.preventDefault(); };
       el.ondrop = (ev) => { ev.preventDefault(); ciCargarDubcard(ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0]); };
     }
+    else if(que === 'dcModo') el.onclick = dcModoClic(el);
     else if(que === 'ciTemp') el.onchange = () => { C.temporada = String(el.value || '').trim(); repintar(); };
     /* Al escribir no se repinta (se perdería el foco); solo se apunta. */
     else if(que === 'ciEquipo') el.oninput = () => { ciEquipo()[el.getAttribute('data-k')] = el.value; };
@@ -1792,26 +1795,10 @@ function bdCablear(raiz){
   if(prov) prov.onchange = () => { const c = getBdCfg(); const np = BD_PROVIDERS[prov.value]; saveBdCfg(Object.assign({}, c, { provider: prov.value, model: (np && np.defaultModel) || '' })); B.cfgMsg = ''; repintar(); };
 }
 
-/* ── Pegado de casting ────────────────────────────────────────────────────── */
-
-const PEGADO_RUTA = './dctools/pegado-casting.html';
-function pgHtml(){
-  return '<div class="dct dct-pegado' + (ST.pg.completa ? ' dct-pegado-completa' : '') + '">'
-    + '<div class="dct-fila dct-cab2"><span class="dct-tenue dct-crece">Herramienta de pegado y armado de casting</span>'
-    + '<button class="cs-b" data-dct="pgCompleta">' + (ST.pg.completa ? 'Restaurar' : 'Pantalla completa') + '</button></div>'
-    + '<iframe class="dct-marco" title="Pegado de casting" src="' + PEGADO_RUTA + '" sandbox="allow-scripts allow-downloads allow-same-origin allow-modals"></iframe></div>';
-}
-function pgCablear(raiz){
-  const b = raiz.querySelector('[data-dct="pgCompleta"]');
-  if(b) b.onclick = () => { ST.pg.completa = !ST.pg.completa; repintar(); };
-}
-
 /* ── Hacia fuera ──────────────────────────────────────────────────────────── */
 
-const TITULOS = { dubcards: ['DUBCARDs', 'Procesador de casting: el plan de copiado de Netflix, la matriz de recurrencia y sus alertas; y el DUBCARD en formato Paramount'],
-                  contratos: ['Contract Inventory', 'Un Word por episodio desde la DUBCARD unida: Main cast, Additional cast, numeración y equipo'],
-                  breakdowns: ['Breakdowns', 'Análisis de libretos con un modelo de lenguaje'],
-                  pegado: ['Pegado de casting', 'Rellena la columna del actor de un desglose con el reparto vigente'] };
+const TITULOS = { dubcards: ['Dubcards', 'Las DUBCARD de cada capítulo (Netflix y otras casas, formato Paramount) y el Contract Inventory'],
+                  breakdowns: ['Breakdowns', 'Análisis de libretos con un modelo de lenguaje'] };
 
 function html(vista){
   const t = TITULOS[vista];
@@ -1819,17 +1806,13 @@ function html(vista){
   const cab = '<div class="cs-cab"><div class="cs-cab-t"><h2>' + E(t[0]) + '</h2><div class="cs-cab-sub">' + E(t[1]) + '</div></div></div>';
   try{
     if(vista === 'dubcards') return cab + dcHtml();
-    if(vista === 'breakdowns') return cab + bdHtml();
-    if(vista === 'contratos') return cab + ciHtml();
-    return cab + pgHtml();
+    return cab + bdHtml();
   }catch(e){ return cab + '<div class="cs-nada">No se pudo pintar: ' + E(e.message) + '</div>'; }
 }
 function cablear(raiz, vista){
   if(!raiz) return;
   if(vista === 'dubcards') dcCablear(raiz);
   else if(vista === 'breakdowns') bdCablear(raiz);
-  else if(vista === 'pegado') pgCablear(raiz);
-  else if(vista === 'contratos') ciCablear(raiz);
 }
 
 return { html: html, cablear: cablear, ST: ST, dcParseFile: dcParseFile, dcProcesar: dcProcesar, bdDocHtml: bdDocHtml, bdGuardados: bdGuardados, bdGuardar: bdGuardar,
