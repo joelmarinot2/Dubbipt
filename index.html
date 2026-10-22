@@ -3045,7 +3045,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.84.0-nube';
+const APP_VER_NUM = 'v11.84.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8129,8 +8129,8 @@ function renderPlanilla(){
   });
   // el catálogo de la empresa también aquí, que es donde se teclea rápido
   try{
-    if(typeof CAST_TALENTOS !== 'undefined' && CAST_TALENTOS.length)
-      box.querySelectorAll('input.talIn').forEach(i=> i.setAttribute('list','talList'));
+    if(typeof talPintarLista === 'function') talPintarLista();
+    box.querySelectorAll('input.talIn').forEach(i=> i.setAttribute('list','talList'));
   }catch(e){}
   // dar por bueno un personaje de solo gestos, desde la tabla
   box.querySelectorAll('button.gestbtn').forEach(b=>{
@@ -8471,11 +8471,9 @@ function renderCards(){
       inp.value = c.talent || '';
       inp.placeholder = (typeof talHayBase==='function' && talHayBase())
         ? 'Talento de la base…' : 'Nombre del talento…';
-      // la base de la empresa; si no hay, el catálogo que trajera el desglose
-      try{
-        if((typeof talHayBase==='function' && talHayBase()) || CAST_TALENTOS.length)
-          inp.setAttribute('list','talList');
-      }catch(e){}
+      // la base, el directorio de Talentos y, si no hay, el catálogo del desglose (con las marcas al final)
+      try{ if(typeof talPintarLista==='function') talPintarLista(); }catch(e){}
+      inp.setAttribute('list','talList');
       inp.setAttribute('aria-label', 'Talento para '+c.display);
       talDiv.appendChild(inp);
       /* ORIGINAL, X y TODOS a un clic (PRO-53): se ponen en el casting, pero
@@ -9935,6 +9933,9 @@ function ponerModo(epId, m){
        marcados con X, que es lo que les toca siempre. */
     (async () => {
       try{ await talCargar(); }catch(e){ fallo('talCargar · index.html:6131', e, 'la base de talentos no se ha podido cargar'); }
+      /* Y el directorio de Talentos de Casting, para que sus nombres salgan al escribir (tarjetas y libreto). */
+      try{ if(typeof PROD !== 'undefined' && !PROD.cargado && typeof prodCargar === 'function') await prodCargar(); }catch(e){ /* sin directorio: la base sola */ }
+      try{ talPintarLista(); talBarraLibreto(); }catch(e){ /* el libreto no está abierto */ }
       try{
         const x = talMarcarSiempreX();
         if(x.length){
@@ -12529,9 +12530,9 @@ async function castCargarCatalogo(){
   try{
     const buf = await castBufferOriginal();
     CAST_TALENTOS = castCatalogo(buf);
-    let dl = document.getElementById('talList');
-    if(!dl){ dl = document.createElement('datalist'); dl.id = 'talList'; document.body.appendChild(dl); }
-    dl.innerHTML = CAST_TALENTOS.map(t => '<option value="' + t.replace(/"/g,'&quot;') + '">').join('');
+    /* La lista de sugerencias es una sola (talPintarLista): la base, el directorio de
+       Talentos y, si no hay ninguno, este catálogo. Antes este la pisaba entera. */
+    try{ talPintarLista(); }catch(e){ /* sin lista se escribe igual */ }
     if(CAST_TALENTOS.length && typeof DDL_UI !== 'undefined' && DDL_UI.toast)
       DDL_UI.toast('🎭 ' + CAST_TALENTOS.length + ' talentos cargados del desglose');
   }catch(e){ /* sin catálogo se sigue escribiendo a mano */ }
