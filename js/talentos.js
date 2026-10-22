@@ -37,8 +37,50 @@ function talEsMarca(t){
   return !!TAL_MARCAS[k] || k === 'X ORIGINAL';
 }
 
-/** ¿Hay base cargada? Sin base NO se restringe nada: se sigue como siempre. */
-function talHayBase(){ return TAL.nombres.length > 0; }
+/**
+ * Los nombres con los que se reparte: la base de este equipo MÁS el directorio
+ * de Talentos de Casting -lo que se crea, renombra, fusiona y borra allí- y
+ * los talentos que ya trabajaron en los programas (sus registros de casting).
+ * Pedido de sala: «los nombres de los talentos no salen en la barra donde uno
+ * escribe, ni en las tarjetas ni en el libreto». La base vive en cada equipo
+ * y en muchos no estaba; el directorio sí. Sin marcas (ORIGINAL, X, TODOS).
+ */
+const TAL_NOMBRES_MEMO = { datos: undefined, regs: undefined, ts: -1, n: -1, out: [] };
+function talDirectorio(){
+  const out = [];
+  try{
+    const d = (typeof PROD !== 'undefined' && PROD && PROD.datos) ? PROD.datos : null;
+    if(d && Array.isArray(d.talents)) d.talents.forEach(t => { if(t && t.name) out.push(t.name); });
+  }catch(e){ /* sin datos de Casting */ }
+  try{
+    const regs = (typeof CS_REGS !== 'undefined' && CS_REGS && Array.isArray(CS_REGS.lista)) ? CS_REGS.lista : [];
+    for(const r of regs){
+      const reg = (r && r.reg) || {};
+      for(const k of Object.keys(reg.personajes || {})){ const x = reg.personajes[k]; if(x && x.talent) out.push(x.talent); }
+      for(const ep of Object.keys(reg.capitulos || {})){ const ps = (reg.capitulos[ep] && reg.capitulos[ep].personajes) || {}; for(const k of Object.keys(ps)){ if(ps[k] && ps[k].talent) out.push(ps[k].talent); } }
+    }
+  }catch(e){ /* sin registros leídos */ }
+  return out;
+}
+function talNombres(){
+  /* Se rehace cuando cambia la base, los datos de Casting (cada cambio deja un objeto nuevo) o los registros leídos. */
+  const M = TAL_NOMBRES_MEMO;
+  const datos = (typeof PROD !== 'undefined' && PROD) ? PROD.datos : null, regs = (typeof CS_REGS !== 'undefined' && CS_REGS) ? CS_REGS.lista : null;
+  if(M.datos === datos && M.regs === regs && M.ts === TAL.ts && M.n === TAL.nombres.length) return M.out;
+  const dir = talDirectorio();
+  const vistos = new Set(), out = [];
+  for(const n of TAL.nombres.concat(dir)){
+    const nombre = String(n || '').replace(/\s+/g, ' ').trim(), k = castNorm(nombre);
+    if(!k || vistos.has(k) || talEsMarca(nombre)) continue;
+    vistos.add(k); out.push(nombre);
+  }
+  out.sort((a, b) => a.localeCompare(b, 'es'));
+  M.datos = datos; M.regs = regs; M.ts = TAL.ts; M.n = TAL.nombres.length; M.out = out;
+  return out;
+}
+
+/** ¿Hay base cargada (o directorio)? Sin ninguna de las dos NO se restringe nada: se sigue como siempre. */
+function talHayBase(){ return talNombres().length > 0; }
 
 /* ── Leer el Excel de la base ──────────────────────────────────────────── */
 
@@ -219,7 +261,7 @@ function talValidar(txt){
     return { ok:true, nombre:(k === 'X ORIGINAL' ? 'X ORIGINAL' : k), tipo:'marca' };
   // sin base no se restringe: la aplicacion tiene que seguir sirviendo
   if(!talHayBase()) return { ok:true, nombre:t, tipo:'libre' };
-  for(const n of TAL.nombres) if(castNorm(n) === k) return { ok:true, nombre:n, tipo:'talento' };
+  for(const n of talNombres()) if(castNorm(n) === k) return { ok:true, nombre:n, tipo:'talento' };
   return { ok:false, nombre:t, tipo:'desconocido',
            motivo:'«' + t + '» no está en la base de talentos',
            cerca: talCerca(t, 4) };
@@ -230,7 +272,7 @@ function talCerca(txt, cuantos){
   const k = castNorm(txt);
   if(!k) return [];
   const con = [];
-  for(const n of TAL.nombres){
+  for(const n of talNombres()){
     const nk = castNorm(n);
     let s = castSimil(k, nk);
     if(nk.indexOf(k) === 0) s = Math.max(s, 0.9);        // lo escrito es el principio
@@ -245,9 +287,11 @@ function talCerca(txt, cuantos){
   return con.slice(0, cuantos || 4).map(x => x.n);
 }
 
-/** Lo que va en la lista de sugerencias: la base + las marcas. */
+/** Lo que va en la lista de sugerencias: la base, el directorio de Talentos y, si no hay ninguno, el catálogo del desglose; y al final las marcas. */
 function talSugerencias(){
-  return TAL.nombres.concat(Object.keys(TAL_MARCAS));
+  let l = talNombres();
+  if(!l.length && typeof CAST_TALENTOS !== 'undefined' && Array.isArray(CAST_TALENTOS)) l = CAST_TALENTOS.filter(n => !talEsMarca(n));
+  return l.concat(Object.keys(TAL_MARCAS));
 }
 
 /* ── Personajes que NUNCA se doblan ───────────────────────────────────── */
@@ -582,7 +626,7 @@ function talAnadir(nombre){
                              + 'Se puede escribir siempre, sin estar en la base.' };
   if(!/\p{L}/u.test(t)) return { ok:false, motivo:'Un nombre lleva letras' };
   const k = castNorm(t);
-  for(const n of TAL.nombres) if(castNorm(n) === k) return { ok:true, nombre:n, yaEstaba:true };
+  for(const n of talNombres()) if(castNorm(n) === k) return { ok:true, nombre:n, yaEstaba:true };
   TAL.nombres.push(t);
   TAL.nombres.sort((a, b) => a.localeCompare(b, 'es'));
   TAL.claves.add(k);
