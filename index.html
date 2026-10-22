@@ -2020,6 +2020,14 @@ body.cs-on #progHeader{ display:none !important; }
 .dct-chip-add{ background:rgba(52,211,153,.15); color:#34D399; } .dct-chip-del{ background:rgba(251,113,133,.15); color:#FB7185; } .dct-chip-re{ background:rgba(251,146,60,.18); color:#FB923C; }
 .dct-sec{ display:flex; flex-direction:column; gap:5px; }
 .dct-sec-t{ color:#4ADE80; font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.5px; }
+/* Contenido confidencial: la IA externa de Breakdowns (ENT-22) */
+.dct-ia{ display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; background:#1a0f16; border:1px solid rgba(244,114,182,.55); border-radius:12px; padding:14px 16px; font-size:13px; color:#fbcfe8; }
+.dct-ia > div{ flex:1; min-width:260px; }
+.dct-ia b{ color:#fdf2f8; }
+.dct-ia p{ margin:6px 0 0; color:#e5c7d6; font-size:12.5px; line-height:1.5; }
+.dct-ia-ok{ background:#1a1508; border-color:rgba(251,191,36,.6); color:#fde68a; }
+.dct-ia-ok b{ color:#fef3c7; }
+.dct-ia.dct-caja{ display:flex; flex-direction:column; align-items:stretch; background:#101215; border-color:#23262b; color:#cbd5e1; }
 /* DUBCARD en formato Paramount (PRO-56) */
 .dct-modos{ margin-bottom:12px; }
 .dct-sec-t i{ font-style:normal; text-transform:none; letter-spacing:0; color:#8b8f97; font-weight:500; }
@@ -3029,7 +3037,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.81.0-nube';
+const APP_VER_NUM = 'v11.82.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);

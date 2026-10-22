@@ -389,13 +389,14 @@ async function bdExtractText(file){
 async function bdListModels(cfg){
   const pr=BD_PROVIDERS[cfg.provider]||BD_PROVIDERS.custom;
   if(pr.kind==="anthropic")return pr.models.slice();
-  const res=await fetch(bdEndpoint(cfg,"/models"),{headers:{"Authorization":"Bearer "+cfg.apiKey}});
+  const res=await fetch(bdEndpoint(cfg,"/models"),{headers:{"Authorization":"Bearer "+cfg.apiKey,[BD_IA_HDR]:"autorizada"}});
   if(!res.ok){let msg="HTTP "+res.status;try{const j=await res.json();msg=(j.error&&(j.error.message||j.error))||j.detail||msg;}catch(e){/* lo mismo que en Casting: sin eso se sigue */}throw new Error(typeof msg==="string"?msg:JSON.stringify(msg));}
   const j=await res.json();const arr=Array.isArray(j.data)?j.data:(Array.isArray(j)?j:[]);
   return arr.map(m=>m.id||m.name).filter(Boolean).sort();
 }
 /* Llamada con streaming (SSE). Devuelve {text,stop,model,usage}. Soporta Anthropic y APIs compatibles con OpenAI. */
 async function bdGenerate({cfg,system,user,onDelta,signal}){
+  bdIaComprobar(cfg);   // contenido confidencial (ENT-22): sin permiso no sale nada
   const pr=BD_PROVIDERS[cfg.provider]||BD_PROVIDERS.custom;
   const model=cfg.model||pr.defaultModel;
   const isAnthropic=pr.kind==="anthropic";
@@ -410,6 +411,7 @@ async function bdGenerate({cfg,system,user,onDelta,signal}){
     url=bdEndpoint(cfg,"/chat/completions");
     body={model,stream:true,temperature:Number(cfg.temperature)||0.3,max_tokens:8192,messages:[{role:"system",content:system},{role:"user",content:user}]};
     headers={"Content-Type":"application/json","Authorization":"Bearer "+cfg.apiKey,"Accept":"text/event-stream"};
+    headers[BD_IA_HDR]="autorizada";   // el proxy /api/llm no reenvía sin ella (ENT-22)
     if(cfg.provider==="openrouter"){headers["HTTP-Referer"]=location.origin;headers["X-Title"]="Dubbipt";}
   }
   const res=await fetch(url,{method:"POST",headers,body:JSON.stringify(body),signal});
@@ -574,7 +576,7 @@ const bdSafeName=t=>t.replace(/[\\/:*?"<>|]+/g,"").slice(0,80);
 const ST = {
   dc: { entries: [], client: null, processed: [], warnings: [], logs: [], busy: false, modo: 'general' },
   pm: { entries: [], eps: [], logs: [], busy: false, cfg: null },
-  bd: { script: null, guide: null, reading: '', name: '', isMovie: false, ep: '', notes: '', withSeries: true,
+  bd: { script: null, guide: null, reading: '', name: '', isMovie: false, ep: '', notes: '', withSeries: true, iaForm: null,
         busy: false, live: '', result: null, err: '', abort: null, openId: null, cfgOpen: false, cfgMsg: '', locales: [] }
 };
 /* Sin emojis en pantalla (PRO-N6): los textos de Casting los traen; aquí se quitan al pintar. */
@@ -1583,6 +1585,61 @@ function pmCablear(raiz){
   if(input) input.onchange = () => { pmAnadir(input.files); input.value = ''; };
 }
 
+/* ── Contenido confidencial: la IA externa, bloqueada (ENT-22) ─────────────
+   Pedido de sala: «es contenido de Netflix y hay políticas de
+   confidencialidad; sería muy grave que se filtren datos de guiones o de
+   casting». Generar un breakdown manda el libreto entero a una IA de fuera
+   (Groq, OpenRouter, NVIDIA, Anthropic): el texto sale de Dubbipt, y los
+   modelos gratuitos pueden guardar o usar lo que reciben. Por eso viene
+   BLOQUEADO. Un administrador lo puede permitir para UN proveedor, con la
+   referencia de la autorización escrita del cliente; queda en los datos de
+   Casting, en la nube (quién, cuándo, qué proveedor y qué autorización) y en
+   el historial, y se puede volver a bloquear. Sin ese permiso no sale nada:
+   lo comprueba la propia llamada (bdGenerate), no solo la pantalla, y el
+   proxy /api/llm exige la cabecera que solo pone esta llamada. */
+
+const BD_IA_HDR = 'x-dubbipt-ia';
+/** El permiso vigente ({ proveedor, autorizacion, quien, cuando }) o null si está bloqueada. */
+function bdIaPermiso(){
+  try{
+    const d = (typeof csDatos === 'function') ? csDatos().datos : null;
+    const a = d && d.ajustes && d.ajustes.iaExterna;
+    return (a && a.permitida === true && a.proveedor && BD_PROVIDERS[a.proveedor]) ? a : null;
+  }catch(e){ return null; }
+}
+/** Antes de mandar nada: sin permiso, o con otro proveedor, no sale el texto. */
+function bdIaComprobar(cfg){
+  const a = bdIaPermiso();
+  if(!a) throw new Error('La IA externa está bloqueada: los libretos son confidenciales. Un administrador puede permitirla para un cliente que lo haya autorizado por escrito.');
+  if(!cfg || cfg.provider !== a.proveedor) throw new Error('Solo está autorizado «' + BD_PROVIDERS[a.proveedor].l + '». Cámbialo en la configuración del modelo.');
+  return a;
+}
+/** Permitir (para un proveedor y con la autorización escrita del cliente) o volver a bloquear. */
+async function bdIaCambiar(permitir, proveedor, autorizacion){
+  const quien = (typeof dcxQuien === 'function') ? dcxQuien() : '', cuando = new Date().toISOString();
+  const valor = permitir ? { permitida: true, proveedor: proveedor, autorizacion: String(autorizacion || '').trim(), quien: quien, cuando: cuando } : { permitida: false, quien: quien, cuando: cuando };
+  const que = permitir ? 'IA externa permitida para breakdowns: ' + BD_PROVIDERS[proveedor].l + ' · autorización: ' + valor.autorizacion : 'IA externa bloqueada de nuevo';
+  if(typeof csEditar !== 'function') return 'error';
+  return csEditar(p => { p.ajustes = Object.assign({}, p.ajustes || {}, { iaExterna: valor }); return true; }, que);
+}
+const BD_IA_GRATIS = new Set(['nvidia', 'groq', 'openrouter']);
+function bdIaHtml(){
+  const B = ST.bd, a = bdIaPermiso(), f = B.iaForm;
+  if(a) return '<div class="dct-ia dct-ia-ok"><div><b>IA externa permitida</b> para breakdowns: solo <b>' + E(BD_PROVIDERS[a.proveedor].l) + '</b>.'
+    + ' Autorización: ' + E(a.autorizacion) + ' · ' + E(a.quien || '') + ', ' + E(new Date(a.cuando).toLocaleString('es')) + '.'
+    + ' El libreto se envía a ese proveedor al generar.</div><button class="cs-b" data-dct="bdIaBloquear">Volver a bloquear</button></div>';
+  if(!f) return '<div class="dct-ia"><div><b>IA externa bloqueada · contenido confidencial</b>'
+    + '<p>Los libretos de Netflix y de otros clientes con acuerdo de confidencialidad no se envían a servicios de IA de terceros (Groq, OpenRouter, NVIDIA, Anthropic): el texto saldría de Dubbipt, y los modelos gratuitos pueden guardar o usar lo que reciben. Los breakdowns ya guardados se pueden ver y descargar.</p></div>'
+    + '<button class="cs-b" data-dct="bdIaPedir">Permitir para un cliente que lo autorizó…</button></div>';
+  return '<div class="dct-ia dct-caja"><b>Permitir la IA externa para breakdowns</b>'
+    + '<p class="dct-tenue">Solo si el cliente lo autorizó <b>por escrito</b> para este proveedor. Queda apuntado quién lo permitió, cuándo y con qué autorización.</p>'
+    + '<label>Proveedor autorizado<select data-dct="bdIaProv">' + Object.keys(BD_PROVIDERS).filter(k => k !== 'custom').map(k => '<option value="' + k + '"' + (f.proveedor === k ? ' selected' : '') + '>' + E(BD_PROVIDERS[k].l) + (BD_IA_GRATIS.has(k) ? ' · gratuito: puede guardar o usar lo que recibe' : '') + '</option>').join('') + '</select></label>'
+    + '<label>Autorización escrita del cliente (quién y referencia)<input data-dct="bdIaAut" value="' + E(f.autorizacion || '') + '" placeholder="p. ej. Correo de Netflix (Ana Pérez) del 12/10/2026, ref. 4471"></label>'
+    + '<label class="dct-check"><input type="checkbox" data-dct="bdIaConfirmo"' + (f.confirmo ? ' checked' : '') + '> Confirmo que el cliente autorizó por escrito enviar sus libretos a este proveedor.</label>'
+    + (f.err ? '<div class="dct-mal">' + E(f.err) + '</div>' : '')
+    + '<div class="dct-fila"><button class="cs-b" data-dct="bdIaCancelar">Cancelar</button><button class="cs-b cs-pri" data-dct="bdIaPermitir">Permitir</button></div></div>';
+}
+
 /* ── Breakdowns ───────────────────────────────────────────────────────────── */
 
 /** Los breakdowns guardados: los de Casting y los de este equipo que aún no subieron. */
@@ -1624,7 +1681,7 @@ async function bdLeer(file, kind){
   finally{ B.reading = ''; repintar(); }
 }
 
-function bdPuede(){ const B = ST.bd, cfg = getBdCfg(); return !!(B.script && cfg.apiKey && B.name.trim() && (B.isMovie || B.ep) && !B.busy); }
+function bdPuede(){ const B = ST.bd, cfg = getBdCfg(), a = bdIaPermiso(); return !!(a && cfg.provider === a.proveedor && B.script && cfg.apiKey && B.name.trim() && (B.isMovie || B.ep) && !B.busy); }
 
 async function bdGenerar(){
   const B = ST.bd, cfg = getBdCfg();
@@ -1699,7 +1756,7 @@ function bdResultadoHtml(rec, cerrar){
 function bdConfigHtml(){
   const cfg = getBdCfg(), pr = BD_PROVIDERS[cfg.provider] || BD_PROVIDERS.custom;
   return '<div class="dct-cfg"><div class="dct-sec-t">Configuración del modelo</div>'
-    + '<label>Proveedor<select id="dctBdProv">' + Object.keys(BD_PROVIDERS).map(k => '<option value="' + k + '"' + (k === cfg.provider ? ' selected' : '') + '>' + E(BD_PROVIDERS[k].l) + '</option>').join('') + '</select></label>'
+    + '<label>Proveedor<select id="dctBdProv">' + Object.keys(BD_PROVIDERS).filter(k => { const a = bdIaPermiso(); return !a || k === a.proveedor; }).map(k => '<option value="' + k + '"' + (k === cfg.provider ? ' selected' : '') + '>' + E(BD_PROVIDERS[k].l) + '</option>').join('') + '</select></label>'
     + '<div class="dct-tenue">' + E(pr.hint || '') + (pr.keyUrl ? ' Obtén la clave en ' + E(pr.keyUrl.replace(/^https:\/\//, '')) + '.' : '') + (pr.proxy ? ' Las llamadas pasan por el proxy de este sitio (/api/llm).' : '') + '</div>'
     + (cfg.provider === 'custom' ? '<label>URL base (termina en /v1)<input id="dctBdBase" value="' + E(cfg.baseUrl || '') + '" placeholder="https://mi-servidor/v1"></label><div class="dct-tenue">Ojo: Dubbipt solo deja conectar con los proveedores de la lista; un endpoint propio puede quedar bloqueado.</div>' : '')
     + '<label>Clave de API<input id="dctBdClave" type="password" autocomplete="off" value="' + E(cfg.apiKey || '') + '" placeholder="clave"></label>'
@@ -1713,11 +1770,13 @@ function bdHtml(){
   const B = ST.bd, cfg = getBdCfg(), saved = bdGuardados();
   const drop = (kind, rec, label, hint) => '<div class="dct-drop dct-drop-p' + (rec ? ' dct-drop-ok' : '') + '" data-dct="bdElegir" data-k="' + kind + '"><b>' + (B.reading === kind ? 'Leyendo…' : (rec ? ico('hecho', 13) + ' ' + E(rec.name) : label)) + '</b>'
     + '<span>' + (rec ? rec.chars.toLocaleString('es') + ' caracteres · clic para cambiar' : hint) + '</span><input type="file" id="dctBd_' + kind + '" accept=".docx,.pdf,.txt,.md" hidden></div>';
+  const ia = bdIaPermiso();
   return '<div class="dct">'
-    + '<div class="dct-fila dct-cab2"><span class="dct-tenue">Análisis de libretos para casting, dirección y técnica · ' + saved.length + ' guardado' + (saved.length === 1 ? '' : 's') + '</span>'
+    + bdIaHtml()
+    + (!ia ? '' : '<div class="dct-fila dct-cab2"><span class="dct-tenue">Análisis de libretos para casting, dirección y técnica · ' + saved.length + ' guardado' + (saved.length === 1 ? '' : 's') + '</span>'
     +   '<button class="cs-b" data-dct="bdCfg">' + ico('dubcards', 13) + '<span>' + E(cfg.apiKey ? bdProviderLabel(cfg) : 'Configurar clave de API') + '</span></button></div>'
     + (B.cfgOpen ? bdConfigHtml() : '')
-    + (!cfg.apiKey && !B.cfgOpen ? '<div class="dct-alertas">Falta la clave de API del proveedor de modelos. Configúrala: puedes usar una gratuita (NVIDIA, Groq u OpenRouter) o Anthropic.</div>' : '')
+    + (!cfg.apiKey && !B.cfgOpen ? '<div class="dct-alertas">Falta la clave de API del proveedor autorizado. Configúrala.</div>' : '')
     + '<div class="dct-caja">'
     +   '<div class="dct-fila">' + drop('script', B.script, 'Libreto en español (obligatorio)', 'Clic o arrastra · .docx, .pdf o .txt') + drop('guide', B.guide, 'Show guide (opcional)', 'Sólo contexto · se etiqueta [SHOW GUIDE]') + '</div>'
     +   '<div class="dct-fila">'
@@ -1732,7 +1791,7 @@ function bdHtml(){
     +   (B.err ? '<div class="dct-mal">' + E(B.err) + '</div>' : '')
     + '</div>'
     + (B.busy ? '<div class="dct-caja"><div class="dct-vivo-t">Analizando el libreto… <span id="dctBdVivoN">' + (B.live ? B.live.length.toLocaleString('es') + ' caracteres generados' : '(el modelo está leyendo; puede tardar unos minutos)') + '</span></div><pre id="dctBdVivo" class="dct-vivo">' + E(B.live) + '</pre></div>' : '')
-    + (B.result && !B.busy ? bdResultadoHtml(B.result, false) : '')
+    + (B.result && !B.busy ? bdResultadoHtml(B.result, false) : ''))
     + '<div class="cs-rep-sec">Breakdowns guardados</div>'
     + (saved.length ? '<div class="dct-lista">' + saved.map(b => '<div><div class="dct-arch"><span class="dct-arch-n"><b>' + E(b.title) + '</b><i>' + E(new Date(b.createdAt).toLocaleString('es')) + ' · ' + E(b.model || '') + (b.guideFile ? ' · con show guide' : '') + (ST.bd.locales.some(x => x.id === b.id) ? ' · solo en este equipo' : '') + '</i></span>'
           + '<button class="cs-b" data-dct="bdVer" data-id="' + E(b.id) + '">' + (B.openId === b.id ? 'Ocultar' : 'Ver') + '</button>'
@@ -1776,6 +1835,29 @@ function bdCablear(raiz){
       repintar();
     };
     else if(que === 'bdProvCambio') { /* sin uso */ }
+    /* ── Contenido confidencial (ENT-22) ── */
+    else if(que === 'bdIaPedir') el.onclick = () => { B.iaForm = { proveedor: 'anthropic', autorizacion: '', confirmo: false, err: '' }; repintar(); };
+    else if(que === 'bdIaCancelar') el.onclick = () => { B.iaForm = null; repintar(); };
+    else if(que === 'bdIaProv') el.onchange = () => { if(B.iaForm) B.iaForm.proveedor = el.value; };
+    else if(que === 'bdIaAut') el.oninput = () => { if(B.iaForm) B.iaForm.autorizacion = el.value; };
+    else if(que === 'bdIaConfirmo') el.onchange = () => { if(B.iaForm) B.iaForm.confirmo = !!el.checked; };
+    else if(que === 'bdIaPermitir') el.onclick = async () => {
+      const f = B.iaForm; if(!f) return;
+      if(String(f.autorizacion || '').trim().length < 8){ f.err = 'Escribe quién autorizó y la referencia (correo, contrato…)'; repintar(); return; }
+      if(!f.confirmo){ f.err = 'Marca la casilla para confirmar la autorización escrita'; repintar(); return; }
+      const r = await bdIaCambiar(true, f.proveedor, f.autorizacion);
+      if(r === 'error'){ f.err = 'No se pudo guardar el permiso'; repintar(); return; }
+      B.iaForm = null;
+      const c = getBdCfg(); if(c.provider !== f.proveedor) saveBdCfg(Object.assign({}, c, { provider: f.proveedor, model: (BD_PROVIDERS[f.proveedor] && BD_PROVIDERS[f.proveedor].defaultModel) || '' }));
+      repintar();
+    };
+    else if(que === 'bdIaBloquear') el.onclick = async () => {
+      const ok = (typeof DDL_UI !== 'undefined' && DDL_UI.confirmModal) ? await DDL_UI.confirmModal({ title: 'Volver a bloquear la IA externa', body: 'Los breakdowns dejarán de poder generarse con IA externa hasta que un administrador lo vuelva a permitir.', confirmLabel: 'Bloquear', cancelLabel: 'Cancelar' }) : true;
+      if(!ok) return;
+      await bdIaCambiar(false);
+      if(B.abort) B.abort.abort();
+      repintar();
+    };
     else if(que === 'bdVer') el.onclick = () => { B.openId = (B.openId === id) ? null : id; repintar(); };
     else if(que === 'bdCopiar') el.onclick = () => { const b = busca(id); if(b && navigator.clipboard) navigator.clipboard.writeText(b.text).then(() => aviso('✓ Copiado'), () => aviso('No se pudo copiar')); };
     else if(que === 'bdWord') el.onclick = async () => { const b = busca(id); if(!b) return; try{ bdDownload(await bdMakeDocx(b.text), bdSafeName(b.title) + '.docx'); }catch(e){ aviso('✗ ' + e.message); } };
@@ -1798,7 +1880,7 @@ function bdCablear(raiz){
 /* ── Hacia fuera ──────────────────────────────────────────────────────────── */
 
 const TITULOS = { dubcards: ['Dubcards', 'Las DUBCARD de cada capítulo (Netflix y otras casas, formato Paramount) y el Contract Inventory'],
-                  breakdowns: ['Breakdowns', 'Análisis de libretos con un modelo de lenguaje'] };
+                  breakdowns: ['Breakdowns', 'Análisis de libretos con un modelo de lenguaje · con la IA externa bloqueada salvo autorización escrita del cliente'] };
 
 function html(vista){
   const t = TITULOS[vista];
@@ -1816,7 +1898,7 @@ function cablear(raiz, vista){
 }
 
 return { html: html, cablear: cablear, ST: ST, dcParseFile: dcParseFile, dcProcesar: dcProcesar, bdDocHtml: bdDocHtml, bdGuardados: bdGuardados, bdGuardar: bdGuardar,
-         bdEndpoint: bdEndpoint, BD_PROVIDERS: BD_PROVIDERS, bdMakeDocx: bdMakeDocx, bdExtractText: bdExtractText, dcSplitRows: dcSplitRows,
+         bdEndpoint: bdEndpoint, BD_PROVIDERS: BD_PROVIDERS, bdIaPermiso: bdIaPermiso, bdIaComprobar: bdIaComprobar, bdIaCambiar: bdIaCambiar, bdGenerate: bdGenerate, bdMakeDocx: bdMakeDocx, bdExtractText: bdExtractText, dcSplitRows: dcSplitRows,
          ciNombre: ciNombre, ciReparto: ciReparto, ciMain: ciMain, ciNumero: ciNumero, ciLlenarXml: ciLlenarXml, ciDocumentos: ciDocumentos,
          ciLeerDubcard: ciLeerDubcard, ciCargarDubcard: ciCargarDubcard, ciEquipoDe: ciEquipoDe,
          pmDatosDeHojas: pmDatosDeHojas, pmEpisodio: pmEpisodio, pmEsTraduccion: pmEsTraduccion, pmArchivosXlsx: pmArchivosXlsx, pmNombreArchivo: pmNombreArchivo, pmProcesar: pmProcesar, pmCfgCargar: pmCfgCargar, pmSerieConocida: pmSerieConocida, pmDescargarVarios: pmDescargarVarios };

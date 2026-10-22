@@ -105,6 +105,27 @@ síntoma engañaba: parecía un cortafuegos del estudio. Se detectó sirviendo l
 app en local **con la CSP real de `vercel.json`**, que es como hay que probar
 cualquier cosa que salga a la red. Probar sin CSP es probar otra aplicación.
 
+## Paso 13 · Verificación en dos pasos (v11.81.0)
+
+La app pide el código del autenticador a todos y cierra la sesión tras 30 minutos
+sin uso (especificación 07, ENT-20 y ENT-21). Para que la nube también lo exija,
+ejecutar `sql/seguridad-13-mfa-obligatorio.sql` **después** de desplegar y de que
+cada persona haya activado su autenticador.
+
+## Paso 14 · Contenido confidencial: IA externa bloqueada (v11.82.0)
+
+Los libretos son de Netflix y otros clientes con acuerdos de confidencialidad.
+Generar un breakdown enviaba el libreto a una IA de terceros (Groq, OpenRouter,
+NVIDIA, Anthropic); los modelos gratuitos pueden guardar o usar lo que reciben.
+Desde v11.82.0 viene **bloqueado** (ENT-22):
+
+| Dónde | Qué |
+|---|---|
+| Breakdowns | Bloqueado por defecto. Solo un administrador lo permite, para un proveedor, con la autorización escrita del cliente; queda en la nube (quién, cuándo, referencia) y en el historial |
+| `bdGenerate` | La llamada misma se niega sin permiso o con otro proveedor |
+| `api/llm.js` | El proxy devuelve 403 sin la cabecera `x-dubbipt-ia` |
+| `vercel.json` | La copia de DublajeCast (`/dublajecast`) ya no puede conectar con ninguna IA |
+
 ## Pendiente
 
 - `ddl:library` sigue siendo un canal **global**: transporta ids de programa y
