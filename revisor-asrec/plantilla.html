@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revisor ASREC</title>
+<!-- Se construye con `node revisor-asrec/construir.js`: no edites
+     revisor-asrec.html a mano, edita revisor-asrec/plantilla.html y motor.js. -->
+<style>
+:root{
+  --bg:#f6f7f5; --panel:#ffffff; --ink:#15171a; --muted:#5f6670; --line:#e3e6e8; --soft:#eef1ef;
+  --accent:#138a4b; --accent-ink:#ffffff; --accent-soft:#e3f4ea;
+  --err:#c62828; --err-soft:#fde8e8; --warn:#a15c00; --warn-soft:#fff1d6; --sug:#1f5fbf; --sug-soft:#e5eefc;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1112; --panel:#171a1c; --ink:#eceff1; --muted:#9aa3ab; --line:#2a2f33; --soft:#1e2225;
+    --accent:#3ccf7e; --accent-ink:#06210f; --accent-soft:#16301f;
+    --err:#ff7b72; --err-soft:#3a1715; --warn:#f0b44c; --warn-soft:#352812; --sug:#79a8ff; --sug-soft:#16243d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1112; --panel:#171a1c; --ink:#eceff1; --muted:#9aa3ab; --line:#2a2f33; --soft:#1e2225;
+  --accent:#3ccf7e; --accent-ink:#06210f; --accent-soft:#16301f;
+  --err:#ff7b72; --err-soft:#3a1715; --warn:#f0b44c; --warn-soft:#352812; --sug:#79a8ff; --sug-soft:#16243d;
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.oculto{display:none!important}
+
+.barra{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line)}
+.logo{width:30px;height:30px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:800;font-size:13px;letter-spacing:-.5px;flex:none}
+.barra h1{font-size:16px;margin:0;font-weight:700;letter-spacing:-.2px}
+.barra .sub{color:var(--muted);font-size:13px}
+.barra .der{margin-left:auto;display:flex;align-items:center;gap:10px}
+.pastilla{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);background:var(--soft);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.pastilla i{width:8px;height:8px;border-radius:50%;background:var(--warn)}
+.pastilla.listo i{background:var(--accent)}
+.pastilla.mal i{background:var(--err)}
+
+main{max-width:1180px;margin:0 auto;padding:24px 20px 80px}
+
+/* Es un <label>: sin display:block se pinta en línea y el borde sale a trozos. */
+.soltar{display:block;cursor:pointer;border:2px dashed var(--line);border-radius:16px;background:var(--panel);padding:48px 24px;text-align:center;transition:border-color .15s, background .15s}
+.soltar:hover{border-color:var(--muted)}
+.soltar.encima{border-color:var(--accent);background:var(--accent-soft)}
+.soltar:focus-within{outline:2px solid var(--accent);outline-offset:3px}
+.soltar .icono{width:52px;height:52px;margin:0 auto 14px;border-radius:14px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center}
+.soltar h2{margin:0 0 6px;font-size:22px;letter-spacing:-.3px}
+.solo-lector{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.soltar p{margin:0 auto;color:var(--muted);max-width:620px}
+.boton{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:8px 14px;font-weight:600;font-size:14px}
+.boton:hover{border-color:var(--muted)}
+.boton.prim{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.soltar .boton{margin-top:20px;padding:11px 20px}
+.cuadro{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:28px;text-align:left}
+.cuadro div{background:var(--soft);border-radius:12px;padding:12px 14px;font-size:13px;color:var(--muted)}
+.cuadro b{display:block;color:var(--ink);font-size:14px;margin-bottom:2px}
+.fallo{margin-top:16px;color:var(--err);font-weight:600}
+
+.cabeza{display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px;margin-bottom:16px}
+.cabeza h2{margin:0;font-size:20px;letter-spacing:-.3px}
+.cabeza .meta{color:var(--muted);font-size:13px}
+.cabeza .acciones{margin-left:auto;display:flex;flex-wrap:wrap;gap:8px}
+
+.cifras{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.cifra{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;text-align:left;cursor:pointer}
+.cifra .n{font-size:28px;font-weight:750;letter-spacing:-1px;line-height:1.1}
+.cifra .t{color:var(--muted);font-size:13px}
+.cifra.err .n{color:var(--err)} .cifra.warn .n{color:var(--warn)} .cifra.sug .n{color:var(--sug)}
+.cifra[aria-pressed="false"]{opacity:.45}
+
+/* Con cuatro pestañas no caben en un móvil: se desplazan en su fila sin empujar la página. */
+.progreso{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin:-6px 0 18px;font-size:14px;color:var(--muted)}
+.progreso .barra{flex:1 1 200px;max-width:420px;height:8px;border-radius:4px;background:var(--soft);overflow:hidden}
+.progreso .barra i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.progreso b{color:var(--ink)}
+.hall li.hecho{background:var(--accent-soft)}
+.hall li.hecho .txt{text-decoration:line-through;text-decoration-color:var(--accent);color:var(--muted)}
+.hall li.hecho .sev{opacity:.45}
+.mini.hecho-btn{color:var(--accent);border-color:var(--accent);font-weight:600}
+.mini.hecho-btn:hover{background:var(--accent);color:var(--accent-ink)}
+.marca-hecho{font-size:12px;font-weight:600;color:var(--accent);white-space:nowrap;align-self:center}
+.fila.toda-hecha{opacity:.7}
+.fila.toda-hecha .dlg mark{background:none;box-shadow:none}
+.fila .cab .fila-hecha{border:1px solid var(--accent);color:var(--accent);background:none;border-radius:8px;padding:1px 8px;font-size:12px;font-weight:600}
+.fila .cab .fila-hecha:hover{background:var(--accent);color:var(--accent-ink)}
+.pestanas{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto;scrollbar-width:none}
+.pestanas::-webkit-scrollbar{display:none}
+.pestanas button{flex:none;white-space:nowrap;border:0;background:none;padding:10px 14px;border-bottom:2px solid transparent;color:var(--muted);font-weight:600}
+.pestanas button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+
+.filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.filtros input[type=search],.filtros select{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:7px 12px;min-width:0}
+.filtros input[type=search]{flex:1 1 240px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:4px 12px;font-size:13px;color:var(--muted)}
+.chip b{color:var(--ink);font-weight:650;margin-left:4px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip[aria-pressed="true"] b{color:var(--bg)}
+
+.fila{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.fila .cab{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin-bottom:6px;align-items:center}
+.fila .cab .num{font-weight:700;color:var(--ink)}
+.fila .cab .tc{font-family:var(--mono)}
+.fila .cab .pj{font-weight:600;letter-spacing:.3px}
+.fila .cab .copiar{margin-left:auto;border:0;background:none;color:var(--muted);font-size:12px;padding:0}
+.fila .cab .copiar:hover{color:var(--ink)}
+.dlg{font-size:16px;line-height:1.6;margin:0 0 10px;white-space:pre-wrap;word-break:break-word}
+.dlg mark{border-radius:3px;padding:1px 0;color:inherit}
+.dlg mark.error{background:var(--err-soft);box-shadow:inset 0 -2px 0 var(--err)}
+.dlg mark.aviso{background:var(--warn-soft);box-shadow:inset 0 -2px 0 var(--warn)}
+.dlg mark.sugerencia{background:var(--sug-soft);box-shadow:inset 0 -2px 0 var(--sug)}
+.inv{display:inline-block;font-size:10px;line-height:1;padding:2px 3px;border-radius:3px;background:var(--err);color:#fff;vertical-align:middle;font-family:var(--mono)}
+.vecina{font-size:14px;line-height:1.5;color:var(--muted);margin:0 0 8px;padding-left:10px;border-left:2px solid var(--line);white-space:pre-wrap;word-break:break-word}
+.vecina b{font-weight:600;font-size:12px;letter-spacing:.2px;margin-right:6px}
+.otra{font-family:var(--mono);font-size:13px;color:var(--muted);margin:0 0 10px}
+.hall{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.hall li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;padding:8px 10px;border-radius:10px;background:var(--soft)}
+.sev{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;border-radius:6px;padding:2px 7px;white-space:nowrap}
+.sev.error{background:var(--err-soft);color:var(--err)} .sev.aviso{background:var(--warn-soft);color:var(--warn)} .sev.sugerencia{background:var(--sug-soft);color:var(--sug)}
+.hall .txt{font-size:14px}
+.hall .txt small{display:block;color:var(--muted);font-size:12px}
+.hall .sug{font-family:var(--mono);font-size:13px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:0 6px;margin-left:2px}
+.hall .acc{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.mini{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:2px 8px;font-size:12px;color:var(--muted)}
+.mini:hover{color:var(--ink);border-color:var(--muted)}
+.vacio{text-align:center;color:var(--muted);padding:40px 0}
+.mas{display:block;margin:12px auto}
+
+table.t{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;font-size:14px}
+table.t th,table.t td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+table.t th{font-size:12px;color:var(--muted);font-weight:650;background:var(--soft)}
+table.t td.n{font-variant-numeric:tabular-nums;text-align:right}
+.g{display:inline-block;font-family:var(--mono);font-size:13px;background:var(--soft);border-radius:6px;padding:0 6px;margin:0 4px 2px 0}
+.g.mal{background:var(--warn-soft);color:var(--warn)}
+.envoltorio{overflow-x:auto}
+
+.reglas{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+.grupo{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.grupo h3{margin:0 0 8px;font-size:15px}
+.regla{display:grid;grid-template-columns:auto 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.regla:first-of-type{border-top:0}
+.regla input{margin-top:4px;accent-color:var(--accent)}
+.regla b{font-size:14px}
+.regla p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.fuente{font-size:11px;font-weight:600;color:var(--muted);background:var(--soft);border-radius:6px;padding:1px 6px;margin-left:6px;white-space:nowrap}
+.cuantas{font-size:12px;color:var(--muted);margin-left:6px}
+textarea{width:100%;min-height:140px;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px;font-family:var(--mono);font-size:13px}
+.nota{color:var(--muted);font-size:13px}
+
+.probar{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-top:20px}
+.probar .cab-p{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:4px}
+.probar h3{margin:0;font-size:17px;letter-spacing:-.2px}
+.probar .nota{margin:0 0 12px}
+.probar textarea{font-family:var(--sans);font-size:16px;line-height:1.55;min-height:110px;resize:vertical;background:var(--bg)}
+.probar textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:transparent}
+.veredicto{font-size:13px;font-weight:700;border-radius:999px;padding:3px 12px}
+.veredicto.bien{background:var(--accent-soft);color:var(--accent)}
+.veredicto.mal{background:var(--err-soft);color:var(--err)}
+.veredicto.casi{background:var(--warn-soft);color:var(--warn)}
+#pResultado{margin-top:12px}
+.captura{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 10px}
+.captura .boton{padding:6px 12px;font-size:13px}
+.captura .nota{margin:0}
+#pOCR{font-size:13px;color:var(--muted)}
+#pOCR.mal{color:var(--err);font-weight:600}
+.barra-ocr{height:4px;border-radius:2px;background:var(--soft);overflow:hidden;flex:1 1 120px;max-width:220px}
+.barra-ocr i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+.probar.encima textarea{outline:2px dashed var(--accent);outline-offset:2px}
+#pResultado .fila{background:var(--bg)}
+.linea-ok{display:flex;gap:8px;align-items:baseline;font-size:14px;color:var(--muted);padding:6px 2px}
+.linea-ok b{color:var(--accent)}
+.mini.usar{color:var(--accent);border-color:var(--accent)}
+.mini.usar:hover{background:var(--accent);color:var(--accent-ink)}
+
+@media (max-width:720px){
+  main{padding:16px 16px 60px}
+  .barra{padding:10px 16px}
+  .barra .sub{display:none}
+  .cifras{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hall li{grid-template-columns:1fr}
+  .hall .acc{justify-content:flex-start}
+  .cabeza .acciones{margin-left:0}
+}
+@media print{
+  .barra,.pestanas,.filtros,.chips,.acciones,.acc,.copiar,.mas{display:none!important}
+  body{background:#fff;color:#000}
+  .fila{break-inside:avoid;border-color:#ccc}
+}
+</style>
+</head>
+<body>
+<header class="barra">
+  <div class="logo" aria-hidden="true">AR</div>
+  <div>
+    <h1>Revisor ASREC</h1>
+    <div class="sub">Ortografía, gramática y reglas del guion As-Recorded de Netflix · sin internet</div>
+  </div>
+  <div class="der">
+    <span id="estadoDic" class="pastilla" role="status" aria-live="polite"><i></i><span>Cargando diccionario…</span></span>
+    <button id="tema" class="mini" type="button" aria-label="Cambiar tema claro u oscuro" title="Tema claro u oscuro"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" style="display:block;margin:3px 0"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1.5a6.5 6.5 0 0 1 0 13z" fill="currentColor"/></svg></button>
+  </div>
+</header>
+
+<main>
+  <section id="inicio">
+    <label id="soltar" class="soltar" for="archivo">
+      <div class="icono" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 18v-6"/><path d="m9 15 3-3 3 3"/></svg></div>
+      <h2>Suelta aquí el Excel del guion</h2>
+      <p>El archivo <b>.xlsx</b> del guion de doblaje (DUB SCRIPT). Se revisan las casillas
+         <b>DIALOGUE</b> de la hoja <b>Dialogue List</b>. Nada sale de este ordenador.</p>
+      <span class="boton prim">Elegir archivo…</span>
+      <input id="archivo" type="file" accept=".xlsx,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="solo-lector">
+      <div id="fallo" class="fallo" role="alert"></div>
+    </label>
+    <div class="cuadro">
+      <div><b>Formato ASREC</b>Casillas vacías, reacciones sin paréntesis, MAYÚSCULAS sostenidas, números y abreviaturas como pide Netflix, continuaciones con «…».</div>
+      <div><b>Ortografía</b>Diccionario de español de LibreOffice y normas de la RAE (solo, este, guion sin tilde), tildes de qué/cómo/dónde.</div>
+      <div><b>Gramática</b>Concordancias, «a el», «haber si», «he echo», dequeísmo, «habían muchas», formas de vosotros en latino.</div>
+      <div><b>Coherencia</b>Guías de pronunciación distintas, nombres escritos de dos formas, «Diosa» y «diosa», etiquetas que no casan con el texto.</div>
+    </div>
+    <section id="probar" class="probar" aria-labelledby="pTitulo">
+      <div class="cab-p"><h3 id="pTitulo">Probar un diálogo</h3><span id="pVeredicto" class="veredicto oculto" role="status" aria-live="polite"></span></div>
+      <p class="nota">Escribe o pega un diálogo y te dice si está bien. Cada línea es un evento y se mira con la de antes y la de después; para una conversación, empieza la línea con el personaje: <b>AMAR: Te iba a decir que…</b><span id="pCtx"></span></p>
+      <div class="captura">
+        <label class="boton" for="pImagen"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="m21 17-5-5-8 7"/></svg>Leer una captura</label>
+        <input id="pImagen" type="file" accept="image/*" class="solo-lector">
+        <span class="nota">o pégala con Ctrl+V, o arrástrala aquí. Saca cada personaje con su línea de diálogo y deja fuera timecodes, la transcripción y las demás columnas.</span>
+        <span id="pOCR" role="status" aria-live="polite"></span>
+      </div>
+      <textarea id="pTexto" spellcheck="false" aria-label="Diálogo para revisar" placeholder="Por ejemplo:&#10;AMAR: Te iba a decir que&#10;RUDRA: ¡No quiero saberlo!&#10;AMAR: ya firmé el divorcio."></textarea>
+      <div id="pResultado"></div>
+    </section>
+  </section>
+
+  <section id="panel" class="oculto">
+    <div class="cabeza">
+      <div>
+        <h2 id="titulo"></h2>
+        <div id="meta" class="meta"></div>
+      </div>
+      <div class="acciones">
+        <button id="otro" class="boton" type="button">Abrir otro archivo</button>
+        <button id="xlsx" class="boton prim" type="button">Descargar informe (.xlsx)</button>
+        <button id="imprimir" class="boton" type="button">Imprimir</button>
+      </div>
+    </div>
+
+    <div class="cifras">
+      <button class="cifra" data-sev="todas" type="button" aria-pressed="true"><div class="n" id="nFilas">0</div><div class="t">filas con algo que revisar</div></button>
+      <button class="cifra err" data-sev="error" type="button" aria-pressed="true"><div class="n" id="nError">0</div><div class="t">errores</div></button>
+      <button class="cifra warn" data-sev="aviso" type="button" aria-pressed="true"><div class="n" id="nAviso">0</div><div class="t">avisos</div></button>
+      <button class="cifra sug" data-sev="sugerencia" type="button" aria-pressed="true"><div class="n" id="nSug">0</div><div class="t">sugerencias</div></button>
+    </div>
+    <div id="progreso" class="progreso" role="status" aria-live="polite"></div>
+
+    <div class="pestanas" role="tablist">
+      <button role="tab" aria-selected="true" data-v="vHall" type="button">Hallazgos</button>
+      <button role="tab" aria-selected="false" data-v="vTerm" type="button">Nombres y guías</button>
+      <button role="tab" aria-selected="false" data-v="vProbar" type="button">Probar un diálogo</button>
+      <button role="tab" aria-selected="false" data-v="vReglas" type="button">Reglas y diccionario</button>
+    </div>
+
+    <div id="vHall">
+      <div class="filtros">
+        <input id="buscar" type="search" placeholder="Buscar en el diálogo, el personaje o el aviso…" aria-label="Buscar">
+        <select id="variante" aria-label="Variante del español">
+          <option value="auto">Variante: automática</option>
+          <option value="latam">Español latinoamericano</option>
+          <option value="es">Castellano (España)</option>
+        </select>
+        <select id="orden" aria-label="Ordenar">
+          <option value="fila">Por fila</option>
+          <option value="grave">Lo más grave primero</option>
+        </select>
+        <select id="estadoF" aria-label="Arreglados o pendientes">
+          <option value="todos">Pendientes y arreglados</option>
+          <option value="pendientes">Solo pendientes</option>
+          <option value="arreglados">Solo arreglados</option>
+        </select>
+      </div>
+      <div id="chips" class="chips"></div>
+      <div id="lista"></div>
+    </div>
+
+    <div id="vTerm" class="oculto">
+      <p class="nota">Nombres propios del guion y sus guías de pronunciación. Una guía en ámbar significa que el mismo nombre se escribe con dos guías distintas.</p>
+      <div class="envoltorio"><table class="t"><thead><tr><th>Nombre</th><th>Guía de pronunciación</th><th class="n">Veces</th><th class="n">Sin guía</th><th>Primera vez</th></tr></thead><tbody id="terminos"></tbody></table></div>
+    </div>
+
+    <div id="vProbar" class="oculto"></div>
+
+    <div id="vReglas" class="oculto">
+      <div id="reglas" class="reglas"></div>
+      <div class="grupo" style="margin-top:14px">
+        <h3>Mi diccionario</h3>
+        <p class="nota">Palabras que el revisor debe dar por buenas, una por línea. Se guardan en este navegador.</p>
+        <textarea id="propias" spellcheck="false" aria-label="Palabras propias"></textarea>
+        <button id="guardarPropias" class="boton" type="button" style="margin-top:8px">Guardar y volver a revisar</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script id="motor">
+/*@@MOTOR@@*/
+</script>
+<script id="dic-base" type="text/plain">@@DIC_BASE@@</script>
+<script id="dic-extra" type="text/plain">@@DIC_EXTRA@@</script>
+<script id="ocr-lib" type="text/plain">@@OCR_LIB@@</script>
+<script id="ocr-worker" type="text/plain">@@OCR_WORKER@@</script>
+<script id="ocr-core" type="text/plain">@@OCR_CORE@@</script>
+<script id="ocr-spa" type="text/plain">@@OCR_SPA@@</script>
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const M = RevisorASREC;
+
+/* Lo que se recuerda entre visitas, si el navegador deja. */
+const guardado = {
+  leer(k, def){ try{ const v = localStorage.getItem('revisorasrec.' + k); return v == null ? def : JSON.parse(v); }catch(e){ return def; } },
+  poner(k, v){ try{ localStorage.setItem('revisorasrec.' + k, JSON.stringify(v)); }catch(e){} }
+};
+
+const estado = {
+  dic: null, guion: null, res: null, nombre: '',
+  apagadas: new Set(guardado.leer('apagadas', [])),
+  variante: guardado.leer('variante', 'auto'),
+  ignorados: new Set(),
+  sev: new Set(['error', 'aviso', 'sugerencia']),
+  cat: null, q: '', orden: 'fila', limite: 150,
+  arreglados: new Map(), estadoF: 'todos'
+};
+
+/* «✓ Arreglado»: lo que ya se corrigió en el guion. Se guarda en este
+   navegador para cada archivo (nombre, MOVIE ID y versión), así que al volver
+   a abrir el mismo Excel sigue marcado. La clave es la fila, la regla y el
+   sitio del texto: no cambia aunque cambie la redacción de un aviso. */
+const claveA = (h) => h.fila + '|' + h.regla + '|' + h.desde + '|' + h.hasta;
+const llaveArreglos = () => { const i = (estado.guion && estado.guion.info) || {}; return 'arreglos.' + estado.nombre + '|' + (i['MOVIE ID'] || '') + '|' + (i.VERSION || ''); };
+const cargarArreglos = () => { estado.arreglados = new Map(Object.entries(guardado.leer(llaveArreglos(), {}))); };
+const guardarArreglos = () => guardado.poner(llaveArreglos(), Object.fromEntries(estado.arreglados));
+const arreglado = (h) => estado.arreglados.has(claveA(h));
+const cuando = (iso) => new Date(iso).toLocaleString('es', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const SEV = { error: 'Error', aviso: 'Aviso', sugerencia: 'Sugerencia' };
+const claveH = (h) => h.fila + '|' + h.regla + '|' + h.desde + '|' + h.msg;
+
+/* ── El diccionario: va dentro de este archivo, comprimido ── */
+function bytesDe(id){
+  const bin = atob(document.getElementById(id).textContent.trim());
+  const u8 = new Uint8Array(bin.length);
+  for(let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return u8;
+}
+async function textoDe(id){
+  const flujo = new Blob([bytesDe(id)]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Response(flujo).text();
+}
+const descomprimir = async (id) => (await textoDe(id)).split('\n');
+const pastilla = (txt, clase) => { const p = $('#estadoDic'); p.className = 'pastilla ' + (clase || ''); p.lastElementChild.textContent = txt; };
+const dicListo = (async () => {
+  if(typeof DecompressionStream === 'undefined'){
+    pastilla('Navegador sin descompresión: usa Chrome, Edge, Firefox o Safari recientes', 'mal');
+    throw new Error('SIN_DECOMPRESSION');
+  }
+  try{
+    const [base, extra] = await Promise.all([descomprimir('dic-base'), descomprimir('dic-extra')]);
+    estado.dic = M.crearDiccionario(base, extra, guardado.leer('propias', []));
+    pastilla(estado.dic.tamano.toLocaleString('es') + ' palabras', 'listo');
+    return estado.dic;
+  }catch(e){
+    pastilla('No se pudo cargar el diccionario', 'mal');
+    console.error(e);
+    return null;
+  }
+})();
+
+/* ── Abrir el archivo ── */
+async function abrir(file){
+  $('#fallo').textContent = '';
+  if(!file) return;
+  if(/^image\//.test(file.type)){ leerCaptura(file); return; }
+  if(/\.xls$/i.test(file.name)){ $('#fallo').textContent = 'Es un .xls antiguo: ábrelo en Excel y guárdalo como .xlsx.'; return; }
+  try{
+    const buf = await file.arrayBuffer();
+    const hojas = await M.leerLibro(buf);
+    estado.guion = M.extraerGuion(hojas);
+    estado.nombre = file.name;
+    estado.ignorados = new Set();
+    cargarArreglos();
+    await dicListo.catch(() => null);
+    revisar();
+    $('#vProbar').appendChild($('#probar'));
+    $('#inicio').classList.add('oculto');
+    $('#panel').classList.remove('oculto');
+    window.scrollTo(0, 0);
+  }catch(e){
+    console.error(e);
+    $('#fallo').textContent = e.message === 'SIN_DIALOGUE' ? 'No encuentro la hoja «Dialogue List» ni una columna DIALOGUE.'
+      : e.message === 'NO_ES_XLSX' ? 'Esto no parece un .xlsx. Guárdalo desde Excel como «Libro de Excel (.xlsx)».'
+      : e.message === 'SIN_DECOMPRESSION' ? 'Este navegador no sabe descomprimir: usa Chrome, Edge, Firefox o Safari recientes.'
+      : 'No se pudo leer el archivo: ' + e.message;
+  }
+}
+
+function revisar(){
+  const g = estado.guion;
+  estado.res = M.revisar(g, estado.dic, { variante: estado.variante, apagadas: estado.apagadas });
+  const info = g.info || {};
+  $('#titulo').textContent = info['EPISODE TITLE'] || info['SHOW TITLE'] || estado.nombre;
+  const vari = { latam: 'español latinoamericano', es: 'castellano' }[estado.res.variante];
+  $('#meta').textContent = [estado.nombre, g.filas.length + ' filas en «' + g.hoja + '»', info.VERSION && 'versión ' + info.VERSION,
+    vari + (estado.variante === 'auto' ? ' (detectado)' : ''), !estado.dic && 'sin diccionario'].filter(Boolean).join(' · ');
+  if(g.faltan.length) $('#meta').textContent += ' · faltan las columnas: ' + g.faltan.join(', ');
+  $('#variante').value = estado.variante;
+  estado.contexto = M.contexto(estado.res, g);
+  pintarTodo();
+  probar();
+}
+
+/* ── Pintar ── */
+const visibles = () => estado.res.hallazgos.filter(h => !estado.ignorados.has(claveH(h)));
+
+function pintarTodo(){
+  const hs = visibles();
+  const n = (s) => hs.filter(h => h.sev === s).length;
+  $('#nError').textContent = n('error');
+  $('#nAviso').textContent = n('aviso');
+  $('#nSug').textContent = n('sugerencia');
+  $('#nFilas').textContent = new Set(hs.map(h => h.i)).size;
+  const hechos = hs.filter(arreglado).length;
+  const pend = (s) => hs.filter(h => h.sev === s && !arreglado(h)).length;
+  const etiqueta = (id, nombre, s) => { const el = document.querySelector('#' + id).nextElementSibling; el.textContent = nombre + (hechos ? (pend(s) ? ' · ' + pend(s) + ' pendiente' + (pend(s) > 1 ? 's' : '') : ' · todo arreglado') : ''); };
+  etiqueta('nError', 'errores', 'error'); etiqueta('nAviso', 'avisos', 'aviso'); etiqueta('nSug', 'sugerencias', 'sugerencia');
+  const pct = hs.length ? Math.round(hechos / hs.length * 100) : 0;
+  $('#progreso').innerHTML = hs.length ? '<span><b>' + hechos + '</b> de ' + hs.length + ' arreglados · <b>' + (hs.length - hechos) + '</b> pendientes</span>'
+    + '<span class="barra" aria-hidden="true"><i style="width:' + pct + '%"></i></span><span>' + pct + ' %</span>' : '';
+  pintarChips(hs);
+  pintarLista();
+  pintarTerminos();
+  pintarReglas();
+}
+
+function pintarChips(hs){
+  const cuenta = {};
+  for(const h of hs) if(estado.sev.has(h.sev)) cuenta[h.cat] = (cuenta[h.cat] || 0) + 1;
+  const total = Object.values(cuenta).reduce((a, b) => a + b, 0);
+  let html = '<button class="chip" type="button" data-cat="" aria-pressed="' + !estado.cat + '">Todo<b>' + total + '</b></button>';
+  for(const [k, nombre] of Object.entries(M.CATEGORIAS)) if(cuenta[k])
+    html += '<button class="chip" type="button" data-cat="' + k + '" aria-pressed="' + (estado.cat === k) + '">' + esc(nombre) + '<b>' + cuenta[k] + '</b></button>';
+  $('#chips').innerHTML = html;
+}
+
+/** El texto con sus fragmentos marcados. Si dos marcas se pisan, gana la más grave. */
+function resaltar(texto, hs){
+  const peso = { error: 3, aviso: 2, sugerencia: 1 };
+  const nivel = new Array(texto.length).fill(0);
+  for(const h of hs) if(h.desde >= 0 && h.donde == null) for(let k = h.desde; k < Math.min(h.hasta, texto.length); k++) nivel[k] = Math.max(nivel[k], peso[h.sev]);
+  const nombre = ['', 'sugerencia', 'aviso', 'error'];
+  const visible = (c) => c === '\u200B' ? '<span class="inv" title="Espacio de ancho cero">ZW</span>'
+    : /[\u200C\u200D\u2060\uFEFF\u00AD]/.test(c) ? '<span class="inv" title="Carácter invisible">INV</span>'
+    : /[\u00A0\u2000-\u200A\u202F\u3000]/.test(c) ? '<span class="inv" title="Espacio especial">ESP</span>' : esc(c);
+  let out = '', k = 0;
+  while(k < texto.length){
+    const n = nivel[k];
+    let j = k;
+    let trozo = '';
+    while(j < texto.length && nivel[j] === n) trozo += visible(texto[j++]);
+    out += n ? '<mark class="' + nombre[n] + '">' + trozo + '</mark>' : trozo;
+    k = j;
+  }
+  return out;
+}
+
+/** Las filas de antes y de después que explican un aviso de puntuación. */
+function vecinasHtml(filas, hs, i, despues, rotulo){
+  const ids = Array.from(new Set(hs.flatMap(h => h.vecinas || []))).filter(j => despues ? j > i : j < i).sort((a, b) => a - b);
+  return ids.map(j => { const g = filas[j]; return '<p class="vecina"><b>' + esc(rotulo(g)) + '</b>' + esc(g.dialogo) + '</p>'; }).join('');
+}
+
+function pintarLista(){
+  const q = estado.q.trim().toLowerCase();
+  const filas = estado.res.filas;
+  const porFila = new Map();
+  for(const h of visibles()){
+    if(!estado.sev.has(h.sev) || estado.cat && h.cat !== estado.cat) continue;
+    if(estado.estadoF === 'pendientes' && arreglado(h) || estado.estadoF === 'arreglados' && !arreglado(h)) continue;
+    const f = filas[h.i];
+    if(q && !(f.dialogo.toLowerCase().includes(q) || f.source.toLowerCase().includes(q) || h.msg.toLowerCase().includes(q) || String(h.fila) === q)) continue;
+    if(!porFila.has(h.i)) porFila.set(h.i, []);
+    porFila.get(h.i).push(h);
+  }
+  let grupos = Array.from(porFila.entries());
+  if(estado.orden === 'grave'){
+    const p = (hs) => hs.reduce((s, h) => s + ({ error: 100, aviso: 10, sugerencia: 1 })[h.sev], 0);
+    grupos.sort((a, b) => p(b[1]) - p(a[1]) || a[0] - b[0]);
+  }
+  if(!grupos.length){
+    $('#lista').innerHTML = '<p class="vacio">' + (!estado.res.hallazgos.length ? 'Ningún problema encontrado. 🎉'
+      : estado.estadoF === 'pendientes' && visibles().every(arreglado) ? 'Todo arreglado. 🎉' : 'Nada con estos filtros.') + '</p>';
+    return;
+  }
+  const html = grupos.slice(0, estado.limite).map(([i, hs]) => {
+    const f = filas[i];
+    const otra = hs.filter(h => h.donde).map(h => h.donde === 'source' ? 'SOURCE: «' + esc(f.source).replace(/ /g, '·') + '»'
+      : h.donde === 'tc' ? 'TC: ' + esc(f.tcIn) + ' → ' + esc(f.tcOut) : 'SOURCE ONSCREEN: ' + esc(f.pantalla));
+    const todos = hs.every(arreglado);
+    return '<article class="fila' + (todos ? ' toda-hecha' : '') + '" data-i="' + i + '">'
+      + '<div class="cab"><span class="num">Fila ' + f.fila + '</span><span class="tc">' + esc(f.tcIn) + '</span><span class="pj">' + esc(f.source.trim()) + '</span>'
+      + (f.tags ? '<span>' + esc(f.tags) + '</span>' : '') + '<button class="copiar" type="button" data-a="copiar">Copiar diálogo</button>'
+      + (hs.length > 1 && !todos ? '<button class="fila-hecha" type="button" data-a="filaHecha">✓ Toda la fila arreglada</button>' : '') + '</div>'
+      + vecinasHtml(filas, hs, i, false, (g) => 'Fila ' + g.fila + ' · ' + g.source.trim())
+      + '<p class="dlg">' + (f.dialogo ? resaltar(f.dialogo, hs) : '<i style="color:var(--muted)">(vacía)</i>') + '</p>'
+      + vecinasHtml(filas, hs, i, true, (g) => 'Fila ' + g.fila + ' · ' + g.source.trim())
+      + (otra.length ? '<p class="otra">' + Array.from(new Set(otra)).join(' · ') + '</p>' : '')
+      + '<ul class="hall">' + hs.map(h => {
+        const r = M.REGLAS[h.regla];
+        const hecho = estado.arreglados.get(claveA(h));
+        return '<li data-k="' + esc(claveH(h)) + '" data-ka="' + esc(claveA(h)) + '"' + (hecho ? ' class="hecho"' : '') + '><span class="sev ' + h.sev + '">' + SEV[h.sev] + '</span>'
+          + '<div class="txt">' + esc(h.msg) + (h.sug ? ' <span class="sug">' + esc(ROTULO[h.regla] || h.sug) + '</span>' : '')
+          + '<small>' + esc(M.CATEGORIAS[r.cat]) + ' · ' + esc(r.titulo) + ' · ' + esc(r.fuente) + '</small></div>'
+          + '<div class="acc">' + (hecho
+            ? '<span class="marca-hecho">✓ Arreglado ' + esc(cuando(hecho)) + '</span><button class="mini" type="button" data-a="deshacer">Deshacer</button>'
+            : '<button class="mini hecho-btn" type="button" data-a="hecho">✓ Arreglado</button>'
+              + (h.palabra ? '<button class="mini" type="button" data-a="dic" data-w="' + esc(h.palabra) + '">Añadir al diccionario</button>' : '')
+              + '<button class="mini" type="button" data-a="ign">Ignorar</button>'
+              + '<button class="mini" type="button" data-a="regla" data-r="' + h.regla + '">Apagar regla</button>') + '</div></li>';
+      }).join('') + '</ul></article>';
+  }).join('');
+  $('#lista').innerHTML = html + (grupos.length > estado.limite ? '<button id="mas" class="boton mas" type="button">Ver ' + Math.min(150, grupos.length - estado.limite) + ' filas más (quedan ' + (grupos.length - estado.limite) + ')</button>' : '');
+}
+
+function pintarTerminos(){
+  const ts = estado.res.terminos;
+  $('#terminos').innerHTML = ts.length ? ts.map(t => '<tr><td><b>' + esc(t.termino) + '</b></td><td>'
+    + (t.guias.length ? t.guias.map(g => '<span class="g' + (t.guias.length > 1 ? ' mal' : '') + '">(' + esc(g.guia) + ') ×' + g.veces + '</span>').join('') : '<span class="nota">sin guía</span>')
+    + '</td><td class="n">' + t.veces + '</td><td class="n">' + (t.guias.length ? t.sinGuia || '' : '') + '</td>'
+    + '<td><span class="tc" style="font-family:var(--mono);font-size:13px">' + esc(t.primera ? t.primera.tc : '') + '</span>' + (t.primera ? ' <span class="nota">fila ' + t.primera.fila + '</span>' : '') + '</td></tr>').join('')
+    : '<tr><td colspan="5" class="nota">No hay nombres propios ni guías de pronunciación.</td></tr>';
+}
+
+function pintarReglas(){
+  const cuenta = {};
+  for(const h of estado.res ? visibles() : []) cuenta[h.regla] = (cuenta[h.regla] || 0) + 1;
+  let html = '';
+  for(const [cat, nombre] of Object.entries(M.CATEGORIAS)){
+    html += '<div class="grupo"><h3>' + esc(nombre) + '</h3>';
+    for(const r of Object.values(M.REGLAS).filter(r => r.cat === cat))
+      html += '<label class="regla"><input type="checkbox" data-r="' + r.id + '"' + (estado.apagadas.has(r.id) ? '' : ' checked') + '>'
+        + '<span><b>' + esc(r.titulo) + '</b><span class="fuente">' + esc(r.fuente) + '</span>' + (cuenta[r.id] ? '<span class="cuantas">' + cuenta[r.id] + '</span>' : '')
+        + '<p>' + esc(r.desc) + '</p></span></label>';
+    html += '</div>';
+  }
+  $('#reglas').innerHTML = html;
+  if(estado.dic) $('#propias').value = Array.from(estado.dic.propias).sort((a, b) => a.localeCompare(b, 'es')).join('\n');
+}
+
+/* ── Probar un diálogo ──
+   Cada línea es un evento. Si hay un Excel abierto, se compara con él: sus
+   nombres, sus guías de pronunciación y su título. */
+const NO_APLICA = new Set(['signosPares', 'sensible', 'titulo', 'anotacion', 'reaccionBorde', 'reaccionIngles', 'vosotros', 'unPersonaje']);
+/* Las que reescriben la última letra («ver» → «ver…»): el botón dice qué hace. */
+const ROTULO = { sinFinal: 'Poner punto final', contFin: 'Terminar con «…»', contIni: 'Empezar con «…»', barra: 'Quitar la «/»', guiaPronunciacion: 'Quitar la guía' };
+let pRes = null;
+
+function probar(){
+  const texto = $('#pTexto').value;
+  const ver = $('#pVeredicto');
+  $('#pCtx').textContent = estado.guion ? ' Se compara con los nombres y las guías de «' + ($('#titulo').textContent || estado.nombre) + '».' : '';
+  if(!texto.trim()){ ver.classList.add('oculto'); $('#pResultado').innerHTML = ''; pRes = null; return; }
+  if(!estado.dic){ ver.className = 'veredicto casi'; ver.textContent = 'Cargando diccionario…'; return; }
+  pRes = M.revisarTexto(texto, estado.dic, { variante: estado.variante, apagadas: estado.apagadas, contexto: estado.contexto });
+  const hs = pRes.hallazgos;
+  const n = (s) => hs.filter(h => h.sev === s).length;
+  const partes = [n('error') && n('error') + ' error' + (n('error') > 1 ? 'es' : ''), n('aviso') && n('aviso') + ' aviso' + (n('aviso') > 1 ? 's' : ''),
+                  n('sugerencia') && n('sugerencia') + ' sugerencia' + (n('sugerencia') > 1 ? 's' : '')].filter(Boolean);
+  ver.className = 'veredicto ' + (n('error') ? 'mal' : n('aviso') ? 'casi' : 'bien');
+  ver.textContent = n('error') || n('aviso') ? '✗ Hay que corregir: ' + partes.join(' · ') : '✓ Está bien' + (partes.length ? ' · ' + partes.join(' · ') : '');
+  const varias = pRes.filas.length > 1;
+  $('#pResultado').innerHTML = pRes.filas.map((f, i) => {
+    const suyos = hs.filter(h => h.i === i);
+    const lugar = varias ? 'Línea ' + f.fila : 'El diálogo';
+    if(!suyos.length) return '<div class="linea-ok"><b>✓</b>' + lugar + ': sin problemas.</div>';
+    const rot = (g) => 'Línea ' + g.fila + (g.source !== 'PRUEBA' ? ' · ' + g.source : '');
+    return '<article class="fila"><div class="cab"><span class="num">' + lugar + (f.source !== 'PRUEBA' ? ' · ' + esc(f.source) : '') + '</span></div>'
+      + vecinasHtml(pRes.filas, suyos, i, false, rot)
+      + '<p class="dlg">' + resaltar(f.dialogo, suyos) + '</p>'
+      + vecinasHtml(pRes.filas, suyos, i, true, rot) + '<ul class="hall">' + suyos.map(h => {
+        const r = M.REGLAS[h.regla];
+        const opciones = h.sug && h.desde >= 0 && !NO_APLICA.has(h.regla) ? h.sug.split(/ · | \/ /).filter(Boolean) : [];
+        const k = hs.indexOf(h);
+        return '<li><span class="sev ' + h.sev + '">' + SEV[h.sev] + '</span><div class="txt">' + esc(h.msg.replace(/\bfila(s?)\b/g, 'línea$1'))
+          + (h.sug && !opciones.length ? ' <span class="sug">' + esc(h.sug) + '</span>' : '')
+          + '<small>' + esc(M.CATEGORIAS[r.cat]) + ' · ' + esc(r.titulo) + ' · ' + esc(r.fuente) + '</small></div><div class="acc">'
+          + opciones.map((o, j) => '<button class="mini usar" type="button" data-h="' + k + '" data-o="' + j + '">' + esc(ROTULO[h.regla] || (o === 'borrar' ? 'Borrar' : 'Usar «' + o.replace(/\u00A0/g, ' ') + '»')) + '</button>').join('')
+          + (h.palabra ? '<button class="mini" type="button" data-a="dic" data-w="' + esc(h.palabra) + '">Añadir al diccionario</button>' : '')
+          + '</div></li>';
+      }).join('') + '</ul></article>';
+  }).join('');
+}
+
+let esperaP;
+$('#pTexto').addEventListener('input', () => { clearTimeout(esperaP); esperaP = setTimeout(probar, 180); });
+dicListo.then(probar, () => {});
+$('#pResultado').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if(!b || !pRes) return;
+  if(b.dataset.a === 'dic' && estado.dic){
+    estado.dic.poner(b.dataset.w);
+    guardado.poner('propias', Array.from(estado.dic.propias));
+    if(estado.guion) revisar(); else probar();
+    return;
+  }
+  const h = pRes.hallazgos[+b.dataset.h];
+  if(!h) return;
+  let o = h.sug.split(/ · | \/ /).filter(Boolean)[+b.dataset.o];
+  if(o === 'borrar') o = ''; else if(o === 'espacio normal') o = ' ';
+  const base = pRes.lineas[h.i].desde;
+  const area = $('#pTexto');
+  area.value = area.value.slice(0, base + h.desde) + o + area.value.slice(base + h.hasta);
+  probar();
+  area.focus();
+});
+
+/* ── Leer una captura ──
+   Tesseract.js va dentro del archivo y no descarga nada. El trabajador es un
+   solo blob con tres trozos:
+     1. el núcleo WebAssembly, ya cargado (por eso importScripts, que lo
+        pediría a internet, se deja vacío);
+     2. el español, y un fetch que lo sirve cuando el lector lo pide;
+     3. el lector de Tesseract.js.
+   Esta versión no acepta el idioma como datos en createWorker: lo pide por
+   su nombre a una dirección, y esa petición es la que se contesta aquí. */
+let lector = null;
+function cargarLector(){
+  if(lector) return lector;
+  lector = (async () => {
+    const [lib, trabajador, nucleo] = await Promise.all([textoDe('ocr-lib'), textoDe('ocr-worker'), textoDe('ocr-core')]);
+    if(!window.Tesseract){ const sc = document.createElement('script'); sc.textContent = lib; document.head.appendChild(sc); }
+    const espanol = document.getElementById('ocr-spa').textContent.trim();
+    const servir = ';self.importScripts = function(){};\n'
+      + 'self.__espanol = "' + espanol + '";\n'
+      + 'self.fetch = function(u){ if(/traineddata/.test(String(u))){ var b = atob(self.__espanol), a = new Uint8Array(b.length);'
+      + ' for(var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return Promise.resolve(new Response(a)); }'
+      + ' return Promise.reject(new Error("Sin internet: " + u)); };\n';
+    const url = URL.createObjectURL(new Blob([nucleo, '\n', servir, trabajador], { type: 'text/javascript' }));
+    let fallo;
+    const plazo = new Promise((_, no) => { fallo = no; setTimeout(() => no(new Error('el lector no arrancó')), 90000); });
+    return Promise.race([plazo, Tesseract.createWorker('spa', 1, {
+      workerPath: url, workerBlobURL: false, corePath: 'incluido', langPath: 'https://sin-internet.invalid', cacheMethod: 'none', gzip: true,
+      errorHandler: (e) => fallo(e instanceof Error ? e : new Error(String(e))),
+      logger: (m) => { if(m.status === 'recognizing text') ocrEstado('Leyendo la captura…', m.progress); }
+    })]);
+  })();
+  lector.catch(() => { lector = null; });
+  return lector;
+}
+
+function ocrEstado(texto, progreso, mal){
+  const e = $('#pOCR');
+  e.className = mal ? 'mal' : '';
+  e.innerHTML = esc(texto) + (progreso != null ? ' <span class="barra-ocr" style="display:inline-block;width:140px;vertical-align:middle"><i style="width:' + Math.round(progreso * 100) + '%"></i></span>' : '');
+}
+
+/** La imagen, preparada para leer: en gris, ampliada si es pequeña y en
+ *  negativo si es oscura (las herramientas de doblaje suelen ir en modo
+ *  oscuro, y el lector lee mejor letra oscura sobre fondo claro). */
+async function prepararImagen(file){
+  const img = await createImageBitmap(file);
+  const escala = Math.min(3, Math.max(1, 1800 / img.width));
+  const c = document.createElement('canvas');
+  c.width = Math.round(img.width * escala); c.height = Math.round(img.height * escala);
+  const x = c.getContext('2d', { willReadFrequently: true });
+  x.imageSmoothingQuality = 'high';
+  x.drawImage(img, 0, 0, c.width, c.height);
+  const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+  let suma = 0;
+  for(let i = 0; i < p.length; i += 4){ const g = 0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]; p[i] = p[i + 1] = p[i + 2] = g; suma += g; }
+  if(suma / (p.length / 4) < 128) for(let i = 0; i < p.length; i += 4) p[i] = p[i + 1] = p[i + 2] = 255 - p[i];
+  x.putImageData(d, 0, 0);
+  return c;
+}
+
+/** Las rayas horizontales de una tabla: filas de píxeles con un trazo
+ *  continuo más oscuro que el fondo a lo largo de casi todo el ancho. Una
+ *  línea de texto tiene muchos puntos oscuros, pero sueltos. Separan las
+ *  filas del guion aunque una casilla tenga dos líneas de texto. */
+function rayasDe(c){
+  const w = c.width, h = c.height;
+  const p = c.getContext('2d').getImageData(0, 0, w, h).data;
+  const hist = new Uint32Array(256);
+  for(let i = 0; i < p.length; i += 16) hist[p[i]]++;
+  let fondo = 0;
+  for(let v = 1; v < 256; v++) if(hist[v] > hist[fondo]) fondo = v;
+  const rayas = [];
+  let ini = -1;
+  for(let y = 0; y <= h; y++){
+    let tramo = 0, mayor = 0;
+    if(y < h) for(let i = y * w * 4, f = i + w * 4; i < f; i += 4){
+      if(p[i] < fondo - 12){ if(++tramo > mayor) mayor = tramo; } else tramo = 0;
+    }
+    const es = y < h && mayor > w * 0.4;
+    if(es && ini < 0) ini = y;
+    if(!es && ini >= 0){ if(y - ini <= 6) rayas.push((ini + y - 1) / 2); ini = -1; }
+  }
+  return rayas;
+}
+
+async function leerCaptura(file){
+  if(!file || !/^image\//.test(file.type)) return;
+  if($('#inicio').classList.contains('oculto')) document.querySelector('.pestanas [data-v="vProbar"]').click();
+  $('#probar').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  try{
+    ocrEstado('Preparando el lector…', 0);
+    const [w, lienzo] = await Promise.all([cargarLector(), prepararImagen(file)]);
+    ocrEstado('Leyendo la captura…', 0);
+    const { data } = await w.recognize(lienzo);
+    /* Solo el personaje y su línea de diálogo, en este orden:
+       1. tarjetas de la herramienta de Netflix, o tabla con cabecera
+          (SOURCE / DIALOGUE), con la lectura normal, por bloque;
+       2. tabla sin cabecera: se vuelve a leer en modo automático, que separa
+          las columnas (por bloque, las casillas de dos líneas se mezclan);
+       3. si no es nada de eso, línea a línea. */
+    const rayas = rayasDe(lienzo);
+    let tabla = M.ordenarTarjetas(data.lines || [], estado.dic, rayas);
+    if(!tabla){ const t = M.ordenarCaptura(data.words || [], estado.dic, rayas); if(t && t.como === 'cabecera') tabla = t; }
+    if(!tabla){
+      ocrEstado('Buscando las columnas…', 0);
+      await w.setParameters({ tessedit_pageseg_mode: '3' });
+      try{ tabla = M.ordenarCaptura((await w.recognize(lienzo)).data.words || [], estado.dic, rayas); }
+      finally{ await w.setParameters({ tessedit_pageseg_mode: '6' }); }
+    }
+    const texto = tabla ? tabla.texto : M.limpiarCaptura(data.text);
+    if(!texto.trim()){ ocrEstado('No encontré texto en la imagen.', null, true); return; }
+    const area = $('#pTexto');
+    area.value = area.value.trim() ? area.value.replace(/\s*$/, '') + '\n' + texto : texto;
+    const n = tabla ? tabla.eventos.length : texto.split('\n').length;
+    const pjs = tabla ? new Set(tabla.eventos.map(e => e.personaje).filter(Boolean)).size : 0;
+    ocrEstado('Leída' + (tabla ? ': ' + n + ' diálogo' + (n > 1 ? 's' : '') + (pjs ? ' de ' + pjs + ' personaje' + (pjs > 1 ? 's' : '') : '')
+      + (tabla.como === 'tarjetas' ? ' (personaje y línea de cada tarjeta)' : tabla.como === 'cabecera' ? ' (columnas del personaje y del diálogo)' : '') : '') + '. Repasa el texto: al leer una imagen se pueden confundir tildes, «¿¡» o «…».');
+    probar();
+  }catch(e){
+    console.error(e);
+    ocrEstado(/SIMD|WebAssembly|wasm/i.test(String(e && e.message || e)) ? 'Este navegador no puede ejecutar el lector: usa Chrome, Edge, Firefox o Safari recientes.' : 'No se pudo leer la captura: ' + (e && e.message || e), null, true);
+  }
+}
+
+$('#pImagen').addEventListener('change', (e) => { leerCaptura(e.target.files[0]); e.target.value = ''; });
+document.addEventListener('paste', (e) => {
+  const img = Array.from(e.clipboardData ? e.clipboardData.items : []).find(it => it.kind === 'file' && /^image\//.test(it.type));
+  if(!img) return;
+  e.preventDefault();
+  leerCaptura(img.getAsFile());
+});
+const zonaP = $('#probar');
+['dragenter', 'dragover'].forEach(t => zonaP.addEventListener(t, (e) => { if(Array.from(e.dataTransfer.items || []).some(it => it.kind === 'file')){ e.preventDefault(); e.stopPropagation(); zonaP.classList.add('encima'); } }));
+['dragleave', 'drop'].forEach(t => zonaP.addEventListener(t, () => zonaP.classList.remove('encima')));
+zonaP.addEventListener('drop', (e) => {
+  const f = e.dataTransfer.files[0];
+  if(f && /^image\//.test(f.type)){ e.preventDefault(); e.stopPropagation(); leerCaptura(f); }
+});
+
+/* ── Exportar ── */
+function informe(){
+  const r = estado.res, g = estado.guion;
+  const hs = visibles();
+  const hall = [['Timecode inicial', 'Fila', 'Estado', 'Arreglado el', 'Personaje', 'Diálogo', 'Gravedad', 'Categoría', 'Regla', 'Fuente', 'Problema', 'Fragmento', 'Sugerencia']];
+  for(const h of hs){
+    const f = r.filas[h.i], regla = M.REGLAS[h.regla], hecho = estado.arreglados.get(claveA(h));
+    hall.push([f.tcIn, h.fila, hecho ? 'Arreglado' : 'Pendiente', hecho ? new Date(hecho).toLocaleString('es') : '', f.source.trim(), f.dialogo, SEV[h.sev], M.CATEGORIAS[regla.cat], regla.titulo, regla.fuente, h.msg,
+      h.desde >= 0 && !h.donde ? f.dialogo.slice(h.desde, h.hasta) : h.donde === 'source' ? f.source : '', h.sug]);
+  }
+  const term = [['Nombre', 'Guías de pronunciación', 'Veces', 'Sin guía', 'Timecode inicial (primera vez)', 'Fila']];
+  for(const t of r.terminos) term.push([t.termino, t.guias.map(x => '(' + x.guia + ') ×' + x.veces).join('  '), t.veces, t.guias.length ? t.sinGuia : 0,
+    t.primera ? t.primera.tc : '', t.primera ? t.primera.fila : '']);
+  const res = [['Concepto', 'Valor'], ['Archivo', estado.nombre], ['Serie', g.info['SHOW TITLE'] || ''], ['Episodio', g.info['EPISODE TITLE'] || ''],
+    ['Versión', g.info.VERSION || ''], ['Filas revisadas', g.filas.length], ['Variante', r.variante === 'es' ? 'Castellano' : 'Latinoamérica'],
+    ['Errores', hs.filter(h => h.sev === 'error').length], ['Avisos', hs.filter(h => h.sev === 'aviso').length], ['Sugerencias', hs.filter(h => h.sev === 'sugerencia').length],
+    ['Arreglados', hs.filter(arreglado).length], ['Pendientes', hs.filter(h => !arreglado(h)).length],
+    ['Errores pendientes', hs.filter(h => h.sev === 'error' && !arreglado(h)).length],
+    ['Ignorados a mano', r.hallazgos.length - hs.length], ['Reglas apagadas', Array.from(estado.apagadas).map(id => M.REGLAS[id] ? M.REGLAS[id].titulo : id).join(', ')],
+    ['Fecha', new Date().toLocaleString('es')]];
+  const blob = M.xlsx([
+    { nombre: 'Hallazgos', filas: hall, anchos: [16, 7, 12, 18, 22, 60, 11, 18, 26, 12, 60, 24, 30] },
+    { nombre: 'Nombres y guías', filas: term, anchos: [22, 50, 8, 9, 26, 7] },
+    { nombre: 'Resumen', filas: res, anchos: [20, 70] }
+  ]);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = estado.nombre.replace(/\.[^.]+$/, '') + '_REVISION_ASREC.xlsx';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ── Eventos ── */
+const zona = $('#soltar');
+['dragenter', 'dragover'].forEach(t => zona.addEventListener(t, (e) => { e.preventDefault(); zona.classList.add('encima'); }));
+['dragleave', 'drop'].forEach(t => zona.addEventListener(t, (e) => { e.preventDefault(); zona.classList.remove('encima'); }));
+zona.addEventListener('drop', (e) => abrir(e.dataTransfer.files[0]));
+document.addEventListener('dragover', (e) => e.preventDefault());
+document.addEventListener('drop', (e) => { e.preventDefault(); if(e.dataTransfer.files[0]) abrir(e.dataTransfer.files[0]); });
+$('#archivo').addEventListener('change', (e) => { abrir(e.target.files[0]); e.target.value = ''; });
+$('#otro').addEventListener('click', () => $('#archivo').click());
+$('#xlsx').addEventListener('click', informe);
+$('#imprimir').addEventListener('click', () => { estado.limite = 1e9; pintarLista(); window.print(); });
+
+document.querySelectorAll('.cifra').forEach(b => b.addEventListener('click', () => {
+  const s = b.dataset.sev;
+  if(s === 'todas') estado.sev = new Set(['error', 'aviso', 'sugerencia']);
+  else if(estado.sev.size === 3) estado.sev = new Set([s]);
+  else if(estado.sev.has(s) && estado.sev.size > 1) estado.sev.delete(s);
+  else estado.sev.add(s);
+  document.querySelectorAll('.cifra').forEach(c => c.setAttribute('aria-pressed', c.dataset.sev === 'todas' ? estado.sev.size === 3 : estado.sev.has(c.dataset.sev)));
+  estado.limite = 150; pintarChips(visibles()); pintarLista();
+}));
+$('#chips').addEventListener('click', (e) => {
+  const b = e.target.closest('.chip'); if(!b) return;
+  estado.cat = b.dataset.cat || null; estado.limite = 150;
+  pintarChips(visibles()); pintarLista();
+});
+let espera;
+$('#buscar').addEventListener('input', (e) => { clearTimeout(espera); espera = setTimeout(() => { estado.q = e.target.value; estado.limite = 150; pintarLista(); }, 150); });
+$('#variante').addEventListener('change', (e) => { estado.variante = e.target.value; guardado.poner('variante', estado.variante); revisar(); });
+$('#orden').addEventListener('change', (e) => { estado.orden = e.target.value; pintarLista(); });
+$('#estadoF').addEventListener('change', (e) => { estado.estadoF = e.target.value; estado.limite = 150; pintarLista(); });
+
+$('#lista').addEventListener('click', async (e) => {
+  const b = e.target.closest('button'); if(!b) return;
+  if(b.id === 'mas'){ estado.limite += 150; pintarLista(); return; }
+  const art = b.closest('.fila'), li = b.closest('li');
+  if(b.dataset.a === 'copiar'){
+    const t = estado.res.filas[+art.dataset.i].dialogo;
+    try{ await navigator.clipboard.writeText(t); b.textContent = 'Copiado'; }catch(err){ b.textContent = 'No se pudo copiar'; }
+    setTimeout(() => { b.textContent = 'Copiar diálogo'; }, 1400);
+  }else if(b.dataset.a === 'hecho' || b.dataset.a === 'deshacer' || b.dataset.a === 'filaHecha'){
+    const ahora = new Date().toISOString();
+    if(b.dataset.a === 'hecho') estado.arreglados.set(li.dataset.ka, ahora);
+    else if(b.dataset.a === 'deshacer') estado.arreglados.delete(li.dataset.ka);
+    else art.querySelectorAll('li[data-ka]').forEach(x => { if(!estado.arreglados.has(x.dataset.ka)) estado.arreglados.set(x.dataset.ka, ahora); });
+    guardarArreglos();
+    pintarTodo();
+  }else if(b.dataset.a === 'ign'){
+    estado.ignorados.add(li.dataset.k); pintarTodo();
+  }else if(b.dataset.a === 'dic' && estado.dic){
+    estado.dic.poner(b.dataset.w);
+    guardado.poner('propias', Array.from(estado.dic.propias));
+    revisar();
+  }else if(b.dataset.a === 'regla'){
+    estado.apagadas.add(b.dataset.r);
+    guardado.poner('apagadas', Array.from(estado.apagadas));
+    revisar();
+  }
+});
+$('#reglas').addEventListener('change', (e) => {
+  const c = e.target.closest('input[data-r]'); if(!c) return;
+  if(c.checked) estado.apagadas.delete(c.dataset.r); else estado.apagadas.add(c.dataset.r);
+  guardado.poner('apagadas', Array.from(estado.apagadas));
+  revisar();
+});
+$('#guardarPropias').addEventListener('click', () => {
+  if(!estado.dic) return;
+  for(const w of Array.from(estado.dic.propias)) estado.dic.quitar(w);
+  for(const w of $('#propias').value.split(/\r?\n/)) estado.dic.poner(w);
+  guardado.poner('propias', Array.from(estado.dic.propias));
+  if(estado.guion) revisar();
+});
+document.querySelector('.pestanas').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-v]'); if(!b) return;
+  document.querySelectorAll('.pestanas button').forEach(x => x.setAttribute('aria-selected', x === b));
+  for(const id of ['vHall', 'vTerm', 'vProbar', 'vReglas']) $('#' + id).classList.toggle('oculto', id !== b.dataset.v);
+  if(b.dataset.v === 'vProbar') $('#pTexto').focus();
+});
+$('#tema').addEventListener('click', () => {
+  const r = document.documentElement;
+  const oscuro = r.dataset.theme ? r.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  r.dataset.theme = oscuro ? 'light' : 'dark';
+  guardado.poner('tema', r.dataset.theme);
+});
+{ const t = guardado.leer('tema', null); if(t) document.documentElement.dataset.theme = t; }
+</script>
+</body>
+</html>
