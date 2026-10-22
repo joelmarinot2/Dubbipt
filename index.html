@@ -334,6 +334,21 @@ body.talent-wait #talentGate{
 .gbtn:hover{filter:brightness(1.08)}
 .gerr{min-height:16px;font-size:12px;color:#FB7185;text-align:center;margin-top:10px}
 .gcard.shake{animation:gsk .3s}
+/* Verificación en dos pasos (ENT-20) y aviso de inactividad (ENT-21) */
+.mfa-card{width:min(400px,94vw);max-height:calc(100vh - 32px);overflow:auto}
+.mfa-ic{width:52px;height:52px;border-radius:14px;margin:0 auto 12px;display:grid;place-items:center;background:linear-gradient(135deg,var(--violet),#4CB84C);color:#160f33}
+.mfa-card .mfa-codigo{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:22px !important;letter-spacing:8px;text-align:center}
+.mfa-card select{width:100%;background:var(--inset);border:1px solid var(--line-soft);border-radius:10px;padding:10px 12px;color:var(--ink);font-family:var(--body);font-size:14px;outline:none}
+.mfa-pasos{margin:0 0 8px 18px;padding:0;font-size:12.5px;color:var(--ink-dim);line-height:1.5}
+.mfa-pasos li{margin:3px 0}
+.mfa-qr{display:grid;place-items:center;margin:6px auto 10px;background:#fff;border-radius:12px;padding:10px;width:max-content}
+.mfa-qr img{width:180px;height:180px;display:block}
+.gcard .mfa-nota{font-size:11.5px;margin:10px 0 8px}
+.mfa-clave{display:inline-block;margin-top:4px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;letter-spacing:1px;color:var(--ink);background:var(--inset);border:1px solid var(--line-soft);border-radius:8px;padding:5px 8px;word-break:break-all}
+.mfa-card .mfa-salir{display:block;margin:12px auto 0}
+.ses-aviso{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:9999;display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center;
+  max-width:calc(100vw - 32px);background:#1a1508;border:1px solid #FBBF24;color:#FDE68A;border-radius:12px;padding:12px 16px;font-size:13.5px;box-shadow:0 14px 40px rgba(0,0,0,.5)}
+.ses-aviso button{border:none;border-radius:9px;padding:8px 14px;background:#FBBF24;color:#1a1508;font-weight:700;cursor:pointer;font-family:inherit}
 @keyframes gsk{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
 .logout{border:1px solid var(--line-soft);background:var(--inset);color:var(--ink-faint);border-radius:9px;
   padding:7px 11px;font-size:12px;cursor:pointer;font-family:inherit;margin-left:auto;white-space:nowrap}
@@ -3014,7 +3029,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.80.0-nube';
+const APP_VER_NUM = 'v11.81.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3745,20 +3760,281 @@ function enterOffline(){
   window.addEventListener('online', ()=> location.reload());   // al volver la red, reentrar con sesión real
   setTimeout(()=>{ if(typeof libMsg==='function') libMsg('🔌 Modo sin conexión — todo queda guardado en este equipo'); }, 600);
 }
+/* ═══ VERIFICACIÓN EN DOS PASOS Y SESIÓN POR INACTIVIDAD (ENT-20, ENT-21) ══════
+   Pedido de sala: «agregar un autenticador cada vez que se inicia sesión, a
+   todos los usuarios y obligatorio para entrar, y que la sesión tenga un
+   tiempo de inactividad». Lo trae Supabase (MFA con TOTP), sin coste: cada
+   persona, la primera vez, escanea un QR con una app autenticadora (Google
+   Authenticator, Microsoft Authenticator, Authy, 1Password) y desde entonces,
+   después de la contraseña o de Google, escribe el código de 6 dígitos. Sin
+   el código no se entra. Para que tampoco se pueda leer la nube saltándose
+   esta pantalla está sql/seguridad-13-mfa-obligatorio.sql (la nube exige la
+   sesión verificada, «aal2»).
+   Inactividad: SESION_INACTIVIDAD_MIN minutos sin tocar nada -en la ventana,
+   en el libreto o en cualquier ventana de Dubbipt de este equipo- y la sesión
+   se cierra en este equipo, avisando un minuto antes. En las tablets del
+   director y del actor también cuenta como uso lo que llega de la sala (el
+   libreto que se mueve): ahí nadie toca la pantalla durante una toma. */
+
+const SESION_INACTIVIDAD_MIN = 30;
+const SESION_AVISO_S = 60;
+const SESION_KEY = 'ddl_ultima_actividad', SESION_MOTIVO_KEY = 'ddl_sesion_motivo';
+const SESION = { t: 0, guardado: 0, timer: null, aviso: null, avisoTimer: null, saliendo: false, vigilando: false };
+
+/** Alguien ha usado Dubbipt ahora. Se apunta en este equipo (cada 10 s como mucho) para que todas sus ventanas lo sepan. */
+function sesionActividad(forzar){
+  const ahora = Date.now();
+  SESION.t = ahora;
+  if(forzar || ahora - SESION.guardado > 10000){
+    SESION.guardado = ahora;
+    try{ localStorage.setItem(SESION_KEY, String(ahora)); }catch(e){ /* sin almacén: vale la de esta ventana */ }
+  }
+  if(SESION.aviso) sesionQuitarAviso();
+}
+/** Lo que llega de la sala cuenta como uso solo en las tablets: un ordenador olvidado no se mantiene abierto porque otros trabajen. */
+function sesionRemota(){
+  try{ if(typeof DEVROLE !== 'undefined' && (DEVROLE === 'tablet' || DEVROLE === 'talent')) sesionActividad(); }catch(e){ /* sin rol: no cuenta */ }
+}
+function sesionUltima(){
+  let v = 0;
+  try{ v = +localStorage.getItem(SESION_KEY) || 0; }catch(e){ v = 0; }
+  return Math.max(v, SESION.t);
+}
+/** ¿Lleva más del tiempo permitido sin usarse? Sin nada apuntado (la primera vez), no. */
+function sesionCaducada(ahora){
+  const u = sesionUltima();
+  return !!u && (ahora || Date.now()) - u > SESION_INACTIVIDAD_MIN * 60000;
+}
+/** Escuchar el uso en una ventana o documento (la principal, el libreto, las ventanas emergentes). */
+function sesionEscuchar(doc){
+  if(!doc || doc.__ddlSesion) return;
+  try{
+    doc.__ddlSesion = true;
+    const f = () => sesionActividad();
+    ['pointerdown', 'keydown', 'wheel', 'touchstart', 'mousemove', 'scroll'].forEach(ev => doc.addEventListener(ev, f, { passive: true, capture: true }));
+  }catch(e){ /* otro origen: no se puede escuchar */ }
+}
+function sesionEscucharTodo(){
+  sesionEscuchar(document);
+  try{ document.querySelectorAll('iframe').forEach(f => { try{ sesionEscuchar(f.contentDocument); }catch(e){ /* de otro origen */ } }); }catch(e){ /* sin marcos */ }
+  try{ if(typeof pop !== 'undefined' && pop.win && !pop.win.closed) sesionEscuchar(pop.win.document); }catch(e){ /* ventana cerrada o ajena */ }
+  try{ if(typeof pop2 !== 'undefined' && pop2.win && pop2.win !== window && !pop2.win.closed) sesionEscuchar(pop2.win.document); }catch(e){ /* ventana cerrada o ajena */ }
+}
+function sesionQuitarAviso(){
+  clearInterval(SESION.avisoTimer); SESION.avisoTimer = null;
+  if(SESION.aviso){ try{ SESION.aviso.remove(); }catch(e){ /* ya no estaba */ } SESION.aviso = null; }
+}
+function sesionMostrarAviso(){
+  if(SESION.aviso) return;
+  const d = document.createElement('div');
+  d.id = 'sesAviso'; d.className = 'ses-aviso ddl-encima'; d.setAttribute('role', 'alertdialog'); d.setAttribute('aria-live', 'assertive');
+  d.innerHTML = '<span>Tu sesión se cerrará por inactividad en <b id="sesSeg">' + SESION_AVISO_S + '</b> s.</span><button type="button" class="ses-seguir">Seguir conectado</button>';
+  d.querySelector('.ses-seguir').onclick = () => sesionActividad(true);
+  document.body.appendChild(d);
+  SESION.aviso = d;
+  const pintar = () => {
+    const quedan = Math.max(0, Math.ceil((sesionUltima() + SESION_INACTIVIDAD_MIN * 60000 - Date.now()) / 1000));
+    const b = d.querySelector('#sesSeg'); if(b) b.textContent = quedan;
+    if(quedan <= 0) sesionSalir('inactividad');
+  };
+  pintar();
+  SESION.avisoTimer = setInterval(pintar, 1000);
+}
+/** Cerrar la sesión en ESTE equipo (no en los demás del usuario) y volver a la pantalla de acceso. */
+async function sesionSalir(motivo){
+  if(SESION.saliendo) return;
+  SESION.saliendo = true;
+  sesionQuitarAviso();
+  try{ localStorage.setItem(SESION_MOTIVO_KEY, motivo || ''); localStorage.removeItem(SESION_KEY); }catch(e){ /* sin almacén */ }
+  try{ onlineDisconnect(); }catch(e){ /* sin presencia */ }
+  try{ if(sb) await sb.auth.signOut({ scope: 'local' }); }catch(e){ fallo('sb.auth.signOut · sesionSalir', e); }
+  try{ if(typeof pop !== 'undefined' && pop.win && !pop.win.closed) pop.win.close(); }catch(e){ /* ya cerrada */ }
+  location.reload();
+}
+function sesionRevisar(){
+  if(SESION.saliendo || window.OFFLINE) return;
+  sesionEscucharTodo();
+  const quedan = sesionUltima() + SESION_INACTIVIDAD_MIN * 60000 - Date.now();
+  if(quedan <= 0) sesionSalir('inactividad');
+  else if(quedan <= SESION_AVISO_S * 1000) sesionMostrarAviso();
+  else if(SESION.aviso) sesionQuitarAviso();
+}
+/** Empieza a contar al entrar. */
+function sesionVigilar(){
+  if(SESION.vigilando) return;
+  SESION.vigilando = true;
+  sesionActividad(true);
+  sesionEscucharTodo();
+  SESION.timer = setInterval(sesionRevisar, 15000);
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) sesionRevisar(); });
+  /* Otra ventana de Dubbipt cerró la sesión: esta también sale. */
+  window.addEventListener('storage', (ev) => { if(ev.key === SESION_MOTIVO_KEY && ev.newValue) sesionSalir(ev.newValue); });
+}
+/** El aviso de por qué se volvió a la pantalla de acceso (una vez). */
+function sesionMotivoMostrar(){
+  let m = '';
+  try{ m = localStorage.getItem(SESION_MOTIVO_KEY) || ''; localStorage.removeItem(SESION_MOTIVO_KEY); }catch(e){ m = ''; }
+  if(m !== 'inactividad') return;
+  const err = document.getElementById('gErr');
+  if(err){ err.style.color = '#FBBF24'; err.textContent = 'Tu sesión se cerró tras ' + SESION_INACTIVIDAD_MIN + ' minutos sin actividad. Vuelve a entrar.'; }
+}
+
+/* ── El código del autenticador ── */
+
+function mfaTarjeta(html){
+  const gate = document.getElementById('gate'), form = document.getElementById('gform');
+  if(form) form.style.display = 'none';
+  if(gate){ gate.classList.remove('off'); document.body.classList.add('locked'); }
+  let c = document.getElementById('mfaCard');
+  if(!c){ c = document.createElement('div'); c.className = 'gcard mfa-card'; c.id = 'mfaCard'; if(gate) gate.appendChild(c); }
+  c.innerHTML = html;
+  return c;
+}
+function mfaQuitarTarjeta(){
+  const c = document.getElementById('mfaCard'); if(c) c.remove();
+  const f = document.getElementById('gform'); if(f) f.style.display = '';
+}
+const MFA_PIE = '<button type="button" class="gforgot mfa-salir">Usar otra cuenta (cerrar sesión)</button>';
+const mfaEsc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+/** El mensaje de un error de Supabase al verificar, en palabras. */
+function mfaError(e){
+  const m = String((e && (e.message || e.error_description || e.code)) || e || '');
+  if(/invalid|incorrect|expired|mfa_verification_failed/i.test(m)) return 'Código incorrecto o vencido. Escribe el que se ve ahora en la app.';
+  if(/rate|too many|429/i.test(m)) return 'Demasiados intentos. Espera un minuto y vuelve a probar.';
+  if(/network|fetch|failed to fetch/i.test(m)) return 'Sin conexión con el servidor. Revisa la red y vuelve a probar.';
+  return 'No se pudo verificar: ' + m;
+}
+/** Cablea la tarjeta: el campo del código (se envía solo al llegar a 6 cifras), el botón y «usar otra cuenta». */
+function mfaCablear(c, verificar){
+  const inp = c.querySelector('.mfa-codigo'), btn = c.querySelector('.mfa-ok'), err = c.querySelector('.gerr');
+  let yendo = false;
+  const enviar = async () => {
+    const code = String(inp.value || '').replace(/\D/g, '');
+    if(code.length !== 6){ err.textContent = 'El código tiene 6 cifras.'; inp.focus(); return; }
+    if(yendo) return;
+    yendo = true; btn.disabled = true; err.textContent = '';
+    try{ await verificar(code); }
+    catch(e){ err.textContent = mfaError(e); inp.value = ''; inp.focus(); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); }
+    finally{ yendo = false; btn.disabled = false; }
+  };
+  inp.addEventListener('input', () => { inp.value = inp.value.replace(/\D/g, '').slice(0, 6); if(inp.value.length === 6) enviar(); });
+  inp.addEventListener('keydown', (ev) => { if(ev.key === 'Enter'){ ev.preventDefault(); enviar(); } });
+  btn.addEventListener('click', enviar);
+  const salir = c.querySelector('.mfa-salir');
+  if(salir) salir.addEventListener('click', async () => { try{ await sb.auth.signOut({ scope: 'local' }); }catch(e){ /* igual se recarga */ } location.reload(); });
+  setTimeout(() => { try{ inp.focus(); }catch(e){ /* sin foco */ } }, 50);
+}
+/** Ya tiene autenticador: pedir el código. */
+function mfaPedirCodigo(factores){
+  return new Promise(resolve => {
+    const varios = factores.length > 1;
+    const c = mfaTarjeta('<div class="mfa-ic" aria-hidden="true">' + MFA_ICONO + '</div><h2>Verificación en dos pasos</h2>'
+      + '<p>Escribe el código de 6 dígitos que muestra tu app autenticadora.</p>'
+      + (varios ? '<label for="mfaFactor">Dispositivo</label><select id="mfaFactor" class="mfa-factor">' + factores.map(f => '<option value="' + mfaEsc(f.id) + '">' + mfaEsc(f.friendly_name || 'Autenticador') + '</option>').join('') + '</select>' : '')
+      + '<label for="mfaCodigo">Código</label><input type="text" id="mfaCodigo" class="mfa-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">'
+      + '<div class="gerr"></div><button type="button" class="gbtn mfa-ok">Verificar</button>'
+      + '<p class="mfa-nota">¿Perdiste el teléfono? Pide al administrador que reinicie tu autenticador.</p>' + MFA_PIE);
+    mfaCablear(c, async (code) => {
+      const sel = c.querySelector('.mfa-factor');
+      const factorId = (varios && sel && sel.value) || factores[0].id;
+      const { error } = await sb.auth.mfa.challengeAndVerify({ factorId: factorId, code: code });
+      if(error) throw error;
+      mfaQuitarTarjeta(); resolve(true);
+    });
+  });
+}
+/** Aún no tiene autenticador: darlo de alta (QR o clave), y confirmar con el primer código. */
+async function mfaActivar(f){
+  /* Un alta a medias de otra vez estorba: se quita antes de empezar. */
+  for(const x of ((f && f.all) || [])){
+    if(x.factor_type === 'totp' && x.status !== 'verified'){ try{ await sb.auth.mfa.unenroll({ factorId: x.id }); }catch(e){ /* se intenta igual */ } }
+  }
+  const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Dubbipt ' + new Date().toISOString().slice(0, 16).replace('T', ' ') });
+  if(error) throw error;
+  const clave = String((data.totp && data.totp.secret) || '').replace(/(.{4})/g, '$1 ').trim();
+  return new Promise(resolve => {
+    const c = mfaTarjeta('<div class="mfa-ic" aria-hidden="true">' + MFA_ICONO + '</div><h2>Activa la verificación en dos pasos</h2>'
+      + '<p>Es obligatoria para entrar en Dubbipt. Se hace una sola vez en este correo.</p>'
+      + '<ol class="mfa-pasos"><li>Instala en tu teléfono una app autenticadora: Google Authenticator, Microsoft Authenticator, Authy o 1Password.</li>'
+      + '<li>En la app, añade una cuenta y escanea este código:</li></ol>'
+      + '<div class="mfa-qr"><img alt="Código QR para la app autenticadora" src="' + mfaEsc(data.totp && data.totp.qr_code) + '"></div>'
+      + '<p class="mfa-nota">¿No puedes escanearlo? Escribe esta clave en la app:<br><code class="mfa-clave">' + mfaEsc(clave) + '</code></p>'
+      + '<ol class="mfa-pasos" start="3"><li>Escribe el código de 6 dígitos que te muestra la app.</li></ol>'
+      + '<label for="mfaCodigo">Código</label><input type="text" id="mfaCodigo" class="mfa-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">'
+      + '<div class="gerr"></div><button type="button" class="gbtn mfa-ok">Activar y entrar</button>' + MFA_PIE);
+    mfaCablear(c, async (code) => {
+      const { error: e2 } = await sb.auth.mfa.challengeAndVerify({ factorId: data.id, code: code });
+      if(e2) throw e2;
+      mfaQuitarTarjeta();
+      try{ DDL_UI.toast('Verificación en dos pasos activada. A partir de ahora te pedirá el código al entrar.'); }catch(e){ /* sin avisos */ }
+      resolve(true);
+    });
+  });
+}
+/** Si hace falta, pide (o da de alta) el autenticador. Resuelve true cuando la sesión está verificada (aal2). */
+async function mfaAsegurar(){
+  for(;;){
+    try{
+      const { data: nivel, error } = await sb.auth.mfa.getAuthenticatorAssuranceLevel();
+      if(error) throw error;
+      if(nivel && nivel.currentLevel === 'aal2') return true;
+      const { data: f, error: e2 } = await sb.auth.mfa.listFactors();
+      if(e2) throw e2;
+      const listos = ((f && f.totp) || []).filter(x => x.status === 'verified');
+      return listos.length ? await mfaPedirCodigo(listos) : await mfaActivar(f);
+    }catch(e){
+      console.error('[acceso] verificación en dos pasos', e);
+      /* Sin poder comprobarlo no se entra: se dice por qué y se puede reintentar. */
+      const seguir = await new Promise(resolve => {
+        const c = mfaTarjeta('<div class="mfa-ic" aria-hidden="true">' + MFA_ICONO + '</div><h2>Verificación en dos pasos</h2>'
+          + '<div class="gerr">' + mfaEsc(mfaError(e)) + '</div><button type="button" class="gbtn mfa-reintentar">Reintentar</button>' + MFA_PIE);
+        c.querySelector('.mfa-reintentar').onclick = () => resolve(true);
+        c.querySelector('.mfa-salir').onclick = async () => { try{ await sb.auth.signOut({ scope: 'local' }); }catch(x){ /* igual se recarga */ } location.reload(); };
+      });
+      if(!seguir) return false;
+    }
+  }
+}
+const MFA_ICONO = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/><path d="M12 15v2"/></svg>';
+
+/**
+ * La única puerta: después de la contraseña, de Google, de recuperar la
+ * contraseña o con la sesión guardada, se exige el código y se empieza a
+ * contar la inactividad. `despues`: lo que se hace al entrar (postLogin…).
+ */
+async function authEntrar(despues){
+  if(sb && sb.auth && sb.auth.mfa){
+    const ok = await mfaAsegurar();
+    if(!ok) return false;
+    try{ const { data } = await sb.auth.getSession(); if(data && data.session) sbUser = data.session.user; }catch(e){ /* se queda el de antes */ }
+  }
+  sesionVigilar();
+  authUnlock(); renderLibrary();
+  if(typeof despues === 'function') despues();
+  return true;
+}
+
 async function authInit(){
   try{
   if(!initSupabase()){ showOfflineGate('No se pudo conectar con la nube — puedes trabajar con la caché local'); return; }
   let { data:{ session } } = await sb.auth.getSession();
-  // sesión guardada válida → entrar directo (usuarios que ya iniciaron sesión antes)
+  // sesión guardada, pero sin usarse más del tiempo permitido (ENT-21): se cierra aquí y se vuelve a entrar
+  if(session && sesionCaducada()){
+    try{ await sb.auth.signOut({ scope: 'local' }); }catch(e){ /* igual se pide entrar */ }
+    try{ localStorage.setItem(SESION_MOTIVO_KEY, 'inactividad'); localStorage.removeItem(SESION_KEY); }catch(e){ /* sin almacén */ }
+    session = null;
+  }
+  // sesión guardada válida → entrar directo (usuarios que ya iniciaron sesión antes), con el código si aún no se puso (ENT-20)
   if(session){
     sbUser = session.user;
     try{
       const t = await sb.from('shows').select('id').limit(1);
       if(t.error && authErr(t.error)) await reAuth();
     }catch(e){}
-    authUnlock(); renderLibrary(); postLogin();
+    authEntrar(() => postLogin());
     return;
   }
+  sesionMotivoMostrar();
   // formulario de INICIO DE SESIÓN / REGISTRO (cuentas reales)
   const form = document.getElementById('gform');
   let mode = 'login';   // 'login' | 'signup'
@@ -3841,7 +4117,7 @@ async function authInit(){
             : authErrMsg(error).txt;
           return;
         }
-        if(data.session){ sbUser=data.session.user; authUnlock(); renderLibrary(); showTutorial(()=> postLogin()); }
+        if(data.session){ sbUser=data.session.user; authEntrar(() => showTutorial(()=> postLogin())); }
         else { err.style.color='#4ADE80'; err.textContent='Cuenta creada. Revisa tu correo para confirmar y luego inicia sesión.'; setMode('login'); }
       } else {
         const { data, error } = await sb.auth.signInWithPassword({ email, password:pass });
@@ -3852,7 +4128,7 @@ async function authInit(){
           err.style.color = '#F472B6'; err.textContent = r.txt;
           document.getElementById('gPass').value=''; document.getElementById('gPass').focus(); return;
         }
-        sbUser=data.user; authUnlock(); renderLibrary(); postLogin();
+        sbUser=data.user; await authEntrar(() => postLogin());
       }
     }catch(e){
       // ANTES este try solo tenia finally: si algo lanzaba (cliente sin
@@ -3988,7 +4264,7 @@ async function showNewPasswordScreen(){
       // la sesion de recuperacion ya vale como sesion normal
       try{
         const { data } = await sb.auth.getSession();
-        if(data && data.session){ sbUser = data.session.user; authUnlock(); renderLibrary(); postLogin(); }
+        if(data && data.session){ sbUser = data.session.user; authEntrar(() => postLogin()); }
       }catch(_){ fallo('sb.auth.getSession · index.html:2949', _); }
     }catch(err){
       console.error('[acceso] no se pudo cambiar la contraseña', err);
@@ -19428,6 +19704,7 @@ function libApplyScroll(dy){
   pop2._navRelease = setTimeout(()=>{ pop2._applyRemote=false; }, 140);
 }
 function onRemoteNav(p){
+  try{ if(typeof sesionRemota === 'function') sesionRemota(); }catch(e){ /* la inactividad se mira igual */ }
   sync._lastNavAt = performance.now(); if(!p) return; navInertiaStop();
   const dy = Math.max(-1200, Math.min(1200, +p.dy || 0));   // un paquete jamás puede teletransportar
   libApplyScroll(dy);
@@ -19543,6 +19820,7 @@ function remoteGuard(ms){
   pop2._navAt = performance.now();
 }
 function onRemotePos(p){
+  try{ if(typeof sesionRemota === 'function') sesionRemota(); }catch(e){ /* la inactividad se mira igual */ }
   if(typeof talentFree==='function' && talentFree()) return;   // actor en libre: no le mueven la pagina
   if(!p || p.from===sync.meId) return;
   if(typeof TP!=='undefined' && TP.on){ if(p.page) markChipCur(p.page); return; }   // trackpad: solo el chip
@@ -19588,6 +19866,7 @@ function resolveTargetPx(p){
   return null;
 }
 function onRemoteScroll(p){
+  try{ if(typeof sesionRemota === 'function') sesionRemota(); }catch(e){ /* la inactividad se mira igual */ }
   if(typeof talentFree==='function' && talentFree()) return;   // actor en libre: se mueve solo
   if(typeof TP!=='undefined' && TP.on) return;   // modo trackpad: no soy libreto
   if(sync._lastNavAt && (performance.now() - sync._lastNavAt) < 8000) return;   // el trackpad manda: pausar el motor de posición
