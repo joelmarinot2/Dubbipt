@@ -125,5 +125,23 @@ exports.pruebas = async function(t){
     t.eq('descargar: el .xlsx armado con fflate, con su nombre', W.bajados.length + ' ' + W.zips.length + ' ' + Object.keys(W.zips[0]).length + ' ' + W.avisos.slice(-1)[0] + ' ' + /Andy Goldstein/.test(de(W.zips[0], 'xl/worksheets/sheet1.xml')),
          '1 1 6 Descargado: BigJohnsBoshFamily_101_dubcard_es.xlsx true');
   }
+  t.seccion('5 · varios capítulos: un archivo cada uno');
+  {
+    const W = cargar({ shows: () => [{ name: "Big John's Bosh Family" }] });
+    W.D.ST.dc.modo = 'paramount'; W.D.ST.pm.pausa = 0;
+    const cap = (n) => CASTING.map(f => (f[0] === 'TITULO(inglés):' ? [f[0], "BIG JOHN'S BOSH FAMILY KFA MEET THE FISHERS " + n] : f));
+    W.D.ST.pm.entries.push({ name: 'PRESUP_102.xlsm', file: archivo('PRESUP_102.xlsm', cap(102)) }, { name: 'PRESUP_101.xlsm', file: archivo('PRESUP_101.xlsm', cap(101)) });
+    await W.D.pmProcesar();
+    t.eq('se suben varios a la vez y quedan en orden', W.D.ST.pm.eps.map(e => e.numero).join(','), '101,102');
+    const h = W.D.html('dubcards');
+    t.ok('el botón dice que es un archivo por episodio', /data-dct="pmBajarTodo">[\s\S]*?Descargar los 2 DUBCARDs \(un archivo por episodio\)/.test(h) && /<input type="file" id="dctPmFiles" multiple/.test(h));
+    const hechos = await W.D.pmDescargarVarios(W.D.ST.pm.eps);
+    const hojas = W.zips.map(z => (de(z, 'xl/workbook.xml').match(/<sheet name="([^"]+)"/g) || []).length + ':' + /<sheet name="(\d+)"/.exec(de(z, 'xl/workbook.xml'))[1]);
+    t.eq('descarga varios: un .xlsx por capítulo, cada uno con su hoja y su nombre', hechos.join(' ') + ' · ' + W.bajados.length + ' · ' + hojas.join(','),
+         'BigJohnsBoshFamily_101_dubcard_es.xlsx BigJohnsBoshFamily_102_dubcard_es.xlsx · 2 · 1:101,1:102');
+    t.eq('y lo dice', W.avisos.slice(-1)[0], '2 DUBCARDs descargados, uno por episodio: BigJohnsBoshFamily_101_dubcard_es.xlsx, BigJohnsBoshFamily_102_dubcard_es.xlsx');
+    W.D.ST.pm.cfg.serie = '';
+    t.eq('sin serie, no baja nada y lo pide', (await W.D.pmDescargarVarios(W.D.ST.pm.eps)).length + ' ' + W.avisos.slice(-1)[0], '0 Escribe el título de la serie (SERIES TITLE)');
+  }
   t.ok('con sus estilos', /\.dct-pm-tabla\{/.test(fs.readFileSync(INDEX, 'utf8')) && /\.dct-pm-campos\{/.test(fs.readFileSync(INDEX, 'utf8')));
 };
