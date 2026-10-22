@@ -1,4 +1,4 @@
-/* DUBCARD en formato Paramount · especificacion 09, PRO-55
+/* DUBCARD en formato Paramount · especificacion 09, PRO-56
  *
  * Pedido de sala, con el DUBCARD entregado de «Big John's Bosh Family» 101 y
  * su desglose: «en la sección de DUBCARD, otra sección que sea DUBCARD
