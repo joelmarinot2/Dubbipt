@@ -207,7 +207,7 @@ exports.pruebas = async function(t){
     c.de('tab', { v: 'casting' }).onclick();
     c = controles(A, 'programa');
     t.ok('Casting: la tabla de todo el programa, con su buscador y sus órdenes', /Por episodio[\s\S]*Por personaje[\s\S]*Principales[\s\S]*Por líneas/.test(c.html) && /5 registros · 4 con talento/.test(c.html) && !!c.de('talento', { ep: 13, ch: 101 }));
-    t.eq('cada talento, para cambiarlo, con la lista de la base', c.de('talento', { ep: 13, ch: 101 }).value + ' ' + /<datalist id="csListaTalentos"><option value="ANA ROJAS"><option value="BEATRIZ SOL"><option value="ORIGINAL">Se deja el audio original<\/option><option value="X">No se graba<\/option><option value="TODOS">Lo graban todos<\/option><\/datalist>/.test(c.html), 'BEATRIZ SOL true');
+    t.eq('cada talento, para cambiarlo, con la lista de la base', c.de('talento', { ep: 13, ch: 101 }).value + ' ' + /<datalist id="csListaTalentos"><option value="ANA ROJAS"><option value="BEATRIZ SOL"><option value="ORIGINAL">Se deja el audio original<\/option><option value="X">No se graba<\/option><option value="TODOS">Lo graban todos<\/option><option value="EDICION">Se resuelve en edición<\/option><\/datalist>/.test(c.html), 'BEATRIZ SOL true');
     A.M.CS.tab = 'reparto';
     c = controles(A, 'programa');
     t.ok('Reparto en cajas, por talento: su carga, sus personajes con líneas y episodios', /<b>ANA ROJAS<\/b><div class="cs-tenue">1 pers\. · 2 apar\. · <b>276<\/b> lín\.<\/div><\/div><span class="cs-carga cs-carga-bajo">Bajo<\/span>[\s\S]*?<b>ALLY<\/b><\/div><span class="cs-rep-lin">276 lín\.<\/span><span class="cs-rep-eps"><span class="cs-rep-ep">Ep\.1<\/span><span class="cs-rep-ep">Ep\.2<\/span><\/span>/.test(c.html)

@@ -25,7 +25,7 @@ exports.pruebas = function(t){
   );
 
   t.seccion('1 · qué cuenta como actor y qué no');
-  const noActores = ['X', 'x', 'ORIGINAL', 'Original', 'X ORIGINAL', 'x original',
+  const noActores = ['X', 'x', 'EDICIÓN', 'Edicion', 'ORIGINAL', 'Original', 'X ORIGINAL', 'x original',
                      'ORIGINAL X', 'TODOS', 'Todos', 'TODAS', 'N/A', 'NA',
                      'VOZ ORIGINAL', 'AUDIO ORIGINAL', 'SIN DOBLAJE', 'NO SE DOBLA',
                      '', '   ', '---'];

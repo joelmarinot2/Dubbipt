@@ -33,7 +33,8 @@ exports.pruebas = async function(t){
   t.seccion('1 · qué es una marca');
   t.eq('ORIGINAL, X, TODOS y X ORIGINAL, como se escriban', ['ORIGINAL', 'x', ' Todos ', 'X ORIGINAL', 'original'].map(csEsMarca).join(','), 'true,true,true,true,true');
   t.eq('una persona no', ['ANA ROJAS', 'XIMENA', 'TODOSANTOS', 'MARCELA BORDA', ''].map(csEsMarca).join(','), 'false,false,false,false,false');
-  t.eq('las tres, con lo que quieren decir', MC.CS_MARCAS.map(m => m[0]).join(','), 'ORIGINAL,X,TODOS');
+  t.eq('las cuatro, con lo que quieren decir (EDICIÓN también: «edición no es un talento»)', MC.CS_MARCAS.map(m => m[0]).join(','), 'ORIGINAL,X,TODOS,EDICION');
+  t.eq('EDICIÓN, con o sin tilde, es una marca', ['EDICION', 'Edición', 'edicion'].map(csEsMarca).join(','), 'true,true,true');
 
   t.seccion('2 · no salen como talentos');
   {
@@ -57,8 +58,8 @@ exports.pruebas = async function(t){
     const L = montar([['function csListaTalentos(d){', '/**\n * La celda del talento']], ['csListaTalentos'], { castNorm: castNorm, csEsMarca: csEsMarca, csEsc: csEsc, CS_MARCAS: MC.CS_MARCAS });
     const dl = L.csListaTalentos({ talents: [{ name: 'ANA ROJAS' }, { name: 'ORIGINAL' }] });
     t.eq('en la lista, las personas y, al final, las tres marcas con lo que significan', dl,
-      '<datalist id="csListaTalentos"><option value="ANA ROJAS"><option value="ORIGINAL">Se deja el audio original</option><option value="X">No se graba</option><option value="TODOS">Lo graban todos</option></datalist>');
-    t.ok('en la tarjeta del casting, ORIGINAL, X y TODOS a un clic, sin perder el foco', /\[\['ORIGINAL','Se deja el audio original'\],\['X','No se graba'\],\['TODOS','Lo graban todos'\]\]\.forEach/.test(HTML)
+      '<datalist id="csListaTalentos"><option value="ANA ROJAS"><option value="ORIGINAL">Se deja el audio original</option><option value="X">No se graba</option><option value="TODOS">Lo graban todos</option><option value="EDICION">Se resuelve en edición</option></datalist>');
+    t.ok('en la tarjeta del casting, ORIGINAL, X, TODOS y EDICIÓN a un clic, sin perder el foco', /\[\['ORIGINAL','Se deja el audio original'\],\['X','No se graba'\],\['TODOS','Lo graban todos'\],\['EDICION','Se resuelve en edición'\]\]\.forEach/.test(HTML)
       && /b\.addEventListener\('mousedown', ev=> ev\.preventDefault\(\)\)/.test(HTML) && /inp\.value = m\[0\]; save\(true\);/.test(HTML) && /\.card \.ctal-marca\{/.test(HTML));
     t.ok('y la tarjeta dice que no es un talento', /c\.noRec \? '<small class="ctal-nomarca"/.test(HTML));
     t.ok('en la tabla de Casting, junto a la casilla, qué quiere decir', /\+ csNotaMarca\(f\.dc \|\| f\.dubbipt \|\| f\.talento\);/.test(CV));

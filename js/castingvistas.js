@@ -104,7 +104,7 @@ function csEsc(s){ return (typeof esc === 'function') ? esc(String(s == null ? '
    cuando un personaje no se graba o se deja original». Se ponen al hacer el
    casting, pero no salen en el directorio de Talentos ni en la ocupación, la
    disponibilidad o la fusión, ni se cuentan como talentos. */
-const CS_MARCAS = [['ORIGINAL', 'Se deja el audio original'], ['X', 'No se graba'], ['TODOS', 'Lo graban todos']];
+const CS_MARCAS = [['ORIGINAL', 'Se deja el audio original'], ['X', 'No se graba'], ['TODOS', 'Lo graban todos'], ['EDICION', 'Se resuelve en edición']];
 /** ¿Lo escrito es una marca de producción (ORIGINAL, X, TODOS…) y no un talento? */
 function csEsMarca(nombre){
   const k = castNorm(nombre);

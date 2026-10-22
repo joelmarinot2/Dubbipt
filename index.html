@@ -3045,7 +3045,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.84.1-nube';
+const APP_VER_NUM = 'v11.84.2-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -4481,7 +4481,7 @@ function progInitials(name){
   if(parts.length===1) return parts[0].slice(0,2).toUpperCase();
   return (parts[0][0]+parts[1][0]).toUpperCase();
 }
-const NO_REC = new Set(['ORIGINAL','TODOS','X','N/A','NA']);
+const NO_REC = new Set(['ORIGINAL','TODOS','X','N/A','NA','EDICION']);
 const TC_RE = /^\d{1,2}\s*[:;.]\s*\d{2}/;
 const SCENE_RE = /^\s*(?:\d+[\s.\-]*)?(INT\.?\/EXT\.?|INT\.?|EXT\.?|EST\.?|ESC\.?|ESCENA|SCENE|SEQ|SEQUENCE)\b/i;
 const NON_CHAR = new Set(['INT','EXT','INTEXT','EST','ESC','ESCENA','SCENE','SEQ','SEQUENCE','FADE','FADEIN','FADEOUT','CUT','CUTTO','SMASHCUT','MATCHCUT','DISSOLVE','DISSOLVETO','CONTINUED','CONTD','THEEND','FIN','INSERT','SUPER','TITLE','TITLES','SUBTITLE','SUBTITLES','OMITTED','FLASHBACK','FLASHFORWARD','MONTAGE','INTERCUT','ANGLE','CLOSEUP','WIDESHOT','CREDITS','ACTO','ACT','MUSICA','MUSIC','SFX','AMBIENTE']);
@@ -8480,7 +8480,7 @@ function renderCards(){
          no son talentos -no salen en Talentos ni cuentan en la ocupación-. */
       const marcas = document.createElement('div');
       marcas.className = 'ctal-marcas';
-      [['ORIGINAL','Se deja el audio original'],['X','No se graba'],['TODOS','Lo graban todos']].forEach(m=>{
+      [['ORIGINAL','Se deja el audio original'],['X','No se graba'],['TODOS','Lo graban todos'],['EDICION','Se resuelve en edición']].forEach(m=>{
         const b = document.createElement('button');
         b.type = 'button'; b.className = 'ctal-marca'; b.textContent = m[0]; b.title = m[1] + ' · no es un talento';
         b.addEventListener('mousedown', ev=> ev.preventDefault());   // que el campo no pierda el foco y no se guarde lo escrito antes
@@ -11115,7 +11115,7 @@ const CAST_CERCA = 4;        // líneas de margen: por debajo, se avisa
    de sala, los hace quien esté). Contarlos aquí no dice nada: saldrían los
    primeros de la lista con cien líneas y con choques falsos en cada página,
    tapando a los actores de verdad. */
-const OCU_NO_ACTOR = new Set(['X','ORIGINAL','ORIGINALES','TODOS','TODAS','NA','N',
+const OCU_NO_ACTOR = new Set(['X','ORIGINAL','ORIGINALES','TODOS','TODAS','NA','N','EDICION',
   'VOZ','VOCES','AUDIO','IDIOMA','SIN','SE','DEJA','QUEDA','DOBLA','DOBLAR','DOBLAJE','NO','A']);
 function castEsActor(talento){
   const t = String(talento == null ? '' : talento).trim();
