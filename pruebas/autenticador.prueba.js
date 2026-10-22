@@ -105,8 +105,8 @@ exports.pruebas = async function(t){
 
   t.seccion('2 · todas las puertas pasan por el código');
   const ini = HTML.slice(HTML.indexOf('async function authInit(){'), HTML.indexOf('function authErrMsg('));
-  t.eq('sesión guardada, cuenta nueva, contraseña y vuelta de recuperar la contraseña', (HTML.match(/authEntrar\(/g) || []).length - 1 + ' ' + (ini.match(/authUnlock\(\)/g) || []).length, '4 0');
-  t.ok('Google vuelve por la sesión guardada: también pide el código', /if\(session\)\{\n    sbUser = session\.user;[\s\S]{0,200}authEntrar\(\(\) => postLogin\(\)\);/.test(ini));
+  t.eq('sesión guardada, contraseña y vuelta de recuperar la contraseña o de la invitación (ya no se crean cuentas aquí, ENT-23)', (HTML.match(/authEntrar\(/g) || []).length - 1 + ' ' + (ini.match(/authUnlock\(\)/g) || []).length, '3 0');
+  t.ok('Google vuelve por la sesión guardada: también pide el código', /if\(session\)\{\n    sbUser = session\.user;[\s\S]{0,400}authEntrar\(\(\) => postLogin\(\)\);/.test(ini));
   t.ok('solo el modo sin conexión entra sin código (no hay nube a la que llegar)', /function enterOffline\(\)\{[\s\S]{0,120}authUnlock\(\); renderLibrary\(\); postLogin\(\);/.test(HTML));
 
   t.seccion('3 · la sesión caduca sin uso');

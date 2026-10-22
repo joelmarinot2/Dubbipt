@@ -20,6 +20,12 @@ Este archivo y la carpeta `sql/` **no se despliegan** (ver `.vercelignore`).
 
 ## Paso 4 · Cerrar el registro (panel de Supabase)
 
+> **Desde v11.83.0 la app ya no ofrece «Crear cuenta» (ENT-23)** y sabe recibir el
+> correo de invitación (quien lo abre elige su contraseña y activa el
+> autenticador). Falta lo del servidor: hacer la **Opción A** de abajo. Sin
+> ella, alguien podría registrarse llamando a la API directamente o entrando con
+> una cuenta de Google nueva.
+
 Hoy cualquiera puede crear una cuenta con un correo inventado y quedar dentro del
 rol `authenticated`. Dos opciones, de más a menos segura:
 
