@@ -563,7 +563,7 @@ function bdPrint(rec){
   const fr=document.createElement("iframe");fr.className="ddl-encima";fr.setAttribute("aria-hidden","true");fr.style.cssText="position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
   document.body.appendChild(fr);
   const done=()=>{setTimeout(()=>{try{fr.remove();}catch(e){/* lo mismo que en Casting: sin eso se sigue */}},1500);};
-  fr.onload=()=>{try{const w=fr.contentWindow;w.addEventListener("afterprint",done);w.focus();w.print();setTimeout(done,60000);}catch(e){done();}};
+  fr.onload=()=>{try{try{if(typeof auditar==="function")auditar("imprimir",{recurso:safe(rec&&rec.title||"breakdown")});}catch(_){/* sin registro (ENT-24) */}const w=fr.contentWindow;w.addEventListener("afterprint",done);w.focus();w.print();setTimeout(done,60000);}catch(e){done();}};
   fr.srcdoc=html;
 }
 /* Vista en pantalla con la misma jerarquía (colores de la app) */

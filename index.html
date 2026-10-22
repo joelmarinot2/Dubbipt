@@ -2188,6 +2188,18 @@ body.cs-on #progHeader{ display:none !important; }
 /* Talentos: buscar y fusionar (PRO-52) */
 .cs-tal-filtros .cs-oc-campos{ grid-template-columns:minmax(220px,1fr) repeat(3,minmax(120px,160px)); }
 .cs-tal-fila2{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:12px; }
+/* Accesos: el registro de quién abrió, descargó o imprimió (ENT-24) */
+.cs-acc-filtros .cs-oc-campos{ grid-template-columns:minmax(200px,1fr) repeat(2,minmax(150px,220px)) repeat(2,minmax(130px,150px)); }
+.cs-acc-filtros input[type=date]{ color-scheme:dark; }
+.cs-aviso-caja{ display:flex; align-items:flex-start; gap:8px; background:#1a1508; border:1px solid rgba(251,191,36,.5); color:#fde68a; border-radius:12px; padding:12px 14px; font-size:13px; line-height:1.5; margin-bottom:12px; }
+.cs-acc-tabla-w{ overflow-x:auto; border:1px solid #23262b; border-radius:12px; }
+.cs-acc-tabla{ width:100%; border-collapse:collapse; font-size:12.5px; }
+.cs-acc-tabla th{ position:sticky; top:0; background:#14171b; color:#8b8f97; text-align:left; font-weight:600; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; padding:9px 12px; border-bottom:1px solid #23262b; white-space:nowrap; }
+.cs-acc-tabla td{ padding:8px 12px; border-bottom:1px solid #1a1d21; color:#cbd5e1; vertical-align:top; }
+.cs-acc-tabla td:first-child{ white-space:nowrap; color:#9aa3ad; }
+.cs-acc-descarga td:nth-child(3), .cs-acc-imprimir td:nth-child(3){ color:#FBBF24; font-weight:600; }
+.cs-acc-abrir_libreto td:nth-child(3){ color:#4ADE80; }
+@media (max-width:760px){ .cs-acc-filtros .cs-oc-campos{ grid-template-columns:1fr 1fr; } }
 .cs-tal-orden{ display:inline-flex; align-items:center; gap:4px; margin:0; }
 .cs-tal-orden > .cs-tenue{ font-size:10.5px; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-right:4px; }
 .cs-b.cs-on{ border-color:rgba(251,146,60,.6); color:#FB923C; background:rgba(251,146,60,.08); }
@@ -3033,7 +3045,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.83.0-nube';
+const APP_VER_NUM = 'v11.84.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3850,6 +3862,7 @@ async function sesionSalir(motivo){
   SESION.saliendo = true;
   sesionQuitarAviso();
   try{ localStorage.setItem(SESION_MOTIVO_KEY, motivo || ''); localStorage.removeItem(SESION_KEY); }catch(e){ /* sin almacén */ }
+  try{ auditar('cierre_' + (motivo || 'sesion')); }catch(e){ /* se queda en la cola */ }
   try{ onlineDisconnect(); }catch(e){ /* sin presencia */ }
   try{ if(sb) await sb.auth.signOut({ scope: 'local' }); }catch(e){ fallo('sb.auth.signOut · sesionSalir', e); }
   try{ if(typeof pop !== 'undefined' && pop.win && !pop.win.closed) pop.win.close(); }catch(e){ /* ya cerrada */ }
@@ -4014,8 +4027,100 @@ async function authEntrar(despues){
   }
   sesionVigilar();
   authUnlock(); renderLibrary();
+  audEnganchar(); auditar('inicio_sesion');   // registro de accesos (ENT-24)
   if(typeof despues === 'function') despues();
   return true;
+}
+
+/* ═══ REGISTRO DE ACCESOS (ENT-24) ═════════════════════════════════════════
+   Pedido de sala, por la confidencialidad de Netflix: poder responder «quién
+   abrió o descargó cada libreto, y cuándo». Cada vez que alguien entra, abre
+   un libreto, sube uno, descarga un archivo de Dubbipt a su equipo o imprime,
+   se añade una fila a public.auditoria (sql/seguridad-14-registro-accesos.sql).
+   Quién y cuándo los pone el servidor; solo se añade, y solo los
+   administradores lo leen (Casting → Accesos). Lo que no se puede mandar (sin
+   conexión, o la tabla aún sin crear) se guarda en este equipo, de cada
+   persona, y se manda cuando se puede: no se pierde. */
+
+const AUD = { clave: 'ddl_auditoria_cola', max: 500, enviando: false, ultimoAbrir: {}, enganchado: false };
+const AUD_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function audLeer(){ try{ const v = JSON.parse(localStorage.getItem(AUD.clave) || '[]'); return Array.isArray(v) ? v : []; }catch(e){ return []; } }
+function audEscribir(l){ try{ localStorage.setItem(AUD.clave, JSON.stringify(l.slice(-AUD.max))); }catch(e){ /* sin almacén: se pierde esta fila */ } }
+/** Dónde se está: el espacio, el programa y el capítulo abiertos, con sus nombres (que el registro se lea sin buscar ids). */
+function audContexto(){
+  const c = {};
+  try{ if(typeof WORKSPACE !== 'undefined' && WORKSPACE && WORKSPACE.id) c.workspace_id = WORKSPACE.id; }catch(e){ /* sin espacio */ }
+  try{
+    const ep = (typeof currentEp !== 'undefined' && currentEp) ? currentEp : null;
+    const showId = (ep && ep.showId) || ((typeof LDB !== 'undefined' && LDB) ? LDB.showId : null);
+    if(showId) c.show_id = showId;
+    if(ep && ep.id) c.episode_id = ep.id;
+    let prog = '';
+    try{ const s = (typeof sbShows === 'function') ? sbShows().find(x => String(x.id) === String(showId)) : null; prog = s ? s.name : ''; }catch(e){ prog = ''; }
+    c.programa = prog; c.capitulo = (ep && ep.name) || '';
+  }catch(e){ /* sin capítulo */ }
+  return c;
+}
+/** Apuntar algo. `datos`: { recurso, detalle, show_id, episode_id, programa, capitulo }; lo que falte sale de lo abierto. */
+function auditar(accion, datos){
+  try{
+    if(typeof sbUser === 'undefined' || !sbUser || !sbUser.id || sbUser.id === 'offline') return;
+    const d = Object.assign({}, audContexto(), datos || {});
+    const uuid = v => (v && AUD_UUID.test(String(v))) ? String(v) : null;
+    const detalle = Object.assign({}, d.detalle || {});
+    if(d.programa) detalle.programa = String(d.programa).slice(0, 200);
+    if(d.capitulo) detalle.capitulo = String(d.capitulo).slice(0, 200);
+    const fila = { accion: String(accion).slice(0, 40), workspace_id: uuid(d.workspace_id), show_id: uuid(d.show_id), episode_id: uuid(d.episode_id),
+                   recurso: d.recurso ? String(d.recurso).slice(0, 300) : null, detalle: Object.keys(detalle).length ? detalle : null,
+                   agente: (typeof navigator !== 'undefined' && navigator.userAgent) ? String(navigator.userAgent).slice(0, 300) : null, cliente_ts: new Date().toISOString() };
+    const cola = audLeer();
+    cola.push({ u: sbUser.id, f: fila });
+    audEscribir(cola);
+    audEnviar();
+  }catch(e){ /* el registro nunca para el trabajo */ }
+}
+/** Manda lo pendiente de la persona conectada; lo de otras cuentas espera a que vuelvan a entrar. */
+async function audEnviar(){
+  if(AUD.enviando || typeof sb === 'undefined' || !sb || window.OFFLINE) return;
+  if(typeof sbUser === 'undefined' || !sbUser || !sbUser.id) return;
+  const mias = audLeer().filter(x => x && x.u === sbUser.id);
+  if(!mias.length) return;
+  AUD.enviando = true;
+  try{
+    const lote = mias.slice(0, 100);
+    const { error } = await sb.from('auditoria').insert(lote.map(x => x.f));
+    if(error) return;   // sin tabla, sin red o sin permiso: se queda guardado y se intenta luego
+    audEscribir(audLeer().filter(x => !lote.some(y => y.f.cliente_ts === x.f.cliente_ts && y.u === x.u && y.f.accion === x.f.accion)));
+    if(mias.length > lote.length) setTimeout(audEnviar, 500);
+  }catch(e){ /* se intenta luego */ }
+  finally{ AUD.enviando = false; }
+}
+/** Abrir un libreto, una vez por capítulo cada 10 minutos (recargar o volver a él no llena el registro). */
+function auditarAbrir(){
+  try{
+    const id = (typeof currentEp !== 'undefined' && currentEp) ? currentEp.id : null;
+    if(!id) return;
+    const ahora = Date.now();
+    if(AUD.ultimoAbrir[id] && ahora - AUD.ultimoAbrir[id] < 600000) return;
+    AUD.ultimoAbrir[id] = ahora;
+    auditar('abrir_libreto');
+  }catch(e){ /* sin capítulo */ }
+}
+/** Todo lo que se descarga al equipo pasa por un enlace con «download»: lo hagan los botones o el código. */
+function audEnganchar(){
+  if(AUD.enganchado || typeof HTMLAnchorElement === 'undefined') return;
+  AUD.enganchado = true;
+  try{
+    const orig = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function(){
+      try{ if(this.hasAttribute('download')) auditar('descarga', { recurso: this.getAttribute('download') || this.download || '' }); }catch(e){ /* sin registro */ }
+      return orig.apply(this, arguments);
+    };
+    document.addEventListener('click', (ev) => {
+      try{ if(!ev.isTrusted) return; const a = ev.target && ev.target.closest && ev.target.closest('a[download]'); if(a) auditar('descarga', { recurso: a.getAttribute('download') || '' }); }catch(e){ /* sin registro */ }
+    }, true);
+    window.addEventListener('online', () => audEnviar());
+  }catch(e){ /* sin registro de descargas */ }
 }
 
 async function authInit(){
@@ -10925,6 +11030,7 @@ function impLanzar(titulo, cuerpo){
         + '</title><style>' + IMP_CSS + '</style></head><body>' + cuerpo + '</body></html>');
   d.close();
   const dispara = () => {
+    try{ auditar('imprimir', { recurso: document.title || '' }); }catch(e){ /* sin registro */ }
     try{ fr.contentWindow.focus(); fr.contentWindow.print(); }
     catch(e){ castAviso('❌ No se pudo abrir la impresión: ' + (e.message || e)); }
   };
@@ -13481,6 +13587,7 @@ async function openEpisodeFromJson(ep){
     const j = JSON.parse(payload);
     if(!j || !j.script || !j.script.length) return false;
     currentEp = { id: ep.id, showId: ep.show_id, name: ep.name };
+    auditarAbrir();   // ENT-24
     try{ localStorage.setItem('ddl_last_ep', ep.id); }catch(e){}
     { const b=document.getElementById('btnSync'); if(b) b.style.display=''; }
     try{ updateBackBtn(); }catch(e){}
@@ -13535,6 +13642,7 @@ async function openEpisode(id){
 
   const showEp = (meta)=>{
     currentEp = { id, showId:(meta&&meta.showId)||LDB.showId||null, name:(meta&&meta.name)||'' };
+    auditarAbrir();   // ENT-24
     try{ localStorage.setItem('ddl_last_ep', id); }catch(e){}
     { const b=document.getElementById('btnSync'); if(b) b.style.display=''; }
     try{ updateBackBtn(); }catch(e){}
@@ -13669,6 +13777,7 @@ async function openEpisode(id){
 async function openEpisodeLegacy(ep){
   const id = ep.id;
   currentEp = { id:ep.id, showId:ep.show_id, name:ep.name };
+  auditarAbrir();   // ENT-24
   // LIMPIEZA ANTES DE CARGAR: que NADA del capítulo anterior quede en memoria.
   // Si el PDF de este capítulo no baja, jamás debe heredar el PDF/libreto del
   // capítulo previo (eso mezclaba libretos entre programas y luego esa mezcla
@@ -13777,6 +13886,7 @@ async function saveEpHere(){
     const { error } = await sb.from('episodes').upsert(row);
     if(error){ libMsg('Error al guardar: '+error.message); return; }
     currentEp = { id:epId, showId:LDB.showId, name:name.trim() };
+    auditar('subir_libreto', { recurso: [row.xls_name, row.pdf_name].filter(Boolean).join(' · '), detalle: { nuevo: !!esNuevo } });   // ENT-24
     /* los datos en memoria son los de ESTE capítulo: sin esta línea, si antes se
        abrió OTRO capítulo, _dataEpId seguía apuntando al viejo y epDataUpsert()
        se auto-bloqueaba (guardia anti-caché-cruzada) → el libreto rápido NUNCA

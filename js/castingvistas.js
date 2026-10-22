@@ -52,6 +52,7 @@ const CS_ICO = {
   produccion: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
   dubcards:   '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 10h10M7 14h6"/>',
   contratos:  '<path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6"/><circle cx="10" cy="13" r="2"/><path d="M7 18a3 3 0 016 0M15 13h2M15 16h2"/>',
+  accesos:    '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
   breakdowns: '<path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
   externo:    '<path d="M14 3h7v7"/><path d="M10 14L21 3"/><path d="M21 14v5a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h5"/>',
   actualizar: '<path d="M21 12a9 9 0 11-2.64-6.36"/><path d="M21 3.5V8h-4.5"/>',
@@ -92,6 +93,7 @@ const CS_SECCIONES = [
   { v: 'produccion', t: 'Producción' },
   /* Contract Inventory va dentro de Dubcards, y Pegado de casting ya no está (PRO-57). */
   { v: 'dubcards',   t: 'Dubcards',          dc: 'dubcards',   dice: 'Prepara las DUBCARD de cada capítulo desde el casting (Netflix y otras casas, formato Paramount) y el Contract Inventory.' },
+  { v: 'accesos',    t: 'Accesos' },
   { v: 'breakdowns', t: 'Breakdowns',        dc: 'breakdowns', dice: 'Escribe los breakdowns de los personajes a partir del libreto y la guía del programa, con su IA.' }
 ];
 
@@ -3274,9 +3276,85 @@ function csHtml(vista, hoy){
     case 'ocupacion':  return csHtmlOcupacion(datos, vivo);
     case 'trailers':   return csHtmlTrailers(datos, h, vivo);
     /* Producción Casting, como en Casting (js/csproduccion.js, PRO-42). Sin ese archivo, la tabla de antes. */
+    case 'accesos':    return csHtmlAccesos(vivo);
     case 'produccion': return (datos && typeof CSP !== 'undefined' && CSP && typeof CSP.html === 'function') ? CSP.html(datos, vivo) : csHtmlProduccion(datos, h, vivo);
   }
   return '';
+}
+
+/* ── Accesos: quién entró, abrió, descargó o imprimió (ENT-24) ────────────
+   Pedido de sala, por la confidencialidad de Netflix: «un registro de quién
+   abre o descarga cada libreto». Lo apunta Dubbipt en public.auditoria
+   (index.html, auditar; sql/seguridad-14-registro-accesos.sql) y aquí lo lee
+   el administrador: con filtros por persona, acción, programa y fechas, y
+   para sacarlo en CSV (para una auditoría o para el cliente). */
+
+const CS_ACC_ACCION = { inicio_sesion: 'Entró', abrir_libreto: 'Abrió el libreto', subir_libreto: 'Subió un libreto', descarga: 'Descargó',
+                        imprimir: 'Imprimió', cierre_inactividad: 'Sesión cerrada por inactividad' };
+const CS_ACC = { filas: null, cargando: false, error: '', persona: '', accion: '', programa: '', desde: '', hasta: '', limite: 1000 };
+
+/** El error de la nube, en palabras. */
+function csAccError(e){
+  const m = String((e && (e.message || e.code)) || e || '');
+  if(/42P01|PGRST205|does not exist|could not find the table/i.test(m)) return 'El registro aún no existe en la nube: ejecuta sql/seguridad-14-registro-accesos.sql en Supabase → SQL Editor. Mientras tanto, cada equipo guarda lo que registra y lo mandará después.';
+  if(/permission|42501|row-level|rls/i.test(m)) return 'Solo los administradores pueden ver el registro de accesos.';
+  return 'No se pudo leer el registro: ' + m;
+}
+/** Leer de la nube lo que piden los filtros (lo más reciente primero). */
+async function csAccesosCargar(){
+  if(CS_ACC.cargando) return 'nada';
+  CS_ACC.cargando = true; CS_ACC.error = '';
+  try{
+    if(typeof sb === 'undefined' || !sb) throw new Error('sin conexión con la nube');
+    let q = sb.from('auditoria').select('creado,email,accion,show_id,episode_id,recurso,detalle').order('creado', { ascending: false }).limit(CS_ACC.limite);
+    if(CS_ACC.accion) q = q.eq('accion', CS_ACC.accion);
+    if(CS_ACC.persona.trim()) q = q.ilike('email', '%' + CS_ACC.persona.trim().replace(/[%_]/g, '') + '%');
+    if(CS_ACC.programa) q = q.eq('show_id', CS_ACC.programa);
+    if(CS_ACC.desde) q = q.gte('creado', new Date(CS_ACC.desde + 'T00:00:00').toISOString());
+    if(CS_ACC.hasta) q = q.lte('creado', new Date(CS_ACC.hasta + 'T23:59:59.999').toISOString());
+    const { data, error } = await q;
+    if(error) throw error;
+    CS_ACC.filas = data || [];
+    return 'leido';
+  }catch(e){ CS_ACC.filas = []; CS_ACC.error = csAccError(e); return 'error'; }
+  finally{ CS_ACC.cargando = false; csRepintar(); }
+}
+/** Una fila como texto: fecha, persona, acción, programa, capítulo y archivo. */
+function csAccFila(r){
+  const det = r.detalle || {};
+  return { cuando: r.creado ? new Date(r.creado).toLocaleString('es') : '', quien: r.email || '', que: CS_ACC_ACCION[r.accion] || r.accion || '',
+           programa: det.programa || '', capitulo: det.capitulo || '', recurso: r.recurso || '' };
+}
+/** El CSV del registro, como se ve (separado por «;» para que Excel en español lo abra en columnas). */
+function csAccCsv(filas){
+  const c = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  return '﻿' + [['Fecha y hora', 'Persona', 'Acción', 'Programa', 'Capítulo', 'Archivo / detalle'].map(c).join(';')]
+    .concat((filas || []).map(r => { const f = csAccFila(r); return [f.cuando, f.quien, f.que, f.programa, f.capitulo, f.recurso].map(c).join(';'); })).join('\r\n');
+}
+function csHtmlAccesos(vivo){
+  if(CS_ACC.filas === null && !CS_ACC.cargando) setTimeout(() => { csAccesosCargar(); }, 0);
+  const filas = CS_ACC.filas || [];
+  const pend = (typeof audLeer === 'function') ? audLeer().length : 0;
+  const op = (v, t, sel) => '<option value="' + csEsc(v) + '"' + (sel === v ? ' selected' : '') + '>' + csEsc(t) + '</option>';
+  const shows = (typeof sbShows === 'function') ? sbShows().slice().sort((a, b) => String(a.name).localeCompare(String(b.name), 'es')) : [];
+  return csCabecera('Accesos', 'Quién entró, abrió o subió un libreto, descargó o imprimió, y cuándo · solo lo ven los administradores', vivo)
+    + '<div class="cs-oc-filtros cs-acc-filtros"><div class="cs-oc-campos">'
+    +   '<label>Persona<input type="text" data-cs="accFiltro" data-campo="persona" value="' + csEsc(CS_ACC.persona) + '" placeholder="correo" autocomplete="off"></label>'
+    +   '<label>Acción<select data-cs="accFiltro" data-campo="accion">' + op('', '— Todas —', CS_ACC.accion) + Object.keys(CS_ACC_ACCION).map(k => op(k, CS_ACC_ACCION[k], CS_ACC.accion)).join('') + '</select></label>'
+    +   '<label>Programa<select data-cs="accFiltro" data-campo="programa">' + op('', '— Todos —', CS_ACC.programa) + shows.map(s => op(String(s.id), s.name, CS_ACC.programa)).join('') + '</select></label>'
+    +   '<label>Desde<input type="date" data-cs="accFiltro" data-campo="desde" value="' + csEsc(CS_ACC.desde) + '"></label>'
+    +   '<label>Hasta<input type="date" data-cs="accFiltro" data-campo="hasta" value="' + csEsc(CS_ACC.hasta) + '"></label>'
+    + '</div><div class="cs-tal-fila2">'
+    +   '<button class="cs-b cs-pri" data-cs="accBuscar">' + csIco('buscar', 13) + '<span>Buscar</span></button>'
+    +   (filas.length ? '<button class="cs-b" data-cs="accCsv">' + csIco('bajar', 13) + '<span>Exportar CSV</span></button>' : '')
+    +   '<span class="cs-tenue">' + (CS_ACC.cargando ? 'Leyendo…' : filas.length + ' registro' + (filas.length === 1 ? '' : 's') + (filas.length >= CS_ACC.limite ? ' (los ' + CS_ACC.limite + ' más recientes: afina los filtros)' : '')) + '</span>'
+    +   (pend ? '<span class="cs-tenue">· ' + pend + ' de este equipo pendiente' + (pend === 1 ? '' : 's') + ' de enviar</span>' : '')
+    + '</div></div>'
+    + (CS_ACC.error ? '<div class="cs-aviso-caja">' + csIco('aviso', 14) + '<span>' + csEsc(CS_ACC.error) + '</span></div>' : '')
+    + (filas.length ? '<div class="cs-acc-tabla-w"><table class="cs-acc-tabla"><thead><tr><th>Fecha y hora</th><th>Persona</th><th>Acción</th><th>Programa</th><th>Capítulo</th><th>Archivo / detalle</th></tr></thead><tbody>'
+        + filas.map(r => { const f = csAccFila(r); return '<tr class="cs-acc-' + csEsc(r.accion) + '"><td>' + csEsc(f.cuando) + '</td><td>' + csEsc(f.quien) + '</td><td>' + csEsc(f.que) + '</td><td>' + csEsc(f.programa) + '</td><td>' + csEsc(f.capitulo) + '</td><td>' + csEsc(f.recurso) + '</td></tr>'; }).join('')
+        + '</tbody></table></div>'
+      : (CS_ACC.cargando || CS_ACC.error ? '' : '<div class="cs-nada">Nada registrado con esos filtros.</div>'));
 }
 
 /** La barra de secciones, a la izquierda como en Casting. */
@@ -3667,6 +3745,20 @@ function csCablear(vista){
     else if(que === 'buscarPer') el.oninput = () => escribir('buscarPer');
     else if(que === 'ocBuscar') el.oninput = () => escribir('ocBuscar');
     else if(que === 'ocFiltro') el.onchange = () => { CS[at('campo')] = el.value; csRepintar(); };
+    /* ── Accesos (ENT-24) ── */
+    else if(que === 'accFiltro'){
+      const poner = () => { CS_ACC[at('campo')] = el.value; };
+      if(el.tagName === 'INPUT' && el.type === 'text'){ el.oninput = poner; el.onkeydown = (ev) => { if(ev.key === 'Enter'){ poner(); csAccesosCargar(); } }; }
+      else el.onchange = () => { poner(); csAccesosCargar(); };
+    }
+    else if(que === 'accBuscar') el.onclick = () => { csAccesosCargar(); };
+    else if(que === 'accCsv') el.onclick = () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csAccCsv(CS_ACC.filas)], { type: 'text/csv;charset=utf-8' }));
+      a.download = 'Dubbipt_registro_accesos_' + new Date().toISOString().slice(0, 10) + '.csv';
+      a.className = 'ddl-encima'; document.body.appendChild(a); a.click();
+      setTimeout(() => { try{ URL.revokeObjectURL(a.href); a.remove(); }catch(e){ /* ya no estaba */ } }, 2000);
+    };
     /* ── Talentos: buscar y fusionar (PRO-52) ── */
     else if(que === 'talFiltro') el.onchange = () => { CS[at('campo')] = el.value; csRepintar(); };
     else if(que === 'talOrden') el.onclick = () => { CS.talOrden = v; csRepintar(); };
