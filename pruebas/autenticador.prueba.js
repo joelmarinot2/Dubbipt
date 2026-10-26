@@ -16,7 +16,8 @@ const { montar, INDEX } = require('./ayuda');
 exports.nombre = 'Verificación en dos pasos y sesión por inactividad';
 
 const RAIZ = path.dirname(INDEX);
-const HTML = fs.readFileSync(INDEX, 'utf8');
+// En Windows git saca los archivos con CRLF; los patrones de abajo cuentan con «\n», como en la nube.
+const HTML = fs.readFileSync(INDEX, 'utf8').replace(/\r\n/g, '\n');
 
 /* Lo justo del DOM: la pantalla de acceso y la tarjeta del código, con sus controles por clase. */
 function dom(){

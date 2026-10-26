@@ -18,7 +18,8 @@ const { montar, INDEX } = require('./ayuda');
 exports.nombre = 'Talentos: las sugerencias al escribir';
 
 const RAIZ = path.dirname(INDEX);
-const HTML = fs.readFileSync(INDEX, 'utf8');
+// En Windows git saca los archivos con CRLF; los patrones de abajo cuentan con «\n», como en la nube.
+const HTML = fs.readFileSync(INDEX, 'utf8').replace(/\r\n/g, '\n');
 const castNorm = (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
 
 exports.pruebas = async function(t){

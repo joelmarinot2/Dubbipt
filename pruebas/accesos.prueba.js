@@ -112,7 +112,7 @@ exports.pruebas = async function(t){
   t.ok('es una sección de Casting (solo administradores), con sus filtros y su estilo', /\{ v: 'accesos',    t: 'Accesos' \}/.test(CV) && /case 'accesos':    return csHtmlAccesos\(vivo\);/.test(CV) && /que === 'accCsv'/.test(CV) && /\.cs-acc-tabla\{/.test(HTML));
 
   t.seccion('4 · en la nube nadie lo falsea ni lo borra');
-  const SQL = fs.readFileSync(path.join(RAIZ, 'sql', 'seguridad-14-registro-accesos.sql'), 'utf8');
+  const SQL = fs.readFileSync(path.join(RAIZ, 'sql', 'seguridad-14-registro-accesos.sql'), 'utf8').replace(/\r\n/g, '\n');   // CRLF en Windows: el patrón cuenta con «\n»
   t.ok('quién, su correo y la hora los pone el servidor', /new\.user_id := auth\.uid\(\);/.test(SQL) && /new\.email   := \(select email from auth\.users where id = auth\.uid\(\)\);/.test(SQL) && /new\.creado  := now\(\);/.test(SQL) && /before insert on public\.auditoria/.test(SQL));
   t.ok('solo se añade, y solo lo leen los administradores, con el código del autenticador', /revoke update, delete, truncate on public\.auditoria from authenticated;/.test(SQL) && /for select to authenticated\n  using \(public\.is_admin\(\)\)/.test(SQL)
     && /policy mfa_aal2 on public\.auditoria as restrictive/.test(SQL) && /revoke all on public\.auditoria from anon;/.test(SQL));
