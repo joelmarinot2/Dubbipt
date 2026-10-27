@@ -3071,7 +3071,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.85.1-nube';
+const APP_VER_NUM = 'v11.85.2-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -7622,7 +7622,15 @@ async function scanPdf(){
         if(m.lineIdx === vaciaEn + 1){ vaciaEn = m.lineIdx; continue; }
         buenas.push(m);
         const cola = l ? headerTail(l.text.slice((m.at||0) + (m.len||0))) : '';
-        vaciaEn = (cola === '') ? m.lineIdx : -99;
+        /* Una cabecera que no es nadie que hable sino una indicación de producción
+           -«GRABACIÓN ORIGINAL», «ORIGINAL», «X»- no se traga el nombre de debajo:
+           ese SÍ es quien habla. Llegó de sala con un guion polaco:
+               "GRABACIÓN ORIGINAL
+               "MILENA SMOLICKA
+               Nie wiem…
+           y a MILENA SMOLICKA se le perdía ese parlamento («1 renglón sin reconocer»). */
+        const indicacion = (typeof castEsActor === 'function') && !castEsActor(m.key);
+        vaciaEn = (cola === '' && !indicacion) ? m.lineIdx : -99;
       }
       marks.length = 0;
       for(const m of buenas) marks.push(m);
@@ -11141,7 +11149,7 @@ const CAST_CERCA = 4;        // líneas de margen: por debajo, se avisa
    de sala, los hace quien esté). Contarlos aquí no dice nada: saldrían los
    primeros de la lista con cien líneas y con choques falsos en cada página,
    tapando a los actores de verdad. */
-const OCU_NO_ACTOR = new Set(['X','ORIGINAL','ORIGINALES','TODOS','TODAS','NA','N','EDICION',
+const OCU_NO_ACTOR = new Set(['X','ORIGINAL','ORIGINALES','TODOS','TODAS','NA','N','EDICION','GRABACION',
   'VOZ','VOCES','AUDIO','IDIOMA','SIN','SE','DEJA','QUEDA','DOBLA','DOBLAR','DOBLAJE','NO','A']);
 function castEsActor(talento){
   const t = String(talento == null ? '' : talento).trim();

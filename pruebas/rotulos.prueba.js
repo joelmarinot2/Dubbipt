@@ -94,6 +94,22 @@ const PAG_DIALOGO = [
 
 const REPARTO = ['GRÁFICA', 'BIG JOHN', 'CHARLOTTE', 'GORDA NAN', 'HENRY'];
 
+/* Una indicación de producción encima de quien habla, con las comillas tal
+   como venían en el guion polaco que llegó de sala (MILENA SMOLICKA salía con
+   «1 renglón sin reconocer»). Aquí el de debajo SÍ habla. */
+const PAG_GRABACION = [
+  [90, 707, '01:14:10'],
+  [90, 671, '"GRABACIÓN ORIGINAL'],
+  [90, 635, '"MILENA SMOLICKA'],
+  [90, 598, 'Nie wiem, co się stało.'],
+  [90, 526, '01:14:20'],
+  [90, 490, 'MILENA SMOLICKA'],
+  [90, 454, 'Tak.']
+];
+const REPARTO_POLACO = ['"GRABACION ORIGINAL', 'MILENA SMOLICKA', 'GRÁFICA', 'GORDA NAN'];
+/* El castEsActor de verdad: qué cabeceras son una indicación y no alguien. */
+const ACTOR = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* Casillas que se rellenan con algo que NO es un actor', '/** Carga por talento']], ['castEsActor'], {});
+
 function fingePdf(paginas){
   return {
     numPages: paginas.length,
@@ -106,8 +122,9 @@ function fingePdf(paginas){
   };
 }
 
-async function escanear(paginas, reparto){
+async function escanear(paginas, reparto, conActor){
   const M = montar(RECORTES, ['scanPdf', 'verPageData: () => pageData'], {
+    castEsActor: conActor ? ACTOR.castEsActor : undefined,
     pdfDoc: fingePdf(paginas), numPages: paginas.length,
     chars: (reparto || REPARTO).map(d => ({ key: d, display: d })),
     occByChar: {}, pageData: {}, charMarks: {}, tcIndex: [], window: {},
@@ -158,6 +175,17 @@ exports.pruebas = async function(t){
   const pd = (await escanear([PAG_DIALOGO]))[1];
   t.eq('las dos cuentan', quienes(pd).join(' · '), 'BIG JOHN · CHARLOTTE',
        'llevan su diálogo pegado, así que ninguna se queda vacía');
+
+  t.seccion('4b · una indicación de producción encima no se traga a quien habla');
+  {
+    const pg = (await escanear([PAG_GRABACION], REPARTO_POLACO, true))[1];
+    t.eq('«GRABACIÓN ORIGINAL» no es nadie: MILENA SMOLICKA, debajo, conserva su parlamento', quienes(pg).join(' · '),
+         '"GRABACION ORIGINAL · MILENA SMOLICKA · MILENA SMOLICKA',
+         'antes la de debajo se tomaba por un nombre dentro de un rótulo y se descartaba');
+    t.eq('GRABACIÓN ORIGINAL, ORIGINAL, X y EDICIÓN son indicaciones; GRÁFICA sí habla', ['"GRABACIÓN ORIGINAL', 'ORIGINAL', 'X', 'EDICIÓN', 'GRÁFICA', 'MILENA SMOLICKA'].map(k => ACTOR.castEsActor(k)).join(','), 'false,false,false,false,true,true');
+    const p32b = (await escanear([PAG32], null, true))[1];
+    t.eq('y los rótulos de GRÁFICA siguen igual', quienes(p32b).join(' · '), 'CHARLOTTE · GRÁFICA · HENRY · GORDA NAN');
+  }
 
   t.seccion('5 · y el libreto que sale de ahí');
   const pdTodo = await escanear([PAG32, PAG40]);
