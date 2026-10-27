@@ -92,7 +92,7 @@ const CS_SECCIONES = [
   { v: 'trailers',   t: 'Tráilers' },
   { v: 'produccion', t: 'Producción' },
   /* Contract Inventory va dentro de Dubcards, y Pegado de casting ya no está (PRO-57). */
-  { v: 'dubcards',   t: 'Dubcards',          dc: 'dubcards',   dice: 'Prepara las DUBCARD de cada capítulo desde el casting (Netflix y otras casas, formato Paramount) y el Contract Inventory.' },
+  { v: 'dubcards',   t: 'Dubcards',          dc: 'dubcards',   dice: 'Prepara las DUBCARD de cada capítulo desde el casting (Netflix y otras casas, formatos Paramount y Pixelogic) y el Contract Inventory.' },
   { v: 'accesos',    t: 'Accesos' },
   { v: 'breakdowns', t: 'Breakdowns',        dc: 'breakdowns', dice: 'Escribe los breakdowns de los personajes a partir del libreto y la guía del programa, con su IA.' }
 ];
