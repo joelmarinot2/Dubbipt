@@ -2997,6 +2997,7 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
   if(CS.tab === 'casting') cuerpo = csHtmlCastingPrograma(filasCast);
   else if(CS.tab === 'reparto') cuerpo = csHtmlReparto(p, reparto, d);
   else if(CS.tab === 'historial') cuerpo = csHtmlHistorial(historial, true, 200);
+  else if(CS.tab === 'continuidad') cuerpo = (typeof contHtml === 'function') ? contHtml(p) : '';
   else {
     const temps = csTemporadas(p);
     const fila = (e) => {
@@ -3056,7 +3057,9 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
     + '</div>'
     + csHtmlRevisar(p, d, hayLibreto)
     + (p.serie ? csCambiadorHtml(csTalentosEn(d, p.dcEps.map(e => e.id)), 'programa') : '')
-    + '<div class="cs-pests cs-tabs">' + pest('episodios', 'Episodios', eps.length) + pest('casting', 'Casting', filasCast.length) + pest('reparto', 'Reparto', reparto.length) + (prodPuede() ? pest('historial', 'Cambios', historial.length) : '') + '</div>'
+    + '<div class="cs-pests cs-tabs">' + pest('episodios', 'Episodios', eps.length) + pest('casting', 'Casting', filasCast.length) + pest('reparto', 'Reparto', reparto.length)
+    +   ((typeof contHtml === 'function') ? pest('continuidad', 'Continuidades original', (p.show && typeof CONT !== 'undefined' && CONT.datos[String(p.show.id)]) ? Object.keys(CONT.datos[String(p.show.id)].episodios || {}).length : '') : '')
+    +   (prodPuede() ? pest('historial', 'Cambios', historial.length) : '') + '</div>'
     + cuerpo
     + csListaTalentos(d);
 }
@@ -3407,6 +3410,7 @@ function csPintarVista(nav, vista){
   nav.querySelectorAll('.cs-nav-b').forEach(b => { b.onclick = () => csIr(b.dataset.v); });
   vista.innerHTML = csHtml(CS.vista);
   csCablear(vista);
+  if(CS.vista === 'programa' && CS.tab === 'continuidad' && typeof contCablear === 'function'){ try{ contCablear(vista, csActual().p); }catch(e){ fallo('contCablear · js/castingvistas.js', e); } }
 }
 
 /**

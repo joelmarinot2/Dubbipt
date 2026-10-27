@@ -14,7 +14,8 @@ const fs = require('fs');
 
 exports.nombre = 'Acceso solo por invitación';
 
-const HTML = fs.readFileSync(INDEX, 'utf8');
+// En Windows git saca los archivos con CRLF; los patrones de abajo cuentan con «\n», como en la nube.
+const HTML = fs.readFileSync(INDEX, 'utf8').replace(/\r\n/g, '\n');
 
 exports.pruebas = async function(t){
   t.seccion('1 · aquí no se crean cuentas');
