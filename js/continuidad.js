@@ -151,6 +151,109 @@ function contDeLibro(libro, archivo){
   return contLeerLista({ filas: filas, resumen: hoja('WORD COUNT SUMMARY'), info: info, cambios: cambios, archivo: archivo });
 }
 
+/* ── Los libretos en original de Discovery: Word en tabla (LIB-27) ─────────
+   Pedido de sala, con «Hoarding For The Holidays» (HOUSE # HHL625819): «que se
+   pueda leer como libreto original, así como los de formato de Netflix, pero
+   estos son de otra casa, que es Discovery». El guion es un Word con una
+   tabla de tres columnas -timecode, personaje, lo que dice- y una fila vacía
+   entre cada dos; lo que va sin personaje son gráficas («GRAPHICS ON
+   SCREEN: …») y marcas de montaje («Break 1», «CREDITS BEGIN»), que no son
+   personajes. Detrás viene una tabla de «Profanity Markers» y un índice de
+   dos columnas, que no son del guion. Se pasa a lo mismo que un dialogue list
+   (IN-TIMECODE, SOURCE, DIALOGUE, SOURCE ONSCREEN) y se cuentan las palabras
+   de cada personaje, que el Word no trae. «Frank (Archive)» es FRANK, solo
+   voz. El episodio no viene en el documento: si no lo dice el nombre del
+   archivo («…E03…», «Ep 3»), se pregunta. */
+
+const CONT_DOCX_MARCA = /^(GRAPHICS?(\s+ON\s+SCREEN)?|ON[- ]?SCREEN|TEXT\s+ON\s+SCREEN|LOWER\s+THIRDS?|SUPERS?|CHYRON|CAPTIONS?|LOCATOR|TITLE\s+(CARD|SEQUENCE)|MAIN\s+TITLE|OPENING\s+TITLES?|(COMMERCIAL\s+)?BREAK(\s+\d+)?|ACT\s+\w+|END\s+OF\s+\w+|(END\s+)?CREDITS(\s+\w+)?|COLD\s+OPEN|TEASE|BUMPER|RECAP)\b/i;
+const CONT_DOCX_VOZ = /\s*\((ARCHIVE|ARCHIVO|V\.?\s?O\.?|O\.?\s?S\.?|O\.?\s?C\.?|OFF|ON\s+PHONE|PHONE|CONT'?D|CONT\.?)\)\s*$/i;
+
+function contXmlTexto(s){
+  return String(s == null ? '' : s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (m, n) => String.fromCharCode(+n)).replace(/&#x([0-9a-f]+);/gi, (m, n) => String.fromCharCode(parseInt(n, 16))).replace(/&amp;/g, '&');
+}
+/** El texto de un trozo de Word: sus párrafos, con los saltos y tabuladores como espacios. */
+function contDocxParrafos(xml){
+  return (String(xml || '').match(/<w:p[ >][\s\S]*?<\/w:p>/g) || []).map(p => {
+    const ts = p.replace(/<w:(br|tab|cr)\b[^>]*\/>/g, '<w:t> </w:t>').match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g) || [];
+    return contXmlTexto(ts.map(t => t.replace(/<[^>]+>/g, '')).join('')).replace(/\s+/g, ' ').trim();
+  });
+}
+/** Las filas de las tablas del guion: {tc, quien, texto}. Sin la tabla de Profanity Markers ni las de menos de tres columnas. */
+function contDocxFilas(xml){
+  const out = [];
+  for(const tb of (String(xml || '').match(/<w:tbl>[\s\S]*?<\/w:tbl>/g) || [])){
+    const filas = [];
+    let fuera = false;
+    for(const tr of (tb.match(/<w:tr[ >][\s\S]*?<\/w:tr>/g) || [])){
+      const celdas = (tr.match(/<w:tc[ >][\s\S]*?<\/w:tc>/g) || []).map(c => contDocxParrafos(c).filter(Boolean));
+      const primera = (celdas[0] || []).join(' ').toUpperCase();
+      if(/^PROFANITY MARKERS/.test(primera) || (primera === 'TIMECODE' && (celdas[1] || []).join(' ').toUpperCase() === 'LABEL')) fuera = true;
+      if(celdas.length >= 3) filas.push({ tc: (celdas[0][0] || '').trim(), quien: celdas[1].join(' ').trim(), texto: celdas[2].join(' ').trim() });
+    }
+    if(!fuera) out.push(...filas);
+  }
+  return out;
+}
+/** Título y número de casa, de la cabecera del documento que los trae («Hoarding For The Holidays» · «HOUSE #HHL625819»). */
+function contDocxCabecera(cabeceras){
+  for(const x of (cabeceras || [])){
+    const ps = contDocxParrafos(x).filter(Boolean), i = ps.findIndex(t => /^HOUSE\s*#\s*\S*\d/i.test(t));
+    if(i < 0) continue;
+    return { titulo: i > 0 ? ps[i - 1] : '', casa: ps[i].replace(/^HOUSE\s*#\s*/i, '').trim(), version: ps.slice(i + 1).find(t => !/^PAGE\b/i.test(t)) || '' };
+  }
+  return { titulo: '', casa: '', version: '' };
+}
+/** El episodio, solo si el nombre del archivo lo dice claro («…_E03_…», «Ep 3», «Episode 3»); el número de casa no lo es. */
+function contDocxEpisodio(archivo){
+  const a = String(archivo || '').replace(/\.[a-z0-9]+$/i, '');
+  const m = a.match(/(?:^|[^a-z])(?:episod(?:e|io)|ep|e)[\s._#-]*(\d{1,3})(?!\d)/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+const contPalabras = t => String(t || '').replace(/\[[^\]]*\]|\([^)]*\)/g, ' ').split(/\s+/).filter(w => /[\p{L}\p{N}]/u.test(w)).length;
+
+/**
+ * Un libreto en original de Word (`partes`: ruta del .docx → texto) a lo
+ * mismo que un dialogue list. Si el guion es de los que dejan sin personaje
+ * la continuación de quien habla (el de subtítulos), esas filas son suyas.
+ */
+function contDeDocx(partes, archivo){
+  const filas = contDocxFilas(partes['word/document.xml']);
+  if(!filas.some(f => f.quien)) throw new Error('«' + (archivo || 'el archivo') + '» no parece un libreto: no tiene una tabla de timecode, personaje y diálogo');
+  const sin = filas.filter(f => !f.quien && f.texto), marcas = sin.filter(f => CONT_DOCX_MARCA.test(f.texto)).length;
+  const continuacion = !(marcas >= 3 && marcas * 2 >= sin.length);
+  const lista = [['IN-TIMECODE', 'SOURCE', 'DIALOGUE', 'SOURCE ONSCREEN']], palabras = {};
+  let ultimo = null;
+  for(const f of filas){
+    if(f.quien){
+      const m = f.quien.match(CONT_DOCX_VOZ), cue = (m && m.index > 0 ? f.quien.slice(0, m.index) : f.quien).replace(/\s+/g, ' ').trim().toUpperCase();
+      if(f.tc && !/\d/.test(f.tc)) continue;                       // la cabecera de la tabla
+      ultimo = { fila: [f.tc, cue, f.texto, m && m.index > 0 && !/^CONT/i.test(m[1]) ? 'OFF' : ''], cue: cue };
+      lista.push(ultimo.fila);
+      palabras[cue] = (palabras[cue] || 0) + contPalabras(f.texto);
+    }else if(continuacion && ultimo && f.texto){
+      ultimo.fila[2] += ' ' + f.texto;
+      palabras[ultimo.cue] += contPalabras(f.texto);
+    }
+  }
+  const cab = contDocxCabecera(Object.keys(partes).filter(k => /^word\/header\d*\.xml$/.test(k)).sort().map(k => partes[k]));
+  const ep = contDocxEpisodio(archivo);
+  const info = { 'SHOW TITLE': cab.titulo, 'VERSION': [cab.casa ? 'HOUSE # ' + cab.casa : '', cab.version].filter(Boolean).join(' · ') };
+  if(ep) info['EPISODE #'] = ep;
+  const res = contLeerLista({ filas: lista, resumen: [['CHARACTER NAME', 'TOTAL WORD COUNT']].concat(Object.keys(palabras).map(k => [k, palabras[k]])), info: info, archivo: archivo });
+  if(!ep) res.ep = null;                                           // el número de casa no es el episodio: se pregunta
+  res.casa = cab.casa; res.casaDe = 'Discovery';
+  return res;
+}
+
+/** Las partes de texto de un .docx que hacen falta: el documento y sus cabeceras. */
+function contDocxPartes(bytes){
+  const z = fflate.unzipSync(bytes, { filter: (f) => /^word\/(document|header\d*)\.xml$/.test(f.name) });
+  const out = {};
+  for(const k of Object.keys(z)) out[k] = fflate.strFromU8(z[k]);
+  return out;
+}
+
 /* ── La tabla ──────────────────────────────────────────────────────────── */
 
 function contSimil(a, b){ return (typeof castSimil === 'function') ? castSimil(a, b) : (a === b ? 1 : 0); }
@@ -317,8 +420,10 @@ async function contSubir(show, archivos){
   const hechos = [], fallos = [];
   for(const f of Array.from(archivos)){
     try{
-      const libro = XLSX.read(new Uint8Array(await f.arrayBuffer()), { type: 'array' });
-      const ep = contDeLibro(libro, f.name);
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      const ep = /\.docx$/i.test(f.name) ? contDeDocx(contDocxPartes(bytes), f.name) : contDeLibro(XLSX.read(bytes, { type: 'array' }), f.name);
+      /* El Word de Discovery no dice el episodio: se pregunta, proponiendo el siguiente al último leído. */
+      if(!ep.ep && /\.docx$/i.test(f.name)) ep.ep = contPreguntarEp(f.name, ep, datos);
       if(!ep.ep) throw new Error('no se sabe de qué episodio es');
       if(!Object.keys(ep.personajes).length) throw new Error('no trae ningún personaje');
       datos.episodios[ep.ep] = ep;
@@ -331,6 +436,17 @@ async function contSubir(show, archivos){
     + (fallos.length ? ' · no se pudo: ' + fallos.join('; ') : '') + (ok ? '' : ' · guardado solo en este equipo: no se pudo subir a la nube'));
   if(typeof csRepintar === 'function') csRepintar();
   return { hechos: hechos, fallos: fallos };
+}
+
+/** ¿Qué episodio es? Para un libreto que no lo dice; propone el siguiente al último leído. Nulo si no se contesta. */
+function contPreguntarEp(archivo, ep, datos){
+  const hay = Object.keys((datos && datos.episodios) || {}).map(Number).filter(n => n > 0);
+  const propuesto = hay.length ? Math.max(...hay) + 1 : 1;
+  const que = '¿Qué episodio es «' + archivo + '»' + (ep && ep.programa ? ' (' + ep.programa + (ep.casa ? ', HOUSE # ' + ep.casa : '') + ')' : '') + '? El libreto no lo dice.';
+  let r = null;
+  try{ r = (typeof window !== 'undefined' && typeof window.prompt === 'function') ? window.prompt(que, String(propuesto)) : null; }catch(e){ r = null; }
+  const n = parseInt(String(r == null ? '' : r).replace(/\D+/g, ' ').trim(), 10);
+  return isFinite(n) && n > 0 ? n : null;
 }
 
 /** Lo que se escribe a mano de un personaje: nombre, categoría, descripción, idiomas, notas, o juntarlo con otro cue. */
@@ -368,7 +484,7 @@ function contHtml(p){
   if(!datos) return '<div class="cs-nada">Cargando las continuidades…</div>';
   const t = contTabla(datos);
   const subir = '<button class="cs-b cs-pri" data-ct="subir">' + contIco('subir', 14) + '<span>Subir libretos en original</span></button>';
-  const cab = '<div class="cs-cast-cab ct-cab"><span>' + (t.eps.length ? t.eps.length + ' episodio' + (t.eps.length === 1 ? '' : 's') + ' leído' + (t.eps.length === 1 ? '' : 's') + ': ' : 'Sube el dialogue list en original de cada episodio (.xlsx de Netflix). Puedes subir varios a la vez.') + '</span>'
+  const cab = '<div class="cs-cast-cab ct-cab"><span>' + (t.eps.length ? t.eps.length + ' episodio' + (t.eps.length === 1 ? '' : 's') + ' leído' + (t.eps.length === 1 ? '' : 's') + ': ' : 'Sube el libreto en original de cada episodio: el dialogue list de Netflix (.xlsx) o el guion de Discovery (Word, .docx). Puedes subir varios a la vez.') + '</span>'
     + t.fuentes.map(f => '<span class="ct-ep" title="' + contEsc(f.archivo) + '">EP' + f.ep + (f.version ? ' · ' + contEsc(f.version) : '') + '<button class="ct-x" data-ct="quitarEp" data-v="' + f.ep + '" title="Quitar este episodio">' + contIco('cerrar', 11) + '</button></span>').join('')
     + '<span class="ct-bots">' + subir + (t.eps.length ? '<button class="cs-b" data-ct="excel">' + contIco('bajar', 14) + '<span>Descargar Excel</span></button>' : '') + '</span></div>';
   if(!t.eps.length) return cab;
@@ -403,7 +519,7 @@ function contCablear(raiz, p){
     const que = el.getAttribute('data-ct'), at = (k) => el.getAttribute('data-' + k);
     if(que === 'subir') el.onclick = () => {
       const i = document.createElement('input');
-      i.type = 'file'; i.multiple = true; i.accept = '.xlsx,.xls';
+      i.type = 'file'; i.multiple = true; i.accept = '.xlsx,.xls,.docx';
       i.onchange = () => { if(i.files && i.files.length) contSubir(p.show, i.files).catch(e => fallo('contSubir · js/continuidad.js', e, 'los libretos no se han podido leer')); };
       i.click();
     };

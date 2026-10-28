@@ -134,7 +134,7 @@ exports.pruebas = async function(t){
     const P = { show: { id: 'sF' }, nombre: 'MI SERIE' };
     t.ok('mientras carga, se dice', /Cargando las continuidades/.test(A.M.contHtml(P)));
     await espera(); await espera();
-    t.ok('vacío: cómo empezar', /Sube el dialogue list en original de cada episodio/.test(A.M.contHtml(P)) && /data-ct="subir"/.test(A.M.contHtml(P)) && !/data-ct="excel"/.test(A.M.contHtml(P)));
+    t.ok('vacío: cómo empezar', /Sube el libreto en original de cada episodio: el dialogue list de Netflix \(\.xlsx\) o el guion de Discovery/.test(A.M.contHtml(P)) && /data-ct="subir"/.test(A.M.contHtml(P)) && !/data-ct="excel"/.test(A.M.contHtml(P)));
     A.M.CONT.datos.sF = datos();
     const h = A.M.contHtml(P);
     t.ok('con libretos: los episodios leídos, subir más y descargar el Excel', /3 episodios leídos/.test(h) && /<span class="ct-ep" title="ep2\.xlsx">EP2/.test(h) && /data-ct="excel"/.test(h) && /data-ct="quitarEp" data-v="4"/.test(h));
