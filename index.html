@@ -3071,7 +3071,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.87.0-nube';
+const APP_VER_NUM = 'v11.87.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -11454,6 +11454,8 @@ async function castRegGuardar(showId, reg){
   try{
     const r = await sb.storage.from('libretos').upload(
       castRegPath(id), new Blob([JSON.stringify(reg)], { type:'application/json' }), { upsert:true });
+    /* CAST-41: el Reparto que estén mirando en los demás equipos se pone al día al momento. */
+    if(!r.error && typeof libPing === 'function') libPing('reg', null, id);
     return !r.error;
   }catch(e){ return false; }
 }
@@ -14017,6 +14019,10 @@ function libPing(t, id, showId){
    con el servidor caído no se insiste. */
 const LIBPING = { tmr: null, ultimo: null, pendiente: false };
 function onLibPing(p){
+  /* CAST-41: cambió el casting de un programa (o un capítulo suyo): su Reparto, si se está mirando, se vuelve a leer.
+     Un aviso solo de casting no recarga la biblioteca. */
+  if(p && p.showId && typeof csRegistroAviso === 'function') csRegistroAviso(p.showId);
+  if(p && p.t === 'reg') return;
   LIBPING.ultimo = (LIBPING.ultimo && LIBPING.ultimo.id && !(p && p.id)) ? LIBPING.ultimo : (p || LIBPING.ultimo);
   if(typeof document !== 'undefined' && document.hidden){ LIBPING.pendiente = true; return; }
   if(LIBPING.tmr) return;

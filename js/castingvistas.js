@@ -420,7 +420,10 @@ function csCastingDe(e, d, registro){
 function csRegistroDe(show){
   if(!show) return null;
   const k = String(show.id);
+  CS_VIVO.uso[k] = Date.now(); CS_VIVO.ids[k] = show.id;
+  csVivoArrancar();
   if(k in CS.registros) return CS.registros[k];
+  CS_VIVO.ts[k] = Date.now();
   CS.registros[k] = null;
   Promise.resolve().then(() => castRegCargar(show.id))
     .then(r => {
@@ -429,6 +432,62 @@ function csRegistroDe(show){
     })
     .catch(() => { if(!CS.registros[k]) CS.registros[k] = { personajes: {} }; });
   return null;
+}
+
+/* ── El Reparto, en vivo (especificacion 02, CAST-41) ─────────────────────
+   Pedido de sala: «los talentos no se actualizan en vivo en el panel de
+   reparto de los programas». El registro de casting de cada programa se leía
+   una vez por sesión: lo asignado después en otro equipo (o en el libreto)
+   no llegaba hasta recargar. Ahora, cuando un equipo guarda el casting de un
+   programa avisa a los demás (canal de la biblioteca, castRegGuardar), y el
+   que lo esté mirando lo vuelve a leer; y por si un aviso se pierde, lo que
+   se está mirando se repasa cada medio minuto. Solo se repinta si cambió, y
+   no mientras se escribe en Casting (se espera a que se termine). */
+const CS_VIVO = { uso: {}, ts: {}, ids: {}, avisos: {}, reloj: null, pend: null, cada: 30000, mirando: 120000 };
+/** ¿Se está escribiendo en Casting? Repintar ahora quitaría el foco. */
+function csEscribiendo(){
+  try{
+    const a = document.activeElement, v = document.getElementById('csVista');
+    return !!(a && v && v.contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+  }catch(e){ return false; }
+}
+function csRepintarVivo(){
+  clearTimeout(CS_VIVO.pend);
+  if(csEscribiendo()){ CS_VIVO.pend = setTimeout(csRepintarVivo, 2000); return; }
+  csRepintar();
+}
+/** Vuelve a leer el registro de un programa que se está mirando; repinta solo si cambió. */
+async function csRegistroRefrescar(showId, forzar){
+  const k = String(showId);
+  if(!CS.registros[k]) return false;
+  CS_VIVO.ts[k] = Date.now();
+  if(forzar){ try{ if(typeof _regNubeVisto !== 'undefined') _regNubeVisto[CS_VIVO.ids[k] != null ? CS_VIVO.ids[k] : showId] = 0; }catch(e){ /* se mira la nube igual en el repaso */ } }
+  const reg = await castRegCargar(CS_VIVO.ids[k] != null ? CS_VIVO.ids[k] : showId);
+  if(!reg || JSON.stringify(reg) === JSON.stringify(CS.registros[k])) return false;
+  CS.registros[k] = reg;
+  csRepintarVivo();
+  return true;
+}
+/** Otro equipo cambió el casting de un programa: si se mira, se pone al día (los avisos seguidos, una sola vez). */
+function csRegistroAviso(showId){
+  const k = String(showId);
+  if(!CS.registros[k]) return;
+  clearTimeout(CS_VIVO.avisos[k]);
+  CS_VIVO.avisos[k] = setTimeout(() => { delete CS_VIVO.avisos[k]; csRegistroRefrescar(showId, true).catch(() => { /* en el repaso */ }); }, 800);
+}
+/** El repaso: lo que se ha mirado en los últimos dos minutos, cada medio minuto, con Casting delante. */
+function csVivoRepaso(){
+  if(typeof document !== 'undefined' && document.hidden) return;
+  if(!csActivo()) return;
+  const ahora = Date.now();
+  for(const k of Object.keys(CS_VIVO.uso)){
+    if(ahora - CS_VIVO.uso[k] > CS_VIVO.mirando || ahora - (CS_VIVO.ts[k] || 0) < CS_VIVO.cada) continue;
+    csRegistroRefrescar(k).catch(() => { /* en el siguiente repaso */ });
+  }
+}
+function csVivoArrancar(){
+  if(CS_VIVO.reloj || typeof setInterval !== 'function') return;
+  CS_VIVO.reloj = setInterval(csVivoRepaso, 10000);
 }
 
 /* Los programas a los que ya se les completó el casting en esta sesión. */
