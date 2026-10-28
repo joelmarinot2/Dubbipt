@@ -3075,7 +3075,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.88.0-nube';
+const APP_VER_NUM = 'v11.89.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -6938,24 +6938,65 @@ function docxLineas(texto){
   return Math.max(1, Math.ceil(n / 12));
 }
 
-/** Las filas de las tablas del documento, con sus párrafos por casilla. */
+/** Las filas de las tablas del documento, con sus párrafos por casilla. La tabla de
+    «Profanity Markers» de los guiones de Discovery (Timecode │ Label │ Content) no es
+    del guion: se salta entera, traiga marcas o no. */
 function docxFilas(div){
   const out = [];
-  div.querySelectorAll('tr').forEach(tr => {
-    const celdas = [...tr.querySelectorAll('td,th')].map(td => {
-      const ps = [...td.querySelectorAll('p,div')].map(p => (p.textContent || '').replace(/\s+/g,' ').trim())
-                   .filter(Boolean);
-      if(ps.length) return ps;
-      const t = (td.textContent || '').replace(/\s+/g,' ').trim();
-      return t ? [t] : [];
+  const tablas = [...(div.querySelectorAll('table') || [])];
+  (tablas.length ? tablas : [div]).forEach(tb => {
+    const filas = [];
+    let fuera = false;
+    tb.querySelectorAll('tr').forEach(tr => {
+      if(tablas.length && tr.closest && tr.closest('table') !== tb) return;      // las de una tabla dentro de otra, con la suya
+      const celdas = [...tr.querySelectorAll('td,th')].map(td => {
+        const ps = [...td.querySelectorAll('p,div')].map(p => (p.textContent || '').replace(/\s+/g,' ').trim())
+                     .filter(Boolean);
+        if(ps.length) return ps;
+        const t = (td.textContent || '').replace(/\s+/g,' ').trim();
+        return t ? [t] : [];
+      });
+      const primera = norm((celdas[0] || []).join(' '));
+      if(/^PROFANITY MARKERS/.test(primera) || (primera === 'TIMECODE' && norm((celdas[1] || []).join(' ')) === 'LABEL')) fuera = true;
+      if(celdas.length >= 3) filas.push({
+        tc: (celdas[0][0] || '').trim(),
+        quien: (celdas[1].join(' ') || '').trim(),
+        parrafos: celdas[2]
+      });
     });
-    if(celdas.length >= 3) out.push({
-      tc: (celdas[0][0] || '').trim(),
-      quien: (celdas[1].join(' ') || '').trim(),
-      parrafos: celdas[2]
-    });
+    if(!fuera) out.push(...filas);
   });
   return out;
+}
+
+/* ── Los guiones de Discovery (especificacion 01, LIB-27) ────────────────
+   La misma tabla de tres columnas, pero de otra casa: TODO lo que se dice
+   lleva su personaje, y una fila sin personaje NO es continuación de nadie,
+   sino lo que pasa en pantalla o en el montaje:
+       01:00:20 │          │ GRAPHICS ON SCREEN:CHRISTA, 48 WANTS A …
+       01:12:02 │          │ Break 1
+   Las gráficas van a GRÁFICA (sin el «GRAPHICS ON SCREEN:»); los cortes, el
+   título, los créditos y el final, a EDICIÓN, que no se graba. Lo que va sin
+   personaje y sin marca justo detrás de una de ellas (el texto de los
+   créditos) es de la misma; si no, es una gráfica. Se sabe que el guion es
+   así porque la mayoría de sus filas sin personaje llevan una de esas
+   marcas: en el guion de subtítulos, casi ninguna. */
+const DOCX_EDICION = 'EDICIÓN';
+const DOCX_MARCA_GRAFICA = /^(GRAPHICS?(\s+ON\s+SCREEN)?|ON[- ]?SCREEN(\s+(TEXT|GRAPHICS?))?|TEXT\s+ON\s+SCREEN|LOWER\s+THIRDS?|SUPERS?|CHYRON|CAPTIONS?|LOCATOR|TITLE\s+CARD|MAIN\s+TITLE|INSERTOS?|R[ÓO]TULOS?|GR[ÁA]FICAS?)\b\s*:?\s*/i;
+const DOCX_MARCA_EDICION = /^(TITLE\s+SEQUENCE|OPENING\s+TITLES?|(COMMERCIAL\s+)?BREAK(\s+\d+)?|ACT\s+(\d+|[IVX]+|ONE|TWO|THREE|FOUR|FIVE|SIX)|END\s+OF\s+(PROGRAMME|PROGRAM|PART|ACT|SHOW|EPISODE)|(END\s+)?CREDITS(\s+(BEGIN|ROLL|START))?|COLD\s+OPEN|TEASE|BUMPER|RECAP|PREVIOUSLY\s+ON)\b/i;
+/** ¿Una fila sin personaje con marca de pantalla o de montaje? Dice cuál: 'grafica', 'edicion' o ''. */
+function docxMarca(texto){
+  const t = String(texto || '').trim();
+  if(DOCX_MARCA_EDICION.test(t)) return 'edicion';
+  if(DOCX_MARCA_GRAFICA.test(t)) return 'grafica';
+  return '';
+}
+/** «Frank (Archive)» es FRANK: de archivo, en off, al teléfono… es el mismo personaje; la nota va delante de lo que dice. */
+const DOCX_ACOTA_QUIEN = /\s*\((ARCHIVE|ARCHIVO|V\.?\s?O\.?|O\.?\s?S\.?|O\.?\s?C\.?|OFF|ON\s+PHONE|PHONE|CONT'?D|CONT\.?)\)\s*$/i;
+function docxQuien(quien){
+  const q = String(quien || '').replace(/\s+/g, ' ').trim(), m = q.match(DOCX_ACOTA_QUIEN);
+  if(!m || m.index === 0) return { nombre: q, nota: '' };
+  return { nombre: q.slice(0, m.index).trim(), nota: /^CONT/i.test(m[1]) ? '' : '(' + m[1] + ')' };
 }
 
 /**
@@ -6978,6 +7019,8 @@ function docxEsRotulo(fila, nombres){
 
 /** Arma el libreto de un guion de Word en tabla. Devuelve false si no lo es. */
 function docxDeTabla(div, name){
+  /* Un salto de línea dentro de una casilla es un espacio: si no, «Executive Producer» y el nombre de debajo salen pegados. */
+  [...(div.querySelectorAll('br') || [])].forEach(br => { if(br.replaceWith) br.replaceWith(' '); });
   const filas = docxFilas(div);
   /* ¿Es esto un guion, o una tabla de portada? Lo que lo dice no es cuánta
      gente hable —un tramo corto puede tener un solo personaje— sino que la
@@ -6985,11 +7028,17 @@ function docxDeTabla(div, name){
      tiene. En el guion que llegó de sala lo son 1046 de 1116.
      Importa acertar: devolver true de más se lleva por delante el lector de
      siempre, el de los nombres en MAYÚSCULAS, que ni se llega a probar. */
-  const conTC = filas.filter(f => f.tc && docxTC(f.tc) != null).length;
-  const conNombre = filas.filter(f => f.quien).length;
-  if(filas.length < 4 || !conNombre || conTC < filas.length / 2) return false;
+  /* Las filas vacías no cuentan: el guion de Discovery deja una entre cada dos. */
+  const utiles = filas.filter(f => f.tc || f.quien || f.parrafos.length);
+  const conTC = utiles.filter(f => f.tc && docxTC(f.tc) != null).length;
+  const conNombre = utiles.filter(f => f.quien).length;
+  if(utiles.length < 4 || !conNombre || conTC < utiles.length / 2) return false;
 
-  const nombres = new Set(filas.filter(f => f.quien).map(f => norm(f.quien)));
+  const nombres = new Set(filas.filter(f => f.quien).map(f => norm(docxQuien(f.quien).nombre)));
+  /* ¿Las filas sin personaje son de otro (Discovery: gráficas y montaje) o del que venía hablando? */
+  const sinQuien = filas.filter(f => !f.quien && f.parrafos.length);
+  const conMarca = sinQuien.filter(f => docxMarca(f.parrafos[0])).length;
+  const marcasDePantalla = conMarca >= 3 && conMarca * 2 >= sinQuien.length;
 
   pdfDoc = null; pdfName = name; lastPdfBuf = null; xlsFileName = null;
   pageData = {}; occByChar = {}; charMarks = {}; tcIndex = [];
@@ -7005,12 +7054,27 @@ function docxDeTabla(div, name){
     return cur;
   };
 
+  let marcaAntes = null;
   for(const f of filas){
-    const texto = f.parrafos.join(' ').trim();
+    let texto = f.parrafos.join(' ').trim();
     if(!texto && !f.quien) continue;
+    const tcSec = f.tc ? docxTC(f.tc) : null;
+    if(f.tc && tcSec == null && f.quien) continue;          // la cabecera: «TC │ PERSONAJE │ DIÁLOGO»
     clen += texto.length + 1;
     const pag = Math.max(1, Math.ceil(clen / 1800));
-    const tcSec = f.tc ? docxTC(f.tc) : null;
+
+    if(marcasDePantalla){
+      if(!f.quien){
+        /* Discovery: lo que no tiene personaje es de pantalla o de montaje, nunca de quien hablaba. */
+        const m = docxMarca(texto) || (marcaAntes ? '' : 'grafica');
+        if(m === 'grafica') texto = texto.replace(DOCX_MARCA_GRAFICA, '').trim() || texto;
+        if(m){ marcaAntes = abrir(m === 'edicion' ? DOCX_EDICION : DOCX_GRAFICA, tcSec, pag); }
+        if(texto) marcaAntes.lines.push(texto);
+        cur = null;
+        continue;
+      }
+      marcaAntes = null;
+    }
 
     if(docxEsRotulo(f, nombres)){
       /* El rótulo es de GRÁFICA, no de quien venía hablando. Y corta: lo que
@@ -7021,7 +7085,11 @@ function docxDeTabla(div, name){
       cur = antes;
       continue;
     }
-    if(f.quien) abrir(f.quien, tcSec, pag);
+    if(f.quien){
+      const q = docxQuien(f.quien);
+      abrir(q.nombre, tcSec, pag);
+      if(q.nota) texto = q.nota + ' ' + texto;
+    }
     if(!cur) abrir(f.quien || DOCX_GRAFICA, tcSec, pag);
     if(cur.tcSec == null && tcSec != null) cur.tcSec = tcSec;
     if(texto) cur.lines.push(texto);
