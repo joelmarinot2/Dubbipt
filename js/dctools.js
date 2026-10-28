@@ -577,6 +577,7 @@ const ST = {
   dc: { entries: [], client: null, processed: [], warnings: [], logs: [], busy: false, modo: 'general' },
   pm: { entries: [], eps: [], logs: [], busy: false, cfg: null },
   px: { entries: [], eps: [], logs: [], busy: false, cfg: null },
+  pl: { entries: [], eps: [], logs: [], busy: false, cfg: null },
   bd: { script: null, guide: null, reading: '', name: '', isMovie: false, ep: '', notes: '', withSeries: true, iaForm: null,
         busy: false, live: '', result: null, err: '', abort: null, openId: null, cfgOpen: false, cfgMsg: '', locales: [] }
 };
@@ -728,8 +729,8 @@ function dcMatrizHtml(eps){
     + '</tbody></table></div></div>';
 }
 
-/* Las pestañas de Dubcards: la de siempre (Netflix y otras casas), los formatos Paramount (PRO-56) y Pixelogic (PRO-58) y el Contract Inventory, que ya no es una sección aparte (PRO-57). */
-const DC_MODOS = [['general', 'Netflix y otras casas'], ['paramount', 'Formato Paramount'], ['pixelogic', 'Formato Pixelogic'], ['contratos', 'Contract Inventory']];
+/* Las pestañas de Dubcards: la de siempre (Netflix y otras casas), los formatos Paramount (PRO-56), Pixelogic (PRO-58) y Pipeline Studio (PRO-59) y el Contract Inventory, que ya no es una sección aparte (PRO-57). */
+const DC_MODOS = [['general', 'Netflix y otras casas'], ['paramount', 'Formato Paramount'], ['pixelogic', 'Formato Pixelogic'], ['pipeline', 'Pipeline Studio'], ['contratos', 'Contract Inventory']];
 function dcModos(){
   const b = (k, t) => '<button class="cs-pest' + (ST.dc.modo === k ? ' on' : '') + '" data-dct="dcModo" data-v="' + k + '">' + E(t) + '</button>';
   return '<div class="cs-pests dct-modos">' + DC_MODOS.map(m => b(m[0], m[1])).join('') + '</div>';
@@ -740,6 +741,7 @@ const dcModoClic = el => () => { const v = el.getAttribute('data-v'); ST.dc.modo
 function dcHtml(){
   if(ST.dc.modo === 'paramount'){ if(!ST.pm.cfg) ST.pm.cfg = pmCfgCargar(); return dcModos() + pmHtml(); }
   if(ST.dc.modo === 'pixelogic'){ if(!ST.px.cfg) ST.px.cfg = pxCfgCargar(); return dcModos() + pxHtml(); }
+  if(ST.dc.modo === 'pipeline'){ if(!ST.pl.cfg) ST.pl.cfg = plCfgCargar(); return dcModos() + plHtml(); }
   if(ST.dc.modo === 'contratos') return dcModos() + ciHtml();
   const S = ST.dc, isNetflix = !S.client || S.client.kind === 'netflix';
   const cli = S.client || lastClient() || { kind: 'netflix', name: 'Netflix' };
@@ -782,6 +784,7 @@ function dcCablear(raiz){
   const S = ST.dc;
   if(S.modo === 'paramount'){ pmCablear(raiz); return; }
   if(S.modo === 'pixelogic'){ pxCablear(raiz); return; }
+  if(S.modo === 'pipeline'){ plCablear(raiz); return; }
   if(S.modo === 'contratos'){ ciCablear(raiz); return; }
   const q = s => raiz.querySelector(s);
   const input = q('#dctDcFiles');
@@ -1296,17 +1299,31 @@ function pmDatosDeHojas(casting, desglose){
     }
   }
   if(!titulo && Array.isArray(desglose) && desglose[8]) titulo = txt(desglose[8][7]);
-  const reparto = [], vistos = new Map();
+  /* Un episodio con segmentos («LYLA IN THE LOOP 119ABI») trae una fila «EPS 119A» antes de cada uno; el
+     personaje puede venir con su timecode pegado («LYLA   01:00:31») y la fila del segmento, con «…» de actor. */
+  const reparto = [], vistos = new Map(), segmentos = [];
+  let seg = null;
   for(let r = cab + 1; cab >= 0 && r < filas.length; r++){
-    const f = filas[r] || [], p = txt(f[colP]), t = txt(f[colT]), l = colL >= 0 ? (parseInt(f[colL], 10) || 0) : 0;
+    const f = filas[r] || [], l = colL >= 0 ? (parseInt(f[colL], 10) || 0) : 0;
+    const p = txt(f[colP]).replace(/\s+\d{1,2}:\d{2}:\d{2}(?:[:;.]\d{2})?$/, '').trim(), t = txt(f[colT]).replace(/^[.…\s\-]+$/, '');
     if(!p) continue;
+    const sm = pmSinTildes(p).toUpperCase().match(PM_SEGMENTO);
+    if(sm){ seg = { nombre: sm[1] + sm[2], reparto: [], vistos: new Map() }; segmentos.push(seg); continue; }
     const k = pmSinTildes(p).toUpperCase();
+    if(seg){
+      if(seg.vistos.has(k)){ const y = seg.vistos.get(k); if(!y.talento && t) y.talento = t; y.lineas += l; }
+      else{ const y = { personaje: p, talento: t, lineas: l }; seg.vistos.set(k, y); seg.reparto.push(y); }
+    }
     if(vistos.has(k)){ const x = vistos.get(k); if(!x.talento && t) x.talento = t; x.lineas += l; continue; }
     const x = { personaje: p, talento: t, lineas: l };
     vistos.set(k, x); reparto.push(x);
   }
-  return { titulo: titulo, director: director, tecnico: tecnico, reparto: reparto, sinCabecera: cab < 0 };
+  return { titulo: titulo, director: director, tecnico: tecnico, reparto: reparto, sinCabecera: cab < 0,
+           segmentos: segmentos.map(g => ({ nombre: g.nombre, reparto: g.reparto })) };
 }
+
+/** «EPS 119A», «EP# 119 B», «EPISODIO 119I»: el comienzo de un segmento del episodio. */
+const PM_SEGMENTO = /^EP(?:S|ISODIO)?\.?\s*#?\s*(\d{1,4})\s*([A-Z])$/;
 
 /** De un libro de SheetJS: sus hojas CASTING (la de ese nombre, si hay varias) y DESGLOCE. */
 function pmDatosDeLibro(wb){
@@ -1991,6 +2008,348 @@ function pxCablear(raiz){
   if(input) input.onchange = () => { pxAnadir(input.files); input.value = ''; };
 }
 
+/* ── DUBCARD de Pipeline Studio (PRO-59) ───────────────────────────────────
+   Pedido de sala, con el desglose de «Lyla in the Loop» 119ABI y la DUBCARD
+   que se entregó: «un nuevo cliente para las DUBCARD, Pipeline Studio».
+   Un episodio puede traer varios segmentos (119A, 119B, 119I: una fila
+   «EPS 119A» antes de cada uno en la hoja CASTING); sale UN archivo por
+   episodio, «Lyla in the Loop_Ep 119_es_DubCard.xlsx», con una hoja por
+   segmento: versión, título traducido entre comillas, «Episodio 119A»,
+   estudio, director, ingeniero, traducción y la lista Personajes / Talento,
+   en mayúsculas como en la entrega. Como la entrega:
+     · El personaje principal primero (el primero del casting; se puede
+       cambiar y se recuerda por serie) y los demás en orden alfabético.
+     · El talento limpio: «PAULA ESPINOSA MEXICO» → «PAULA ESPINOSA» (el
+       nombre del directorio de talentos si está, o sin la ciudad o el país).
+       Lo que se corrige a mano se recuerda para la próxima vez.
+     · Un personaje mal escrito en un segmento («LIDIA») se une al de los
+       demás segmentos con el mismo actor («LYDIA»).
+     · ORIGINAL, TODOS y lo que no es un talento no entra.
+   La serie: el nombre para el archivo, el título traducido y quién tradujo
+   se recuerdan por serie; la versión y el estudio, en este equipo. */
+
+const PL_KEY = 'dc_pipeline_v1';
+const PL_CFG_BASE = { idioma: 'Versión Español Latino', estudio: 'Centauro Comunicaciones', memoria: {}, actores: {} };
+function plCfgCargar(){
+  let g = null;
+  try{ g = JSON.parse(localStorage.getItem(PL_KEY) || 'null'); }catch(e){ g = null; }
+  const c = Object.assign({}, PL_CFG_BASE, g || {});
+  c.memoria = Object.assign({}, (g && g.memoria) || {});
+  c.actores = Object.assign({}, (g && g.actores) || {});
+  return c;
+}
+function plCfgGuardar(c){ try{ localStorage.setItem(PL_KEY, JSON.stringify(c)); }catch(e){ /* sin almacén: vale para esta vez */ } }
+/** Lo que se recuerda de una serie: nombre para el archivo, título traducido, traductor, quién va primero y sus personajes (con su actor). */
+function plMemoria(cfg, clave){
+  const m = cfg.memoria[clave] || (cfg.memoria[clave] = {});
+  m.personajes = m.personajes || {};
+  return m;
+}
+
+/** Distancia de edición (para «LIDIA» y «LYDIA»). */
+function plDistancia(a, b){
+  if(a === b) return 0;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for(let i = 1; i <= a.length; i++){
+    const cur = [i];
+    for(let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/** Ciudades y países que sala pone tras el nombre del talento («PAULA ESPINOSA MEXICO»): no son parte del nombre. */
+const PL_LUGARES = /\s+\(?(MEXICO|MIAMI|REMOTO|REMOTA|ARGENTINA|CHILE|PERU|VENEZUELA|USA|ESPANA|BOGOTA|MEDELLIN|CALI)\)?$/;
+function plDirectorio(){
+  try{ return (typeof talNombres === 'function') ? talNombres() : []; }catch(e){ return []; }
+}
+/** El talento como va en la DUBCARD: lo corregido a mano antes, el nombre del directorio, o sin ciudad ni país; en mayúsculas. */
+function plActor(bruto, cfg, dir){
+  const t = String(bruto == null ? '' : bruto).replace(/\s+/g, ' ').trim().normalize('NFC'), k = pxClave(t);
+  if(!k) return '';
+  if(cfg.actores[k]) return cfg.actores[k];
+  const lista = dir || plDirectorio();
+  const igual = lista.find(n => pxClave(n) === k);
+  if(igual) return igual.toUpperCase();
+  let mejor = '';
+  for(const n of lista){ const kn = pxClave(n); if(kn && k.indexOf(kn + ' ') === 0 && n.length > mejor.length) mejor = n; }
+  if(mejor) return mejor.toUpperCase();
+  const m = k.match(PL_LUGARES);
+  return (m ? t.slice(0, t.length - m[0].length) : t).toUpperCase();
+}
+
+/**
+ * El episodio para Pipeline, de lo que se leyó del desglose (pmDatosDeHojas):
+ * número, serie, y por segmento la lista de personajes con su talento.
+ */
+function plEpisodio(datos, archivo, cfg){
+  const tit = String(datos.titulo || '').replace(/\s+/g, ' ').trim();
+  const m = tit.match(/(\d{1,4})\s*([A-Za-z]{0,6})\s*$/);
+  let numero = m ? m[1] : '';
+  if(!numero){ const n = extractEpNum(archivo); numero = n != null ? String(n) : ''; }
+  const resto = m ? tit.slice(0, m.index).trim() : tit;
+  const clave = pxClave(resto) || '-';
+  const mem = plMemoria(cfg, clave);
+  if(!mem.nombre) mem.nombre = pmTituloIngles(pmSerieConocida(tit) || resto);
+  const dir = plDirectorio();
+  /* Personajes conocidos de la serie: nombre → actor, para unir «LIDIA» con «LYDIA». */
+  const conocidos = new Map(Object.keys(mem.personajes).map(n => [n, mem.personajes[n]]));
+  const nombrar = (p, actorK) => {
+    const k = pxClave(p);
+    if(conocidos.has(k)) return k;
+    for(const [n, a] of conocidos) if(a === actorK && n.length >= 4 && k.length >= 4 && plDistancia(n, k) <= 1) return n;
+    conocidos.set(k, actorK);
+    return k;
+  };
+  const fuera = [];
+  const segs = (datos.segmentos && datos.segmentos.length ? datos.segmentos : [{ nombre: numero, reparto: datos.reparto }]).map(g => {
+    const filas = [], vistos = new Set();
+    for(const x of g.reparto){
+      if(x.talento && dcIsPseudo(x.talento)){ fuera.push(g.nombre + ': ' + pxClave(x.personaje) + ' (' + x.talento.toUpperCase() + ')'); continue; }
+      const actor = plActor(x.talento, cfg, dir), personaje = nombrar(x.personaje, pxClave(actor));
+      if(vistos.has(personaje)) continue;
+      vistos.add(personaje);
+      filas.push({ personaje: personaje, actor: actor, auto: actor, bruto: pxClave(x.talento) });
+    }
+    return { nombre: g.nombre, filas: filas };
+  });
+  const primero = segs.map(g => g.filas[0]).find(Boolean);
+  if(!mem.arriba && primero) mem.arriba = primero.personaje;
+  const ep = { archivo: archivo || '', tituloDesglose: tit, numero: numero, clave: clave, segmentos: segs,
+               director: pmPropio(datos.director), tecnico: pmPropio(datos.tecnico), fuera: fuera };
+  plOrdenar(ep, cfg);
+  return ep;
+}
+/** El principal de la serie primero; los demás, en orden alfabético. */
+function plOrdenar(ep, cfg){
+  const arriba = plMemoria(cfg, ep.clave).arriba || '';
+  ep.segmentos.forEach(g => g.filas.sort((a, b) => ((b.personaje === arriba) - (a.personaje === arriba)) || a.personaje.localeCompare(b.personaje, 'es', { sensitivity: 'base' })));
+}
+
+/* ── El Excel, como la entrega ── */
+
+const PL_B = '<border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border>';
+const PL_ESTILOS = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+  + '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+  + '<fonts count="3"><font><sz val="11"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>'
+  +   '<font><b/><sz val="12"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font>'
+  +   '<font><sz val="12"/><name val="Calibri"/><family val="2"/><scheme val="minor"/></font></fonts>'
+  + '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>'
+  + '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>' + PL_B + '</borders>'
+  + '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
+  + '<cellXfs count="10">'
+  +   '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'                                                                                                  // 0
+  +   '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center"/></xf>'                            // 1 versión
+  +   '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>'          // 2 título y episodio
+  +   '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center"/></xf>'                                          // 3 fila vacía
+  +   '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right"/></xf>'             // 4 Estudio, Director…
+  +   '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/>'                                                                     // 5 celda con borde
+  +   '<xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left"/></xf>'              // 6 su nombre
+  +   '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment horizontal="right"/></xf>'             // 7 Personajes
+  +   '<xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/>'                                                                     // 8 Talento
+  +   '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1"/>'                                                                                   // 9 reparto
+  + '</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+
+/** La hoja de un segmento, celda a celda como la entrega. */
+function plHojaXml(ep, seg, cfg){
+  const mem = plMemoria(cfg, ep.clave), filas = [], c = pxCelda;
+  const fila = (n, celdas, alto) => filas.push('<row r="' + n + '"' + (alto ? ' ht="' + alto + '" customHeight="1"' : '') + '>' + celdas.join('') + '</row>');
+  const ancho = (n, v, s) => [c('A' + n, v, s), c('B' + n, '', s), c('C' + n, '', s)];
+  fila(1, ancho(1, cfg.idioma || '', 1), 15.75);
+  fila(2, ancho(2, mem.trad ? '"' + mem.trad + '"' : '', 2), 15.75);
+  fila(3, ancho(3, 'Episodio ' + seg.nombre, 2), 15.75);
+  fila(4, ancho(4, '', 3));
+  [['Estudio', cfg.estudio], ['Director de Doblaje', ep.director], ['Ingeniero de Grabación', ep.tecnico], ['Traducción', mem.traductor]].forEach((x, i) => {
+    const n = 5 + i;
+    fila(n, [c('A' + n, x[0], 4), c('B' + n, '', 5), c('C' + n, x[1] || '', 6)], 15.75);
+  });
+  fila(9, [c('A9', '', 9), c('B9', '', 9), c('C9', '', 9)]);
+  fila(10, [c('A10', 'Personajes', 7), c('B10', '', 5), c('C10', 'Talento', 8)], 15.75);
+  seg.filas.forEach((x, i) => { const n = 11 + i; fila(n, [c('A' + n, x.personaje, 9), c('B' + n, '', 9), c('C' + n, x.actor || '', 9)]); });
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+    + '<dimension ref="A1:C' + (10 + Math.max(1, seg.filas.length)) + '"/><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetFormatPr defaultColWidth="8.85546875" defaultRowHeight="15"/>'
+    + '<cols><col min="1" max="1" width="44.42578125" customWidth="1"/><col min="2" max="2" width="5.42578125" customWidth="1"/><col min="3" max="3" width="45" customWidth="1"/></cols>'
+    + '<sheetData>' + filas.join('') + '</sheetData>'
+    + '<mergeCells count="4"><mergeCell ref="A1:C1"/><mergeCell ref="A2:C2"/><mergeCell ref="A3:C3"/><mergeCell ref="A4:C4"/></mergeCells>'
+    + '<pageMargins left="0.511811024" right="0.511811024" top="0.787401575" bottom="0.787401575" header="0.31496062" footer="0.31496062"/></worksheet>';
+}
+
+/** Los archivos del .xlsx de un episodio: una hoja por segmento («Ep 119A»). */
+function plArchivosXlsx(ep, cfg){
+  const usados = new Set();
+  const nombres = ep.segmentos.map((g, i) => {
+    const base = ('Ep ' + (g.nombre || i + 1)).replace(/[\\\/?*\[\]:]/g, '').slice(0, 27);
+    let n = base, k = 2;
+    while(usados.has(n.toUpperCase())) n = base + ' (' + k++ + ')';
+    usados.add(n.toUpperCase());
+    return n;
+  });
+  const f = {
+    '[Content_Types].xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+      + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
+      + '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+      + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+      + nombres.map((_, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')
+      + '</Types>',
+    '_rels/.rels': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    'xl/workbook.xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+      + '<bookViews><workbookView/></bookViews><sheets>' + nombres.map((n, i) => '<sheet name="' + pmX(n) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>').join('') + '</sheets></workbook>',
+    'xl/_rels/workbook.xml.rels': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + nombres.map((_, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join('')
+      + '<Relationship Id="rId' + (nombres.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+    'xl/styles.xml': PL_ESTILOS
+  };
+  ep.segmentos.forEach((g, i) => { f['xl/worksheets/sheet' + (i + 1) + '.xml'] = plHojaXml(ep, g, cfg); });
+  return f;
+}
+
+/** «Lyla in the Loop», episodio 119 → «Lyla in the Loop_Ep 119_es_DubCard.xlsx». */
+function plNombreArchivo(cfg, ep){
+  const s = String(plMemoria(cfg, ep.clave).nombre || '').replace(/[\\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').trim() || 'Serie';
+  return s + '_Ep ' + (String(ep.numero || '').trim() || '0') + '_es_DubCard.xlsx';
+}
+
+/** Lo corregido a mano se recuerda: el talento bien escrito y los personajes de la serie con su actor. */
+function plRecordar(ep, cfg){
+  const mem = plMemoria(cfg, ep.clave);
+  for(const g of ep.segmentos) for(const x of g.filas){
+    const a = String(x.actor || '').replace(/\s+/g, ' ').trim().toUpperCase();
+    if(x.bruto && a && a !== x.auto) cfg.actores[x.bruto] = a;
+    if(x.personaje) mem.personajes[pxClave(x.personaje)] = pxClave(a);
+  }
+  plCfgGuardar(cfg);
+}
+
+/** Descarga la DUBCARD de un episodio (un archivo con una hoja por segmento). Devuelve el nombre del archivo (o null). */
+function plDescargar(ep, callado){
+  const S = ST.pl;
+  if(!ep){ aviso('Primero procesa los desgloses'); return null; }
+  try{
+    ep.segmentos.forEach(g => g.filas.forEach(x => { x.personaje = String(x.personaje || '').replace(/\s+/g, ' ').trim().toUpperCase(); x.actor = String(x.actor || '').replace(/\s+/g, ' ').trim().toUpperCase(); }));
+    plOrdenar(ep, S.cfg);
+    plRecordar(ep, S.cfg);
+    const f = plArchivosXlsx(ep, S.cfg), z = {};
+    for(const k of Object.keys(f)) z[k] = fflate.strToU8(f[k]);
+    const blob = new Blob([fflate.zipSync(z, { level: 6 })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const nombre = plNombreArchivo(S.cfg, ep);
+    bdDownload(blob, nombre);
+    if(!callado) aviso('Descargado: ' + nombre);
+    return nombre;
+  }catch(e){ aviso('No se pudo armar la DUBCARD: ' + e.message); return null; }
+}
+
+/** Un archivo por episodio, uno tras otro. */
+async function plDescargarVarios(eps){
+  const S = ST.pl;
+  if(!eps.length){ aviso('Primero procesa los desgloses'); return []; }
+  const hechos = [];
+  for(let i = 0; i < eps.length; i++){
+    if(i) await new Promise(r => setTimeout(r, S.pausa == null ? 700 : S.pausa));
+    const n = plDescargar(eps[i], true);
+    if(n) hechos.push(n);
+  }
+  if(hechos.length) aviso(hechos.length + (hechos.length === 1 ? ' DUBCARD descargada: ' : ' DUBCARDs descargadas, una por episodio: ') + hechos.join(', '));
+  return hechos;
+}
+
+/** Lee los desgloses subidos. */
+async function plProcesar(){
+  const S = ST.pl;
+  if(S.busy || !S.entries.length) return;
+  if(!S.cfg) S.cfg = plCfgCargar();
+  S.busy = true; S.logs = []; S.eps = []; repintar();
+  try{
+    for(const en of S.entries){
+      try{
+        const wb = XLSX.read(new Uint8Array(await readFileBuffer(en.file)), { type: 'array', bookVBA: true });
+        const d = pmDatosDeLibro(wb);
+        if(!d){ S.logs.push({ msg: en.name + ': no tiene hoja CASTING', cls: 'err' }); continue; }
+        if(d.sinCabecera){ S.logs.push({ msg: en.name + ': la hoja CASTING no tiene la columna NOMBRE DEL ACTOR', cls: 'err' }); continue; }
+        const ep = plEpisodio(d, en.name, S.cfg);
+        S.eps.push(ep);
+        const sin = ep.segmentos.reduce((n, g) => n + g.filas.filter(x => !x.actor).length, 0);
+        S.logs.push({ msg: en.name + ': episodio ' + (ep.numero || '?') + ' · ' + (ep.segmentos.length > 1 ? ep.segmentos.length + ' segmentos (' + ep.segmentos.map(g => g.nombre).join(', ') + ')' : '1 hoja')
+          + ' · ' + ep.segmentos.map(g => g.filas.length).join(' + ') + ' personajes' + (ep.fuera.length ? ' · ' + ep.fuera.length + ' fuera (no son talentos)' : '') + (sin ? ' · ' + sin + ' sin talento' : ''), cls: sin ? 'err' : 'ok' });
+      }catch(e){ S.logs.push({ msg: en.name + ': ' + e.message, cls: 'err' }); }
+    }
+    plCfgGuardar(S.cfg);
+    S.eps.sort((a, b) => (parseInt(a.numero, 10) || 0) - (parseInt(b.numero, 10) || 0));
+  }finally{ S.busy = false; repintar(); }
+}
+
+function plHtml(){
+  const S = ST.pl, cfg = S.cfg;
+  const campo = (dct, k, et, v, ph, extra) => '<label>' + E(et) + '<input type="text" data-dct="' + dct + '" data-k="' + k + '"' + (extra || '') + ' value="' + E(v || '') + '"' + (ph ? ' placeholder="' + E(ph) + '"' : '') + ' autocomplete="off"></label>';
+  return '<div class="dct">'
+    + '<div class="dct-drop" data-dct="plElegir">' + ico('subir', 22) + '<b>Haz clic o arrastra los desgloses (presupuesto) de cada episodio</b><span>.xlsm · .xlsx · varios a la vez (hoja CASTING con el NOMBRE DEL ACTOR; los segmentos, con su fila «EPS 119A»)</span>'
+    +   '<input type="file" id="dctPlFiles" multiple accept=".xlsm,.xlsx,.xls" hidden></div>'
+    + (S.entries.length ? '<div class="dct-lista">' + S.entries.map((e, i) => '<div class="dct-arch"><span class="dct-arch-n">' + E(e.name) + '</span><button class="cs-b cs-b-icono cs-borrar" data-dct="plQuitar" data-i="' + i + '" title="Quitar">' + ico('cerrar', 13) + '</button></div>').join('') + '</div>' : '')
+    + '<div class="dct-pm-cfg"><div class="dct-sec-t">Pipeline Studio <i>(se recuerda en este equipo)</i></div>'
+    +   '<div class="dct-pm-campos">' + campo('plCfg', 'idioma', 'Versión', cfg.idioma) + campo('plCfg', 'estudio', 'Estudio', cfg.estudio) + '</div></div>'
+    + (S.entries.length ? '<button class="cs-b cs-pri dct-ancho" data-dct="plProcesar"' + (S.busy ? ' disabled' : '') + '>' + (S.busy ? 'Procesando…' : ico('actualizar', 14) + '<span>Procesar</span>') + '</button>' : '')
+    + (S.logs.length ? '<div class="dct-log">' + S.logs.map(l => '<div class="dct-log-' + (l.cls || 'n') + '">' + E(l.msg) + '</div>').join('') + '</div>' : '')
+    + (S.eps.length ? (S.eps.length > 1 ? '<button class="cs-b cs-pri dct-ancho dct-bajar" data-dct="plBajarTodo">' + ico('bajar', 14) + '<span>Descargar las ' + S.eps.length + ' DUBCARDs (un archivo por episodio)</span></button>' : '')
+      + S.eps.map((ep, i) => {
+          const mem = plMemoria(cfg, ep.clave), todos = [];
+          ep.segmentos.forEach(g => g.filas.forEach(x => { if(todos.indexOf(x.personaje) < 0) todos.push(x.personaje); }));
+          return '<div class="dct-ep dct-pm-ep"><div class="dct-pm-cab"><div class="dct-ep-t">' + E(ep.tituloDesglose || ep.archivo) + '</div>'
+          + '<button class="cs-b cs-pri" data-dct="plBajar" data-i="' + i + '">' + ico('bajar', 14) + '<span>Descargar DUBCARD ' + E(ep.numero) + '</span></button></div>'
+          + '<div class="dct-pm-campos">'
+          +   campo('plSerie', 'nombre', 'Serie (nombre del archivo)', mem.nombre, 'Lyla in the Loop', ' data-i="' + i + '"')
+          +   campo('plSerie', 'trad', 'Título traducido (va entre comillas)', mem.trad, 'Lyla Lo Logra', ' data-i="' + i + '"')
+          +   campo('plSerie', 'traductor', 'Traducción', mem.traductor, 'Nombre Apellido', ' data-i="' + i + '"')
+          +   campo('plEp', 'numero', 'Episodio', ep.numero, '', ' data-i="' + i + '"')
+          +   campo('plEp', 'director', 'Director de Doblaje', ep.director, '', ' data-i="' + i + '"')
+          +   campo('plEp', 'tecnico', 'Ingeniero de Grabación', ep.tecnico, '', ' data-i="' + i + '"')
+          +   '<label>Primero en la lista<select data-dct="plArriba" data-i="' + i + '"><option value="">(ninguno: todo en orden alfabético)</option>'
+          +     todos.map(p => '<option' + (p === mem.arriba ? ' selected' : '') + '>' + E(p) + '</option>').join('') + '</select></label></div>'
+          + ep.segmentos.map((g, s) => '<div class="dct-sec-t">Episodio ' + E(g.nombre) + '</div>'
+              + '<div class="dct-tabla-w"><table class="dct-pm-tabla"><thead><tr><th>#</th><th>Personaje</th><th>Talento</th><th></th></tr></thead><tbody>'
+              + g.filas.map((x, j) => '<tr' + (x.actor ? '' : ' class="dct-pm-sin"') + '><td>' + (j + 1) + '</td>'
+                  + '<td><input type="text" data-dct="plFila" data-i="' + i + '" data-s="' + s + '" data-j="' + j + '" data-k="personaje" value="' + E(x.personaje) + '"></td>'
+                  + '<td><input type="text" data-dct="plFila" data-i="' + i + '" data-s="' + s + '" data-j="' + j + '" data-k="actor" value="' + E(x.actor) + '" placeholder="Sin talento"></td>'
+                  + '<td><button class="cs-b cs-b-icono cs-borrar" data-dct="plFilaQuitar" data-i="' + i + '" data-s="' + s + '" data-j="' + j + '" title="Quitar esta fila">' + ico('cerrar', 12) + '</button></td></tr>').join('')
+              + '</tbody></table></div>').join('')
+          + (ep.fuera.length ? '<div class="dct-tenue">No entran (no son talentos): ' + E(ep.fuera.join(', ')) + '</div>' : '')
+          + '</div>';
+        }).join('') : '')
+    + '</div>';
+}
+
+function plAnadir(files){
+  const S = ST.pl;
+  Array.from(files || []).filter(f => /\.(xlsm|xlsx|xls)$/i.test(f.name)).forEach(f => { if(!S.entries.find(e => e.name === f.name)) S.entries.push({ file: f, name: f.name }); });
+  repintar();
+}
+
+function plCablear(raiz){
+  const S = ST.pl;
+  const input = raiz.querySelector('#dctPlFiles');
+  raiz.querySelectorAll('[data-dct]').forEach(el => {
+    const que = el.getAttribute('data-dct'), i = +el.getAttribute('data-i'), s = +el.getAttribute('data-s'), j = +el.getAttribute('data-j'), k = el.getAttribute('data-k');
+    const ep = S.eps[i], fila = () => ep && ep.segmentos[s] && ep.segmentos[s].filas[j];
+    if(que === 'plElegir'){
+      el.onclick = (ev) => { if(ev.target !== input && input) input.click(); };
+      el.ondragover = (ev) => { ev.preventDefault(); };
+      el.ondrop = (ev) => { ev.preventDefault(); plAnadir(ev.dataTransfer && ev.dataTransfer.files); };
+    }
+    else if(que === 'dcModo') el.onclick = dcModoClic(el);
+    else if(que === 'plQuitar') el.onclick = () => { S.entries.splice(i, 1); repintar(); };
+    else if(que === 'plCfg') el.oninput = () => { S.cfg[k] = el.value; plCfgGuardar(S.cfg); };
+    else if(que === 'plSerie') el.oninput = () => { if(ep){ plMemoria(S.cfg, ep.clave)[k] = el.value.trim(); plCfgGuardar(S.cfg); } };
+    else if(que === 'plProcesar') el.onclick = () => { plProcesar().catch(e => aviso('No se pudo procesar: ' + e.message)); };
+    else if(que === 'plEp') el.oninput = () => { if(ep) ep[k] = el.value; };
+    else if(que === 'plFila') el.oninput = () => { const x = fila(); if(x) x[k] = el.value; };
+    else if(que === 'plArriba') el.onchange = () => { if(ep){ plMemoria(S.cfg, ep.clave).arriba = el.value; plCfgGuardar(S.cfg); S.eps.filter(e => e.clave === ep.clave).forEach(e => plOrdenar(e, S.cfg)); repintar(); } };
+    else if(que === 'plFilaQuitar') el.onclick = () => { if(ep && ep.segmentos[s]){ ep.segmentos[s].filas.splice(j, 1); repintar(); } };
+    else if(que === 'plBajar') el.onclick = () => { if(ep){ plDescargar(ep); repintar(); } };
+    else if(que === 'plBajarTodo') el.onclick = () => { plDescargarVarios(S.eps.slice()).then(repintar).catch(e => aviso('No se pudieron descargar: ' + e.message)); };
+  });
+  if(input) input.onchange = () => { plAnadir(input.files); input.value = ''; };
+}
+
 /* ── Contenido confidencial: la IA externa, bloqueada (ENT-22) ─────────────
    Pedido de sala: «es contenido de Netflix y hay políticas de
    confidencialidad; sería muy grave que se filtren datos de guiones o de
@@ -2285,7 +2644,7 @@ function bdCablear(raiz){
 
 /* ── Hacia fuera ──────────────────────────────────────────────────────────── */
 
-const TITULOS = { dubcards: ['Dubcards', 'Las DUBCARD de cada capítulo (Netflix y otras casas, formatos Paramount y Pixelogic) y el Contract Inventory'],
+const TITULOS = { dubcards: ['Dubcards', 'Las DUBCARD de cada capítulo (Netflix y otras casas, formatos Paramount, Pixelogic y Pipeline Studio) y el Contract Inventory'],
                   breakdowns: ['Breakdowns', 'Análisis de libretos con un modelo de lenguaje · con la IA externa bloqueada salvo autorización escrita del cliente'] };
 
 function html(vista){
@@ -2308,7 +2667,8 @@ return { html: html, cablear: cablear, ST: ST, dcParseFile: dcParseFile, dcProce
          ciNombre: ciNombre, ciReparto: ciReparto, ciMain: ciMain, ciNumero: ciNumero, ciLlenarXml: ciLlenarXml, ciDocumentos: ciDocumentos,
          ciLeerDubcard: ciLeerDubcard, ciCargarDubcard: ciCargarDubcard, ciEquipoDe: ciEquipoDe,
          pmDatosDeHojas: pmDatosDeHojas, pmEpisodio: pmEpisodio, pmEsTraduccion: pmEsTraduccion, pmArchivosXlsx: pmArchivosXlsx, pmNombreArchivo: pmNombreArchivo, pmProcesar: pmProcesar, pmCfgCargar: pmCfgCargar, pmSerieConocida: pmSerieConocida, pmDescargarVarios: pmDescargarVarios,
-         pxEpisodio: pxEpisodio, pxArchivosXlsx: pxArchivosXlsx, pxNombreArchivo: pxNombreArchivo, pxProcesar: pxProcesar, pxCfgCargar: pxCfgCargar, pxDescargarVarios: pxDescargarVarios, pxPartes: pxPartes };
+         pxEpisodio: pxEpisodio, pxArchivosXlsx: pxArchivosXlsx, pxNombreArchivo: pxNombreArchivo, pxProcesar: pxProcesar, pxCfgCargar: pxCfgCargar, pxDescargarVarios: pxDescargarVarios, pxPartes: pxPartes,
+         plEpisodio: plEpisodio, plActor: plActor, plArchivosXlsx: plArchivosXlsx, plNombreArchivo: plNombreArchivo, plProcesar: plProcesar, plCfgCargar: plCfgCargar, plDescargarVarios: plDescargarVarios };
 })();
 
 /* ═══ FIN DE HERRAMIENTAS DE DUBLAJECAST EN DUBBIPT ═══ */
