@@ -85,6 +85,27 @@ exports.pruebas = async function(t){
     t.ok('un archivo sin DESGLOCE se dice y no se procesa', D.ST.dc.processed.length === 0 && D.ST.dc.logs.some(l => /No encontré hoja DESGLOCE/.test(l.msg)));
   }
 
+  t.seccion('1b · los episodios, siempre en orden de número (PRO-60)');
+  {
+    /* Pedido de sala: «subí el presupuesto de 100 Days of the Session 108, 109 y 110 y se me puso primero el 110». */
+    const caso = (titulos, nombres) => {
+      const V = cargar(), D = V.D;
+      D.ST.dc.client = { kind: 'netflix', name: 'Netflix' };
+      D.ST.dc.entries = titulos.map((ti, i) => ({ file: desglose(ti, ['ANA', 'LEO'], [['ANA', 'Luz Mar'], ['LEO', 'Pepe Gil']]), name: nombres[i], cap: nombres[i].replace(/\.[^.]+$/, '') }));
+      return D.dcProcesar().then(() => D.ST.dc.processed);
+    };
+    let p = await caso(['100 DAYS OF THE SESSION 110', '100 DAYS OF THE SESSION 109', '100 DAYS OF THE SESSION 108'], ['P110.xlsm', 'P109.xlsm', 'P108.xlsm']);
+    t.eq('subidos 110, 109, 108: salen 108, 109, 110 (el «100» de la serie no cuenta)', p.map(e => e.cap.slice(-3)).join(','), '108,109,110');
+    t.eq('y el copiado de Netflix va del anterior', p.slice(1).map(e => e.plan.srcCap.slice(-3)).join(','), '108,108');
+    p = await caso(['100 DAYS OF THE SESSION', '100 DAYS OF THE SESSION', '100 DAYS OF THE SESSION'], ['PRESUP 100 DAYS OF THE SESSION 110.xlsm', 'PRESUP 100 DAYS OF THE SESSION 108 (1).xlsm', 'PRESUP 100 DAYS OF THE SESSION 109.xlsm']);
+    t.eq('si el título no trae el episodio, se toma del nombre del archivo', p.map(e => e.cap).join(' | '), '100 DAYS OF THE SESSION 108 | 100 DAYS OF THE SESSION 109 | 100 DAYS OF THE SESSION 110');
+    p = await caso(['SERIE 1010', 'SERIE 1009', 'LYLA IN THE LOOP 119ABI'], ['a.xlsm', 'b.xlsm', 'c.xlsm']);
+    t.eq('cuatro cifras y segmentos', p.map(e => e.cap).join(' | '), 'LYLA IN THE LOOP 119ABI | SERIE 1009 | SERIE 1010');
+    const V = cargar(), D = V.D;
+    D.dcAnadir([{ name: 'P 110.xlsm' }, { name: 'P 109.xlsm' }, { name: 'P 108.xlsm' }, { name: 'notas.pdf' }]);
+    t.eq('la lista de archivos subidos, también en orden', D.ST.dc.entries.map(e => e.name).join(','), 'P 108.xlsm,P 109.xlsm,P 110.xlsm');
+  }
+
   t.seccion('2 · Breakdowns');
   {
     const V = cargar(), D = V.D;
