@@ -1,0 +1,203 @@
+1
+00:00:00,650 --> 00:00:06,629
+Bienvenidos a la guía del flujo de los estudios de studio.centauro.com.
+
+2
+00:00:07,179 --> 00:00:19,810
+El objetivo es uno solo: ser más eficientes como equipo. En este video vamos a recorrer el día de grabación paso a paso, dos casos especiales, y tres reglas que aplican siempre.
+
+3
+00:00:21,560 --> 00:00:27,817
+Primero, lo más importante. La planilla, o PDT, ya no espera al fin de mes.
+
+4
+00:00:28,367 --> 00:00:37,283
+Antes, la PDT se generaba al final del mes. Contabilidad y los talentos recibían el PDT a fin de mes, todo junto.
+
+5
+00:00:37,833 --> 00:00:46,900
+Ahora, la PDT se genera al completar el episodio. Contabilidad y el talento reciben el PDT apenas se completa el episodio.
+
+6
+00:00:47,450 --> 00:00:57,527
+Por eso, lo que marca el estudio tiene que estar bien desde el primer momento: no hay fin de mes para corregir. Si no lo marcan como grabado, no existe.
+
+7
+00:00:59,277 --> 00:01:03,410
+Todos los días, el día de grabación tiene nueve pasos.
+
+8
+00:01:03,960 --> 00:01:08,233
+Los pasos uno y dos se hacen una vez, al empezar el día.
+
+9
+00:01:08,783 --> 00:01:12,718
+Los pasos tres a nueve se repiten con cada talento del llamado.
+
+10
+00:01:14,468 --> 00:01:19,228
+Paso uno: entrar y revisar episodios, menciones y mensajes.
+
+11
+00:01:19,778 --> 00:01:28,033
+Antes de empezar, revisen los episodios asignados, y lean las menciones y los mensajes. Ahí llegan los cambios del día.
+
+12
+00:01:29,783 --> 00:01:38,536
+Paso dos: abrir la Planilla Diaria. Es el llamado del día: cada talento con su hora, su episodio y sus personajes.
+
+13
+00:01:39,086 --> 00:01:44,647
+Revisen que la fecha sea la de hoy, y que los episodios correspondan a lo que tienen asignado.
+
+14
+00:01:45,197 --> 00:01:50,201
+Si ven algo que ya fue grabado, avísenle a Joel o a Rafael Nieto por chat.
+
+15
+00:01:51,951 --> 00:01:55,237
+Los pasos tres a nueve se repiten con cada talento.
+
+16
+00:01:56,987 --> 00:01:59,332
+Paso tres: llamar al talento.
+
+17
+00:01:59,882 --> 00:02:07,370
+Al tocar Llamar Talento, su nombre sale en la TV de la sala de espera, con el mensaje: pase por favor.
+
+18
+00:02:09,120 --> 00:02:11,315
+Paso cuatro: abrir el libreto.
+
+19
+00:02:11,865 --> 00:02:20,433
+Al abrirlo, la sesión pasa a Grabando, y la TV lo muestra, avisándole al resto de los talentos y al equipo que están en sesión.
+
+20
+00:02:22,183 --> 00:02:25,271
+Paso cinco: marcar las líneas grabadas.
+
+21
+00:02:25,821 --> 00:02:33,019
+En el libreto, marquen cada línea cuando queda grabada. Esto ayuda a evitar que queden líneas faltantes.
+
+22
+00:02:34,769 --> 00:02:39,192
+Paso seis: si el talento tiene tiempo, sumar más personajes.
+
+23
+00:02:39,742 --> 00:02:49,157
+En Otros roles en este estudio están los otros personajes pendientes del talento, en otros episodios. Agréguenlos y grábenlos en la misma sesión.
+
+24
+00:02:50,907 --> 00:02:58,232
+Paso siete: cuando termina, marcar qué grabó y qué no. Por cada personaje hay tres estados.
+
+25
+00:02:58,782 --> 00:03:02,602
+Grabado, con sus líneas: se firma y se paga.
+
+26
+00:03:03,152 --> 00:03:07,332
+Faltan líneas: se paga lo grabado, y se avisa a Felipe.
+
+27
+00:03:07,882 --> 00:03:11,457
+No grabado: no se paga, y se avisa a Felipe.
+
+28
+00:03:12,007 --> 00:03:19,496
+Lo que queda como No grabado, o con Faltan líneas, le llega como notificación a Felipe para reprogramarlo.
+
+29
+00:03:21,246 --> 00:03:23,777
+Paso ocho: finalizar la sesión.
+
+30
+00:03:24,327 --> 00:03:33,614
+Toquen Finalizar Grabación, revisen el resumen con el talento, y confirmen y firmen. Solo lo marcado como Grabado se firma y se paga.
+
+31
+00:03:34,164 --> 00:03:44,357
+Si la sesión no se finaliza, se generan huecos de información que solo se descubren al final del mes. Por eso a veces aparecen episodios que se grabaron el mes pasado.
+
+32
+00:03:44,907 --> 00:03:50,259
+Siempre deben asegurarse de marcar lo que grabaron, igual que con la planilla física.
+
+33
+00:03:52,009 --> 00:03:55,005
+Paso nueve: llamar al siguiente talento.
+
+34
+00:03:55,555 --> 00:03:59,479
+Vuelvan a la Planilla Diaria, y repitan desde el paso tres.
+
+35
+00:04:01,229 --> 00:04:06,419
+Caso especial X: el talento está grabando, pero no está en el llamado.
+
+36
+00:04:06,969 --> 00:04:16,268
+Si llegó alguien que no aparece en la Planilla Diaria, se agrega antes de grabar. Si no está en el llamado, no se puede finalizar ni pagar.
+
+37
+00:04:16,818 --> 00:04:21,520
+X1: abrir Desglose Episodio, en el episodio que va a grabar.
+
+38
+00:04:22,070 --> 00:04:28,280
+X2: tocar Grabar Talento No Programado. El botón está en el desglose del episodio.
+
+39
+00:04:28,830 --> 00:04:39,221
+X3: elegir el personaje y el talento. Busquen el personaje en la lista, o escríbanlo si es nuevo, y elijan el talento que lo está grabando.
+
+40
+00:04:39,771 --> 00:04:46,353
+X4: agregar a llamado. Queda en la Planilla Diaria de hoy, como cualquier otra sesión.
+
+41
+00:04:46,903 --> 00:04:58,362
+X5: seguir los pasos cuatro a ocho. Abrir libreto, marcar líneas, marcar qué grabó y qué no, y finalizar la sesión, igual que con cualquier talento.
+
+42
+00:05:00,112 --> 00:05:04,918
+Caso especial Z: si hay que cambiar el talento de un personaje.
+
+43
+00:05:05,468 --> 00:05:13,269
+El pago va al talento que figura en el casting. Si el casting está mal, se le paga a la persona equivocada.
+
+44
+00:05:13,819 --> 00:05:27,390
+Z1: cambiar el casting en Desglose Episodio. En el personaje, cambien el talento por quien lo graba de verdad. Queda marcado como Recasteado. Revisen que todo el casting del episodio esté correcto.
+
+45
+00:05:27,940 --> 00:05:33,118
+Háganlo antes de finalizar la sesión, para que se firme a nombre de la persona correcta.
+
+46
+00:05:34,868 --> 00:05:37,120
+Para tener en cuenta, siempre.
+
+47
+00:05:37,670 --> 00:05:47,561
+Uno: marcar como grabado exactamente lo que el talento grabó. Ni más ni menos. Eso es lo que se le paga, y lo que recibe contabilidad.
+
+48
+00:05:48,111 --> 00:05:58,431
+Dos: si hay duda, preguntar. Escriban a alguien del equipo antes de finalizar. Es más fácil preguntar que corregir una PDT ya enviada.
+
+49
+00:05:58,981 --> 00:06:08,976
+Tres: el casting tiene que estar bien. Quien grabó es quien cobra. Si cambió el talento, cambien el casting, caso Z, antes de finalizar.
+
+50
+00:06:10,726 --> 00:06:24,762
+En resumen: marcar bien desde el primer momento, finalizar cada sesión, y preguntar ante la duda. Así la PDT sale correcta apenas se completa el episodio, y todos somos más eficientes como equipo.
+
+51
+00:06:25,312 --> 00:06:28,063
+Gracias. studio.centauro.com.

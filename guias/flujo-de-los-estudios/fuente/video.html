@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Flujo de los estudios</title>
+<style>
+:root{
+  --bg:#FAF9F6; --ink:#17171A; --ink2:#46464D; --mute:#86868E; --line:#E4E1DB; --card:#FFFFFF; --head:#EFEDE8;
+  --or:#C2410C; --or-deep:#9A3412; --or-bg:#FBE8DD; --or-soft:#FDF3EC;
+  --yl-bg:#FBF0CF; --yl-ink:#5B4300; --pk-bg:#FADFDF; --pk-ink:#7F1D1D;
+  --gr-bg:#DCF3E3; --gr-ink:#1D6B3B; --am-bg:#FBF0C8; --am-ink:#8A5A00; --rd-bg:#F8D9D9; --rd-ink:#9B1C1C;
+  --pu:#6D28D9; --pu-bg:#F1EAFB; --pu-soft:#F8F4FD; --bl:#1D4ED8; --bl-bg:#E8EEFB; --bl-soft:#F3F6FD;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--bg)}
+body{font-family:Inter,"Inter Display",system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;font-feature-settings:"cv11","ss01"}
+.mono{font-family:"JetBrains Mono",monospace}
+#stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:var(--bg)}
+.scene{position:absolute;inset:0;background:var(--bg);display:none;padding:72px 110px 0}
+.scene.on{display:block}
+[data-r]{opacity:0;will-change:transform,opacity}
+b,strong{font-weight:700;color:var(--ink)}
+
+/* chrome */
+.eyebrow{position:absolute;top:50px;left:110px;font-family:"JetBrains Mono",monospace;font-size:19px;letter-spacing:.14em;text-transform:uppercase;color:var(--or);font-weight:600}
+.brand{position:absolute;bottom:44px;left:110px;font-family:"JetBrains Mono",monospace;font-size:18px;color:var(--mute);letter-spacing:.04em}
+.tracker{position:absolute;bottom:40px;right:110px;display:flex;align-items:center;gap:10px}
+.tracker .lbl{font-family:"JetBrains Mono",monospace;font-size:15px;letter-spacing:.1em;color:var(--mute);text-transform:uppercase;margin:0 10px 0 6px}
+.tracker .dot{width:34px;height:34px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:var(--mute);background:#fff}
+.tracker .dot.done{border-color:var(--or-bg);background:var(--or-bg);color:var(--or)}
+.tracker .dot.now{border-color:var(--or);background:var(--or);color:#fff;box-shadow:0 0 0 6px var(--or-bg)}
+.tracker .sep{width:1px;height:26px;background:var(--line);margin:0 8px}
+
+/* headers */
+.hdr{display:flex;align-items:flex-start;gap:26px;margin-bottom:34px}
+.badge{flex:none;width:76px;height:76px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:38px}
+.badge.or{background:var(--or-bg);color:var(--or)}
+.badge.or-solid{background:var(--or);color:#fff;font-size:30px;letter-spacing:-.02em}
+.badge.pu{background:var(--pu);color:#fff}
+.badge.bl{background:var(--bl);color:#fff}
+.badge.chk{background:var(--or-bg);color:var(--or)}
+.kicker{font-family:"JetBrains Mono",monospace;font-size:18px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);margin-bottom:6px;font-weight:600}
+.pu .kicker,.kick-pu{color:var(--pu)} .kick-bl{color:var(--bl)}
+h1{font-size:112px;line-height:1;letter-spacing:-.035em;font-weight:800}
+h2{font-size:58px;line-height:1.1;letter-spacing:-.028em;font-weight:800}
+h3{font-size:44px;line-height:1.15;letter-spacing:-.022em;font-weight:700}
+.lead{font-size:30px;line-height:1.45;color:var(--ink2)}
+.two{display:grid;grid-template-columns:1fr 820px;gap:70px;align-items:center;min-height:830px;margin-top:40px!important}
+.step{display:flex;gap:26px;align-items:flex-start}
+.num{flex:none;width:72px;height:72px;border-radius:50%;border:3px solid var(--or);color:var(--or);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:32px;background:#fff;margin-top:2px}
+.num.pu{border-color:var(--pu);color:var(--pu);font-size:24px}
+.num.bl{border-color:var(--bl);color:var(--bl);font-size:24px}
+.num.solid{background:var(--or);color:#fff}
+.body{font-size:30px;line-height:1.5;color:var(--ink2);margin-top:22px}
+.body b{font-weight:700;color:var(--ink)}
+.callout{display:flex;gap:18px;align-items:flex-start;border-radius:18px;padding:24px 28px;font-size:27px;line-height:1.45;margin-top:28px}
+.callout svg{flex:none;width:34px;height:34px;margin-top:4px}
+.callout.yl{background:var(--yl-bg);color:var(--yl-ink)} .callout.yl b{color:var(--yl-ink)}
+.callout.pk{background:var(--pk-bg);color:var(--pk-ink)} .callout.pk b{color:var(--pk-ink)}
+.callout.or{background:var(--or-soft);color:var(--or-deep)} .callout.or b{color:var(--or)}
+.callout.pu{background:#fff;color:var(--ink2);border:2px solid #DCCFF5}
+
+/* mock windows */
+.win{background:#fff;border:2px solid var(--line);border-radius:22px;overflow:hidden;box-shadow:0 18px 50px -30px rgba(0,0,0,.25)}
+.win .bar{display:flex;align-items:center;gap:16px;background:var(--head);padding:18px 26px;border-bottom:2px solid var(--line)}
+.win .bar .dots{display:flex;gap:7px}.win .bar .dots i{width:12px;height:12px;border-radius:50%;background:#C9C6BF;display:block}
+.win .bar .t{font-family:"JetBrains Mono",monospace;font-size:21px;color:var(--ink2)}
+.win .in{padding:22px 26px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:18px;background:#fff;border:2px solid var(--line);border-radius:14px;padding:20px 24px;font-size:24px;font-weight:600}
+.row+.row{margin-top:14px}
+.row .sub{font-family:"JetBrains Mono",monospace;font-size:21px;color:var(--ink2);font-weight:400;margin-top:8px}
+.row.col{flex-direction:column;align-items:stretch}
+.row .top{display:flex;align-items:center;justify-content:space-between}
+.row.dim{color:var(--mute);border-style:solid;opacity:.75}
+.chip{display:inline-flex;align-items:center;gap:8px;font-family:"JetBrains Mono",monospace;font-size:19px;padding:7px 14px;border-radius:9px;background:var(--head);color:var(--ink2);font-weight:500;white-space:nowrap}
+.chip.gr{background:var(--gr-bg);color:var(--gr-ink)} .chip.am{background:var(--am-bg);color:var(--am-ink)} .chip.rd{background:var(--rd-bg);color:var(--rd-ink)}
+.chip.rec{background:var(--rd-bg);color:var(--rd-ink)} .chip.rec i{width:11px;height:11px;border-radius:50%;background:var(--rd-ink);display:block}
+.chip.bl{background:var(--bl-bg);color:var(--bl)}
+.btn{display:inline-flex;align-items:center;gap:10px;border:2px solid var(--line);border-radius:12px;padding:12px 20px;font-size:22px;font-weight:600;background:#fff;white-space:nowrap}
+.btn svg{width:22px;height:22px}
+.btn.fill{background:#B42318;border-color:#B42318;color:#fff}
+.btn.fill-rd{background:#B42318;border-color:#B42318;color:#fff}
+.ring{box-shadow:0 0 0 4px #fff,0 0 0 8px var(--or);border-color:var(--or)!important}
+.ring-pu{box-shadow:0 0 0 4px #fff,0 0 0 8px var(--pu);border-color:var(--pu)!important}
+.ring-bl{box-shadow:0 0 0 4px #fff,0 0 0 8px var(--bl);border-color:var(--bl)!important}
+.tv{background:var(--or-soft);border-radius:16px;padding:26px;text-align:center;margin-top:16px}
+.tv .k{font-family:"JetBrains Mono",monospace;font-size:18px;letter-spacing:.14em;color:var(--ink2);text-transform:uppercase}
+.tv .n{font-size:40px;font-weight:800;letter-spacing:-.02em;margin:10px 0 6px}
+.tv .m{font-size:24px;font-weight:700}
+.tv .m.rec{color:var(--rd-ink);display:inline-flex;align-items:center;gap:10px}
+.tv .m.rec i{width:12px;height:12px;border-radius:50%;background:var(--rd-ink);display:block}
+.tabs{display:flex;gap:12px;margin-bottom:18px}
+.tab{padding:14px 22px;border-radius:12px;border:2px solid transparent;font-size:24px;font-weight:600;color:var(--ink2);display:flex;align-items:center;gap:12px}
+.tab.on{background:#fff;border-color:var(--line);color:var(--ink);border-bottom:4px solid var(--or)}
+.tab .b{width:30px;height:30px;border-radius:50%;background:#B42318;color:#fff;font-size:17px;display:flex;align-items:center;justify-content:center;font-weight:700}
+.line{display:flex;align-items:center;gap:22px;padding:18px 8px;border-bottom:2px solid var(--line);font-size:24px}
+.line:last-child{border-bottom:none}
+.line .cb{width:34px;height:34px;border-radius:9px;border:3px solid var(--line);display:flex;align-items:center;justify-content:center;flex:none;background:#fff}
+.line .cb.on{background:var(--gr-ink);border-color:var(--gr-ink)}
+.line .cb.on svg{width:20px;height:20px}
+.line .cb.todo{border-radius:50%;border-color:#E8A08A}
+.line .who{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:20px;width:120px;flex:none}
+.line .what{color:var(--ink2)}
+table.t{width:100%;border-collapse:separate;border-spacing:0;font-size:23px}
+table.t th{font-family:"JetBrains Mono",monospace;font-weight:500;font-size:18px;color:var(--ink2);text-align:left;padding:8px 10px 14px;border-bottom:2px solid var(--line)}
+table.t td{padding:16px 10px;border-bottom:2px solid var(--line);vertical-align:middle}
+table.t tr:last-child td{border-bottom:none}
+table.t .r{text-align:right;font-family:"JetBrains Mono",monospace}
+table.t .who{font-family:"JetBrains Mono",monospace;font-weight:700;font-size:20px}
+.states{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-top:18px}
+.state{border-radius:14px;padding:20px 20px;font-size:22px;line-height:1.35}
+.state .h{font-weight:800;font-size:25px;margin-bottom:10px;display:block}
+.state.gr{background:var(--gr-bg);color:var(--gr-ink)} .state.am{background:var(--am-bg);color:var(--am-ink)} .state.rd{background:var(--rd-bg);color:var(--rd-ink)}
+.field{border:3px solid var(--pu);border-radius:14px;padding:14px 20px;margin-top:14px;background:#fff}
+.field .k{font-family:"JetBrains Mono",monospace;font-size:18px;color:var(--ink2)}
+.field .v{font-weight:700;font-size:25px;margin-top:4px}
+.panel{position:absolute;inset:60px 110px 60px 110px;border-radius:34px;padding:50px 70px;display:flex;flex-direction:column;justify-content:center}
+.panel.pu{background:var(--pu-bg)} .panel.bl{background:var(--bl-bg)}
+.list .it{display:flex;gap:20px;align-items:flex-start;padding:14px 22px;border-radius:18px;margin-bottom:8px;transition:none}
+.list .it .nm{flex:none;width:58px;height:58px;border-radius:50%;border:3px solid var(--pu);color:var(--pu);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:22px;background:#fff}
+.list .it .tt{font-size:29px;font-weight:700;letter-spacing:-.015em;line-height:1.15}
+.list .it .ds{font-size:22px;line-height:1.35;color:var(--ink2);margin-top:6px}
+.list .it.act{background:#fff;box-shadow:0 10px 30px -18px rgba(109,40,217,.35)}
+.list .it.act .nm{background:var(--pu);color:#fff}
+.list .it.pending{opacity:.45}
+.chain{display:flex;flex-wrap:wrap;gap:12px;align-items:center;font-family:"JetBrains Mono",monospace;font-size:21px}
+.chain .c{background:var(--head);padding:10px 16px;border-radius:9px;color:var(--ink2)}
+.chain .c.gr{background:var(--gr-bg);color:var(--gr-ink)} .chain .c.am{background:var(--am-bg);color:var(--am-ink)}
+.chain .a{color:var(--mute)}
+.cards3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px}
+.card{background:#fff;border:2px solid var(--line);border-radius:24px;padding:38px 38px 42px;min-height:440px}
+.card .ic{width:64px;height:64px;border-radius:50%;background:var(--or-bg);display:flex;align-items:center;justify-content:center;margin-bottom:26px}
+.card .ic svg{width:32px;height:32px}
+.card h3{font-size:34px;margin-bottom:16px}
+.card p{font-size:25px;line-height:1.45;color:var(--ink2)}
+.tl{position:relative;height:60px;margin:22px 0 14px}
+.tl .track{position:absolute;left:12px;right:12px;top:28px;height:4px;background:var(--line);border-radius:2px}
+.tl .track.dash{background:repeating-linear-gradient(90deg,#C9C6BF 0 12px,transparent 12px 24px);height:3px}
+.tl .track.fill{background:var(--or);transform-origin:left;transform:scaleX(var(--p,0))}
+.tl .pt{position:absolute;top:18px;width:24px;height:24px;border-radius:50%;background:#fff;border:3px solid #B8B5AE}
+.tl .pt.l{left:0}.tl .pt.r{right:0}
+.tl .pt.or{background:var(--or);border-color:var(--or);width:30px;height:30px;top:15px;box-shadow:0 0 0 8px var(--or-bg)}
+.tl .pt.mv{left:0;transform:translateX(calc(var(--p,0) * (100% + 0px)))}
+.tl .lab{position:absolute;top:50px;font-family:"JetBrains Mono",monospace;font-size:19px;color:var(--ink2)}
+.tl .lab.r{right:0}
+.ab{border-radius:26px;padding:36px 40px;border:2px solid var(--line);background:#fff;min-height:430px}
+.ab.now{background:var(--or-bg);border-color:var(--or);border-width:3px}
+.ab .k{font-family:"JetBrains Mono",monospace;font-size:18px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);font-weight:600}
+.ab.now .k{color:var(--or)}
+.ab h3{margin:10px 0 0;font-size:46px}
+.ab.past h3{color:var(--ink2)}
+.ab p{font-size:26px;line-height:1.45;color:var(--ink2);margin-top:30px}
+.ab.now p{color:#4A2412}
+.grid9{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+.sc{display:flex;align-items:center;gap:18px;background:#fff;border:2px solid var(--line);border-radius:18px;padding:24px 24px;font-size:27px;font-weight:600;line-height:1.2}
+.sc .n{flex:none;width:50px;height:50px;border-radius:50%;border:3px solid var(--or);color:var(--or);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:23px}
+.glab{font-family:"JetBrains Mono",monospace;font-size:18px;letter-spacing:.14em;text-transform:uppercase;color:var(--or);font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.glab svg{width:22px;height:22px}
+.loopchip{display:inline-flex;align-items:center;gap:16px;background:var(--or-bg);color:var(--or);border-radius:16px;padding:18px 26px;font-size:28px;font-weight:700;margin-top:28px}
+.loopchip svg{width:34px;height:34px}
+.loopchip span{color:var(--ink);font-weight:500}
+.bigcenter{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:20px}
+</style>
+</head>
+<body>
+<div id="stage">
+
+<!-- ================= 0 PORTADA ================= -->
+<section class="scene" data-id="portada">
+  <div class="bigcenter" style="gap:0">
+    <div data-r="0" class="mono" style="font-size:22px;letter-spacing:.16em;text-transform:uppercase;color:var(--or);font-weight:600;margin-bottom:36px">studio.centauro.com · guía para estudios</div>
+    <h1 data-r="0" data-d="150">Flujo de los estudios</h1>
+    <div data-r="1" class="lead" style="font-size:38px;margin-top:34px;color:var(--ink2)">Objetivo: <b>ser más eficientes como equipo.</b></div>
+    <div style="display:flex;gap:22px;margin-top:70px">
+      <div data-r="1" data-d="900" data-anim="pop" class="sc" style="padding:22px 30px;font-size:27px"><span class="n" style="font-size:19px;width:54px;height:54px">1–9</span>El día de grabación</div>
+      <div data-r="1" data-d="1250" data-anim="pop" class="sc" style="padding:22px 30px;font-size:27px"><span class="n" style="border-color:var(--pu);color:var(--pu);font-size:19px;width:54px;height:54px">X·Z</span>Casos especiales</div>
+      <div data-r="1" data-d="1600" data-anim="pop" class="sc" style="padding:22px 30px;font-size:27px"><span class="n" style="width:54px;height:54px">✓</span>Siempre</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 1 IMPORTANTE ================= -->
+<section class="scene" data-id="importante">
+  <div class="eyebrow">studio.centauro.com · guía para estudios</div>
+  <div class="hdr" data-r="0" style="margin-top:60px">
+    <div class="badge or">!</div>
+    <div><div class="kicker">Importante</div><h2>La Planilla (PDT) ya no espera al fin de mes</h2></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:34px;margin-top:50px">
+    <div class="ab past" data-r="1">
+      <div class="k">Antes</div>
+      <h3>PDT al final del mes</h3>
+      <div class="tl"><div class="track dash"></div><div class="pt l"></div><div class="pt r"></div><div class="lab">Se graba</div><div class="lab r">Fin de mes</div></div>
+      <p>Contabilidad y los talentos recibían el PDT a fin de mes, todo junto.</p>
+    </div>
+    <div class="ab now" data-r="2">
+      <div class="k">Ahora</div>
+      <h3>PDT al completar el episodio</h3>
+      <div class="tl"><div class="track"></div><div class="track fill" data-r="2" data-d="500" data-dur="1400" data-anim="var"></div><div class="pt l"></div><div class="pt r or"></div><div class="lab">Se graba</div><div class="lab r">Episodio completo</div></div>
+      <p>Contabilidad y el talento reciben el PDT <b>apenas se completa el episodio</b>.</p>
+    </div>
+  </div>
+  <div class="callout or" data-r="3" style="font-size:30px;padding:28px 34px;margin-top:34px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+    <div>Lo que marca el estudio tiene que estar bien desde el primer momento: <b>no hay fin de mes para corregir.</b> Si no lo marcan grabado, <b>no existe.</b></div>
+  </div>
+  <div class="brand">studio.centauro.com</div>
+</section>
+
+<!-- ================= 2 EL DÍA DE GRABACIÓN ================= -->
+<section class="scene" data-id="dia">
+  <div class="eyebrow">studio.centauro.com · guía para estudios</div>
+  <div class="hdr" data-r="0" style="margin-top:90px">
+    <div class="badge or-solid">1–9</div>
+    <div><div class="kicker">Todos los días</div><h2>El día de grabación</h2></div>
+  </div>
+  <div style="display:grid;grid-template-columns:540px 1fr;gap:60px;margin-top:60px;align-items:start">
+    <div data-r="1">
+      <div class="glab">Una vez · al empezar el día</div>
+      <div class="sc" data-r="1" data-d="100"><span class="n">1</span>Entrar y revisar episodios, menciones y mensajes</div>
+      <div class="sc" data-r="1" data-d="300" style="margin-top:18px"><span class="n">2</span>Abrir la Planilla Diaria</div>
+    </div>
+    <div data-r="2">
+      <div class="glab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Pasos 3 a 9 · con cada talento</div>
+      <div class="grid9">
+        <div class="sc" data-r="2" data-d="100"><span class="n">3</span>Llamar talento</div>
+        <div class="sc" data-r="2" data-d="220"><span class="n">4</span>Abrir libreto</div>
+        <div class="sc" data-r="2" data-d="340"><span class="n">5</span>Marcar las líneas grabadas</div>
+        <div class="sc" data-r="2" data-d="460"><span class="n">6</span>Sumar más personajes</div>
+        <div class="sc" data-r="2" data-d="580"><span class="n">7</span>Marcar qué grabó y qué no</div>
+        <div class="sc" data-r="2" data-d="700"><span class="n">8</span>Finalizar la sesión</div>
+        <div class="sc" data-r="2" data-d="820"><span class="n">9</span>Llamar al siguiente talento</div>
+      </div>
+    </div>
+  </div>
+  <div class="brand">studio.centauro.com</div>
+</section>
+
+<!-- ================= 3 PASO 1 ================= -->
+<section class="scene" data-id="paso1" data-step="1">
+  <div class="eyebrow">todos los días · el día de grabación</div>
+  <div class="two" style="margin-top:60px">
+    <div class="step">
+      <div class="num" data-r="0">1</div>
+      <div>
+        <h2 data-r="0" data-d="80">Entrar y revisar episodios, menciones y mensajes</h2>
+        <div class="body" data-r="1">Revisar los <b>episodios asignados</b> y leer <b>Menciones</b> y <b>Mensajes</b> antes de empezar: ahí llegan los cambios del día.</div>
+      </div>
+    </div>
+    <div class="win" data-r="0" data-d="250" data-anim="pop">
+      <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">studio.centauro.com</div></div>
+      <div class="in">
+        <div class="tabs">
+          <div class="tab on">Episodios</div>
+          <div class="tab" data-r="1" data-d="150" data-anim="ringpop" data-ring="ring" style="opacity:1">Menciones <span class="b">2</span></div>
+          <div class="tab" data-r="1" data-d="450" data-anim="ringpop" data-ring="ring" style="opacity:1">Mensajes <span class="b">1</span></div>
+        </div>
+        <div class="row">Show A · Ep 104 <span class="chip">Grabación</span></div>
+        <div class="row">Show B · Ep 12 <span class="chip">Grabación</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="brand">studio.centauro.com</div>
+</section>
+
+<!-- ================= 4 PASO 2 ================= -->
+<section class="scene" data-id="paso2" data-step="2">
+  <div class="eyebrow">todos los días · el día de grabación</div>
+  <div class="two" style="margin-top:60px">
+    <div class="step">
+      <div class="num" data-r="0">2</div>
+      <div>
+        <h2 data-r="0" data-d="80">Abrir la Planilla Diaria</h2>
+        <div class="body" data-r="0" data-d="500">El llamado del día: <b>cada talento con su hora, episodio y personajes.</b></div>
+        <div class="body" data-r="1" style="margin-top:14px">Revisar que la <b>fecha sea la de hoy</b> y los episodios correspondan a lo que tienen asignado.</div>
+        <div class="callout yl" data-r="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <div>Si ven algo que <b>ya fue grabado</b>, avísenle a <b>Joel</b> o <b>Rafael Nieto</b> por chat.</div>
+        </div>
+      </div>
+    </div>
+    <div class="win" data-r="0" data-d="250" data-anim="pop">
+      <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">Planilla Diaria · <span data-r="1" data-anim="ringpop" data-ring="ring" style="opacity:1;border-radius:6px;padding:2px 6px;border:2px solid transparent">hoy</span></div></div>
+      <div class="in">
+        <div class="row col"><div class="top"><span>9:00 a. m. · Ana Gómez</span><span class="chip">agendada</span></div><div class="sub"><span data-r="1" data-d="250" data-anim="ringpop" data-ring="ring" style="opacity:1;border-radius:6px;padding:2px 6px;border:2px solid transparent">Ep 104</span> · MARCO, LUNA</div></div>
+        <div class="row col dim"><div class="top"><span>10:30 a. m. · Luis Pardo</span><span class="chip">agendada</span></div><div class="sub"><span data-r="1" data-d="450" data-anim="ringpop" data-ring="ring" style="opacity:1;border-radius:6px;padding:2px 6px;border:2px solid transparent">Ep 12</span> · DOCTOR</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="brand">studio.centauro.com</div>
+</section>
+
+<!-- ================= 5 REPETIR ================= -->
+<section class="scene" data-id="repetir">
+  <div class="bigcenter">
+    <div data-r="0" data-anim="pop" style="width:120px;height:120px;border-radius:50%;background:var(--or-bg);display:flex;align-items:center;justify-content:center;color:var(--or)"><svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>
+    <div data-r="0" data-d="150" class="mono" style="font-size:24px;letter-spacing:.16em;text-transform:uppercase;color:var(--or);font-weight:600;margin-top:20px">Pasos 3 a 9</div>
+    <h1 data-r="0" data-d="250" style="font-size:96px">Con cada talento</h1>
+    <div style="display:flex;gap:16px;margin-top:40px">
+      <div class="num" data-r="0" data-d="600" data-anim="pop">3</div><div class="num" data-r="0" data-d="700" data-anim="pop">4</div><div class="num" data-r="0" data-d="800" data-anim="pop">5</div><div class="num" data-r="0" data-d="900" data-anim="pop">6</div><div class="num" data-r="0" data-d="1000" data-anim="pop">7</div><div class="num" data-r="0" data-d="1100" data-anim="pop">8</div><div class="num" data-r="0" data-d="1200" data-anim="pop">9</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 6 PASO 3 ================= -->
+<section class="scene" data-id="paso3" data-step="3">
+  <div class="eyebrow">con cada talento · pasos 3 a 9</div>
+  <div class="two" style="margin-top:60px">
+    <div class="step">
+      <div class="num" data-r="0">3</div>
+      <div>
+        <h2 data-r="0" data-d="80">Llamar Talento</h2>
+        <div class="body" data-r="1">Su nombre sale en la <b>TV</b> de la sala de espera con <b>«Pase por favor»</b>.</div>
+      </div>
+    </div>
+    <div class="win" data-r="0" data-d="250" data-anim="pop">
+      <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">Planilla Diaria</div></div>
+      <div class="in">
+        <div class="row">9:00 a. m. · Ana Gómez <span class="btn" data-r="1" data-anim="ringpop" data-ring="ring" style="opacity:1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Llamar Talento</span></div>
+        <div class="tv" data-r="1" data-d="700"><div class="k">TV · Sala de espera</div><div class="n">Ana Gómez</div><div class="m">Pase por favor</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="brand">studio.centauro.com</div>
+</section>
+
+<!-- ================= 7 PASO 4 ================= -->
+<section class="scene" data-id="paso4" data-step="4">
+  <div class="eyebrow">con cada talento · pasos 3 a 9</div>
+  <div class="two" style="margin-top:60px">
+    <div class="step">
+      <div class="num" data-r="0">4</div>
+      <div>
+        <h2 data-r="0" data-d="80">Abrir Libreto</h2>
+        <div class="body" data-r="1">Al abrirlo, la sesión pasa a <b>Grabando</b> y la TV lo muestra, avisándole al resto de los talentos y al equipo que están en sesión.</div>
+      </div>
+    </div>
+    <div class="win" data-r="0" data-d="250" data-anim="pop">
+      <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">Planilla Diaria</div></div>
+      <div class="in">
+        <div class="row col"><div class="top"><span>9:00 a. m. · Ana Gómez</span></div>
+          <div style="display:flex;gap:16px;align-items:center;margin-top:14px">
+            <span class="chip rec" data-r="1" data-d="500"><i data-pulse></i>Grabando</span>
+            <span class="btn" data-r="1" data-anim="ringpop" data-ring="ring" style="opacity:1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Abrir Libreto</span>
+          </div>
+        </div>
+        <div class="tv" data-r="1" data-d="900"><div class="k">TV · Sala de espera</div><div class="n">Ana Gómez</div><div class="m rec"><i data-pulse></i>Grabando</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="brand">studio.centauro.com</div>
+</section>
+
+<!-- ================= 8 PASO 5 ================= -->
+<section class="scene" data-id="paso5" data-step="5">
+  <div class="eyebrow">con cada talento · pasos 3 a 9</div>
+  <div class="two" style="margin-top:60px">
+    <div class="step">
+      <div class="num" data-r="0">5</div>
+      <div>
+        <h2 data-r="0" data-d="80">Marcar las líneas grabadas</h2>
+        <div class="body" data-r="1">En el Libreto, marcar <b>cada línea cuando queda grabada</b>. Ayuda a evitar que haya líneas faltantes.</div>
+      </div>
+    </div>
+    <div class="win" data-r="0" data-d="250" data-anim="pop">
+      <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">Libreto · Ep 104</div></div>
+      <div class="in" style="padding:10px 26px">
+        <div class="line"><div class="cb on" data-r="1" data-d="200" data-anim="pop" style="opacity:1" data-ring="cbon"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div><div class="who">MARCO</div><div class="what">¿Dónde estabas anoche?</div></div>
+        <div class="line"><div class="cb on" data-r="1" data-d="900" data-anim="pop" style="opacity:1" data-ring="cbon"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div><div class="who">LUNA</div><div class="what">No te importa.</div></div>
+        <div class="line"><div class="cb on" data-r="1" data-d="1600" data-anim="pop" style="opacity:1" data-ring="cbon"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div><div class="who">MARCO</div><div class="what">Claro que me importa.</div></div>
+        <div class="line"><div class="cb todo"></div><div class="who">LUNA</div><div class="what">Entonces escúchame…</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="brand">studio.centauro.com</div>
+</section>
+
+<!-- ================= 9 PASO 6 ================= -->
+<section class="scene" data-id="paso6" data-step="6">
+  <div class="eyebrow">con cada talento · pasos 3 a 9</div>
+  <div class="two" style="margin-top:60px">
+    <div class="step">
+      <div class="num" data-r="0">6</div>
+      <div>
+        <h2 data-r="0" data-d="80">Si el talento tiene tiempo, sumar más personajes</h2>
+        <div class="body" data-r="1">En <b>Otros roles en este estudio</b> están los otros personajes pendientes del talento en otros episodios. <b>Agregarlos y grabarlos en la misma sesión.</b></div>
+      </div>
+    </div>
+    <div class="win" data-r="0" data-d="250" data-anim="pop">
+      <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">Otros roles en este estudio (2)</div></div>
+      <div class="in">
+        <div class="row col"><div class="top"><span><span class="mono" style="font-weight:700">GUARDIA 2</span> <span class="mono" style="font-weight:400;color:var(--ink2)">· Ep 105 · 6 líneas</span></span></div>
+          <div style="margin-top:14px"><span class="btn" data-r="1" data-anim="ringpop" data-ring="ring" style="opacity:1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Agregar personaje</span></div></div>
+        <div class="row col"><div class="top"><span><span class="mono" style="font-weight:700">VECINA</span> <span class="mono" style="font-weight:400;color:var(--ink2)">· Ep 107 · 11 líneas</span></span></div>
+          <div style="margin-top:14px"><span class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Agregar personaje</span></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="brand">studio.centauro.com</div>
+</section>
+
+<!-- ================= 10 PASO 7 ================= -->
+<section class="scene" data-id="paso7" data-step="7">
+  <div class="eyebrow">con cada talento · pasos 3 a 9</div>
+  <div class="two" style="margin-top:60px">
+    <div class="step">
+      <div class="num" data-r="0">7</div>
+      <div>
+        <h2 data-r="0" data-d="80">Cuando termina: marcar qué grabó y qué no</h2>
+        <div class="body" data-r="0" data-d="600">Por cada personaje: <b>Grabado</b> con sus líneas, <b>No grabado</b>, o <b>Faltan líneas</b>.</div>
+        <div class="callout yl" data-r="4">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+          <div>Lo que queda <b>No grabado</b> o con <b>Faltan líneas</b> le llega como <b>notificación a Felipe</b> para reprogramarlo.</div>
+        </div>
+      </div>
+    </div>
+    <div class="win" data-r="0" data-d="250" data-anim="pop">
+      <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">Grabar sesión — Ana Gómez</div></div>
+      <div class="in">
+        <table class="t">
+          <tr><th>Personaje</th><th></th><th class="r">Esperadas</th><th class="r">Grabadas</th></tr>
+          <tr data-r="1" data-anim="fade"><td class="who">MARCO</td><td><span class="chip gr">Grabado</span></td><td class="r">42</td><td class="r"><b>42</b></td></tr>
+          <tr data-r="2" data-anim="fade" style="background:var(--am-bg)"><td class="who">LUNA</td><td><span class="chip am" style="background:transparent;padding-left:0">Faltan líneas</span></td><td class="r">20</td><td class="r"><b>15</b></td></tr>
+          <tr data-r="3" data-anim="fade"><td class="who" style="color:var(--mute)">GUARDIA 2</td><td><span class="chip">No grabado</span></td><td class="r" style="color:var(--mute)">6</td><td class="r" style="color:var(--mute)">—</td></tr>
+        </table>
+        <div class="states">
+          <div class="state gr" data-r="1" data-d="300"><span class="h">Grabado</span>Se firma y se paga</div>
+          <div class="state am" data-r="2" data-d="300"><span class="h">Faltan líneas</span>Se paga lo grabado · aviso a Felipe</div>
+          <div class="state rd" data-r="3" data-d="300"><span class="h">No grabado</span>No se paga · aviso a Felipe</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="brand">studio.centauro.com</div>
+</section>
+
+<!-- ================= 11 PASO 8 ================= -->
+<section class="scene" data-id="paso8" data-step="8">
+  <div class="eyebrow">con cada talento · pasos 3 a 9</div>
+  <div class="two" style="margin-top:60px">
+    <div class="step">
+      <div class="num" data-r="0">8</div>
+      <div>
+        <h2 data-r="0" data-d="80">Finalizar la sesión</h2>
+        <div class="body" data-r="1"><b>Finalizar Grabación</b>, revisar el resumen con el talento y <b>Confirmar y firmar</b>.</div>
+        <div class="callout pk" data-r="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 5.5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <div>Si la sesión no se finaliza, se generan <b>huecos de información</b> que solo se descubren al final del mes. Por esto a veces ven episodios que se grabaron el mes pasado. <span data-r="3" data-anim="fade" style="display:inline"><b>Siempre deben asegurarse de marcar lo que grabaron, igual que la planilla física.</b></span></div>
+        </div>
+      </div>
+    </div>
+    <div class="win" data-r="0" data-d="250" data-anim="pop">
+      <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">¿Firmar a Ana Gómez?</div></div>
+      <div class="in">
+        <div class="mono" style="font-size:21px;color:var(--ink2);margin-bottom:16px">Solo lo marcado como Grabado se firma y se paga.</div>
+        <div class="row col" style="font-size:22px"><div>MARCO · 42 líneas</div><div style="margin-top:10px">LUNA · 15 líneas</div></div>
+        <div style="display:flex;justify-content:flex-end;gap:14px;margin-top:22px">
+          <span class="btn">Volver</span>
+          <span class="btn fill" data-r="1" data-anim="ringpop" data-ring="ring" style="opacity:1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>Confirmar y firmar</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="brand">studio.centauro.com</div>
+</section>
+
+<!-- ================= 12 PASO 9 ================= -->
+<section class="scene" data-id="paso9" data-step="9">
+  <div class="eyebrow">con cada talento · pasos 3 a 9</div>
+  <div class="two" style="margin-top:60px">
+    <div class="step">
+      <div class="num" data-r="0">9</div>
+      <div>
+        <h2 data-r="0" data-d="80">Llamar al siguiente talento</h2>
+        <div class="body" data-r="1">Volver a la <b>Planilla Diaria</b> y repetir desde el paso 3.</div>
+        <div class="loopchip" data-r="1" data-d="500" data-anim="pop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Paso 3 <span>· Llamar Talento</span></div>
+      </div>
+    </div>
+    <div class="win" data-r="0" data-d="250" data-anim="pop">
+      <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">Planilla Diaria</div></div>
+      <div class="in">
+        <div class="row dim">9:00 a. m. · Ana Gómez <span class="chip gr">✓ firmó</span></div>
+        <div class="row">10:30 a. m. · Luis Pardo <span class="btn" data-r="1" data-anim="ringpop" data-ring="ring" style="opacity:1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Llamar Talento</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="brand">studio.centauro.com</div>
+</section>
+
+<!-- ================= 13 CASO X ================= -->
+<section class="scene" data-id="casoX">
+  <div class="panel pu">
+    <div class="hdr" data-r="0" style="margin-bottom:18px">
+      <div class="badge pu">X</div>
+      <div><div class="kicker kick-pu">Caso especial</div><h2>El talento está grabando pero no está en el llamado</h2></div>
+    </div>
+    <div class="lead" data-r="1" style="font-size:27px;margin-left:102px;max-width:1500px">Si llegó alguien que no aparece en la Planilla Diaria, se agrega <b>antes de grabar</b>. <b>Si no está en el llamado, no se puede finalizar ni pagar.</b></div>
+    <div style="display:grid;grid-template-columns:1fr 760px;gap:60px;margin-top:34px;align-items:start">
+      <div class="list">
+        <div class="it" data-r="2" data-act="2" data-done="3"><div class="nm">X1</div><div><div class="tt">Abrir Desglose Episodio</div><div class="ds">En el episodio que va a grabar.</div></div></div>
+        <div class="it" data-r="3" data-act="3" data-done="4"><div class="nm">X2</div><div><div class="tt">Grabar Talento No Programado</div><div class="ds">El botón está en el Desglose del episodio.</div></div></div>
+        <div class="it" data-r="4" data-act="4" data-done="5"><div class="nm">X3</div><div><div class="tt">Elegir personaje y talento</div><div class="ds">Buscar el personaje en la lista (o escribirlo si es nuevo) y elegir el talento que lo está grabando.</div></div></div>
+        <div class="it" data-r="5" data-act="5" data-done="6"><div class="nm">X4</div><div><div class="tt">Agregar a llamado</div><div class="ds">Queda en la Planilla Diaria de hoy, como cualquier otra sesión.</div></div></div>
+        <div class="it" data-r="6" data-act="6" data-done="99"><div class="nm">X5</div><div><div class="tt">Seguir los pasos 4 a 8</div><div class="ds">Abrir Libreto, marcar líneas, marcar qué grabó y qué no, y finalizar la sesión, igual que con cualquier talento.</div></div></div>
+      </div>
+      <div style="position:relative;min-height:520px">
+        <div class="win" data-r="2" data-h="3" data-anim="pop" style="position:absolute;inset:0 auto auto 0;width:760px">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">Show A · Ep 104</div></div>
+          <div class="in"><div class="row"><span class="mono" style="font-weight:700">Ep 104</span><span class="btn ring-pu">Desglose Episodio</span></div></div>
+        </div>
+        <div class="win" data-r="3" data-h="4" data-anim="pop" style="position:absolute;inset:0 auto auto 0;width:760px">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">Desglose Episodio · Ep 104</div></div>
+          <div class="in"><div class="mono" style="font-size:22px;color:var(--ink2);margin-bottom:16px">62 / 120 líneas</div><span class="btn fill-rd ring-pu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Grabar Talento No Programado</span></div>
+        </div>
+        <div class="win" data-r="4" data-h="5" data-anim="pop" style="position:absolute;inset:0 auto auto 0;width:760px">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">Grabar Talento No Programado</div></div>
+          <div class="in" style="padding-top:8px"><div class="field"><div class="k">Personaje</div><div class="v">MESERA</div></div><div class="field"><div class="k">Talento</div><div class="v">Carla Ruiz</div></div></div>
+        </div>
+        <div class="win" data-r="5" data-h="6" data-anim="pop" style="position:absolute;inset:0 auto auto 0;width:760px">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">Desglose Episodio · Ep 104</div></div>
+          <div class="in"><div class="row"><span><span class="mono" style="font-weight:700">MESERA</span> · Carla Ruiz</span><span class="btn ring-pu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Agregar a llamado</span></div><div style="margin-top:16px"><span class="chip gr" data-r="5" data-d="700">En el llamado de hoy</span></div></div>
+        </div>
+        <div class="win" data-r="6" data-anim="pop" style="position:absolute;inset:0 auto auto 0;width:760px">
+          <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">Pasos 4 a 8</div></div>
+          <div class="in"><div class="chain"><span class="c">4 Abrir Libreto</span><span class="a">→</span><span class="c">5 Marcar líneas</span><span class="a">→</span><span class="c">6 Más personajes</span><span class="a">→</span><span class="c am">7 Grabado / No</span><span class="a">→</span><span class="c gr">8 Finalizar</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 14 CASO Z ================= -->
+<section class="scene" data-id="casoZ">
+  <div class="panel bl">
+    <div class="hdr" data-r="0" style="margin-bottom:18px">
+      <div class="badge bl">Z</div>
+      <div><div class="kicker kick-bl">Caso especial</div><h2>Si hay que cambiar el talento de un personaje</h2></div>
+    </div>
+    <div class="lead" data-r="1" style="font-size:27px;margin-left:102px;max-width:1500px">El pago va al talento que figura en el casting. <b>Si el casting está mal, se le paga a la persona equivocada.</b></div>
+    <div style="display:grid;grid-template-columns:1fr 760px;gap:60px;margin-top:44px;align-items:start">
+      <div>
+        <div class="step" data-r="2">
+          <div class="num bl">Z1</div>
+          <div>
+            <h3>Cambiar el casting en Desglose Episodio</h3>
+            <div class="body" style="font-size:27px;margin-top:16px">En el personaje, cambiar el <b>Talento</b> por quien lo graba de verdad. Queda marcado como <b>Recasteado</b>. Revisar que todo el casting del episodio esté correcto.</div>
+          </div>
+        </div>
+        <div class="callout yl" data-r="3" style="margin-left:98px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+          <div>Hacerlo <b>antes</b> de finalizar la sesión, para que se firme a nombre de la persona correcta.</div>
+        </div>
+      </div>
+      <div class="win" data-r="2" data-d="200" data-anim="pop">
+        <div class="bar"><div class="dots"><i></i><i></i><i></i></div><div class="t">Desglose Episodio · Ep 104</div></div>
+        <div class="in">
+          <table class="t">
+            <tr><th>Personaje</th><th>Talento</th></tr>
+            <tr><td class="who">MARCO</td><td>Ana Gómez</td></tr>
+            <tr><td class="who">DOCTOR</td><td>
+              <div style="display:inline-flex;align-items:center;gap:14px;border:3px solid var(--bl);border-radius:12px;padding:8px 16px" data-r="2" data-d="700" data-anim="pop" style="opacity:1"><span style="text-decoration:line-through;color:var(--mute)">Luis Pardo</span><span style="color:var(--bl)">→</span><b>Jorge Díaz</b></div>
+              <div style="margin-top:10px"><span class="chip bl" data-r="2" data-d="1100">Recasteado</span></div>
+            </td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= 15 SIEMPRE ================= -->
+<section class="scene" data-id="siempre">
+  <div class="eyebrow">studio.centauro.com · guía para estudios</div>
+  <div class="hdr" data-r="0" style="margin-top:100px">
+    <div class="badge chk"><svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+    <div><div class="kicker">Para tener en cuenta</div><h2>Siempre</h2></div>
+  </div>
+  <div class="cards3" style="margin-top:80px">
+    <div class="card" data-r="1">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2.4"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg></div>
+      <h3>Marcar como grabado exactamente lo que el talento grabó</h3>
+      <p>Ni más ni menos. Eso es lo que se le paga y lo que recibe contabilidad.</p>
+    </div>
+    <div class="card" data-r="2">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <h3>Si hay duda, preguntar</h3>
+      <p>Escribir a alguien del equipo antes de finalizar. Es más fácil preguntar que corregir un PDT ya enviado.</p>
+    </div>
+    <div class="card" data-r="3">
+      <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      <h3>El casting tiene que estar bien</h3>
+      <p>Quien grabó es quien cobra. Si cambió el talento, cambiar el casting (caso Z) antes de finalizar.</p>
+    </div>
+  </div>
+  <div class="brand">studio.centauro.com</div>
+</section>
+
+<!-- ================= 16 CIERRE ================= -->
+<section class="scene" data-id="cierre">
+  <div class="bigcenter" style="gap:0">
+    <div data-r="0" class="mono" style="font-size:22px;letter-spacing:.16em;text-transform:uppercase;color:var(--or);font-weight:600;margin-bottom:30px">En resumen</div>
+    <div style="display:flex;flex-direction:column;gap:18px;align-items:stretch;width:900px">
+      <div class="sc" data-r="0" data-d="200" style="font-size:34px;padding:26px 32px"><span class="n">1</span>Marcar bien desde el primer momento</div>
+      <div class="sc" data-r="0" data-d="1400" style="font-size:34px;padding:26px 32px"><span class="n">2</span>Finalizar cada sesión</div>
+      <div class="sc" data-r="0" data-d="2600" style="font-size:34px;padding:26px 32px"><span class="n">3</span>Si hay duda, preguntar</div>
+    </div>
+    <div data-r="0" data-d="5200" class="lead" style="font-size:32px;margin-top:50px">Así la <b>PDT sale correcta</b> apenas se completa el episodio.</div>
+    <h2 data-r="1" style="margin-top:60px;font-size:64px">Gracias</h2>
+    <div data-r="1" data-d="300" class="mono" style="font-size:20px;color:var(--mute);margin-top:22px">studio.centauro.com · noviembre de 2026 · Los nombres y números de los ejemplos son inventados.</div>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function(){
+  const stage = document.getElementById('stage');
+  const scenes = Array.from(document.querySelectorAll('.scene'));
+  const FADE = 420, ANIM = 480, XFADE = 380, LEAD = 350;
+  let TL = null;
+
+  // tracker (pasos 1-9)
+  scenes.forEach(s => {
+    const st = s.getAttribute('data-step');
+    if (!st) return;
+    const n = +st;
+    const t = document.createElement('div'); t.className = 'tracker';
+    let html = '<span class="lbl">Todos los días</span>';
+    for (let i = 1; i <= 9; i++) {
+      if (i === 3) html += '<span class="sep"></span><span class="lbl">Con cada talento</span>';
+      html += `<span class="dot ${i < n ? 'done' : i === n ? 'now' : ''}">${i}</span>`;
+    }
+    t.innerHTML = html; s.appendChild(t);
+  });
+
+  const items = scenes.map(s => Array.from(s.querySelectorAll('[data-r]')).map(el => ({
+    el, r: +el.getAttribute('data-r'), d: +(el.getAttribute('data-d') || 0),
+    dur: +(el.getAttribute('data-dur') || ANIM), anim: el.getAttribute('data-anim') || 'up',
+    h: el.hasAttribute('data-h') ? +el.getAttribute('data-h') : null,
+    ring: el.getAttribute('data-ring'),
+  })));
+  const listItems = scenes.map(s => Array.from(s.querySelectorAll('.list .it')).map(el => ({ el, act: +el.getAttribute('data-act'), done: +el.getAttribute('data-done') })));
+  const pulses = scenes.map(s => Array.from(s.querySelectorAll('[data-pulse]')));
+
+  const ease = p => 1 - Math.pow(1 - p, 3);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  function beatLocal(si, k) { // beat start relative to scene start (ms)
+    const sc = TL.scenes[si];
+    const b = sc.beats[Math.min(k, sc.beats.length - 1)];
+    return Math.max(0, b.start - sc.start - LEAD);
+  }
+  function sceneIndexAt(t) {
+    for (let i = TL.scenes.length - 1; i >= 0; i--) if (t >= TL.scenes[i].start) return i;
+    return 0;
+  }
+
+  function applyItem(it, t, si) {
+    const el = it.el;
+    const start = beatLocal(si, it.r) + it.d;
+    let p = clamp((t - start) / it.dur, 0, 1);
+    let dyn = p > 0 && p < 1;
+    let hideQ = 0;
+    if (it.h !== null) {
+      const hs = beatLocal(si, it.h);
+      hideQ = clamp((t - hs) / 260, 0, 1);
+      if (hideQ > 0 && hideQ < 1) dyn = true;
+    }
+    const e = ease(p);
+    const op = e * (1 - hideQ);
+    switch (it.anim) {
+      case 'fade': el.style.opacity = op; el.style.transform = ''; break;
+      case 'pop': el.style.opacity = op; el.style.transform = `scale(${0.9 + 0.1 * e})`; break;
+      case 'var': el.style.opacity = p > 0 ? 1 : 0; el.style.setProperty('--p', e); break;
+      case 'ringpop': // element always visible; ring appears with a small pop
+        el.style.opacity = 1;
+        if (it.ring === 'cbon') { el.style.opacity = op; el.style.transform = `scale(${0.6 + 0.4 * e})`; }
+        else { el.classList.toggle(it.ring, p > 0); el.style.transform = p > 0 && p < 1 ? `scale(${1 + 0.06 * Math.sin(p * Math.PI)})` : ''; }
+        break;
+      default: el.style.opacity = op; el.style.transform = `translateY(${(1 - e) * 22}px)`;
+    }
+    if (hideQ >= 1) el.style.visibility = 'hidden'; else el.style.visibility = '';
+    return dyn;
+  }
+
+  function renderScene(si, t) {
+    let dyn = false;
+    for (const it of items[si]) if (applyItem(it, t, si)) dyn = true;
+    // beat index for list highlighting
+    const sc = TL.scenes[si];
+    let k = -1; for (let i = 0; i < sc.beats.length; i++) if (t >= sc.beats[i].start - sc.start) k = i;
+    for (const li of listItems[si]) {
+      li.el.classList.toggle('act', k >= li.act && k < li.done);
+      li.el.classList.toggle('pending', k < li.act);
+    }
+    for (const p of pulses[si]) {
+      const vis = p.closest('[data-r]') ? parseFloat(p.closest('[data-r]').style.opacity || 0) > 0 : true;
+      if (vis) { p.style.opacity = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t / 220)); dyn = true; }
+    }
+    return dyn;
+  }
+
+  window.setTimeline = tl => { TL = tl; };
+  window.sceneCount = () => scenes.length;
+  // render global time (ms). Returns true when the frame differs from a static hold.
+  window.render = function (tg) {
+    const si = sceneIndexAt(tg);
+    const sc = TL.scenes[si];
+    const t = tg - sc.start;
+    let dyn = false;
+    scenes.forEach((s, i) => {
+      const on = i === si || (i === si - 1 && t < XFADE);
+      s.classList.toggle('on', on);
+      if (!on) return;
+      if (i === si) { s.style.opacity = si === 0 ? 1 : clamp(t / XFADE, 0, 1); s.style.zIndex = 2; }
+      else { s.style.opacity = 1; s.style.zIndex = 1; }
+      if (i === si && t < XFADE && si !== 0) dyn = true;
+      const d = renderScene(i, i === si ? t : (tg - TL.scenes[i].start));
+      if (i === si && d) dyn = true;
+    });
+    let k = 0; for (let i = 0; i < sc.beats.length; i++) if (t >= sc.beats[i].start - sc.start) k = i;
+    return { dyn, key: si + ':' + k };
+  };
+  // preview helper: ?t=seconds
+  const m = location.search.match(/t=([\d.]+)/);
+  window.previewAt = sec => { fetch('timeline.json').then(r => r.json()).then(tl => { setTimeline(tl); render(sec * 1000); }); };
+  if (m) window.previewAt(+m[1]);
+})();
+</script>
+</body>
+</html>

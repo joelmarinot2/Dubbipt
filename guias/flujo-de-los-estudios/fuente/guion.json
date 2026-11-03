@@ -1,0 +1,141 @@
+{
+  "voz": "es_MX-claude-high",
+  "escenas": [
+    {
+      "id": "portada",
+      "beats": [
+        "Bienvenidos a la guía del flujo de los estudios de studio punto centauro punto com.",
+        "El objetivo es uno solo: ser más eficientes como equipo. En este video vamos a recorrer el día de grabación paso a paso, dos casos especiales, y tres reglas que aplican siempre."
+      ]
+    },
+    {
+      "id": "importante",
+      "beats": [
+        "Primero, lo más importante. La planilla, o PDT, ya no espera al fin de mes.",
+        "Antes, la PDT se generaba al final del mes. Contabilidad y los talentos recibían el PDT a fin de mes, todo junto.",
+        "Ahora, la PDT se genera al completar el episodio. Contabilidad y el talento reciben el PDT apenas se completa el episodio.",
+        "Por eso, lo que marca el estudio tiene que estar bien desde el primer momento: no hay fin de mes para corregir. Si no lo marcan como grabado, no existe."
+      ]
+    },
+    {
+      "id": "dia",
+      "beats": [
+        "Todos los días, el día de grabación tiene nueve pasos.",
+        "Los pasos uno y dos se hacen una vez, al empezar el día.",
+        "Los pasos tres a nueve se repiten con cada talento del llamado."
+      ]
+    },
+    {
+      "id": "paso1",
+      "beats": [
+        "Paso uno: entrar y revisar episodios, menciones y mensajes.",
+        "Antes de empezar, revisen los episodios asignados, y lean las menciones y los mensajes. Ahí llegan los cambios del día."
+      ]
+    },
+    {
+      "id": "paso2",
+      "beats": [
+        "Paso dos: abrir la Planilla Diaria. Es el llamado del día: cada talento con su hora, su episodio y sus personajes.",
+        "Revisen que la fecha sea la de hoy, y que los episodios correspondan a lo que tienen asignado.",
+        "Si ven algo que ya fue grabado, avísenle a Joel o a Rafael Nieto por chat."
+      ]
+    },
+    {
+      "id": "repetir",
+      "beats": [
+        "Los pasos tres a nueve se repiten con cada talento."
+      ]
+    },
+    {
+      "id": "paso3",
+      "beats": [
+        "Paso tres: llamar al talento.",
+        "Al tocar Llamar Talento, su nombre sale en la TV de la sala de espera, con el mensaje: pase por favor."
+      ]
+    },
+    {
+      "id": "paso4",
+      "beats": [
+        "Paso cuatro: abrir el libreto.",
+        "Al abrirlo, la sesión pasa a Grabando, y la TV lo muestra, avisándole al resto de los talentos y al equipo que están en sesión."
+      ]
+    },
+    {
+      "id": "paso5",
+      "beats": [
+        "Paso cinco: marcar las líneas grabadas.",
+        "En el libreto, marquen cada línea cuando queda grabada. Esto ayuda a evitar que queden líneas faltantes."
+      ]
+    },
+    {
+      "id": "paso6",
+      "beats": [
+        "Paso seis: si el talento tiene tiempo, sumar más personajes.",
+        "En Otros roles en este estudio están los otros personajes pendientes del talento, en otros episodios. Agréguenlos y grábenlos en la misma sesión."
+      ]
+    },
+    {
+      "id": "paso7",
+      "beats": [
+        "Paso siete: cuando termina, marcar qué grabó y qué no. Por cada personaje hay tres estados.",
+        "Grabado, con sus líneas: se firma y se paga.",
+        "Faltan líneas: se paga lo grabado, y se avisa a Felipe.",
+        "No grabado: no se paga, y se avisa a Felipe.",
+        "Lo que queda como No grabado, o con Faltan líneas, le llega como notificación a Felipe para reprogramarlo."
+      ]
+    },
+    {
+      "id": "paso8",
+      "beats": [
+        "Paso ocho: finalizar la sesión.",
+        "Toquen Finalizar Grabación, revisen el resumen con el talento, y confirmen y firmen. Solo lo marcado como Grabado se firma y se paga.",
+        "Si la sesión no se finaliza, se generan huecos de información que solo se descubren al final del mes. Por eso a veces aparecen episodios que se grabaron el mes pasado.",
+        "Siempre deben asegurarse de marcar lo que grabaron, igual que con la planilla física."
+      ]
+    },
+    {
+      "id": "paso9",
+      "beats": [
+        "Paso nueve: llamar al siguiente talento.",
+        "Vuelvan a la Planilla Diaria, y repitan desde el paso tres."
+      ]
+    },
+    {
+      "id": "casoX",
+      "beats": [
+        "Caso especial X: el talento está grabando, pero no está en el llamado.",
+        "Si llegó alguien que no aparece en la Planilla Diaria, se agrega antes de grabar. Si no está en el llamado, no se puede finalizar ni pagar.",
+        "X uno: abrir Desglose Episodio, en el episodio que va a grabar.",
+        "X dos: tocar Grabar Talento No Programado. El botón está en el desglose del episodio.",
+        "X tres: elegir el personaje y el talento. Busquen el personaje en la lista, o escríbanlo si es nuevo, y elijan el talento que lo está grabando.",
+        "X cuatro: agregar a llamado. Queda en la Planilla Diaria de hoy, como cualquier otra sesión.",
+        "X cinco: seguir los pasos cuatro a ocho. Abrir libreto, marcar líneas, marcar qué grabó y qué no, y finalizar la sesión, igual que con cualquier talento."
+      ]
+    },
+    {
+      "id": "casoZ",
+      "beats": [
+        "Caso especial Z: si hay que cambiar el talento de un personaje.",
+        "El pago va al talento que figura en el casting. Si el casting está mal, se le paga a la persona equivocada.",
+        "Z uno: cambiar el casting en Desglose Episodio. En el personaje, cambien el talento por quien lo graba de verdad. Queda marcado como Recasteado. Revisen que todo el casting del episodio esté correcto.",
+        "Háganlo antes de finalizar la sesión, para que se firme a nombre de la persona correcta."
+      ]
+    },
+    {
+      "id": "siempre",
+      "beats": [
+        "Para tener en cuenta, siempre.",
+        "Uno: marcar como grabado exactamente lo que el talento grabó. Ni más ni menos. Eso es lo que se le paga, y lo que recibe contabilidad.",
+        "Dos: si hay duda, preguntar. Escriban a alguien del equipo antes de finalizar. Es más fácil preguntar que corregir una PDT ya enviada.",
+        "Tres: el casting tiene que estar bien. Quien grabó es quien cobra. Si cambió el talento, cambien el casting, caso Z, antes de finalizar."
+      ]
+    },
+    {
+      "id": "cierre",
+      "beats": [
+        "En resumen: marcar bien desde el primer momento, finalizar cada sesión, y preguntar ante la duda. Así la PDT sale correcta apenas se completa el episodio, y todos somos más eficientes como equipo.",
+        "Gracias. studio punto centauro punto com."
+      ]
+    }
+  ]
+}
