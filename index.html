@@ -3075,7 +3075,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.89.2-nube';
+const APP_VER_NUM = 'v11.90.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -7185,7 +7185,7 @@ async function loadDocx(buf, name){
 /* Estructura: fila con "PERSONAJE" (+LOCUTOR, +TIME opcional); subfila P|L;
    datos: pares (página, intervenciones); filas sin nombre = continuación. */
 function parseSheet(rows){
-  let hr=-1, cChar=-1, cLoc=-1;
+  let hr=-1, cChar=-1, cLoc=-1, cTime=-1;
   for(let i=0;i<Math.min(rows.length,40);i++){
     const row = rows[i]||[];
     for(let j=0;j<row.length;j++){
@@ -7193,7 +7193,7 @@ function parseSheet(rows){
       if(s==='PERSONAJE'){ hr=i; cChar=j; }
       if(hr===i && s==='LOCUTOR') cLoc=j;
     }
-    if(hr>=0) break;
+    if(hr>=0){ for(let j=0;j<row.length;j++) if(/^(TIME|TIME ?CODE|TC|TIMECODE|TC IN)$/.test(norm(row[j]))) cTime=j; break; }
   }
   if(hr<0) return null;
   let pStart=-1, pEnd=-1;
@@ -7210,9 +7210,13 @@ function parseSheet(rows){
   for(let r=hr+1;r<rows.length;r++){
     const row = rows[r]||[];
     let nameV = String(row[cChar]||'').trim();
+    /* El timecode de entrada (LIB-28): en su columna, en la de LOCUTOR o pegado al nombre («LYLA   01:00:31»). */
+    const tcNombre = nameV.match(/\s+(\d{1,2}\s*[:;.]\s*\d{2}(\s*[:;.]\s*\d{2}){0,2})\s*$/);
     nameV = nameV.replace(/\s+\d{1,2}\s*[:;.]\s*\d{2}(\s*[:;.]\s*\d{2}){0,2}\s*$/,'').trim();
     let locV = cLoc>=0 ? String(row[cLoc]||'').trim() : '';
-    if(TC_RE.test(locV)) locV='';
+    let tcV = cTime>=0 ? desgloseTC(row[cTime]) : '';
+    if(TC_RE.test(locV)){ if(!tcV) tcV = desgloseTC(locV); locV=''; }
+    if(!tcV && tcNombre) tcV = desgloseTC(tcNombre[1]);
     const pairs=[];
     const limit = Math.min(pEnd, row.length);
     for(let j=pStart;j+1<limit;j+=2){
@@ -7221,7 +7225,7 @@ function parseSheet(rows){
         pairs.push({p:Math.round(p), ints:Math.round(l)});
     }
     if(nameV && !['PERSONAJE','P'].includes(norm(nameV))){
-      last = {display:nameV, talent:locV, pages:pairs};
+      last = {display:nameV, talent:locV, pages:pairs, tc:tcV};
       out.push(last);
     } else if(last && pairs.length){
       last.pages.push(...pairs);
@@ -7268,6 +7272,7 @@ function parseDesglose(wb){
       noRec: NO_REC.has(norm(talent)),
       color:'#5FC85A'
     };
+    if(c.tc) obj.tc0 = c.tc;
     chars.push(obj); charIdx[key]=obj;
   });
   chars.sort((a,b)=> b.totalInts - a.totalInts || a.display.localeCompare(b.display));
@@ -7297,6 +7302,7 @@ function applyCharMerges(){
       const ab = byKey[ak]; if(!ab) continue;
       for(const pg of ab.pages){ if(seen.has(pg.p)) seen.get(pg.p).ints += pg.ints; else seen.set(pg.p, {p:pg.p, ints:pg.ints}); }
       if(ab.talent && !prim.talent) prim.talent = ab.talent;
+      if(ab.tc0 && (!prim.tc0 || String(ab.tc0) < String(prim.tc0))) prim.tc0 = ab.tc0;
       names.push(ab.display);
       delete byKey[ak];   // el absorbido desaparece de la lista
     }
@@ -8154,9 +8160,44 @@ function rebuild(){ try{ if(currentEp && currentEp.id && !(typeof LDB!=='undefin
 
 /* ===== planilla visual estilo CENTAURO: personaje | time | locutor | P·L | total ===== */
 let plaOpen = true;
+/**
+ * El timecode con el que entra el personaje, para su tarjeta (LIB-28). Pedido
+ * de sala: «que en las tarjetas de doblaje esté el timecode inicial de cada
+ * personaje». Solo se miraban las marcas del PDF escaneado: con el libreto de
+ * Word, con el capítulo abierto desde la nube (las marcas no se guardan) o con
+ * solo el desglose, la cajita salía vacía. Por orden: las marcas del PDF, el
+ * libreto (sus parlamentos con timecode) y el desglose (la columna de tiempo
+ * o el timecode pegado al nombre). Con personajes fusionados, el primero de todos.
+ */
 function firstTCOf(key){
-  const list = (charMarks[key]||[]).filter(x=>x.tcSec!=null);
-  return list.length ? fmtTC(list[0].tcSec) : null;
+  const c = (typeof charIdx !== 'undefined' && charIdx) ? charIdx[key] : null;
+  const claves = [key].concat((c && Array.isArray(c.aliases)) ? c.aliases : []);
+  let mejor = null;
+  for(const k of claves){
+    const list = (charMarks[k]||[]).filter(x=>x.tcSec!=null);
+    if(list.length && (mejor == null || list[0].tcSec < mejor)) mejor = list[0].tcSec;
+  }
+  if(mejor == null && typeof scriptByKey !== 'undefined' && scriptByKey && Array.isArray(script)){
+    for(const k of claves){
+      for(const i of (scriptByKey[k] || [])){
+        const b = script[i];
+        if(b && typeof b.tcSec === 'number' && isFinite(b.tcSec)){ if(mejor == null || b.tcSec < mejor) mejor = b.tcSec; break; }
+      }
+    }
+  }
+  if(mejor != null) return fmtTC(mejor);
+  const raw = window._charsRaw || [];
+  const desglose = claves.map(k => (k === key && c) ? c.tc0 : ((raw.find(r => r && r.key === k) || {}).tc0)).filter(Boolean).map(String).sort();
+  return desglose[0] || null;
+}
+/** Un timecode de una celda de Excel: texto («00:12:23 », «0:12:23») o la fracción de día que guarda Excel. Devuelve «HH:MM:SS» (o con fotogramas) o ''. */
+function desgloseTC(v){
+  if(typeof v === 'number' && v > 0 && v < 1){
+    const t = Math.round(v * 86400);
+    return [Math.floor(t / 3600), Math.floor(t / 60) % 60, t % 60].map(n => String(n).padStart(2, '0')).join(':');
+  }
+  const m = String(v == null ? '' : v).trim().match(/^(\d{1,2})\s*[:;.]\s*(\d{2})\s*[:;.]\s*(\d{2})(?:\s*[:;.]\s*(\d{2}))?$/);
+  return m ? [m[1], m[2], m[3]].concat(m[4] ? [m[4]] : []).map(n => String(n).padStart(2, '0')).join(':') : '';
 }
 function renderPlanilla(){
   const box = $('planilla');
@@ -13417,6 +13458,7 @@ function hydrateEpisode(d){ _epOpen(true);
       pages: Array.isArray(c.pages) ? c.pages.filter(p=>p&&typeof p==='object').map(p=> ({ ...p, p: num(p.p)|0, ints: num(p.ints)|0 })) : [] };
     numIf(o,'totalInts'); numIf(o,'total');
     if(o.aliases!==undefined && !Array.isArray(o.aliases)) o.aliases = [];
+    if(o.tc0!==undefined) o.tc0 = (typeof desgloseTC==='function' ? desgloseTC(o.tc0) : '') || undefined;
     return o;
   };
   const sanBlock = (b)=>{
@@ -13424,7 +13466,8 @@ function hydrateEpisode(d){ _epOpen(true);
     const o = { ...b, lines: Array.isArray(b.lines) ? b.lines.map(str) : [] };
     if(b.key) o.key = normalizeKey(str(b.key));
     if(b.who!==undefined) o.who = str(b.who);
-    numIf(o,'page'); numIf(o,'idx'); numIf(o,'tcSec'); numIf(o,'tcEff');
+    /* Un parlamento SIN timecode se queda sin él: antes pasaba a 0 y salía como «00:00:00» (LIB-28). */
+    numIf(o,'page'); numIf(o,'idx'); if(o.tcSec!==null) numIf(o,'tcSec'); if(o.tcEff!==null) numIf(o,'tcEff');
     return o;
   };
   try{ gestOlvidar(); }catch(e){}
