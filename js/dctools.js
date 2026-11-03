@@ -78,8 +78,16 @@ const dcIsAdic=n=>{
   return false;
 };
 const dcTc=s=>(s||"").toLowerCase().replace(/(^|[^\p{L}\p{N}])(\p{L})/gu,(m,p,c)=>p+c.toUpperCase()); // mayúscula inicial también tras acentos (Garzón, no GarzóN)
-const dcEpNum=cap=>{const m=(cap||"").match(/\d{2,3}/g);return m?parseInt(m[m.length-1],10):0;};
-const dcFmtEp=cap=>{const m=(cap||"").match(/\d{2,3}/g);return m?m[m.length-1]:cap;};
+/* El número del episodio: el que va AL FINAL del título («100 DAYS OF THE SESSION 108», «LYLA IN THE LOOP 119ABI»,
+   hasta cuatro cifras); si no hay, el último grupo de 2-3 cifras, como antes. Antes se tomaba siempre ese último grupo:
+   con un título sin número salía el de la serie («100») para todos y el orden quedaba al azar (PRO-60). */
+const dcNumFinal=t=>{const m=String(t||"").match(/(\d{2,4})\s*[A-Za-z]{0,4}\s*$/);return m?m[1]:"";};
+const dcEpNum=cap=>{const f=dcNumFinal(cap);if(f)return parseInt(f,10);const m=(cap||"").match(/\d{2,3}/g);return m?parseInt(m[m.length-1],10):0;};
+const dcFmtEp=cap=>{const f=dcNumFinal(cap);if(f)return f;const m=(cap||"").match(/\d{2,3}/g);return m?m[m.length-1]:cap;};
+/** El número de episodio en el nombre de un archivo («PRESUP 100 DAYS OF THE SESSION 108 (1).xlsm» → 108), sin fechas ni copias. */
+const dcNumArchivo=nombre=>{const t=String(nombre||"").replace(/\.[^.]+$/,"").replace(/\(\d+\)\s*$/,"").replace(/\d{1,4}[-_.\/]\d{1,2}[-_.\/]\d{1,4}/g," ").trim();return dcNumFinal(t)||((t.match(/\d{2,4}/g)||[]).pop()||"");};
+/** Orden de los episodios: por número; a igual número, por el nombre del archivo leído como números (108 antes que 110). */
+const dcOrdenEps=(a,b)=>(dcEpNum(a.cap)-dcEpNum(b.cap))||String(a.name||a.cap||"").localeCompare(String(b.name||b.cap||""),"es",{numeric:true,sensitivity:"base"});
 const dcSplitRows=data=>{
   const princ=data.filter(r=>r.tipo==="Principal").sort((a,b)=>a.personaje.localeCompare(b.personaje));
   const tm=new Set(princ.filter(r=>!r.pseudo).map(r=>r.talentoKey).filter(Boolean));
@@ -610,7 +618,10 @@ async function dcParseFile(en, addLog){
     const dOff = XLSX.utils.decode_range(wb.Sheets[dsName]['!ref'] || 'A1').s, cOff = XLSX.utils.decode_range(wb.Sheets[csName]['!ref'] || 'A1').s;
     const dcell = (r, c) => { const row = dr[r - dOff.r]; return row && row[c - dOff.c] != null ? row[c - dOff.c].toString().trim() : ''; };
     const ccell = (r, c) => { const row = cr[r - cOff.r]; return row && row[c - cOff.c] != null ? row[c - cOff.c].toString().trim() : ''; };
-    const titulo = dcell(8, 7) || en.cap;
+    let titulo = dcell(8, 7) || en.cap;
+    /* Sin el episodio al final del título (solo el nombre de la serie), se toma del nombre del archivo. */
+    const numArch = dcNumArchivo(en.name);
+    if(!dcNumFinal(titulo) && numArch){ titulo = titulo + ' ' + numArch; addLog('  ℹ️ El título no trae el episodio: uso el ' + numArch + ' del nombre del archivo', ''); }
     addLog('  📋 "' + titulo + '"', 'ok');
     const personajes = []; for(let r = 16; r < dr.length + dOff.r; r++){ const v = dcell(r, 0); if(v) personajes.push(v); }
     let talentCol = -1, charCol = 0, hdrRow = 11;
@@ -648,7 +659,7 @@ async function dcProcesar(){
   try{
     const results = [];
     for(const en of S.entries){ const parsed = await dcParseFile(en, addLog); if(parsed) results.push(Object.assign({}, en, parsed)); }
-    const sorted = results.sort((a, b) => dcEpNum(a.cap) - dcEpNum(b.cap));
+    const sorted = results.sort(dcOrdenEps);
     const seen = {};
     sorted.forEach(en => {
       const princ = en.data.filter(r => r.tipo === 'Principal');
@@ -777,6 +788,8 @@ function dcAnadir(files){
   Array.from(files || []).filter(f => /\.(xlsm|xlsx|xls)$/i.test(f.name)).forEach(f => {
     if(!S.entries.find(e => e.name === f.name)) S.entries.push({ file: f, name: f.name, cap: f.name.replace(/\.[^.]+$/, ''), data: [] });
   });
+  /* La lista de archivos, también en orden de episodio, no en el que los entrega el navegador. */
+  S.entries.sort((a, b) => String(a.name).localeCompare(String(b.name), 'es', { numeric: true, sensitivity: 'base' }));
   repintar();
 }
 
@@ -896,7 +909,7 @@ function ciLeerDubcard(wb){
     });
     if(data.length) eps.push({ cap: cap || nombre, data });
   });
-  return eps.sort((a, b) => dcEpNum(a.cap) - dcEpNum(b.cap));
+  return eps.sort(dcOrdenEps);
 }
 
 /** Los personajes que pueden ir al main cast: principales con un actor de verdad, con en cuántos episodios salen. */
@@ -2662,7 +2675,7 @@ function cablear(raiz, vista){
   else if(vista === 'breakdowns') bdCablear(raiz);
 }
 
-return { html: html, cablear: cablear, ST: ST, dcParseFile: dcParseFile, dcProcesar: dcProcesar, bdDocHtml: bdDocHtml, bdGuardados: bdGuardados, bdGuardar: bdGuardar,
+return { html: html, cablear: cablear, ST: ST, dcParseFile: dcParseFile, dcProcesar: dcProcesar, dcAnadir: dcAnadir, bdDocHtml: bdDocHtml, bdGuardados: bdGuardados, bdGuardar: bdGuardar,
          bdEndpoint: bdEndpoint, BD_PROVIDERS: BD_PROVIDERS, bdIaPermiso: bdIaPermiso, bdIaComprobar: bdIaComprobar, bdIaCambiar: bdIaCambiar, bdGenerate: bdGenerate, bdMakeDocx: bdMakeDocx, bdExtractText: bdExtractText, dcSplitRows: dcSplitRows,
          ciNombre: ciNombre, ciReparto: ciReparto, ciMain: ciMain, ciNumero: ciNumero, ciLlenarXml: ciLlenarXml, ciDocumentos: ciDocumentos,
          ciLeerDubcard: ciLeerDubcard, ciCargarDubcard: ciCargarDubcard, ciEquipoDe: ciEquipoDe,
