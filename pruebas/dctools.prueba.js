@@ -101,6 +101,13 @@ exports.pruebas = async function(t){
     t.eq('si el título no trae el episodio, se toma del nombre del archivo', p.map(e => e.cap).join(' | '), '100 DAYS OF THE SESSION 108 | 100 DAYS OF THE SESSION 109 | 100 DAYS OF THE SESSION 110');
     p = await caso(['SERIE 1010', 'SERIE 1009', 'LYLA IN THE LOOP 119ABI'], ['a.xlsm', 'b.xlsm', 'c.xlsm']);
     t.eq('cuatro cifras y segmentos', p.map(e => e.cap).join(' | '), 'LYLA IN THE LOOP 119ABI | SERIE 1009 | SERIE 1010');
+    /* Lo que de verdad llegó de sala: el título con el número corto (8, 9, 10) y el archivo con el entero. */
+    p = await caso(['100 DAYS OF DECEPTION 10', '100 DAYS OF DECEPTION 8', '100 DAYS OF DECEPTION 9'],
+                   ['PRESUP 100 DAYS OF DECEPTION 110.xlsm', 'PRESUP 100 DAYS OF DECEPTION 108.xlsm', 'PRESUP 100 DAYS OF DECEPTION 109 v2.xlsm']);
+    t.eq('título «… 8» y archivo «… 108»: el 108, y el 10 no se pone delante', p.map(e => e.cap).join(' | '), '100 DAYS OF DECEPTION 108 | 100 DAYS OF DECEPTION 109 | 100 DAYS OF DECEPTION 110');
+    t.eq('y el copiado de Netflix, cada uno del anterior', p.slice(1).map(e => e.plan.srcCap.slice(-3)).join(','), '108,108');
+    p = await caso(['100 DAYS OF DECEPTION 10', '100 DAYS OF DECEPTION 8', '100 DAYS OF DECEPTION 9'], ['x.xlsm', 'y.xlsm', 'z.xlsm']);
+    t.eq('sin número en el archivo, el corto del título, en orden', p.map(e => e.cap).join(' | '), '100 DAYS OF DECEPTION 8 | 100 DAYS OF DECEPTION 9 | 100 DAYS OF DECEPTION 10');
     const V = cargar(), D = V.D;
     D.dcAnadir([{ name: 'P 110.xlsm' }, { name: 'P 109.xlsm' }, { name: 'P 108.xlsm' }, { name: 'notas.pdf' }]);
     t.eq('la lista de archivos subidos, también en orden', D.ST.dc.entries.map(e => e.name).join(','), 'P 108.xlsm,P 109.xlsm,P 110.xlsm');

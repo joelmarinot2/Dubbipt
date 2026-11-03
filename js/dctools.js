@@ -81,11 +81,29 @@ const dcTc=s=>(s||"").toLowerCase().replace(/(^|[^\p{L}\p{N}])(\p{L})/gu,(m,p,c)
 /* El número del episodio: el que va AL FINAL del título («100 DAYS OF THE SESSION 108», «LYLA IN THE LOOP 119ABI»,
    hasta cuatro cifras); si no hay, el último grupo de 2-3 cifras, como antes. Antes se tomaba siempre ese último grupo:
    con un título sin número salía el de la serie («100») para todos y el orden quedaba al azar (PRO-60). */
-const dcNumFinal=t=>{const m=String(t||"").match(/(\d{2,4})\s*[A-Za-z]{0,4}\s*$/);return m?m[1]:"";};
+const dcNumFinal=t=>{const m=String(t||"").match(/(\d{1,4})\s*[A-Za-z]{0,4}\s*$/);return m?m[1]:"";};
 const dcEpNum=cap=>{const f=dcNumFinal(cap);if(f)return parseInt(f,10);const m=(cap||"").match(/\d{2,3}/g);return m?parseInt(m[m.length-1],10):0;};
 const dcFmtEp=cap=>{const f=dcNumFinal(cap);if(f)return f;const m=(cap||"").match(/\d{2,3}/g);return m?m[m.length-1]:cap;};
 /** El número de episodio en el nombre de un archivo («PRESUP 100 DAYS OF THE SESSION 108 (1).xlsm» → 108), sin fechas ni copias. */
-const dcNumArchivo=nombre=>{const t=String(nombre||"").replace(/\.[^.]+$/,"").replace(/\(\d+\)\s*$/,"").replace(/\d{1,4}[-_.\/]\d{1,2}[-_.\/]\d{1,4}/g," ").trim();return dcNumFinal(t)||((t.match(/\d{2,4}/g)||[]).pop()||"");};
+const dcNumArchivo=nombre=>{const t=String(nombre||"").replace(/\.[^.]+$/,"").replace(/\(\d+\)\s*$/,"").replace(/\d{1,4}[-_.\/]\d{1,2}[-_.\/]\d{1,4}/g," ").trim();const m=t.match(/(\d{2,4})\s*[A-Za-z]{0,4}\s*$/);return m?m[1]:((t.match(/\d{2,4}/g)||[]).pop()||"");};
+/**
+ * El título con el episodio entero. Sala escribe en el título el número corto
+ * («100 DAYS OF DECEPTION 8», «… 10») y en el nombre del archivo el entero
+ * («… 108», «… 110»): si el del archivo termina en el del título, manda el del
+ * archivo (108, no 8: así el 10 no se pone delante del 108). Sin número en el
+ * título, se le pone el del archivo.
+ */
+function dcTituloConEpisodio(titulo, archivo, addLog){
+  const t = String(titulo || '').trim(), corto = dcNumFinal(t), entero = dcNumArchivo(archivo), log = addLog || (() => {});
+  if(!entero) return t;
+  if(!corto){ log('  ℹ️ El título no trae el episodio: uso el ' + entero + ' del nombre del archivo', ''); return t + ' ' + entero; }
+  if(entero.length > corto.length && entero.slice(-corto.length) === corto && +entero !== +corto){
+    const m = t.match(/(\d{1,4})(\s*[A-Za-z]{0,4}\s*)$/);
+    log('  ℹ️ El título dice el episodio ' + corto + ': uso el ' + entero + ' del nombre del archivo', '');
+    return t.slice(0, m.index) + entero + m[2];
+  }
+  return t;
+}
 /** Orden de los episodios: por número; a igual número, por el nombre del archivo leído como números (108 antes que 110). */
 const dcOrdenEps=(a,b)=>(dcEpNum(a.cap)-dcEpNum(b.cap))||String(a.name||a.cap||"").localeCompare(String(b.name||b.cap||""),"es",{numeric:true,sensitivity:"base"});
 const dcSplitRows=data=>{
@@ -619,9 +637,7 @@ async function dcParseFile(en, addLog){
     const dcell = (r, c) => { const row = dr[r - dOff.r]; return row && row[c - dOff.c] != null ? row[c - dOff.c].toString().trim() : ''; };
     const ccell = (r, c) => { const row = cr[r - cOff.r]; return row && row[c - cOff.c] != null ? row[c - cOff.c].toString().trim() : ''; };
     let titulo = dcell(8, 7) || en.cap;
-    /* Sin el episodio al final del título (solo el nombre de la serie), se toma del nombre del archivo. */
-    const numArch = dcNumArchivo(en.name);
-    if(!dcNumFinal(titulo) && numArch){ titulo = titulo + ' ' + numArch; addLog('  ℹ️ El título no trae el episodio: uso el ' + numArch + ' del nombre del archivo', ''); }
+    titulo = dcTituloConEpisodio(titulo, en.name, addLog);
     addLog('  📋 "' + titulo + '"', 'ok');
     const personajes = []; for(let r = 16; r < dr.length + dOff.r; r++){ const v = dcell(r, 0); if(v) personajes.push(v); }
     let talentCol = -1, charCol = 0, hdrRow = 11;
