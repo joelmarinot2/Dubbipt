@@ -3107,7 +3107,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.93.1-nube';
+const APP_VER_NUM = 'v11.93.2-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -10089,6 +10089,64 @@ function castForzarRecalculo(arch){
   return true;
 }
 
+/* ── Cuando el nombre no es idéntico (CAST-44) ─────────────────────────────
+   Llegó de sala con IN THE EYE OF THE STORM 309: el Excel salía bien (54 de 55
+   filas con su actor) pero avisaba de 4 talentos «sin fila»:
+     · HOMBRE BRAD y HOMBRE FONDO 1: en el desglose solo están en versión
+       (ARCHIVO) -una vez con espacio y otra sin, «HOMBRE BRAD(ARCHIVO)»- y esas
+       filas YA llevan el mismo actor. No falta nada: se dicen aparte, sin
+       alarma («cubiertos por su fila de archivo»).
+     · MUJER AUTO y CAMERON MUJER AUTO: el libreto y el desglose los escriben
+       distinto. Si una fila que se queda vacía tiene las mismas palabras que
+       un talento sin fila (sin contar «de», «del», «en»…, los números iguales,
+       los dos con o sin ARCHIVO/VO) y no hay otra pareja posible, se escribe
+       ahí y se dice cuál, para mirarlo. Nunca se pisa una fila con actor. */
+const CAST_PAL_VACIAS = new Set(['DE', 'DEL', 'EN', 'LA', 'EL', 'LOS', 'LAS', 'Y', 'AL', 'CON', 'A']);
+/** La persona: el nombre sin su ARCHIVO o su VO (sobre la clave, que ya no lleva paréntesis). */
+function castPersonaClave(clave){ return String(clave || '').replace(/\s+(ARCHIVO|V O|VO)$/, ''); }
+/** ¿Dos nombres son el mismo escrito distinto? Mismos números, los dos con o sin sufijo, y las mismas palabras (salvo las
+    vacías); con `estricto` en falso basta con que las de uno estén en el otro («MUJER AUTO» en «CAMERON MUJER AUTO»). */
+function castParecidas(a, b, estricto){
+  if(!a || !b || a === b) return !!a && a === b;
+  if((castPersonaClave(a) !== a) !== (castPersonaClave(b) !== b)) return false;
+  const pal = (x) => x.split(' ').filter(w => w && !CAST_PAL_VACIAS.has(w));
+  const pa = pal(a), pb = pal(b), chica = pa.length <= pb.length ? pa : pb, grande = new Set(pa.length <= pb.length ? pb : pa);
+  if(chica.length < 2 || !chica.every(w => grande.has(w))) return false;
+  if(estricto !== false && new Set(pa).size !== new Set(pb).size) return false;
+  const nums = (arr) => arr.filter(w => /^\d+$/.test(w)).sort().join(',');
+  return nums(pa) === nums(pb);
+}
+/** Parejas seguras talento sin fila ↔ fila vacía: cada uno con un solo candidato, y el mismo los dos. Primero con las
+    mismas palabras; con lo que quede, con las de uno dentro del otro. */
+function castCasarPorParecido(sinCasar, filasVacias, personajes){
+  const out = [];
+  let ks = sinCasar.slice(), fs = filasVacias.slice();
+  for(const estricto of [true, false]){
+    for(const k of ks.slice()){
+      const cand = fs.filter(f => castParecidas(k, castClave(personajes[f]), estricto));
+      if(cand.length !== 1) continue;
+      const otros = ks.filter(x => castParecidas(x, castClave(personajes[cand[0]]), estricto));
+      if(otros.length !== 1 || otros[0] !== k) continue;
+      out.push({ k: k, fila: cand[0], nombreFila: String(personajes[cand[0]]).trim() });
+      ks = ks.filter(x => x !== k); fs = fs.filter(f => f !== cand[0]);
+    }
+  }
+  return out;
+}
+/** Talentos sin fila propia cuya otra cara (su ARCHIVO, su VO o la normal) ya lleva en el Excel el mismo actor. */
+function castCubiertosPorGemelo(sinCasar, personajes, valores, asign){
+  const out = [];
+  for(const k of sinCasar){
+    const pk = castPersonaClave(k);
+    for(const f in personajes){
+      const kf = castClave(personajes[f]);
+      if(kf === k || castPersonaClave(kf) !== pk || !valores[+f]) continue;
+      if(castNorm(valores[+f]) === castNorm(asign[k])){ out.push({ k: k, fila: String(personajes[f]).trim() }); break; }
+    }
+  }
+  return out;
+}
+
 /**
  * Rellena el desglose con el casting.
  * @param {ArrayBuffer} buf   el .xlsm original
@@ -10109,15 +10167,27 @@ function castRellenar(buf, asign, meta, training){
      ni una palabra. Una celda vacia puede ser dos cosas muy distintas -no hay
      talento asignado, o lo hay y no se encontro la fila- y hasta ahora las dos
      se veian igual. */
-  const enBlanco = [];
+  const enBlanco = [], filasVacias = [];
   for(const fila in personajes){
     const bruto = personajes[fila];
     if(!castClave(bruto)) continue;
     const usa = castQuienVaEnLaFila(bruto, asign);
     if(usa){ valores[+fila] = asign[usa]; vistos.add(usa); }
-    else enBlanco.push(String(bruto).trim());
+    else { enBlanco.push(String(bruto).trim()); filasVacias.push(+fila); }
   }
-  const sinCasar = Object.keys(asign).filter(k => !vistos.has(k));
+  let sinCasar = Object.keys(asign).filter(k => !vistos.has(k));
+  /* Los que el libreto y el desglose escriben distinto (CAST-44): solo en filas vacías y sin dudas. */
+  /* Solo filas VACÍAS de verdad: si el Excel subido ya trae un actor escrito en una fila, ese no se toca. */
+  const yaEnExcel = castLeerColumnaTexto(arch, xml, CAST_COL_ACTOR);
+  const porParecido = castCasarPorParecido(sinCasar, filasVacias.filter(f => !/^\d+$/.test(String(personajes[f]).trim()) && !String(yaEnExcel[f] || '').trim()), personajes);
+  for(const x of porParecido){
+    valores[x.fila] = asign[x.k]; vistos.add(x.k);
+    const i = enBlanco.indexOf(x.nombreFila); if(i >= 0) enBlanco.splice(i, 1);
+  }
+  sinCasar = sinCasar.filter(k => !vistos.has(k));
+  /* Y los que no tienen fila propia pero su otra cara ya lleva el mismo actor: no falta nada. */
+  const cubiertos = castCubiertosPorGemelo(sinCasar, personajes, valores, asign);
+  sinCasar = sinCasar.filter(k => !cubiertos.some(c => c.k === k));
 
   const r = castEscribirColumna(xml, CAST_COL_ACTOR, valores);
   // la cabecera del programa: fecha, género, tiempo, director, técnico, estudio
@@ -10130,7 +10200,8 @@ function castRellenar(buf, asign, meta, training){
   castForzarRecalculo(arch);   // que las demás hojas se enteren del cambio
   return { datos: fflate.zipSync(arch, { level: 6 }), puestos: r.puestos,
            sinCasar: sinCasar, enBlanco: enBlanco,
-           enExcel: Object.keys(personajes).length, cabecera: cabecera, training: tr };
+           enExcel: Object.keys(personajes).length, cabecera: cabecera, training: tr,
+           porParecido: porParecido, cubiertos: cubiertos };
 }
 
 /** Catálogo de talentos de la hoja TALENTOS, para autocompletar. */
@@ -12037,7 +12108,12 @@ function castDiagExport(fuente, asign, r){
     filasVaciasTeniendoTalento: castFilasVaciasConTalento(nom, act, filas, asign)
       .slice(0, 20).map(f => 'f' + f + '  ' + nom[f]),
     sinSitioEnElExcel: (r.sinCasar || []).slice(0, 20),
-    comoHaQuedado: filas.slice(0, 25).map(f =>
+    /* CAST-44: lo escrito por parecido y lo que ya estaba en su fila de archivo/VO, y TODAS las filas
+       (antes se cortaba en 25 y justo la fila vacía no salía). */
+    escritosPorNombreParecido: (r.porParecido || []).map(x => x.k + '  →  f' + x.fila + '  ' + x.nombreFila),
+    yaEnSuFilaDeArchivoOVO: (r.cubiertos || []).map(x => x.k + '  →  ' + x.fila),
+    filasSinActorNombres: vacias.map(f => 'f' + f + '  ' + nom[f]),
+    comoHaQuedado: filas.slice(0, 150).map(f =>
       (act[f] ? '✓ ' : '✗ ') + 'f' + f + '  ' + nom[f] + '  →  ' + (act[f] || '(vacío)'))
   };
 }
@@ -13010,6 +13086,12 @@ async function castDescargar(){
       msg = '✅ ' + r.puestos + ' de ' + n + ' talentos escritos en «' + fuente.nombre + '»';
     }
     msg += (r.cabecera ? ' · cabecera con ' + r.cabecera + ' datos' : ' · ⚠️ sin cabecera: rellénala en «Cabecera»');
+    if(r.porParecido && r.porParecido.length)
+      msg += ' · ✎ escrito' + (r.porParecido.length === 1 ? '' : 's') + ' por nombre parecido, revísalo: '
+           + r.porParecido.slice(0, 4).map(x => x.k + ' → «' + x.nombreFila + '»').join(', ') + (r.porParecido.length > 4 ? '…' : '');
+    if(r.cubiertos && r.cubiertos.length)
+      msg += ' · ' + r.cubiertos.length + ' sin fila propia pero ya en su fila de archivo/VO con el mismo actor ('
+           + r.cubiertos.slice(0, 4).map(x => x.k).join(', ') + (r.cubiertos.length > 4 ? '…' : '') + ')';
     if(r.training && (r.training.marcados.length || r.training.sinFila.length)){
       const t = r.training;
       msg += ' · training: ' + t.marcados.length + ' marcado' + (t.marcados.length === 1 ? '' : 's') + ' en amarillo'
