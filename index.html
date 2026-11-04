@@ -1831,6 +1831,12 @@ span.ct-cel{ display:inline-block; border-radius:6px; padding:1px 7px; }
 .ct-resumen td{ color:#8b93a1; font-size:12px; background:#0e1013; }
 .ct-alerta .cs-linea-t{ white-space:normal; }
 .ct-mas{ margin-top:10px; } .ct-mas summary{ cursor:pointer; color:#cbd5e1; font-weight:600; margin-bottom:8px; }
+/* Personajes de training (js/training.js, CAST-43): amarillo, como en el Excel. */
+.ctrn{ display:inline-block; margin-left:6px; padding:1px 8px; border-radius:999px; background:#FACC15; color:#2b2200; font-size:10.5px; font-weight:800; vertical-align:middle; white-space:nowrap; }
+.trn-menu{ position:fixed; z-index:2147483645; min-width:210px; background:#16181d; border:1px solid #2b2f36; border-radius:10px; padding:6px; box-shadow:0 12px 32px rgba(0,0,0,.5); }
+.trn-menu-t{ padding:4px 10px 6px; font-size:11px; font-weight:700; color:#8b8f97; border-bottom:1px solid #23262b; margin-bottom:4px; }
+.trn-menu button{ display:block; width:100%; text-align:left; background:none; border:none; color:#f2f3f5; font:inherit; font-size:13px; padding:7px 10px; border-radius:7px; cursor:pointer; }
+.trn-menu button:hover{ background:#23262b; }
 /* El panel del TC inicial por proyecto y por casa (js/tcinicial.js, EST-5). */
 .tci-caja{ max-width:520px; text-align:left; }
 .tci-f{ display:block; margin:10px 0 4px; font-size:12px; color:#c9cde0; }
@@ -3100,7 +3106,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.92.0-nube';
+const APP_VER_NUM = 'v11.93.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8265,6 +8271,7 @@ function renderPlanilla(){
       html += '<tr style="--pc:'+c.color+'"'+(clases.trim()?' class="'+clases.trim()+'"':'')+' data-k="'+esc(c.key)+'" title="Abrir el libreto de '+esc(c.display)+'">'
         +'<td class="pnm"><div class="nrow"><span class="cdot"></span>'
         +'<span class="nm2">'+esc(c.display)+'</span>'
+        +(c.training?'<span class="ctrn" title="Training'+(c.tel?' · '+esc(c.tel):'')+'">training</span>':'')
         +(done?'<span class="bdg">✓</span>':'')
         +'<button class="delChar" data-k="'+esc(c.key)+'" title="Eliminar personaje del desglose" style="margin-left:auto;display:inline-grid;place-items:center;border:none;background:none;color:#7d76a8;cursor:pointer;padding:2px 4px">'+ICO.trash+'</button>'
         +'</div></td>'
@@ -8578,13 +8585,16 @@ function renderCards(){
       // timecode en cajita encima del nombre
       (tc0 ? `<div class="ctc">${esc(tc0)}</div>` : `<div class="ctc ctc-empty"></div>`)+
       // nombre grande (con aviso si no aparece en el libreto)
-      `<div class="cname">${esc(c.display)}${notInLib?'<span class="nolib-b" title="No se encontró en el libreto">sin libreto</span>':''}</div>`+
+      `<div class="cname">${esc(c.display)}${notInLib?'<span class="nolib-b" title="No se encontró en el libreto">sin libreto</span>':''}${c.training?'<span class="ctrn" title="Training: en el Excel sale en amarillo'+(c.tel?' con el teléfono '+esc(c.tel):' (sin teléfono)')+'. Clic derecho para cambiarlo">training'+(c.tel?' · '+esc(c.tel):'')+'</span>':''}</div>`+
       // divisor
       `<div class="cdiv"></div>`+
       // talento (o "Sin asignar") — donde antes estaban los chips
       `<div class="tal" id="tal_${esc(c.key)}">${talDisplay}</div>`+
       // botón al pie
       `<button class="cbtn" aria-label="${c.talent?'Editar talento':'Asignar talento'} de ${esc(c.display)}">${c.talent ? (origCont ? 'Asignar talento' : 'Editar') : 'Asignar'}</button>`;
+
+    // clic derecho → training (solo Casting, y solo en este personaje: nada se contagia a otros)
+    card.addEventListener('contextmenu', ev=>{ try{ if(typeof trnMenu==='function') trnMenu(ev, c.key); }catch(e){ fallo('trnMenu · index.html:renderCards', e); } });
 
     // clic en la tarjeta (no en botones) → abre libreto
     card.addEventListener('click', ev=>{
@@ -9903,6 +9913,154 @@ function castEscribirColumna(xml, col, valores){
   return { xml: xml2, puestos };
 }
 
+/* ── Training: teléfono, amarillo y «training» en el Excel (CAST-43) ─────────
+   Pedido de sala: «clic derecho a la tarjeta y marcar que ese personaje es de
+   training: se marca en amarillo en el desglose; en el Excel se le pide un
+   número de teléfono, que va donde dice TELEFONO; y en la planilla, al
+   costado derecho de las líneas de ese talento, se pone la palabra training.
+   Importante: eso se marca solo en el programa que lo haga, nada de
+   automatizaciones». Por eso la marca vive solo en el personaje de ESE
+   capítulo (c.training, c.tel): ni se hereda, ni va al registro del programa,
+   ni se copia a los gemelos (ARCHIVO, VO) ni a otros capítulos. */
+
+const CAST_COL_TEL = 'F';          // TELEFONO, en la hoja del casting
+const CAST_TRAINING = 'training';
+
+/** El teléfono como se escribe en el Excel: número si son solo cifras (sin cero delante), texto si no. */
+function castTelLimpio(t){ return String(t == null ? '' : t).replace(/\s+/g, ' ').trim().slice(0, 40); }
+function castTelEsNumero(t){ return /^[1-9]\d{6,14}$/.test(t); }
+
+/**
+ * Rellenos amarillos sin romper nada: cada celda que se pinta de amarillo
+ * necesita una COPIA de su estilo con el relleno cambiado (el bordes, la
+ * letra y el formato se quedan). Devuelve null si el libro no trae los estilos
+ * como se espera; si no, { estilo(s) → índice nuevo, final() → styles.xml }.
+ */
+function castAmarillo(stylesXml){
+  const mF = stylesXml.match(/<fills count="(\d+)">([\s\S]*?)<\/fills>/);
+  const mX = stylesXml.match(/<cellXfs count="(\d+)">([\s\S]*?)<\/cellXfs>/);
+  if(!mF || !mX) return null;
+  const nFills = (mF[2].match(/<fill[\s>\/]/g) || []).length;
+  const items = mX[2].match(/<xf\b[^>]*?\/>|<xf\b[^>]*?>[\s\S]*?<\/xf>/g) || [];
+  if(nFills !== +mF[1] || items.length !== +mX[1]) return null;     // no cuadra: mejor no tocar los estilos
+  const cache = {}, nuevos = [];
+  const poner = (attrs, k, v) => new RegExp('\\s' + k + '="[^"]*"').test(attrs) ? attrs.replace(new RegExp('\\s' + k + '="[^"]*"'), ' ' + k + '="' + v + '"') : attrs + ' ' + k + '="' + v + '"';
+  return {
+    estilo: (s) => {
+      const i = s == null ? 0 : +s;
+      if(cache[i] != null) return cache[i];
+      const base = items[i];
+      if(!base) return (cache[i] = i);
+      const copia = base.replace(/^<xf\b([^>]*?)(\/?)>/, (m, a, c) => '<xf' + poner(poner(a, 'fillId', nFills), 'applyFill', '1') + c + '>');
+      nuevos.push(copia);
+      return (cache[i] = items.length + nuevos.length - 1);
+    },
+    final: () => !nuevos.length ? stylesXml
+      : stylesXml.replace(mF[0], () => '<fills count="' + (nFills + 1) + '">' + mF[2] + '<fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill></fills>')
+                 .replace(mX[0], () => '<cellXfs count="' + (items.length + nuevos.length) + '">' + mX[2] + nuevos.join('') + '</cellXfs>')
+  };
+}
+
+/** Cambia el estilo de UNA celda con `estilo(sViejo) → sNuevo`, dejando lo que tenga dentro. Si la celda no existe, la crea vacía. */
+function castCeldaEstilo(xml, ref, estilo){
+  const re = new RegExp('<c r="' + ref + '"([^>]*?)(/?)>');
+  let m = xml.match(re);
+  if(!m){
+    const r = castEscribirCelda(xml, ref, '');
+    if(!r.puesto) return xml;
+    xml = r.xml; m = xml.match(re);
+    if(!m) return xml;
+  }
+  const s = (m[1].match(/\bs="(\d+)"/) || [])[1];
+  const nuevo = estilo(s == null ? 0 : +s);
+  const attrs = s != null ? m[1].replace(/\bs="\d+"/, 's="' + nuevo + '"') : m[1] + ' s="' + nuevo + '"';
+  return xml.replace(re, () => '<c r="' + ref + '"' + attrs + m[2] + '>');
+}
+
+/** La columna a la derecha de «TOTAL» (la hoja PLANILLA): donde va la palabra training. 'AT' si no se encuentra. */
+function castColDespuesDeTotal(arch, xml){
+  let comp = [];
+  if(arch['xl/sharedStrings.xml']){
+    const t = new TextDecoder().decode(arch['xl/sharedStrings.xml']);
+    comp = (t.match(/<si>[\s\S]*?<\/si>/g) || []).map(si => (si.match(/<t[^>]*>([\s\S]*?)<\/t>/g) || []).map(x => x.replace(/<[^>]+>/g, '')).join(''));
+  }
+  const corte = xml.search(/<row r="(?:[3-9]\d|\d{3,})"/);
+  const cab = corte > 0 ? xml.slice(0, corte) : xml;
+  const num = (c) => { let n = 0; for(const ch of c) n = n * 26 + (ch.charCodeAt(0) - 64); return n; };
+  const letra = (n) => { let r = ''; while(n > 0){ const k = (n - 1) % 26; r = String.fromCharCode(65 + k) + r; n = Math.floor((n - 1) / 26); } return r; };
+  for(const m of cab.matchAll(/<c r="([A-Z]+)\d+"([^>]*?)>([\s\S]*?)<\/c>/g)){
+    const v = m[3].match(CAST_RE_V), t = m[3].match(/<t[^>]*>([\s\S]*?)<\/t>/);
+    const txt = /\bt="s"/.test(m[2]) ? (v ? comp[+v[1]] : '') : (t ? castDesXml(t[1]) : (v ? castDesXml(v[1]) : ''));
+    if(String(txt || '').trim().toUpperCase() === 'TOTAL') return letra(num(m[1]) + 1);
+  }
+  return 'AT';
+}
+
+/**
+ * Marca los personajes de training en el libro. `training`: {clave del personaje: {tel}}.
+ *  · CASTING: el teléfono en TELEFONO y la fila en amarillo;
+ *  · PLANILLA: la palabra «training» a la derecha de su línea, y su nombre en amarillo;
+ *  · DESGLOCE: su nombre en amarillo.
+ * Devuelve el CASTING ya editado y lo que pasó. No toca a nadie más.
+ */
+function castAplicarTraining(arch, xmlCasting, personajes, training){
+  const claves = Object.keys(training || {});
+  const out = { xml: xmlCasting, marcados: [], sinFila: [], sinTel: [], planilla: 0, desglose: 0 };
+  if(!claves.length) return out;
+  const stRuta = 'xl/styles.xml';
+  const am = arch[stRuta] ? castAmarillo(new TextDecoder().decode(arch[stRuta])) : null;
+  const pintar = (xml, ref) => am ? castCeldaEstilo(xml, ref, am.estilo) : xml;
+  let xml = xmlCasting;
+  const filasDesglose = [], hechos = new Set();
+  for(const fila in personajes){
+    const bruto = personajes[fila];
+    const k = castQuienVaEnLaFila(bruto, training);
+    if(!k || hechos.has(k)) continue;
+    hechos.add(k);
+    const tel = castTelLimpio(training[k].tel);
+    if(tel){ xml = castEscribirCelda(xml, CAST_COL_TEL + fila, tel, castTelEsNumero(tel)).xml; }
+    else out.sinTel.push(String(bruto).trim());
+    for(const col of ['A', 'B', 'C', 'D', 'E', 'F']) xml = pintar(xml, col + fila);
+    out.marcados.push(String(bruto).trim());
+    /* La fila del desglose de la que sale esta, leída de su propia fórmula: IF(DESGLOCE!A17="","",DESGLOCE!A17) */
+    const f = (xml.match(new RegExp('<c r="' + CAST_COL_PERSONAJE + fila + '"[^>]*>\\s*<f>([^<]*)</f>')) || [])[1];
+    const d = f && f.match(/([A-Za-z_.]+)!\$?A\$?(\d+)/);
+    if(d) filasDesglose.push({ hoja: d[1], fila: +d[2], k: k });
+  }
+  for(const k of claves) if(!hechos.has(k)) out.sinFila.push(k);
+  if(am){
+    /* La PLANILLA: la fila de cada uno, por el nombre que enseña. */
+    try{
+      const rp = castHojaXml(arch, 'PLANILLA');
+      let px = new TextDecoder().decode(arch[rp]);
+      const col = castColDespuesDeTotal(arch, px), nombres = castLeerColumna(px, 'A'), vistos = new Set();
+      for(const fila in nombres){
+        const k = castQuienVaEnLaFila(nombres[fila], training);
+        if(!k || !hechos.has(k) || vistos.has(k)) continue;
+        vistos.add(k);
+        px = castEscribirCelda(px, col + fila, CAST_TRAINING, false).xml;
+        for(const c of ['A', 'B', col]) px = pintar(px, c + fila);
+        out.planilla++;
+      }
+      arch[rp] = new TextEncoder().encode(px);
+    }catch(e){ /* un libro sin PLANILLA no se rompe: se queda sin esa marca */ }
+    /* El DESGLOCE: el nombre y su tiempo, en amarillo. */
+    const porHoja = {};
+    for(const x of filasDesglose) (porHoja[x.hoja] = porHoja[x.hoja] || []).push(x.fila);
+    for(const hoja in porHoja){
+      try{
+        const rd = castHojaXml(arch, hoja);
+        let dx = new TextDecoder().decode(arch[rd]);
+        for(const f of porHoja[hoja]){ dx = pintar(dx, 'A' + f); dx = pintar(dx, 'B' + f); out.desglose++; }
+        arch[rd] = new TextEncoder().encode(dx);
+      }catch(e){ /* sin esa hoja, sin esa marca */ }
+    }
+    arch[stRuta] = new TextEncoder().encode(am.final());
+  }
+  out.xml = xml;
+  return out;
+}
+
 /** Marca el libro para que Excel RECALCULE todo al abrirlo.
  *
  *  Sin esto, cambiar la celda del actor no bastaba: las demás hojas -CASTING 1,
@@ -9935,7 +10093,7 @@ function castForzarRecalculo(arch){
  * @param {Object} asign      {NOMBRE DE PERSONAJE: 'Talento'}
  * @returns {{datos:Uint8Array, puestos:number, sinCasar:string[], enExcel:number}}
  */
-function castRellenar(buf, asign, meta){
+function castRellenar(buf, asign, meta, training){
   if(typeof fflate === 'undefined') throw new Error('falta la librería de ZIP');
   const arch = fflate.unzipSync(new Uint8Array(buf));
   const ruta = castHojaXml(arch, CAST_HOJA);
@@ -9963,11 +10121,14 @@ function castRellenar(buf, asign, meta){
   // la cabecera del programa: fecha, género, tiempo, director, técnico, estudio
   let xmlFinal = r.xml, cabecera = 0;
   if(meta){ const m = castEscribirMeta(xmlFinal, meta); xmlFinal = m.xml; cabecera = m.puestas; }
+  /* Los de training: teléfono, amarillo y la palabra en la planilla. Solo los que se marcaron a mano en este capítulo. */
+  const tr = castAplicarTraining(arch, xmlFinal, personajes, training);
+  xmlFinal = tr.xml; delete tr.xml;
   arch[ruta] = new TextEncoder().encode(xmlFinal);
   castForzarRecalculo(arch);   // que las demás hojas se enteren del cambio
   return { datos: fflate.zipSync(arch, { level: 6 }), puestos: r.puestos,
            sinCasar: sinCasar, enBlanco: enBlanco,
-           enExcel: Object.keys(personajes).length, cabecera: cabecera };
+           enExcel: Object.keys(personajes).length, cabecera: cabecera, training: tr };
 }
 
 /** Catálogo de talentos de la hoja TALENTOS, para autocompletar. */
@@ -10217,8 +10378,10 @@ function castFoto(keys){
   for(const k of keys){
     const c = charIdx[k];
     if(!c) continue;
-    out.push({ key: k, talent: c.talent || '', noRec: !!c.noRec, heredado: !!c.heredado,
-               gestOk: !!c.gestOk });
+    const f = { key: k, talent: c.talent || '', noRec: !!c.noRec, heredado: !!c.heredado,
+                gestOk: !!c.gestOk };
+    if(c.training){ f.training = true; f.tel = c.tel || ''; }          // el training también se deshace (CAST-43)
+    out.push(f);
   }
   return out;
 }
@@ -10250,10 +10413,12 @@ async function castUndo(){
     c.noRec = e.noRec;
     c.heredado = !!e.heredado;
     c.gestOk = !!e.gestOk;
+    if(e.training){ c.training = true; c.tel = e.tel || ''; } else { delete c.training; delete c.tel; }
     try{
       const raw = (window._charsRaw || []).find(x => x.key === e.key);
       if(raw){ raw.talent = e.talent; raw.noRec = e.noRec; raw.heredado = !!e.heredado;
-               raw.gestOk = !!e.gestOk; }
+               raw.gestOk = !!e.gestOk;
+               if(e.training){ raw.training = true; raw.tel = e.tel || ''; } else { delete raw.training; delete raw.tel; } }
     }catch(x){}
   }
   try{ renderCards(); }catch(e){ fallo('renderCards · index.html:6182', e); }
@@ -12809,7 +12974,10 @@ async function castDescargar(){
     }
     const buf = fuente.buf;
     const meta = await castMetaCargar(LDB.showId || (currentEp && currentEp.showId));
-    const r = castRellenar(buf, asign, meta);
+    /* Los de training: solo los marcados a mano en ESTE capítulo (clic derecho en su tarjeta). */
+    const training = {};
+    for(const k in charIdx){ const c = charIdx[k]; if(c && c.training) training[castClave(c.display || k)] = { tel: c.tel || '' }; }
+    const r = castRellenar(buf, asign, meta, training);
 
     const ep = (LDB.epsAll || []).find(e => e.id === currentEp.id);
     const base = ((ep && (ep.xls_name || ep.name)) || currentEp.name || 'desglose')
@@ -12842,6 +13010,12 @@ async function castDescargar(){
       msg = '✅ ' + r.puestos + ' de ' + n + ' talentos escritos en «' + fuente.nombre + '»';
     }
     msg += (r.cabecera ? ' · cabecera con ' + r.cabecera + ' datos' : ' · ⚠️ sin cabecera: rellénala en «Cabecera»');
+    if(r.training && (r.training.marcados.length || r.training.sinFila.length)){
+      const t = r.training;
+      msg += ' · training: ' + t.marcados.length + ' marcado' + (t.marcados.length === 1 ? '' : 's') + ' en amarillo'
+           + (t.sinTel.length ? ' · ⚠️ sin teléfono: ' + t.sinTel.slice(0, 4).join(', ') + (t.sinTel.length > 4 ? '…' : '') : '')
+           + (t.sinFila.length ? ' · ⚠️ sin fila en el Excel: ' + t.sinFila.slice(0, 4).join(', ') : '');
+    }
 
     /* El diagnóstico, siempre a mano. Se abre SOLO cuando algo no cuadra -se
        rellenó el común, quedó algún talento sin fila, o alguna fila se quedó
@@ -13534,6 +13708,8 @@ function hydrateEpisode(d){ _epOpen(true);
       pages: Array.isArray(c.pages) ? c.pages.filter(p=>p&&typeof p==='object').map(p=> ({ ...p, p: num(p.p)|0, ints: num(p.ints)|0 })) : [] };
     numIf(o,'totalInts'); numIf(o,'total');
     if(o.aliases!==undefined && !Array.isArray(o.aliases)) o.aliases = [];
+    if(o.training!==undefined){ o.training = o.training === true; if(!o.training) delete o.tel; }
+    if(o.tel!==undefined) o.tel = String(o.tel == null ? '' : o.tel).replace(/\s+/g,' ').trim().slice(0,40);
     if(o.tc0!==undefined) o.tc0 = (typeof desgloseTC==='function' ? desgloseTC(o.tc0) : '') || undefined;
     return o;
   };
@@ -23897,5 +24073,6 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/salud.js"></script>
 <script src="./js/borrartexto.js"></script>
 <script src="./js/tcinicial.js"></script>
+<script src="./js/training.js"></script>
 <script src="./js/continuidad.js"></script>
 <script src="./js/qcpdf.js"></script>
