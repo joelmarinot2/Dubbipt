@@ -122,7 +122,7 @@ function adrEstado(si, estado){
 function adrCapturar(si, cual){
   const el = studioEl();
   if(!el || !el.src){ stMsg('⚠️ Primero carga el vídeo'); return false; }
-  const tc = el.currentTime + studioTc0() + studioFine();
+  const tc = el.currentTime / (typeof studioK === 'function' ? studioK() : 1) + studioTc0() + studioFine();
   const a = adrDe(si);
   if(cual === 'in'){
     if(a.tc1 != null && tc >= a.tc1 - 0.1){ stMsg('⚠️ La entrada quedaría después de la salida'); return false; }
@@ -170,8 +170,8 @@ function adrBucle(si){
   if(a.tc0 == null || a.tc1 == null){ stMsg('⚠️ Ese cue no trae timecode'); return false; }
   const pre = studioPreroll();
   adrLoop.si = si;
-  adrLoop.t0 = Math.max(0, a.tc0 - studioTc0() - studioFine() - pre);
-  adrLoop.t1 = a.tc1 - studioTc0() - studioFine() + 0.25;
+  adrLoop.t0 = Math.max(0, (a.tc0 - studioTc0() - studioFine()) * (typeof studioK === 'function' ? studioK() : 1) - pre);
+  adrLoop.t1 = (a.tc1 - studioTc0() - studioFine()) * (typeof studioK === 'function' ? studioK() : 1) + 0.25;
   try{ el.currentTime = adrLoop.t0; el.play().catch(()=>{}); }catch(e){}
   if(!adrLoop.iv) adrLoop.iv = setInterval(adrBucleVigilar, 50);
   adrRepintar();
@@ -185,7 +185,7 @@ function adrBucle(si){
 function adrSiAhora(){
   const el = studioEl();
   if(!el || !el.duration) return -1;
-  const t = el.currentTime + studioTc0() + studioFine();
+  const t = el.currentTime / (typeof studioK === 'function' ? studioK() : 1) + studioTc0() + studioFine();
   let mejor = -1;
   for(let i = 0; i < script.length; i++){
     const a = (script[i] && script[i].tcEff != null) ? adrDe(i) : null;
