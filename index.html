@@ -1831,6 +1831,16 @@ span.ct-cel{ display:inline-block; border-radius:6px; padding:1px 7px; }
 .ct-resumen td{ color:#8b93a1; font-size:12px; background:#0e1013; }
 .ct-alerta .cs-linea-t{ white-space:normal; }
 .ct-mas{ margin-top:10px; } .ct-mas summary{ cursor:pointer; color:#cbd5e1; font-weight:600; margin-bottom:8px; }
+/* El panel del TC inicial por proyecto y por casa (js/tcinicial.js, EST-5). */
+.tci-caja{ max-width:520px; text-align:left; }
+.tci-f{ display:block; margin:10px 0 4px; font-size:12px; color:#c9cde0; }
+.tci-f input, .tci-f select{ display:block; width:100%; box-sizing:border-box; margin-top:4px; background:#0d0f12; border:1px solid #2b2f36; color:#f2f3f5; border-radius:7px; padding:6px 9px; font:inherit; }
+.tci-op{ margin:8px 0; font-size:13px; color:#e7ebf3; }
+.tci-op input[type=number]{ width:70px; background:#0d0f12; border:1px solid #2b2f36; color:#f2f3f5; border-radius:6px; padding:3px 6px; margin:0 4px; }
+.tci-reglas{ margin:12px 0 6px; font-size:12.5px; color:#c9cde0; }
+.tci-r{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid #22252f; }
+.tci-nada{ color:#8892a6; }
+.tci-msg{ min-height:16px; margin:6px 0; font-size:12px; color:#F59E0B; }
 /* La × para borrar el texto de las casillas (js/borrartexto.js, ENT-25). */
 .ddl-x{ position:fixed; z-index:2147483640; display:none; align-items:center; justify-content:center; padding:0; border:0; border-radius:50%; background:#3a3f47; color:#f2f3f5; font-family:Arial,sans-serif; line-height:1; cursor:pointer; opacity:.85; }
 .ddl-x:hover{ background:#ef4444; opacity:1; }
@@ -3090,7 +3100,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.91.0-nube';
+const APP_VER_NUM = 'v11.92.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -13387,6 +13397,10 @@ async function newShow(){
         +'<div class="ddlm-field" style="margin:0"><label for="npName">Nombre del programa</label><input id="npName" placeholder="Ej. La Vida en Seúl"></div>'
       +'</div>'
     +'</div>'
+    +'<div class="ddlm-field"><label for="npCasa">Casa</label><select id="npCasa"><option value="">Elige la casa…</option>'
+      + ((typeof TCI_CASAS!=='undefined' ? TCI_CASAS : []).map(c=>'<option>'+c+'</option>').join(''))
+      +'<option value="__otra">Otra…</option></select>'
+      +'<input id="npCasaOtra" placeholder="Nombre de la casa" style="display:none;margin-top:6px"></div>'
     +'<div class="ddlm-field"><label for="npEps">N.º de episodios <span style="color:#6b7280">(opcional)</span></label><input id="npEps" type="number" min="0" placeholder="24"></div>'
     +'<div class="ddlm-row">'
       +'<div class="ddlm-field"><label for="npLangSrc">Idioma original</label><select id="npLangSrc">'+optHtml('Coreano')+'</select></div>'
@@ -13401,11 +13415,15 @@ async function newShow(){
   ov.addEventListener('mousedown', e=>{ if(e.target===ov) close(); });
   ov.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
   $q('npCancel').onclick = close;
+  $q('npCasa').addEventListener('change', ()=>{ const o=$q('npCasaOtra'); o.style.display = $q('npCasa').value==='__otra' ? '' : 'none'; if($q('npCasa').value==='__otra') o.focus(); });
   // preview de portada
   $q('npCov').addEventListener('change', ()=>{ const f=$q('npCov').files[0]; if(f){ const img=$q('npCovImg'); img.src=URL.createObjectURL(f); img.style.display='block'; const pl=$q('npCovBox').querySelector('.pl'); if(pl) pl.style.display='none'; } });
   $q('npGo').addEventListener('click', async ()=>{
     const name=($q('npName').value||'').trim();
     if(!name){ $q('npErr').textContent='Escribe el nombre del programa'; $q('npName').focus(); return; }
+    /* La casa se elige cada vez que se crea un proyecto: de ella sale el TC inicial del video (EST-5). */
+    const casa = ($q('npCasa').value==='__otra' ? $q('npCasaOtra').value : $q('npCasa').value).replace(/\s+/g,' ').trim();
+    if(!casa){ $q('npErr').textContent='Elige la casa del proyecto'; ($q('npCasa').value==='__otra' ? $q('npCasaOtra') : $q('npCasa')).focus(); return; }
     const btn=$q('npGo'); btn.disabled=true; btn.textContent='Creando…';
     // guarda metadata extra si las columnas existen; si no, cae limpio a solo {name, workspace_id}
     const payload = { name, workspace_id:WORKSPACE.id };
@@ -13425,10 +13443,13 @@ async function newShow(){
         const u=await sb.storage.from('portadas').upload(path,f,{upsert:true,contentType:f.type||undefined});
         if(!u.error){ await sb.from('shows').update({cover_path:path}).eq('id',show.id); } }
     }catch(e){ console.warn('cover', e); }
+    let tcCasa = null;
+    try{ if(typeof tciAsignarCasa==='function') tcCasa = await tciAsignarCasa(show.id, casa); }
+    catch(e){ fallo('tciAsignarCasa · index.html:newShow', e, 'el programa se creó, pero no se pudo guardar su casa: se elige en «Más capítulos…» del Video Estudio'); }
     close();
     LDB.showId=show.id; libView='eps'; await libFetchAll(); renderLibrary(true);
     if(typeof libPing==='function') libPing('show', show.id);
-    if(typeof DDL_UI!=='undefined') DDL_UI.toast('Programa «'+name+'» creado');
+    if(typeof DDL_UI!=='undefined') DDL_UI.toast('Programa «'+name+'» creado · casa '+casa+(tcCasa!=null?' · TC inicial '+stFmtTC(tcCasa):''));
   });
   setTimeout(()=>{ const n=$q('npName'); if(n) n.focus(); }, 60);
 }
@@ -20789,6 +20810,9 @@ async function loadCloudMarks(){
     const { data } = await sb.from('episodes').select('marks').eq('id', currentEp.id).single();
     sync.marks = (data && data.marks) || {};
   }catch(e){ sync.marks = {}; }
+  /* El TC inicial que le toca a este capítulo según las reglas de su proyecto y su casa (EST-5). */
+  try{ if(typeof tciAplicar==='function') tciAplicar().catch(e=> fallo('tciAplicar · index.html:loadCloudMarks', e)); }
+  catch(e){ fallo('tciAplicar · index.html:loadCloudMarks', e); }
 }
 function refreshBlock(si){
   const blk = pop2.doc.querySelector('.blk[data-si="'+si+'"]'); if(!blk) return;
@@ -20839,10 +20863,12 @@ function stMsg(t){
 }
 function studioStripOn(){ const l=$('stLeft'); return !!(l && l.style.display!=='none'); }
 function studioTc0(){ const m = sync.marks && sync.marks._tcOff; return (m && +m.v) || 0; }
-function studioSetTc0(sec, save){
+/* `origen`: 'manual' (lo fijó una persona para ESTE capítulo: la excepción), 'regla' (de las reglas del
+   proyecto, js/tcinicial.js) o 'auto' (el primer TC del libreto). Solo el manual se libra de las reglas (EST-5). */
+function studioSetTc0(sec, save, origen){
   const inp = $('stTc0'); if(inp) inp.value = stFmtTC(sec);
   if(save!==false){
-    sync.marks._tcOff = { v: sec };
+    sync.marks._tcOff = { v: sec, o: origen || 'manual' };
     if(typeof _marksDirty!=='undefined') _marksDirty.add('_tcOff');
     cloudSaveMarks();
   }
@@ -20938,6 +20964,7 @@ function studioEnsureStrip(){
      '<label title="Timecode en el que INICIA el video">TC inicio '
        +'<input id="stTc0" class="st-tc" placeholder="01:00:00"></label>'
     +'<button id="stTc0Set" class="st-btn ghost" title="Fijar el TC de inicio con el tiempo actual del video">⌖ Fijar aquí</button>'
+    +'<button id="stTc0Regla" class="st-btn ghost" title="Usar este TC en más capítulos: un bloque, todo el programa o toda la casa (Discovery, Netflix, Pixelogic…)">Más capítulos…</button>'
     +'<label title="Más alto = marca más pausas">sensib. <input id="stSens" type="range" min="14" max="50" value="26" style="width:66px;vertical-align:middle"></label>'
     +'<label title="Silencio mínimo que cuenta como pausa">pausa mín <input id="stMin" type="range" min="150" max="800" value="280" style="width:56px;vertical-align:middle"><span id="stMinV">280</span>ms</label>'
     +'<label title="Ajuste fino de sincronía">ajuste <input id="stOff" type="range" min="-30" max="30" value="0" style="width:60px;vertical-align:middle"><span id="stOffV">0.0</span>s</label>'
@@ -21080,9 +21107,12 @@ function studioWireStrip(){
   $('stCps').onchange = (e)=>{ window._stCps = e.target.checked; try{ renderLibretoBlocks(); }catch(e){ fallo('renderLibretoBlocks · index.html:15197', e); } };
   $('stTc0').onchange = (e)=>{
     const v = studioParseTC(e.target.value);
-    if(v!=null){ studioSetTc0(v); studio.cur=-1; studioTick(); stMsg('✅ TC inicial del video: '+stFmtTC(v)+' (guardado y sincronizado)'); }
+    if(v!=null){ studioSetTc0(v); studio.cur=-1; studioTick(); stMsg('✅ TC inicial del video: '+stFmtTC(v)+' solo para este capítulo · para más capítulos, «Más capítulos…»'); }
     else { stMsg('⚠️ Formato de TC no válido — usa HH:MM:SS (ej. 01:00:00)'); e.target.value = stFmtTC(studioTc0()); }
   };
+  // Más capítulos…: el mismo TC para un bloque, el programa o toda la casa (js/tcinicial.js)
+  { const rb = $('stTc0Regla');
+    if(rb) rb.onclick = ()=>{ if(typeof tciPanel==='function') tciPanel().catch(e=> fallo('tciPanel · index.html', e, 'no se ha podido abrir el panel del TC inicial')); }; }
   // ⌖ FIJAR AQUÍ: toma el tiempo actual del video como TC de inicio.
   // El libreto en curso debería alinear su timecode con este instante del video.
   $('stTc0Set').onclick = ()=>{
@@ -21270,7 +21300,7 @@ function studioToggleStrip(){
   if(show){
     studio.on = true; studio.epId = currentEp.id;
     studioInjectCurCss();
-    const inp=$('stTc0'); if(inp) inp.value = stFmtTC(studioTc0() || ((script[0] && script[0].tcEff)||0));
+    const inp=$('stTc0'); if(inp) inp.value = stFmtTC(studioTc0() || ((typeof sync!=='undefined' && sync.marks && sync.marks._tcOff) ? 0 : ((script[0] && script[0].tcEff)||0)));
     if(!studio.url) studioLoadSaved(); else { studioShowPlayer(); stDrawWave(); }
     stMsg('');
   }else{
@@ -23099,8 +23129,8 @@ function studioAttach(blob, name, offerCloud){
   studio.env = null; studio.envAny = false; studio.dur = 0;
   studio.pyr = null; studio.pcmMax = 0; studio._waveT0 = null;
   // TC inicial por defecto: el primer timecode del libreto (los videos suelen iniciar en 01:00:00)
-  if(!studioTc0() && script && script.length && script[0].tcEff!=null && script[0].tcEff>300){
-    studioSetTc0(script[0].tcEff);
+  if(!studioTc0() && !(typeof sync!=='undefined' && sync.marks && sync.marks._tcOff && sync.marks._tcOff.o==='regla') && script && script.length && script[0].tcEff!=null && script[0].tcEff>300){
+    studioSetTc0(script[0].tcEff, true, 'auto');
     stMsg('TC inicial ajustado al primer TC del libreto ('+stFmtTC(script[0].tcEff)+') — cámbialo si tu video inicia en otro');
   }
   // Persistir en IndexedDB SOLO si el archivo es razonable. Un video de varios GB
@@ -23866,5 +23896,6 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/csproduccion.js"></script>
 <script src="./js/salud.js"></script>
 <script src="./js/borrartexto.js"></script>
+<script src="./js/tcinicial.js"></script>
 <script src="./js/continuidad.js"></script>
 <script src="./js/qcpdf.js"></script>
