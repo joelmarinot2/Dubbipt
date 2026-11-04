@@ -65,7 +65,7 @@ const SALA = {
 const SALA_SEGS = [1, 2, 2.67, 3, 3.3, 5];
 
 /** El segundo de VÍDEO de un timecode de libreto. */
-function salaVid(tc){ return tc - studioTc0() - studioFine(); }
+function salaVid(tc){ return (tc - studioTc0() - studioFine()) * (typeof studioK === 'function' ? studioK() : 1); }
 
 /** Los cues del capítulo, en segundos de vídeo. Con memoria. */
 function salaCues(){
@@ -74,7 +74,7 @@ function salaCues(){
   let firma = '';
   try{ firma = JSON.stringify(window._adrDatos || {}).length + ':'
              + Object.keys(window._adrDatos || {}).length; }catch(e){}
-  const sello = (script ? script.length : 0) + '|' + studioTc0() + '|' + studioFine() + '|' + firma;
+  const sello = (script ? script.length : 0) + '|' + studioTc0() + '|' + studioFine() + '|' + (typeof studioK === 'function' ? studioK() : 1) + '|' + firma;
   if(SALA.cues && SALA.sello === sello) return SALA.cues;
   const out = [];
   for(let i = 0; i < script.length; i++){
@@ -331,7 +331,7 @@ function salaPalabras(si){
 }
 const _salaPalCache = new Map();
 function salaPalabrasCache(si){
-  const clave = si + '|' + studioTc0() + '|' + studioFine();
+  const clave = si + '|' + studioTc0() + '|' + studioFine() + '|' + (typeof studioK === 'function' ? studioK() : 1);
   if(_salaPalCache.has(clave)) return _salaPalCache.get(clave);
   let r = null; try{ r = salaPalabras(si); }catch(e){}
   if(_salaPalCache.size > 300) _salaPalCache.clear();

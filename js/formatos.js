@@ -37,9 +37,18 @@ function ioTC(sec, coma){
   const p = (v, n) => String(v).padStart(n || 2, '0');
   return p(h) + ':' + p(m) + ':' + p(s) + (coma ? ',' : '.') + p(ms, 3);
 }
+/* El frame rate del video (EST-6): los fotogramas del timecode y el factor entre timecode y tiempo del
+   video. Sin video detectado, 25 y 1, como siempre. */
+const ioFps = () => (typeof studioFpsNominal === 'function') ? studioFpsNominal() : 25;
+const ioK = () => (typeof studioK === 'function') ? studioK() : 1;
+function ioFpsEtiqueta(){
+  const m = (typeof studioFpsDato === 'function') ? studioFpsDato() : null;
+  return m ? String(+m.v) + (m.df ? ' Drop' : '') : '25';
+}
+
 /** Timecode con fotogramas, como lo escribe Pro Tools. */
 function ioTCf(sec, fps){
-  fps = fps || 25;
+  fps = fps || ioFps();
   sec = Math.max(0, sec || 0);
   const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = Math.floor(sec % 60);
   const f = Math.min(fps - 1, Math.floor((sec - Math.floor(sec)) * fps));
@@ -54,7 +63,7 @@ function ioLeerTC(str, fps){
   let m = str.match(/^(\d{1,3}):(\d{1,2}):(\d{1,2})[.,](\d{1,3})$/);
   if(m) return +m[1]*3600 + +m[2]*60 + +m[3] + (+m[4]) / Math.pow(10, m[4].length);
   m = str.match(/^(\d{1,3}):(\d{1,2}):(\d{1,2})[:;](\d{1,2})$/);
-  if(m) return +m[1]*3600 + +m[2]*60 + +m[3] + (+m[4]) / (fps || 25);
+  if(m) return +m[1]*3600 + +m[2]*60 + +m[3] + (+m[4]) / (fps || ioFps());
   m = str.match(/^(\d{1,3}):(\d{1,2}):(\d{1,2})$/);
   if(m) return +m[1]*3600 + +m[2]*60 + +m[3];
   m = str.match(/^(\d{1,2}):(\d{1,2})$/);
@@ -193,6 +202,7 @@ function ioLeerSTL(buf){
 function ioMontarLibreto(filas, opts){
   opts = opts || {};
   const desfase = (opts.relativo === false) ? 0 : studioTc0();
+  const k = (opts.relativo === false) ? 1 : ioK();        // tiempos del video → timecode (EST-6)
   const gen = opts.personaje || 'DIÁLOGO';
   script = []; scriptByKey = {}; tcIndex = [];
   const pags = new Map();
@@ -211,7 +221,7 @@ function ioMontarLibreto(filas, opts){
     enPag++;
     const key = norm(nombre);
     const blk = { idx: script.length, key: key, display: nombre.trim(),
-                  tcSec: f.t0 + desfase, tcEff: f.t0 + desfase, page: pagina, lines: [texto] };
+                  tcSec: f.t0 / k + desfase, tcEff: f.t0 / k + desfase, page: pagina, lines: [texto] };
     script.push(blk);
     (scriptByKey[key] = scriptByKey[key] || []).push(blk.idx);
     tcIndex.push({ sec: blk.tcEff, page: pagina, lineIdx: 0 });
@@ -220,7 +230,7 @@ function ioMontarLibreto(filas, opts){
     // salida distinta de la del libreto: se guarda como corrección del cue
     if(f.t1 != null && f.t1 > f.t0){
       const d = adrDatos();
-      (d[blk.idx] = d[blk.idx] || {}).tc1 = f.t1 + desfase;
+      (d[blk.idx] = d[blk.idx] || {}).tc1 = f.t1 / k + desfase;
     }
   }
   numPages = pagina;
@@ -344,7 +354,7 @@ function ioExportarSRT(){
   const off = studioTc0();
   let s = '';
   cues.forEach((a, i) => {
-    s += (i + 1) + '\n' + ioTC(a.tc0 - off, true) + ' --> ' + ioTC(a.tc1 - off, true) + '\n'
+    s += (i + 1) + '\n' + ioTC((a.tc0 - off) * ioK(), true) + ' --> ' + ioTC((a.tc1 - off) * ioK(), true) + '\n'
       + (a.display ? a.display + ': ' : '') + a.texto + '\n\n';
   });
   ioDescargar(ioBase() + '.srt', s, 'application/x-subrip');
@@ -384,7 +394,7 @@ function ioExportarTTML(){
        + '<ttm:name type="full">' + esc2(pers[k].display) + '</ttm:name></ttm:agent>\n';
   s += '    </metadata>\n  </head>\n  <body>\n    <div>\n';
   for(const a of cues)
-    s += '      <p begin="' + ioTC(a.tc0 - off) + '" end="' + ioTC(a.tc1 - off) + '"'
+    s += '      <p begin="' + ioTC((a.tc0 - off) * ioK()) + '" end="' + ioTC((a.tc1 - off) * ioK()) + '"'
        + (a.key ? ' ttm:agent="p_' + esc2(a.key.replace(/[^A-Za-z0-9]+/g, '_')) + '"' : '')
        + '>' + esc2(a.texto) + '</p>\n';
   s += '    </div>\n  </body>\n</tt>\n';
@@ -397,16 +407,16 @@ function ioExportarMarcadores(){
   const cues = ioCues();
   if(!cues.length){ castAviso('No hay cues que exportar'); return; }
   let s = 'SESSION NAME:\t' + ((currentEp && currentEp.name) || 'Dubbipt') + '\n'
-        + 'TIMECODE FORMAT:\t25 Frame\n\n'
+        + 'TIMECODE FORMAT:\t' + ioFpsEtiqueta() + ' Frame\n\n'
         + 'M A R K E R S  L I S T I N G\n'
         + '#\tLOCATION\tTIME REFERENCE\tUNITS\tNAME\tCOMMENTS\n';
   cues.forEach((a, i) => {
     const nombre = (a.display || 'CUE') + (a.take ? (' T' + a.take) : '');
-    s += (i + 1) + '\t' + ioTCf(a.tc0) + '\t' + Math.round(a.tc0 * 48000) + '\tSamples\t'
+    s += (i + 1) + '\t' + ioTCf(a.tc0) + '\t' + Math.round(a.tc0 * ioK() * 48000) + '\tSamples\t'
       + nombre.replace(/\t/g, ' ') + '\t' + String(a.texto || '').replace(/\t/g, ' ').slice(0, 120) + '\n';
   });
   ioDescargar(ioBase() + ' · marcadores.txt', s, 'text/plain');
-  castAviso('✅ ' + cues.length + ' marcadores · 25 fps, referencia a 48 kHz');
+  castAviso('✅ ' + cues.length + ' marcadores · ' + ioFpsEtiqueta() + ' fps, referencia a 48 kHz');
 }
 
 /* ── El panel ─────────────────────────────────────────────────────────── */

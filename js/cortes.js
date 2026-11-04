@@ -238,10 +238,10 @@ function cortesPegar(margen){
     if(!script[i] || script[i].tcEff == null) continue;
     const a = adrDe(i);
     if(a.tc0 == null) continue;
-    const v = a.tc0 - studioTc0() - studioFine();
+    const v = (a.tc0 - studioTc0() - studioFine()) * (typeof studioK === 'function' ? studioK() : 1);
     const c = cortesCerca(v, margen);
     if(c == null || Math.abs(c - v) < 0.005) continue;
-    adrFijar(i, 'tc0', c + studioTc0() + studioFine());
+    adrFijar(i, 'tc0', c / (typeof studioK === 'function' ? studioK() : 1) + studioTc0() + studioFine());
     n++;
   }
   try{ salaOlvidar(); adrRepintar(); }catch(e){ fallo('salaOlvidar · js\cortes.js:247', e); }

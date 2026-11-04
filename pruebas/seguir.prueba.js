@@ -117,6 +117,8 @@ function conSeguir(opts){
     $: (id) => (id === 'stFollow' ? casilla : null),
     studioEl: () => opts.video || null,
     studioTc0: () => 0,
+    /* El frame rate (EST-6): sin video detectado, factor 1, como siempre. */
+    studioK: () => 1, studioTcDeVid: (t) => t,
     studioStripOn: () => !!opts.tiraAbierta,
     stFmt: () => '', stFmtTC: () => '', stDrawWave: () => { M._dibujos++; }, adrRepintar: () => {},
     pop2: { doc: doc, scopeAll: opts.scopeAll !== false, els: { wrap: wrap },
