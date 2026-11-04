@@ -141,51 +141,70 @@ exports.pruebas = async function(t){
     t.eq('el gemelo de ARCHIVO recibe el talento, pero NO el training ni el teléfono', hechos.join(',') + ' · ' + g.talent + ' · ' + JSON.stringify([g.training, g.tel]), 'MARK PEYTON (ARCHIVO) · ANA ROJAS · [null,null]');
   }
 
-  t.seccion('3 · el clic derecho y el guardado');
+  t.seccion('3 · se marca el TALENTO en este capítulo: todos sus personajes, un teléfono');
   {
-    const V = { avisos: [], hist: [], pintadas: 0, planilla: 0, subidas: 0, items: [], prevenidos: 0, modal: null };
-    const mk = () => { const e = { children: [], style: {}, classList: { add(){}, remove(){} }, setAttribute(){}, appendChild(h){ e.children.push(h); return h; }, remove(){ V.cerrado = true; }, contains: () => false,
-      set onclick(f){ e._click = f; }, get onclick(){ return e._click; }, addEventListener(){}, querySelector: () => ({ value: '316 847 9418', focus(){}, select(){}, addEventListener(){}, set onclick(f){} }), querySelectorAll: () => [] }; return e; };
-    const charIdx = { A: { key: 'A', display: 'LYLA', talent: 'ANA' }, B: { key: 'B', display: 'LOUIS', talent: 'LUZ', training: true, tel: '3001112233' } };
-    const raws = [{ key: 'A', talent: 'ANA' }, { key: 'B', talent: 'LUZ', training: true, tel: '3001112233' }];
-    const ctx = vm.createContext({ console, setTimeout, DDL_MODO: 'casting', charIdx, window: { _charsRaw: raws, innerWidth: 1000, innerHeight: 800, addEventListener(){} },
+    const V = { avisos: [], hist: [], pintadas: 0, planilla: 0, subidas: 0, prevenidos: 0 };
+    const mk = () => { const e = { children: [], style: {}, setAttribute(){}, appendChild(h){ e.children.push(h); return h; }, remove(){}, contains: () => false, set onclick(f){ e._click = f; }, get onclick(){ return e._click; } }; return e; };
+    /* María Coronado hace tres personajes; Luz, uno; uno sin talento y uno ORIGINAL. */
+    const charIdx = { A: { key: 'A', display: 'LYLA', talent: 'MARÍA CORONADO' }, B: { key: 'B', display: 'LOUIS', talent: 'LUZ MAR' },
+                      C: { key: 'C', display: 'LIANA', talent: 'Maria  Coronado' }, D: { key: 'D', display: 'LUKE', talent: 'MARIA CORONADO' },
+                      E: { key: 'E', display: 'THI', talent: '' }, F: { key: 'F', display: 'WALLA', talent: 'ORIGINAL', noRec: true } };
+    const ctx = vm.createContext({ console, setTimeout, JSON, DDL_MODO: 'casting', charIdx, chars: Object.values(charIdx), currentEp: { id: 'e1', showId: 's1' },
+      window: { _charsRaw: [], innerWidth: 1000, innerHeight: 800, addEventListener(){} },
       document: { createElement: () => { const e = mk(); e.textContent = ''; return e; }, body: { appendChild: (e) => { V.menu = e; return e; } }, getElementById: () => null, addEventListener(){} },
-      esc: (x) => String(x == null ? '' : x), fallo(){}, castHistPush: (f, et) => V.hist.push(et + ':' + JSON.stringify(f)), castFoto: (k) => k.map(x => ({ key: x })),
-      renderCards: () => V.pintadas++, renderPlanilla: () => V.planilla++, epDataUpsert: async () => V.subidas++, currentEp: { id: 'e1', showId: 's1' },
-      DDL_UI: { toast: (m) => V.avisos.push(m) } });
-    vm.runInContext(fs.readFileSync(path.join(RAIZ, 'js', 'training.js'), 'utf8') + ';this.A = { trnMenu, trnPoner, trnGuardar, trnMenuCerrar, trnLimpiarTel, TRN };', ctx);
-    const A = ctx.A;
+      esc: (x) => String(x == null ? '' : x), fallo(){}, castHistPush: (f, et) => V.hist.push(et + ':' + JSON.stringify(f)),
+      renderCards: () => V.pintadas++, renderPlanilla: () => V.planilla++, epDataUpsert: async () => V.subidas++, DDL_UI: { toast: (m) => V.avisos.push(m) } });
+    vm.runInContext(fs.readFileSync(path.join(RAIZ, 'js', 'training.js'), 'utf8') + ';this.A = { trnMenu, trnGuardar, trnDe, trnMapa, trnCargar, trnParaGuardar, trnRestaurar, trnPersonajesDe, trnClave };', ctx);
+    const A = ctx.A, textos = () => V.menu.children.map(x => x.textContent).join(' | ');
     const ev = { clientX: 100, clientY: 50, preventDefault(){ V.prevenidos++; }, stopPropagation(){} };
-    t.eq('en Casting abre el menú; ofrece marcar', String(A.trnMenu(ev, 'A')) + ' ' + V.prevenidos + ' ' + V.menu.children.map(x => x.textContent).join(' | '), 'true 1 LYLA | Marcar como training…');
-    t.eq('si ya es training: cambiar el teléfono (con el actual) y quitar', (A.trnMenu(ev, 'B'), V.menu.children.map(x => x.textContent).join(' | ')), 'LOUIS | Cambiar el teléfono… (3001112233) | Quitar training');
+    t.eq('el menú ofrece marcar AL TALENTO, y dice cuántos personajes hace aquí (sin importar tildes ni espacios)', (A.trnMenu(ev, 'A'), textos()), 'LYLA · MARÍA CORONADO | Marcar a MARÍA CORONADO como training… (3 personajes)');
+    t.eq('sin talento, no se puede (el training es del talento)', (A.trnMenu(ev, 'E'), textos()), 'THI | Asigna primero el talento: el training es del talento en este capítulo');
+    t.eq('ORIGINAL no es un talento', (A.trnMenu(ev, 'F'), textos()), 'WALLA · ORIGINAL | ORIGINAL no es un talento');
     t.eq('el menú queda dentro de la pantalla', V.menu.style.left + ' ' + V.menu.style.top, '100px 50px');
     ctx.DDL_MODO = 'grabacion';
     const antes = V.prevenidos;
     t.eq('fuera de Casting no hace nada (el clic derecho es el de siempre)', String(A.trnMenu(ev, 'A')) + ' ' + (V.prevenidos - antes), 'false 0');
     ctx.DDL_MODO = 'casting';
-    await A.trnGuardar('A', true, '  316   847 9418 ');
-    t.eq('marcar: en la tarjeta y en lo crudo, con su teléfono limpio', JSON.stringify([charIdx.A.training, charIdx.A.tel, raws[0].training, raws[0].tel]), '[true,"316 847 9418",true,"316 847 9418"]');
-    t.eq('se apunta para deshacer, se repinta (tarjetas y tabla), se sube y se avisa', V.hist.length + ' ' + V.pintadas + ' ' + V.planilla + ' ' + V.subidas + ' ' + V.avisos[0], '1 1 1 1 LYLA · training · 316 847 9418');
-    await A.trnGuardar('B', false);
-    t.eq('quitar: sin marca ni teléfono, en los dos sitios', JSON.stringify([charIdx.B.training, charIdx.B.tel, raws[1].training, raws[1].tel]) + ' ' + V.avisos[1], '[null,null,null,null] LOUIS · ya no es training');
-    t.eq('sin teléfono también vale (se puede poner después)', (await A.trnGuardar('A', true, ''), JSON.stringify([charIdx.A.training, charIdx.A.tel]) + ' ' + V.avisos[2]), '[true,""] LYLA · training');
-    t.eq('el otro personaje no se entera', JSON.stringify(Object.keys(charIdx).filter(k => charIdx[k].training)), '["A"]');
+    await A.trnGuardar('MARÍA CORONADO', true, '  316   847 9418 ');
+    t.eq('marcar una vez: sus TRES personajes son training, con el mismo teléfono; los demás no', ['A', 'B', 'C', 'D', 'E', 'F'].map(k => { const x = A.trnDe(charIdx[k]); return k + ':' + (x ? x.tel : '-'); }).join(' '),
+         'A:316 847 9418 B:- C:316 847 9418 D:316 847 9418 E:- F:-');
+    t.eq('se apunta para deshacer, se repinta, se sube y se avisa', V.hist.length + ' ' + V.pintadas + ' ' + V.planilla + ' ' + V.subidas + ' · ' + V.avisos[0], '1 1 1 1 · MARÍA CORONADO · training en 3 personajes · 316 847 9418');
+    t.eq('ya marcado: cambiar el teléfono o quitarlo, desde cualquiera de sus personajes', (A.trnMenu(ev, 'D'), textos()),
+         'LUKE · MARIA CORONADO | Cambiar el teléfono de MARIA CORONADO… (316 847 9418) | Quitar training a MARIA CORONADO (3 personajes)');
+    t.eq('lo que se guarda con el capítulo: el talento y su teléfono, una vez', JSON.stringify(A.trnParaGuardar()), '{"MARIA CORONADO":{"nombre":"MARÍA CORONADO","tel":"316 847 9418"}}');
+    charIdx.E.talent = 'María Coronado';
+    t.eq('un personaje al que se le reparte ese talento después, en este capítulo, también lo es', !!A.trnDe(charIdx.E), true);
+    charIdx.A.talent = 'LUZ MAR';
+    t.eq('y el que deja de tenerlo, deja de serlo', A.trnDe(charIdx.A), null);
+    await A.trnGuardar('MARIA CORONADO', false);
+    t.eq('quitar: ninguno de sus personajes, y se dice', ['C', 'D', 'E'].map(k => String(A.trnDe(charIdx[k]))).join(',') + ' · ' + V.avisos[1], 'null,null,null · MARIA CORONADO ya no es training');
+    A.trnRestaurar(JSON.parse(V.hist[1].split(':').slice(1).join(':'))[0].mapa);
+    t.eq('deshacer devuelve la lista como estaba', !!A.trnDe(charIdx.C), true);
+    /* Otro capítulo: su lista no vale aquí. */
+    ctx.currentEp = { id: 'e2', showId: 's1' };
+    t.eq('al cambiar de capítulo, la lista del anterior no vale', JSON.stringify(A.trnMapa()) + ' ' + String(A.trnDe(charIdx.C)), '{} null');
+    /* Al abrir un capítulo: su lista, limpia; y la marca de la primera versión (por personaje) pasa a su talento. */
+    const viejo = { key: 'X', talent: 'PEDRO PAZ', training: true, tel: '300' }, raw = { key: 'X', talent: 'PEDRO PAZ', training: true, tel: '300' };
+    ctx.chars = [viejo]; ctx.window._charsRaw = [raw];
+    const m = A.trnCargar({ training: { 'a': { nombre: '  Ana   Ruiz ', tel: ' 1 2 ' }, 'b': 'basura', 'c': { nombre: '' } } }, 'e2');
+    t.eq('se sanea lo que viene de la nube y se migra lo viejo', JSON.stringify(m), '{"ANA RUIZ":{"nombre":"Ana Ruiz","tel":"1 2"},"C":{"nombre":"c","tel":""},"PEDRO PAZ":{"nombre":"PEDRO PAZ","tel":"300"}}');
+    t.ok('y la marca vieja se quita de los personajes', viejo.training === undefined && viejo.tel === undefined && raw.training === undefined);
   }
 
   t.seccion('4 · deshacer y cableado');
   {
     const HTML = fs.readFileSync(INDEX, 'utf8'), sw = fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8');
-    const charIdx = { A: { key: 'A', display: 'A', talent: 'X', training: true, tel: '123' }, B: { key: 'B', display: 'B', talent: '' } };
+    const charIdx = { A: { key: 'A', display: 'A', talent: 'X' } };
     const F = montar([['function castFoto(keys){', 'function castHistPush(']], ['castFoto'], { charIdx });
-    t.eq('la foto del deshacer lleva el training solo si lo hay (el resto, como antes)', JSON.stringify(F.castFoto(['A', 'B'])),
-         '[{"key":"A","talent":"X","noRec":false,"heredado":false,"gestOk":false,"training":true,"tel":"123"},{"key":"B","talent":"","noRec":false,"heredado":false,"gestOk":false}]');
-    t.ok('deshacer lo restaura (y lo quita si antes no estaba)', /if\(e\.training\)\{ c\.training = true; c\.tel = e\.tel \|\| ''; \} else \{ delete c\.training; delete c\.tel; \}/.test(HTML) && /if\(e\.training\)\{ raw\.training = true; raw\.tel = e\.tel \|\| ''; \} else \{ delete raw\.training; delete raw\.tel; \}/.test(HTML));
-    t.ok('al abrir un capítulo guardado se sanea (y un training apagado no deja teléfono)', /if\(o\.training!==undefined\)\{ o\.training = o\.training === true; if\(!o\.training\) delete o\.tel; \}/.test(HTML) && /if\(o\.tel!==undefined\) o\.tel = String\(/.test(HTML));
+    t.eq('la foto del deshacer de cada personaje, como antes', JSON.stringify(F.castFoto(['A'])), '[{"key":"A","talent":"X","noRec":false,"heredado":false,"gestOk":false}]');
+    t.ok('deshacer devuelve la lista de training', /if\(e\.key === '__training'\)\{ try\{ trnRestaurar\(e\.mapa\); \}/.test(HTML));
+    t.ok('la lista se guarda con el capítulo y se carga al abrirlo', /training: \(typeof trnParaGuardar === 'function'\) \? trnParaGuardar\(\) : null \};/.test(HTML)
+         && /if\(typeof trnCargar==='function'\) trnCargar\(d, d\._epId \|\| \(currentEp && currentEp\.id\)\)/.test(HTML));
     t.ok('el módulo se carga y va en la caché', /<script src="\.\/js\/training\.js"><\/script>/.test(HTML) && /'\.\/js\/training\.js'/.test(sw));
-    t.ok('la tarjeta: clic derecho, marca «training» con su teléfono; la tabla también',
-         /card\.addEventListener\('contextmenu', ev=>\{ try\{ if\(typeof trnMenu==='function'\) trnMenu\(ev, c\.key\)/.test(HTML) && /\$\{c\.training\?'<span class="ctrn"/.test(HTML) && /\+\(c\.training\?'<span class="ctrn" title="Training'/.test(HTML));
-    t.ok('la descarga: solo los marcados en ESTE capítulo, y avisa de los que no tienen teléfono ni fila',
-         /if\(c && c\.training\) training\[castClave\(c\.display \|\| k\)\] = \{ tel: c\.tel \|\| '' \}/.test(HTML) && /castRellenar\(buf, asign, meta, training\)/.test(HTML) && /sin teléfono: /.test(HTML) && /sin fila en el Excel: /.test(HTML));
+    t.ok('la tarjeta: clic derecho y la marca «training» con su teléfono; la tabla también',
+         /card\.addEventListener\('contextmenu', ev=>\{ try\{ if\(typeof trnMenu==='function'\) trnMenu\(ev, c\.key\)/.test(HTML) && (HTML.match(/const t = \(typeof trnDe==='function'\) \? trnDe\(c\) : null; return t \? '<span class="ctrn"/g) || []).length === 2);
+    t.ok('la descarga: los personajes de los talentos de training de ESTE capítulo, y avisa de los que no tienen teléfono ni fila',
+         /t = \(typeof trnDe === 'function'\) \? trnDe\(c\) : null; if\(t\) training\[castClave\(c\.display \|\| k\)\] = \{ tel: t\.tel \|\| '' \}/.test(HTML) && /castRellenar\(buf, asign, meta, training\)/.test(HTML) && /sin teléfono: /.test(HTML) && /sin fila en el Excel: /.test(HTML));
     t.ok('en amarillo, con su estilo', /\.ctrn\{[^}]*background:#FACC15/.test(HTML) && /\.trn-menu\{/.test(HTML));
   }
 };
