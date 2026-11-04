@@ -1539,6 +1539,21 @@ body.modo-casting .card.heredado .tal b{ color:#F59E0B; }
 /* fuera del casting no se enseña: es una marca de trabajo del reparto */
 body:not(.modo-casting) .verbtn{ display:none; }
 
+/* ═══ ORIGINAL por continuidad ═══════════════════════════════════════════
+   Celeste, aparte del naranja: ese ORIGINAL viene de otro capítulo y falta
+   decidir si sigue así o si ahora lo hace un talento (CAST-42). */
+body.modo-casting .card.heredado.origcont{
+  border-color:#38BDF8 !important;
+  box-shadow:0 0 0 1px rgba(56,189,248,.38), 0 6px 18px rgba(56,189,248,.12);
+}
+body.modo-casting .card.heredado.origcont::before{ background:#38BDF8; }
+body.modo-casting .card.heredado.origcont .tal b{ color:#38BDF8; }
+.verbtn-orig{ background:#38BDF8; color:#06222f; }
+.ctal-orig{ display:inline-block; margin-left:6px; color:#38BDF8; font-size:10.5px; font-weight:700; }
+body.modo-casting .pla tbody tr.origcont td{ background:rgba(56,189,248,.08); }
+body.modo-casting .pla tbody tr.origcont .ploc input{ color:#38BDF8; font-weight:700; }
+body.modo-casting .pla tbody tr.origcont td:first-child{ box-shadow:inset 3px 0 0 #38BDF8; }
+
 /* ═══ Personajes que en este capítulo SOLO hacen gestos ═══════════════════
    Un «MALE SOLDIER» que en el 101 tenía texto y en el 102 solo reacciona no
    es el mismo papel: no debe heredar actor sin que alguien lo mire. Violeta,
@@ -3075,7 +3090,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.90.0-nube';
+const APP_VER_NUM = 'v11.91.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8213,12 +8228,13 @@ function renderPlanilla(){
   const doneN = rows.filter(c=>isCharDone(c)).length;
   const conTal = rows.filter(c=> c.talent && String(c.talent).trim()).length;
   const porVer = rows.filter(c=> c.heredado).length;
+  const porOrig = cast ? rows.filter(c=> castOriginalHeredado(c)).length : 0;
   const porGesto = cast ? rows.filter(c=>{ try{ return gestPendiente(c.key); }catch(e){ return false; } }).length : 0;
   let html = '<div class="pla show"><div class="pla-head" id="plaHead">'
     +'<h2>'+(cast ? 'Casting' : 'Desglose visual')+'</h2>'
     +'<span class="cnt">'+rows.length+' personaje'+(rows.length===1?'':'s')
     +(q?' · filtro activo':'')
-    +(cast ? (' · '+conTal+' con talento'+(porVer?(' · '+porVer+' por verificar'):'')
+    +(cast ? (' · '+conTal+' con talento'+(porVer?(' · '+porVer+' por verificar'):'')+(porOrig?(' · '+porOrig+' original por continuidad'):'')
              +(porGesto?(' · 🎭 '+porGesto+' solo gestos'):''))
            : (' · '+doneN+' ✓'))+'</span>'
     +'<span class="tg">'+(plaOpen?'▾ ocultar':'▸ mostrar')+'</span></div>';
@@ -8234,7 +8250,8 @@ function renderPlanilla(){
       const pct = c.pages.length ? Math.round(100*recCount/c.pages.length) : 0;
       const tc = firstTCOf(c.key);
       const gestPend = cast ? (function(){ try{ return gestPendiente(c.key); }catch(e){ return false; } })() : false;
-      const clases = (done?'done':'') + (cast && c.heredado ? ' heredado' : '') + (gestPend ? ' gestos' : '');
+      const origCont = cast && !gestPend && castOriginalHeredado(c);
+      const clases = (done?'done':'') + (cast && c.heredado ? ' heredado' : '') + (origCont ? ' origcont' : '') + (gestPend ? ' gestos' : '');
       html += '<tr style="--pc:'+c.color+'"'+(clases.trim()?' class="'+clases.trim()+'"':'')+' data-k="'+esc(c.key)+'" title="Abrir el libreto de '+esc(c.display)+'">'
         +'<td class="pnm"><div class="nrow"><span class="cdot"></span>'
         +'<span class="nm2">'+esc(c.display)+'</span>'
@@ -8247,7 +8264,8 @@ function renderPlanilla(){
               +'<td class="pest">'+(gestPend
                   ? '<button class="gestbtn" data-k="'+esc(c.key)+'" title="En este capítulo solo hace gestos — pulsa para dejarlo original (no se dobla)">🎭 verificar</button>'
                   : c.heredado
-                  ? '<button class="verbtn" data-k="'+esc(c.key)+'" title="Viene de otro capítulo — pulsa para darlo por bueno">✓ verificar</button>'
+                  ? (origCont ? '<button class="verbtn verbtn-orig" data-k="'+esc(c.key)+'" title="Era ORIGINAL en otro capítulo — pulsa para dejarlo original, o escribe en Talento quién lo interpreta">✓ verificar</button>'
+                              : '<button class="verbtn" data-k="'+esc(c.key)+'" title="Viene de otro capítulo — pulsa para darlo por bueno">✓ verificar</button>')
                   : (c.talent ? '<span class="est-ok">✓</span>' : '<span class="est-no">—</span>'))+'</td></tr>')
             : ('<td class="ptime">'+(tc||'—')+'</td>'
               +'<td><div class="prog"><span class="track"><i style="width:'+pct+'%"></i></span>'
@@ -8373,6 +8391,7 @@ async function assignTalent(key, val){
   c.talent = val; c.noRec = NO_REC.has(norm(val));
   try{ const raw=(window._charsRaw||[]).find(x=>x.key===key); if(raw){ raw.talent=val; raw.noRec=c.noRec; } }catch(e){}
   try{ castVerificar(key, true); }catch(e){}   // escrito a mano: ya está verificado
+  if(val) try{ gestDarPorMirado(key); }catch(e){ fallo('gestDarPorMirado · index.html:assignTalent', e, 'puede seguir apareciendo como solo gestos'); }   // y si solo hacía gestos, también mirado (CAST-42)
   const copiados = castCopiarAGemelos(key, val);
   if(copiados.length) try{ DDL_UI.toast('También se ha puesto en ' + copiados.join(' y '), { duration: 4500 }); }catch(e){ /* el aviso es un extra */ }
   try{ renderCards(); }catch(e){ fallo('renderCards · index.html:4865', e); }
@@ -8519,7 +8538,8 @@ function renderCards(){
     const notInLib = !!(window._scanMissingKeys && window._scanMissingKeys.has(c.key));
     const enChoque = (typeof _choqueMapa !== 'undefined' && _choqueMapa) ? !!castChoqueDe(c.key, _choqueMapa) : false;
     const soloGestos = _gestM ? gestPendiente(c.key, _gestM) : false;
-    card.className = 'card'+(done?' done':'')+(notInLib?' nolib':'')+(c.heredado?' heredado':'')+(enChoque?' choque':'')+(soloGestos?' gestos':'')+(listo?' listo':'');
+    const origCont = !soloGestos && castOriginalHeredado(c);   // ORIGINAL que viene de otro capítulo: celeste, por decidir
+    card.className = 'card'+(done?' done':'')+(notInLib?' nolib':'')+(c.heredado?' heredado':'')+(origCont?' origcont':'')+(enChoque?' choque':'')+(soloGestos?' gestos':'')+(listo?' listo':'');
     card.dataset.key = c.key;    // para poder animarla al salir de la vista
     card.tabIndex=0;
     if(notInLib) card.title = 'Este personaje no se encontró en el libreto';
@@ -8532,8 +8552,10 @@ function renderCards(){
       ? `<button class="gestbtn" title="En este capítulo solo hace gestos — pulsa para dejarlo original (no se dobla)" aria-label="Verificar que ${esc(c.display)} solo hace gestos">✓ verificar</button>`
       : '';
     const talDisplay = (c.talent
-      ? `<b>${esc(c.talent)}</b>` + (c.noRec ? '<small class="ctal-nomarca" title="No es un talento: no cuenta en Talentos ni en la ocupación">no es un talento</small>' : '') + (c.heredado && !soloGestos
-          ? `<button class="verbtn" title="Viene de otro capítulo — pulsa para darlo por bueno" aria-label="Verificar el talento de ${esc(c.display)}">✓ verificar</button>`
+      ? `<b>${esc(c.talent)}</b>` + (origCont ? '<small class="ctal-orig" title="En otro capítulo se dejó ORIGINAL: verifícalo para dejarlo así, o pulsa «Asignar talento» si ahora lo hace alguien">original por continuidad</small>'
+                                  : (c.noRec ? '<small class="ctal-nomarca" title="No es un talento: no cuenta en Talentos ni en la ocupación">no es un talento</small>' : '')) + (c.heredado && !soloGestos
+          ? (origCont ? `<button class="verbtn verbtn-orig" title="Era ORIGINAL en otro capítulo — pulsa para dejarlo original, o «Asignar talento» para ponerle quien lo interpreta" aria-label="Verificar que ${esc(c.display)} sigue original">✓ verificar</button>`
+                      : `<button class="verbtn" title="Viene de otro capítulo — pulsa para darlo por bueno" aria-label="Verificar el talento de ${esc(c.display)}">✓ verificar</button>`)
           : '')
       : (soloGestos ? '<span class="ng">Solo gestos</span>' : '<span class="ng">Sin asignar</span>')) + gestBtn;
     const tc0 = (typeof firstTCOf==='function' ? firstTCOf(c.key) : '') || '';
@@ -8552,7 +8574,7 @@ function renderCards(){
       // talento (o "Sin asignar") — donde antes estaban los chips
       `<div class="tal" id="tal_${esc(c.key)}">${talDisplay}</div>`+
       // botón al pie
-      `<button class="cbtn" aria-label="${c.talent?'Editar talento':'Asignar talento'} de ${esc(c.display)}">${c.talent ? 'Editar' : 'Asignar'}</button>`;
+      `<button class="cbtn" aria-label="${c.talent?'Editar talento':'Asignar talento'} de ${esc(c.display)}">${c.talent ? (origCont ? 'Asignar talento' : 'Editar') : 'Asignar'}</button>`;
 
     // clic en la tarjeta (no en botones) → abre libreto
     card.addEventListener('click', ev=>{
@@ -8674,6 +8696,7 @@ function renderCards(){
         // reabrir; si el talento no está también en el crudo, se pierde.
         try{ const raw = (window._charsRaw||[]).find(x=> x.key===c.key); if(raw){ raw.talent = val; raw.noRec = c.noRec; } }catch(e){}
         try{ castVerificar(c.key, true); }catch(e){}   // escrito a mano: verificado
+        if(val) try{ gestDarPorMirado(c.key); }catch(e){ fallo('gestDarPorMirado · index.html:tarjeta', e, 'puede seguir apareciendo como solo gestos'); }   // y si solo hacía gestos, también mirado (CAST-42)
         if(val) try{ castAvisarChoque(c.key); }catch(e){}
         /* Guardar cierra el reparto de este personaje: la tarjeta se chulea en
            verde AHÍ MISMO y, pasado el golpe, se va a «Personajes completados».
@@ -10978,6 +11001,21 @@ function gestPendiente(key, mapa){
 }
 
 /**
+ * Quien pone un talento a mano en un personaje de solo gestos ya lo ha mirado
+ * (CAST-42): se acabó el violeta y el «verificar», y la tarjeta se cierra con
+ * el nombre que escribió. Antes seguía en violeta con el nombre puesto y, al
+ * pulsar «verificar», el nombre se cambiaba por ORIGINAL.
+ */
+function gestDarPorMirado(key){
+  const c = (typeof charIdx !== 'undefined') ? charIdx[key] : null;
+  if(c) c.gestOk = true;
+  try{
+    const raw = (window._charsRaw || []).find(x => x.key === key);
+    if(raw) raw.gestOk = true;
+  }catch(e){ /* se rehace al reabrir el capítulo */ }
+}
+
+/**
  * «Dejarlo original», al pie de la letra: dar por bueno que solo hace gestos
  * es decir que ese personaje NO se dobla, y en el desglose eso se escribe
  * ORIGINAL. Así sale ya puesto en el Excel y nadie tiene que acordarse.
@@ -11000,9 +11038,14 @@ function gestVerificar(key, ok, sinHistoria){
   if(c){
     c.gestOk = !!ok;
     if(ok){
-      const tal = gestTalentoDe(key);
-      c.talent = tal;                            // ORIGINAL: no se dobla · TODOS: lo graban todos
-      try{ c.noRec = NO_REC.has(norm(tal)); }catch(e){ c.noRec = true; }
+      /* Un talento puesto a mano (o traído en el desglose) se respeta: «verificar» no lo cambia por ORIGINAL.
+         Solo se deja ORIGINAL o TODOS cuando no hay nadie, o el nombre viene heredado de otro capítulo. */
+      const propio = !!(c.talent && String(c.talent).trim()) && !c.heredado;
+      if(!propio){
+        const tal = gestTalentoDe(key);
+        c.talent = tal;                          // ORIGINAL: no se dobla · TODOS: lo graban todos
+        try{ c.noRec = NO_REC.has(norm(tal)); }catch(e){ c.noRec = true; }
+      }
       c.heredado = false;                        // lo acabas de decidir tú
     }
   }
@@ -11964,13 +12007,25 @@ function castVerificar(key, verificado){
 }
 
 /**
+ * ¿El talento viene de otro capítulo y es ORIGINAL (CAST-42)? Pedido de sala: «los
+ * personajes que por continuidad son ORIGINAL, verificarlos y colocarlos en otro
+ * color, para yo colocar un talento que lo interpretó u otro talento». Ese
+ * ORIGINAL no lo puso nadie en este capítulo: lo mismo sigue siendo original que
+ * ahora lo hace alguien. Va en celeste, aparte del naranja de los demás heredados,
+ * y «Confirmar todos» no lo da por bueno: se decide uno por uno.
+ */
+function castOriginalHeredado(c){
+  return !!(c && c.heredado && /^\s*original\s*$/i.test(String(c.talent == null ? '' : c.talent)));
+}
+
+/**
  * Pedido de sala: «agrega en casting un botón que sea confirmar todos los
  * talentos». Da por buenos de una vez todos los talentos heredados de otros
  * capítulos (los naranjas, CAST-7) que ya tienen talento: lo mismo que pulsar
  * «verificar» en cada tarjeta, con un solo paso de «Deshacer». Devuelve cuántos.
  */
 async function castConfirmarTodos(){
-  const claves = Object.keys(charIdx || {}).filter(k => { const c = charIdx[k]; return !!(c && c.heredado && c.talent && String(c.talent).trim()); });
+  const claves = Object.keys(charIdx || {}).filter(k => { const c = charIdx[k]; return !!(c && c.heredado && c.talent && String(c.talent).trim()) && !castOriginalHeredado(c); });
   if(!claves.length){ castAviso('No hay talentos heredados por confirmar'); castPintarConfirmar(); return 0; }
   try{ castHistPush(castFoto(claves), 'confirmar ' + claves.length + ' talento' + (claves.length === 1 ? '' : 's')); }catch(e){ /* sin deshacer para este paso */ }
   for(const k of claves) castVerificar(k, true);
@@ -11987,7 +12042,7 @@ function castPintarConfirmar(){
   const b = document.getElementById('btnCastOk');
   if(!b) return 0;
   let n = 0;
-  try{ for(const k in charIdx){ const c = charIdx[k]; if(c && c.heredado && c.talent && String(c.talent).trim()) n++; } }catch(e){ n = 0; }
+  try{ for(const k in charIdx){ const c = charIdx[k]; if(c && c.heredado && c.talent && String(c.talent).trim() && !castOriginalHeredado(c)) n++; } }catch(e){ n = 0; }
   b.disabled = !n;
   b.textContent = n ? 'Confirmar todos (' + n + ')' : 'Confirmar todos';
   b.title = n ? 'Da por buenos de una vez los ' + n + ' talento' + (n === 1 ? '' : 's') + ' heredado' + (n === 1 ? '' : 's') + ' de otros capítulos (los naranjas)' : 'No hay talentos heredados por confirmar';
