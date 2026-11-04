@@ -1834,6 +1834,7 @@ span.ct-cel{ display:inline-block; border-radius:6px; padding:1px 7px; }
 /* Personajes de training (js/training.js, CAST-43): amarillo, como en el Excel. */
 .ctrn{ display:inline-block; margin-left:6px; padding:1px 8px; border-radius:999px; background:#FACC15; color:#2b2200; font-size:10.5px; font-weight:800; vertical-align:middle; white-space:nowrap; }
 .trn-menu{ position:fixed; z-index:2147483645; min-width:210px; background:#16181d; border:1px solid #2b2f36; border-radius:10px; padding:6px; box-shadow:0 12px 32px rgba(0,0,0,.5); }
+.trn-menu-n{ padding:6px 10px; font-size:12px; color:#c9cde0; max-width:260px; }
 .trn-menu-t{ padding:4px 10px 6px; font-size:11px; font-weight:700; color:#8b8f97; border-bottom:1px solid #23262b; margin-bottom:4px; }
 .trn-menu button{ display:block; width:100%; text-align:left; background:none; border:none; color:#f2f3f5; font:inherit; font-size:13px; padding:7px 10px; border-radius:7px; cursor:pointer; }
 .trn-menu button:hover{ background:#23262b; }
@@ -3106,7 +3107,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.93.0-nube';
+const APP_VER_NUM = 'v11.93.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8271,7 +8272,7 @@ function renderPlanilla(){
       html += '<tr style="--pc:'+c.color+'"'+(clases.trim()?' class="'+clases.trim()+'"':'')+' data-k="'+esc(c.key)+'" title="Abrir el libreto de '+esc(c.display)+'">'
         +'<td class="pnm"><div class="nrow"><span class="cdot"></span>'
         +'<span class="nm2">'+esc(c.display)+'</span>'
-        +(c.training?'<span class="ctrn" title="Training'+(c.tel?' · '+esc(c.tel):'')+'">training</span>':'')
+        +(function(){ const t = (typeof trnDe==='function') ? trnDe(c) : null; return t ? '<span class="ctrn" title="'+esc(t.nombre)+' · training'+(t.tel?' · '+esc(t.tel):'')+'">training</span>' : ''; })()
         +(done?'<span class="bdg">✓</span>':'')
         +'<button class="delChar" data-k="'+esc(c.key)+'" title="Eliminar personaje del desglose" style="margin-left:auto;display:inline-grid;place-items:center;border:none;background:none;color:#7d76a8;cursor:pointer;padding:2px 4px">'+ICO.trash+'</button>'
         +'</div></td>'
@@ -8585,7 +8586,7 @@ function renderCards(){
       // timecode en cajita encima del nombre
       (tc0 ? `<div class="ctc">${esc(tc0)}</div>` : `<div class="ctc ctc-empty"></div>`)+
       // nombre grande (con aviso si no aparece en el libreto)
-      `<div class="cname">${esc(c.display)}${notInLib?'<span class="nolib-b" title="No se encontró en el libreto">sin libreto</span>':''}${c.training?'<span class="ctrn" title="Training: en el Excel sale en amarillo'+(c.tel?' con el teléfono '+esc(c.tel):' (sin teléfono)')+'. Clic derecho para cambiarlo">training'+(c.tel?' · '+esc(c.tel):'')+'</span>':''}</div>`+
+      `<div class="cname">${esc(c.display)}${notInLib?'<span class="nolib-b" title="No se encontró en el libreto">sin libreto</span>':''}${(function(){ const t = (typeof trnDe==='function') ? trnDe(c) : null; return t ? '<span class="ctrn" title="'+esc(t.nombre)+' es training en este capítulo: en el Excel sale en amarillo'+(t.tel?' con el teléfono '+esc(t.tel):' (sin teléfono)')+'. Clic derecho para cambiarlo">training'+(t.tel?' · '+esc(t.tel):'')+'</span>' : ''; })()}</div>`+
       // divisor
       `<div class="cdiv"></div>`+
       // talento (o "Sin asignar") — donde antes estaban los chips
@@ -9919,9 +9920,10 @@ function castEscribirColumna(xml, col, valores){
    número de teléfono, que va donde dice TELEFONO; y en la planilla, al
    costado derecho de las líneas de ese talento, se pone la palabra training.
    Importante: eso se marca solo en el programa que lo haga, nada de
-   automatizaciones». Por eso la marca vive solo en el personaje de ESE
-   capítulo (c.training, c.tel): ni se hereda, ni va al registro del programa,
-   ni se copia a los gemelos (ARCHIVO, VO) ni a otros capítulos. */
+   automatizaciones», y «se marca al TALENTO de training en ese episodio: si
+   tiene tres personajes, los tres». La lista vive en el capítulo
+   (js/training.js): ni se hereda, ni va al registro del programa ni a otros
+   capítulos. Aquí llegan ya los personajes, con el teléfono de su talento. */
 
 const CAST_COL_TEL = 'F';          // TELEFONO, en la hoja del casting
 const CAST_TRAINING = 'training';
@@ -10121,7 +10123,7 @@ function castRellenar(buf, asign, meta, training){
   // la cabecera del programa: fecha, género, tiempo, director, técnico, estudio
   let xmlFinal = r.xml, cabecera = 0;
   if(meta){ const m = castEscribirMeta(xmlFinal, meta); xmlFinal = m.xml; cabecera = m.puestas; }
-  /* Los de training: teléfono, amarillo y la palabra en la planilla. Solo los que se marcaron a mano en este capítulo. */
+  /* Los de training: teléfono, amarillo y la palabra en la planilla. Solo los talentos marcados a mano en este capítulo. */
   const tr = castAplicarTraining(arch, xmlFinal, personajes, training);
   xmlFinal = tr.xml; delete tr.xml;
   arch[ruta] = new TextEncoder().encode(xmlFinal);
@@ -10380,7 +10382,6 @@ function castFoto(keys){
     if(!c) continue;
     const f = { key: k, talent: c.talent || '', noRec: !!c.noRec, heredado: !!c.heredado,
                 gestOk: !!c.gestOk };
-    if(c.training){ f.training = true; f.tel = c.tel || ''; }          // el training también se deshace (CAST-43)
     out.push(f);
   }
   return out;
@@ -10407,18 +10408,17 @@ async function castUndo(){
   const paso = castHist.pila.pop();
   if(!paso){ castAviso('No hay nada que deshacer'); castPintarUndo(); return; }
   for(const e of paso.antes){
+    if(e.key === '__training'){ try{ trnRestaurar(e.mapa); }catch(x){ fallo('trnRestaurar · index.html:castUndo', x); } continue; }   // los talentos de training (CAST-43)
     const c = charIdx[e.key];
     if(!c) continue;
     c.talent = e.talent;
     c.noRec = e.noRec;
     c.heredado = !!e.heredado;
     c.gestOk = !!e.gestOk;
-    if(e.training){ c.training = true; c.tel = e.tel || ''; } else { delete c.training; delete c.tel; }
     try{
       const raw = (window._charsRaw || []).find(x => x.key === e.key);
       if(raw){ raw.talent = e.talent; raw.noRec = e.noRec; raw.heredado = !!e.heredado;
-               raw.gestOk = !!e.gestOk;
-               if(e.training){ raw.training = true; raw.tel = e.tel || ''; } else { delete raw.training; delete raw.tel; } }
+               raw.gestOk = !!e.gestOk; }
     }catch(x){}
   }
   try{ renderCards(); }catch(e){ fallo('renderCards · index.html:6182', e); }
@@ -12974,9 +12974,9 @@ async function castDescargar(){
     }
     const buf = fuente.buf;
     const meta = await castMetaCargar(LDB.showId || (currentEp && currentEp.showId));
-    /* Los de training: solo los marcados a mano en ESTE capítulo (clic derecho en su tarjeta). */
+    /* Los de training: los personajes de los talentos marcados a mano en ESTE capítulo (clic derecho en una tarjeta). */
     const training = {};
-    for(const k in charIdx){ const c = charIdx[k]; if(c && c.training) training[castClave(c.display || k)] = { tel: c.tel || '' }; }
+    for(const k in charIdx){ const c = charIdx[k], t = (typeof trnDe === 'function') ? trnDe(c) : null; if(t) training[castClave(c.display || k)] = { tel: t.tel || '' }; }
     const r = castRellenar(buf, asign, meta, training);
 
     const ep = (LDB.epsAll || []).find(e => e.id === currentEp.id);
@@ -13785,6 +13785,9 @@ function hydrateEpisode(d){ _epOpen(true);
   scriptByKey = {};
   script.forEach(b=>{ if(b.key) (scriptByKey[b.key] = scriptByKey[b.key] || []).push(b.idx); });
   window._charsRaw = (Array.isArray(d.charsRaw) ? d.charsRaw : chars.map(c=> ({...c, pages:(c.pages||[]).map(p=>({...p}))}))).map(sanChar).filter(Boolean);
+  /* Los talentos de training de ESTE capítulo (CAST-43), después de tener los personajes y su copia cruda. */
+  try{ if(typeof trnCargar==='function') trnCargar(d, d._epId || (currentEp && currentEp.id)); }
+  catch(e){ fallo('trnCargar · index.html:hydrateEpisode', e, 'las marcas de training de este capítulo no se han cargado'); }
   // B3 (auditoría): al cambiar de capítulo, las marcas del anterior no deben
   // pintarse ni guardarse en el nuevo. Solo cuando el capítulo REALMENTE cambia
   // (si se rehidrata el mismo capítulo, se conservan las marcas en memoria).
@@ -13865,7 +13868,8 @@ async function epDataUpsert(epId, showId){
       cortes: (typeof CORTES !== 'undefined' && CORTES.lista.length) ? CORTES.lista : null,
       cotejo: (window._cotejo && Object.keys(window._cotejo).length) ? window._cotejo : null,
       qc: qcParaGuardar(),
-      qcMeta: qcMetaParaGuardar() };
+      qcMeta: qcMetaParaGuardar(),
+      training: (typeof trnParaGuardar === 'function') ? trnParaGuardar() : null };
     const stamp = new Date().toISOString();
     let { error } = await sb.from('episode_data').upsert({ ep_id:epId, show_id:showId||null, data, updated_at:stamp });
     if(error && authErr(error) && await reAuth()){
