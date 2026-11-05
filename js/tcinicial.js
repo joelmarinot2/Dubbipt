@@ -54,6 +54,7 @@ function tciSan(d){
   const out = { v: 1, casa: '', programa: null, bloques: [] };
   if(!d || typeof d !== 'object') return out;
   out.casa = tciCasaLimpia(d.casa);
+  if(d.tipo === 'serie' || d.tipo === 'pelicula') out.tipo = d.tipo;          // serie o película (PRO-61)
   if(d.programa && num(d.programa.v) != null) out.programa = { v: num(d.programa.v), casa: tciCasaLimpia(d.programa.casa), ts: num(d.programa.ts) || 0 };
   for(const b of (Array.isArray(d.bloques) ? d.bloques : [])){
     const desde = parseInt(b && b.desde, 10), hasta = parseInt(b && b.hasta, 10), v = num(b && b.v);
@@ -163,11 +164,12 @@ function tciCasaTc(todos, casa, exceptoId){
  * La casa de un programa (al crearlo, o después). Si la casa ya tiene un TC en
  * otros programas y este no tiene el suyo, lo hereda. Devuelve el TC heredado o nulo.
  */
-async function tciAsignarCasa(showId, casa){
+async function tciAsignarCasa(showId, casa, tipo){
   const nombre = tciCasaNombre(casa);
   if(!nombre) throw new Error('Elige la casa del proyecto');
   const d = await tciCargar(showId, true);
   d.casa = nombre;
+  if(tipo === 'serie' || tipo === 'pelicula') d.tipo = tipo;                   // y si es serie o película (PRO-61)
   let heredado = null;
   if(!d.programa){
     const r = tciCasaTc(await tciTodos(), nombre, showId);
