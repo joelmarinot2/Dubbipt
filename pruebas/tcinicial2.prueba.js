@@ -145,7 +145,7 @@ exports.pruebas = async function(t){
     t.ok('se carga el módulo y va en la caché', /<script src="\.\/js\/tcinicial\.js"><\/script>/.test(html) && /'\.\/js\/tcinicial\.js'/.test(sw));
     t.ok('«Nuevo programa» pide la casa, con las del pedido y «Otra…», y no crea sin ella',
          /<label for="npCasa">Casa<\/label><select id="npCasa">/.test(html) && /TCI_CASAS/.test(html) && /<option value="__otra">Otra…<\/option>/.test(html)
-         && /if\(!casa\)\{ \$q\('npErr'\)\.textContent='Elige la casa del proyecto';/.test(html) && /tciAsignarCasa\(show\.id, casa\)/.test(html));
+         && /if\(!casa\)\{ \$q\('npErr'\)\.textContent='Elige la casa del proyecto';/.test(html) && /tciAsignarCasa\(show\.id, casa, tipo\)/.test(html));
     t.ok('el estudio: botón «Más capítulos…», el TC con su origen y las reglas al cargar las marcas',
          /<button id="stTc0Regla"[^>]*>Más capítulos…<\/button>/.test(html) && /function studioSetTc0\(sec, save, origen\)/.test(html) && /sync\.marks\._tcOff = \{ v: sec, o: origen \|\| 'manual' \}/.test(html)
          && /if\(typeof tciAplicar==='function'\) tciAplicar\(\)/.test(html) && /studioSetTc0\(script\[0\]\.tcEff, true, 'auto'\)/.test(html));

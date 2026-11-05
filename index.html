@@ -1831,6 +1831,11 @@ span.ct-cel{ display:inline-block; border-radius:6px; padding:1px 7px; }
 .ct-resumen td{ color:#8b93a1; font-size:12px; background:#0e1013; }
 .ct-alerta .cs-linea-t{ white-space:normal; }
 .ct-mas{ margin-top:10px; } .ct-mas summary{ cursor:pointer; color:#cbd5e1; font-weight:600; margin-bottom:8px; }
+/* Serie o película, al crear el programa (PRO-61). */
+.ddlm-tipo{ display:flex; gap:10px; }
+.ddlm-field .ddlm-tipo label{ flex:1; display:flex; margin:0; align-items:center; gap:8px; padding:9px 12px; border:1px solid #2b2f36; border-radius:10px; cursor:pointer; color:#e7ebf3; font-size:13.5px; }
+.ddlm-field .ddlm-tipo label:has(input:checked){ border-color:#4ADE80; background:rgba(74,222,128,.08); }
+.ddlm-field .ddlm-tipo input{ width:auto; flex:none; margin:0; padding:0; accent-color:#22C55E; }
 /* Personajes de training (js/training.js, CAST-43): amarillo, como en el Excel. */
 .ctrn{ display:inline-block; margin-left:6px; padding:1px 8px; border-radius:999px; background:#FACC15; color:#2b2200; font-size:10.5px; font-weight:800; vertical-align:middle; white-space:nowrap; }
 .trn-menu{ position:fixed; z-index:2147483645; min-width:210px; background:#16181d; border:1px solid #2b2f36; border-radius:10px; padding:6px; box-shadow:0 12px 32px rgba(0,0,0,.5); }
@@ -3107,7 +3112,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.94.0-nube';
+const APP_VER_NUM = 'v11.95.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -13657,7 +13662,16 @@ async function newShow(){
       + ((typeof TCI_CASAS!=='undefined' ? TCI_CASAS : []).map(c=>'<option>'+c+'</option>').join(''))
       +'<option value="__otra">Otra…</option></select>'
       +'<input id="npCasaOtra" placeholder="Nombre de la casa" style="display:none;margin-top:6px"></div>'
-    +'<div class="ddlm-field"><label for="npEps">N.º de episodios <span style="color:#6b7280">(opcional)</span></label><input id="npEps" type="number" min="0" placeholder="24"></div>'
+    /* Serie o película (PRO-61): se elige siempre. Una película sube su libreto aquí mismo y queda con su único capítulo. */
+    +'<div class="ddlm-field"><label>Tipo</label><div class="ddlm-tipo" id="npTipo">'
+      +'<label><input type="radio" name="npTipo" value="serie"> Serie</label>'
+      +'<label><input type="radio" name="npTipo" value="pelicula"> Película</label></div></div>'
+    +'<div class="ddlm-field" id="npPeliW" style="display:none"><label>Libreto de la película</label>'
+      +'<label class="ddlm-drop" id="npDrop"><span class="ddlm-drop-ic">'+ICO.upload+'</span>'
+        +'<span class="ddlm-drop-t" id="npDropT">Arrastra o elige el libreto</span>'
+        +'<span class="ddlm-drop-h">PDF · Word · Excel · lista de diálogos original — el desglose se genera solo</span>'
+        +'<input type="file" id="npFile" accept="application/pdf,.pdf,.docx,.xlsx,.xlsm,.xls"></label></div>'
+    +'<div class="ddlm-field" id="npEpsW"><label for="npEps">N.º de episodios <span style="color:#6b7280">(opcional)</span></label><input id="npEps" type="number" min="0" placeholder="24"></div>'
     +'<div class="ddlm-row">'
       +'<div class="ddlm-field"><label for="npLangSrc">Idioma original</label><select id="npLangSrc">'+optHtml('Coreano')+'</select></div>'
       +'<div class="ddlm-field"><label for="npLangDub">Idioma de doblaje</label><select id="npLangDub">'+optHtml('Español')+'</select></div>'
@@ -13671,6 +13685,14 @@ async function newShow(){
   ov.addEventListener('mousedown', e=>{ if(e.target===ov) close(); });
   ov.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
   $q('npCancel').onclick = close;
+  /* Película: aparece el libreto y desaparece el número de episodios. */
+  ov.querySelectorAll('input[name="npTipo"]').forEach(r=> r.addEventListener('change', ()=>{
+    const peli = r.value==='pelicula' && r.checked;
+    $q('npPeliW').style.display = peli ? '' : 'none';
+    $q('npEpsW').style.display = peli ? 'none' : '';
+    $q('npGo').textContent = peli ? 'Crear película y subir libreto' : 'Crear programa';
+  }));
+  $q('npFile').addEventListener('change', ()=>{ const f=$q('npFile').files[0]; if(f){ $q('npDropT').textContent=f.name; $q('npDrop').classList.add('has'); } });
   $q('npCasa').addEventListener('change', ()=>{ const o=$q('npCasaOtra'); o.style.display = $q('npCasa').value==='__otra' ? '' : 'none'; if($q('npCasa').value==='__otra') o.focus(); });
   // preview de portada
   $q('npCov').addEventListener('change', ()=>{ const f=$q('npCov').files[0]; if(f){ const img=$q('npCovImg'); img.src=URL.createObjectURL(f); img.style.display='block'; const pl=$q('npCovBox').querySelector('.pl'); if(pl) pl.style.display='none'; } });
@@ -13680,10 +13702,14 @@ async function newShow(){
     /* La casa se elige cada vez que se crea un proyecto: de ella sale el TC inicial del video (EST-5). */
     const casa = ($q('npCasa').value==='__otra' ? $q('npCasaOtra').value : $q('npCasa').value).replace(/\s+/g,' ').trim();
     if(!casa){ $q('npErr').textContent='Elige la casa del proyecto'; ($q('npCasa').value==='__otra' ? $q('npCasaOtra') : $q('npCasa')).focus(); return; }
+    const tipo = (ov.querySelector('input[name="npTipo"]:checked')||{}).value || '';
+    if(!tipo){ $q('npErr').textContent='Elige si es una serie o una película'; return; }
+    const archivoPeli = tipo==='pelicula' ? $q('npFile').files[0] : null;
+    if(tipo==='pelicula' && !archivoPeli){ $q('npErr').textContent='Sube el libreto de la película (PDF, Word o Excel)'; return; }
     const btn=$q('npGo'); btn.disabled=true; btn.textContent='Creando…';
     // guarda metadata extra si las columnas existen; si no, cae limpio a solo {name, workspace_id}
     const payload = { name, workspace_id:WORKSPACE.id };
-    const epsN = parseInt($q('npEps').value||'',10);
+    const epsN = tipo==='pelicula' ? 1 : parseInt($q('npEps').value||'',10);
     const meta = { episodes: isFinite(epsN)?epsN:null, lang_src: $q('npLangSrc').value, lang_dub: $q('npLangDub').value };
     let r = await sb.from('shows').insert(Object.assign({}, payload, meta)).select().single();
     if(r.error && /column|schema|meta|lang_|episodes/i.test(r.error.message||'')){
@@ -13700,12 +13726,20 @@ async function newShow(){
         if(!u.error){ await sb.from('shows').update({cover_path:path}).eq('id',show.id); } }
     }catch(e){ console.warn('cover', e); }
     let tcCasa = null;
-    try{ if(typeof tciAsignarCasa==='function') tcCasa = await tciAsignarCasa(show.id, casa); }
+    try{ if(typeof tciAsignarCasa==='function') tcCasa = await tciAsignarCasa(show.id, casa, tipo); }
     catch(e){ fallo('tciAsignarCasa · index.html:newShow', e, 'el programa se creó, pero no se pudo guardar su casa: se elige en «Más capítulos…» del Video Estudio'); }
     close();
     LDB.showId=show.id; libView='eps'; await libFetchAll(); renderLibrary(true);
     if(typeof libPing==='function') libPing('show', show.id);
-    if(typeof DDL_UI!=='undefined') DDL_UI.toast('Programa «'+name+'» creado · casa '+casa+(tcCasa!=null?' · TC inicial '+stFmtTC(tcCasa):''));
+    if(typeof DDL_UI!=='undefined') DDL_UI.toast((tipo==='pelicula' ? 'Película «'+name+'» creada' : 'Programa «'+name+'» creado')+' · casa '+casa+(tcCasa!=null?' · TC inicial '+stFmtTC(tcCasa):''));
+    /* Película: su libreto, de una vez. Se lee, se revisa el desglose y se guarda como su único capítulo, con su nombre. */
+    if(archivoPeli){
+      try{
+        currentEp = null;
+        await loadFileForEp(archivoPeli);
+        showDesgloseReview(name, async ()=>{ window._epNameOverride = name; await saveEpHere(); try{ _epOpen(true); }catch(e){ /* se abre desde la biblioteca */ } });
+      }catch(e){ fallo('loadFileForEp · index.html:newShow', e, 'la película se creó, pero su libreto no se pudo leer: súbelo con «Nuevo episodio»'); }
+    }
   });
   setTimeout(()=>{ const n=$q('npName'); if(n) n.focus(); }, 60);
 }
