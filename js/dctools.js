@@ -1899,8 +1899,13 @@ function pxDescargar(ep, callado){
   try{
     pxOrdenar(ep.filas);
     pxRecordar(ep, S.cfg);
-    const f = pxArchivosXlsx(ep, S.cfg), z = {};
-    for(const k of Object.keys(f)) z[k] = fflate.strToU8(f[k]);
+    const tpl = pxTplDe(S.cfg.serie);                                    // la plantilla de este programa, si se subió (PRO-62)
+    let z = {};
+    if(tpl){
+      try{ z = pxLlenarPlantilla(fflate.unzipSync(tpl.bytes), ep, S.cfg); }
+      catch(e){ aviso('No se pudo llenar la plantilla «' + tpl.nombre + '»: ' + e.message); return null; }
+    }
+    else { const f = pxArchivosXlsx(ep, S.cfg); for(const k of Object.keys(f)) z[k] = fflate.strToU8(f[k]); }
     const blob = new Blob([fflate.zipSync(z, { level: 6 })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const nombre = pxNombreArchivo(S.cfg, ep);
     bdDownload(blob, nombre);
@@ -1922,6 +1927,256 @@ async function pxDescargarVarios(eps){
   }
   if(hechos.length) aviso(hechos.length + (hechos.length === 1 ? ' DUBCARD descargado: ' : ' DUBCARDs descargados, uno por episodio: ') + hechos.join(', '));
   return hechos;
+}
+
+/* ── Otra plantilla de Pixelogic, por programa (PRO-62) ─────────────────────
+   Pedido de sala: «que en el apartado de Pixelogic pueda subir otra plantilla
+   dependiendo el programa». Cada programa (el PROJECT TITLE) puede tener su
+   propio Excel: al descargar, se rellena ESA plantilla en lugar de la de
+   siempre, sin tocar su formato, sus listas ni lo que ya trae escrito. Los
+   datos se colocan buscando los rótulos, no las celdas fijas:
+     · los del proyecto (PROJECT TITLE, TYPE, CLIENT, SEASON NUMBER…), en la
+       celda de al lado (o pasada la combinación del rótulo);
+     · los créditos técnicos, por su «Description» (Show, Title, Studio,
+       Translator, Dubbing Director…), en Translation / First Name / Last Name
+       / Legal Name;
+     · el reparto, debajo de la cabecera con «Character Name», una fila por
+       actor, con el formato (y las fórmulas) de su primera fila.
+   Un dato vacío no borra lo que la plantilla ya traiga. Se guarda en este
+   equipo, por programa; «Usar la de siempre» la quita. */
+
+const PX_TPL_KEY = 'dc_pixelogic_tpl_v1';
+const PX_DEC = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+const pxDes = s => String(s == null ? '' : s).replace(/&(amp|lt|gt|quot|apos|#(\d+)|#x([0-9a-f]+));/gi, (m, n, d, h) => d ? String.fromCharCode(+d) : h ? String.fromCharCode(parseInt(h, 16)) : PX_DEC[n.toLowerCase()]);
+/** Un rótulo comparable: sin tildes, en mayúsculas, sin dos puntos ni espacios de más. */
+const pxRotulo = s => pmSinTildes(s).toUpperCase().replace(/[:：]\s*$/, '').replace(/\s+/g, ' ').trim();
+const pxColN = l => { let n = 0; for(const ch of l) n = n * 26 + ch.charCodeAt(0) - 64; return n; };
+const pxColL = n => { let s = ''; while(n > 0){ const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = (n - 1 - r) / 26; } return s; };
+const pxAttr = (a, k) => { const m = String(a || '').match(new RegExp('\\b' + k + '="([^"]*)"')); return m ? m[1] : null; };
+
+/** Las plantillas guardadas: { PROGRAMA: { nombre, b64, ts } }. */
+function pxTplTodas(){ try{ return JSON.parse(localStorage.getItem(PX_TPL_KEY) || '{}') || {}; }catch(e){ return {}; } }
+/** La plantilla de un programa: { nombre, bytes } o nula (la de siempre). */
+function pxTplDe(serie){
+  const k = pxClave(serie);
+  const g = k ? pxTplTodas()[k] : null;
+  if(!g || !g.b64) return null;
+  return { nombre: g.nombre, bytes: Uint8Array.from(atob(g.b64), c => c.charCodeAt(0)) };
+}
+
+/** El libro abierto: la hoja del Contract Inventory (la que se llame así, o la primera), sus filas y sus textos. */
+function pxTplLibro(arch){
+  const dec = (r) => arch[r] ? new TextDecoder().decode(arch[r]) : '';
+  const wb = dec('xl/workbook.xml');
+  if(!wb) throw new Error('no es un Excel (.xlsx)');
+  const hojas = [...wb.matchAll(/<sheet\b([^>]*)\/?>/g)].map(m => ({ nombre: pxDes(pxAttr(m[1], 'name')), rid: pxAttr(m[1], 'r:id') }));
+  if(!hojas.length) throw new Error('el Excel no tiene hojas');
+  const hoja = hojas.find(h => /CONTRACT INVENTORY/.test(pxRotulo(h.nombre))) || hojas[0];
+  const rels = dec('xl/_rels/workbook.xml.rels');
+  const rel = [...rels.matchAll(/<Relationship\b([^>]*)\/?>/g)].map(m => m[1]).find(a => pxAttr(a, 'Id') === hoja.rid);
+  let ruta = rel ? pxAttr(rel, 'Target') : 'worksheets/sheet1.xml';
+  ruta = ruta.replace(/^\//, '');
+  if(ruta.indexOf('xl/') !== 0) ruta = 'xl/' + ruta;
+  const xml = dec(ruta);
+  if(!xml || xml.indexOf('<sheetData') < 0) throw new Error('no se encontró la hoja «' + hoja.nombre + '»');
+  const compartidos = [...dec('xl/sharedStrings.xml').matchAll(/<si>([\s\S]*?)<\/si>/g)].map(m => pxDes([...m[1].matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map(t => t[1]).join('')));
+  /* Las filas: número → { attrs, celdas: Map columna → { xml, s, texto, f } }. */
+  const filas = new Map();
+  const ini = xml.indexOf('<sheetData'), fin = xml.indexOf('</sheetData>');
+  const cuerpo = fin < 0 ? '' : xml.slice(xml.indexOf('>', ini) + 1, fin);
+  let nf = 0;
+  for(const m of cuerpo.matchAll(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)){
+    const r = +pxAttr(m[1], 'r') || nf + 1; nf = r;
+    const fila = { attrs: m[1].replace(/\s*\bspans="[^"]*"/, ''), celdas: new Map() };
+    let nc = 0;
+    for(const c of (m[2] || '').matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)){
+      const ref = pxAttr(c[1], 'r'), col = ref ? pxColN(ref.replace(/\d+/g, '')) : nc + 1; nc = col;
+      const t = pxAttr(c[1], 't'), dentro = c[2] || '';
+      const v = (dentro.match(/<v>([\s\S]*?)<\/v>/) || [])[1];
+      const texto = t === 's' ? (compartidos[+v] || '') : t === 'inlineStr' ? pxDes([...dentro.matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)].map(x => x[1]).join('')) : pxDes(v == null ? '' : v);
+      const f = (dentro.match(/<f\b[^>]*>([\s\S]*?)<\/f>/) || [])[1];
+      fila.celdas.set(col, { xml: c[0], s: pxAttr(c[1], 's'), texto: texto, f: f != null ? pxDes(f) : null });
+    }
+    filas.set(r, fila);
+  }
+  const combinadas = [...xml.matchAll(/<mergeCell\b[^>]*ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"/g)].map(m => ({ c1: pxColN(m[1]), r1: +m[2], c2: pxColN(m[3]), r2: +m[4] }));
+  return { ruta: ruta, xml: xml, hoja: hoja.nombre, filas: filas, combinadas: combinadas };
+}
+
+/** Dónde va cada cosa en una plantilla: lo busca por los rótulos. */
+function pxTplMapa(L){
+  const celdas = [];
+  L.filas.forEach((f, r) => f.celdas.forEach((c, col) => { if(c.texto) celdas.push({ r: r, col: col, k: pxRotulo(c.texto) }); }));
+  const en = (r, k) => { const c = celdas.find(x => x.r === r && x.k === k); return c ? c.col : 0; };
+  const cabReparto = celdas.find(x => x.k === 'CHARACTER NAME');
+  if(!cabReparto) throw new Error('no tiene la tabla de reparto (la cabecera «Character Name»)');
+  const R = cabReparto.r;
+  const rep = { fila: R, mc: en(R, 'M.C.') || en(R, 'MC'), personaje: cabReparto.col, trad: en(R, 'TRANSLATION'), nombre: en(R, 'FIRST NAME TO APPEAR IN CREDITS'),
+                apellido: en(R, 'LAST NAME TO APPEAR IN CREDITS'), legal: en(R, 'LEGAL NAME'), edad: en(R, 'ADULT OR MINOR') };
+  if(!rep.legal && !rep.nombre) throw new Error('la tabla de reparto no tiene «Legal Name» ni «First Name to appear in Credits»');
+  /* Los datos del proyecto: el valor, a la derecha del rótulo (pasada su combinación). */
+  const PROY = { 'PROJECT TITLE (ENGLISH)': 'serie', 'PROJECT TITLE (TRANSLATED)': 'serieTrad', 'ALPHA': 'alpha', 'TYPE': 'tipo', 'RIGHTS': 'derechos', 'LANGUAGE': 'idioma',
+                 'CLIENT': 'cliente', 'PRODUCT TYPE': 'producto', 'SEASON NUMBER': '@temporada', 'EPISODE NUMBER': '@episodio', 'TOTAL NUMBER OF EPISODES': 'totalEps', 'LANGUAGE IDENTIFIER': 'idLengua' };
+  const proyecto = [];
+  celdas.filter(x => x.r < R && PROY[x.k]).forEach(x => {
+    const cm = L.combinadas.find(m => m.r1 <= x.r && x.r <= m.r2 && m.c1 <= x.col && x.col <= m.c2);
+    const junto = (cm ? cm.c2 : x.col) + 1, f = L.filas.get(x.r);
+    /* Si la de al lado no existe pero hay una celda (con su borde) más a la derecha, va en esa. */
+    const derecha = [...f.celdas.keys()].filter(c => c >= junto).sort((a, b) => a - b)[0];
+    proyecto.push({ r: x.r, col: f.celdas.has(junto) || !derecha ? junto : derecha, sola: !derecha, desde: x.col, dato: PROY[x.k] });
+  });
+  /* Un rótulo sin nada a su derecha: a la columna que usan los demás rótulos de su misma columna. */
+  proyecto.filter(p => p.sola).forEach(p => {
+    const cuenta = {};
+    proyecto.filter(q => !q.sola && q.desde === p.desde).forEach(q => { cuenta[q.col] = (cuenta[q.col] || 0) + 1; });
+    const mejor = Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a])[0];
+    if(mejor) p.col = +mejor;
+  });
+  proyecto.forEach(p => { delete p.sola; delete p.desde; });
+  /* Los créditos técnicos: bajo la cabecera con «First Name…» que no es la del reparto. */
+  const cabCred = celdas.filter(x => x.r < R && x.k === 'FIRST NAME TO APPEAR IN CREDITS').sort((a, b) => a.r - b.r)[0];
+  const creditos = [];
+  if(cabCred){
+    const C = cabCred.r, cols = { trad: en(C, 'TRANSLATION'), nombre: cabCred.col, apellido: en(C, 'LAST NAME TO APPEAR IN CREDITS'), legal: en(C, 'LEGAL NAME') };
+    const desc = en(C, 'DESCRIPTION') || (cols.trad ? cols.trad - 1 : cabCred.col - 2);
+    const CRED = { 'SHOW': 'show', 'TITLE ID': 'titleId', 'TITLE': 'titulo', 'STUDIO': 'estudio' };
+    PX_CREDITOS.forEach(k => { CRED[pxRotulo(k[1])] = 'cr.' + k[0]; });
+    celdas.filter(x => x.r > C && x.r < R && x.col === desc && CRED[x.k]).forEach(x => creditos.push(Object.assign({ r: x.r, dato: CRED[x.k] }, cols)));
+  }
+  return { proyecto: proyecto, creditos: creditos, reparto: rep };
+}
+
+/** Una celda nueva con el estilo `s`: texto, número o fórmula con su valor. */
+function pxTplCelda(ref, v, s, f){
+  const st = s != null ? ' s="' + s + '"' : '';
+  if(f) return '<c r="' + ref + '"' + st + ' t="str"><f>' + pmX(f) + '</f><v>' + pmX(v) + '</v></c>';
+  if(v === '' || v == null) return '<c r="' + ref + '"' + st + '/>';
+  if(typeof v === 'number') return '<c r="' + ref + '"' + st + '><v>' + v + '</v></c>';
+  return '<c r="' + ref + '"' + st + ' t="inlineStr"><is><t xml:space="preserve">' + pmX(v) + '</t></is></c>';
+}
+
+/**
+ * Rellena la plantilla de un programa con un episodio. `arch`: los archivos del
+ * .xlsx (ruta → bytes); devuelve los mismos, con la hoja escrita.
+ */
+function pxLlenarPlantilla(arch, ep, cfg){
+  const L = pxTplLibro(arch), M = pxTplMapa(L), cr = cfg.creditos || {};
+  const fila = (r) => { if(!L.filas.has(r)) L.filas.set(r, { attrs: ' r="' + r + '"', celdas: new Map() }); return L.filas.get(r); };
+  const poner = (r, col, v, o) => {
+    if(!col) return;
+    o = o || {};
+    v = typeof v === 'number' ? v : String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+    if(v === '' && !o.vaciar) return;                                   // un dato vacío no borra lo que trae la plantilla
+    const f = fila(r), antes = f.celdas.get(col);
+    const s = o.s !== undefined ? o.s : (antes ? antes.s : null);
+    f.celdas.set(col, { xml: pxTplCelda(pxColL(col) + r, v, s, o.f), s: s, texto: String(v), f: o.f || null });
+  };
+  /* El proyecto. */
+  for(const p of M.proyecto){
+    const v = p.dato === '@temporada' ? pxNum(ep.temporada) : p.dato === '@episodio' ? pxNum(ep.episodio) : p.dato === 'totalEps' ? pxNum(cfg.totalEps) : cfg[p.dato];
+    poner(p.r, p.col, v);
+  }
+  /* Los créditos técnicos. */
+  for(const c of M.creditos){
+    if(c.dato === 'show') poner(c.r, c.nombre, cfg.serie);
+    else if(c.dato === 'titleId') poner(c.r, c.nombre, ep.titleId);
+    else if(c.dato === 'titulo'){ poner(c.r, c.trad, ep.tituloTrad); poner(c.r, c.nombre, ep.titulo); }
+    else if(c.dato === 'estudio'){ poner(c.r, c.trad, cfg.estudio); poner(c.r, c.nombre, cfg.estudioEn); poner(c.r, c.legal, cfg.estudio); }
+    else {
+      const k = c.dato.slice(3);
+      const nombre = String(k === 'director' ? (cr.director || ep.director || '') : k === 'ingeniero' ? (cr.ingeniero || ep.tecnico || '') : (cr[k] || '')).replace(/\s+/g, ' ').trim();
+      const p = pxPartes(nombre);
+      poner(c.r, c.nombre, p[0]); poner(c.r, c.apellido, p[1]); poner(c.r, c.legal, nombre);
+    }
+  }
+  /* El reparto: el formato (y las fórmulas) de la primera fila; lo que traiga de ejemplo se borra. */
+  const R = M.reparto, cols = [R.mc, R.personaje, R.trad, R.nombre, R.apellido, R.legal, R.edad].filter(Boolean);
+  const r0 = R.fila + 1, molde = L.filas.get(r0) || { attrs: '', celdas: new Map() };
+  const estilo = {}, formula = {};
+  cols.forEach(col => { const c = molde.celdas.get(col); estilo[col] = c ? c.s : null; formula[col] = c ? c.f : null; });
+  for(let r = r0; L.filas.has(r) && cols.some(col => { const c = L.filas.get(r).celdas.get(col); return c && c.texto; }); r++) cols.forEach(col => { if(L.filas.get(r).celdas.has(col)) poner(r, col, '', { vaciar: true }); });
+  const altoMolde = pxAttr(molde.attrs, 'ht');
+  (ep.filas || []).forEach((x, i) => {
+    const r = r0 + i, p = pxPartes(x.actor);
+    const f = fila(r);
+    if(altoMolde && !pxAttr(f.attrs, 'ht')) f.attrs = ' r="' + r + '" ht="' + altoMolde + '" customHeight="1"';
+    const conFormula = (col, v) => {
+      const fx = formula[col] ? formula[col].replace(/(\$?[A-Z]{1,3}\$?)(\d+)/g, (m, c, n) => +n === r0 ? c + r : m) : null;
+      poner(r, col, v, { s: estilo[col], f: fx, vaciar: true });
+    };
+    if(R.mc) poner(r, R.mc, x.personaje && x.mc ? 'X' : '', { s: estilo[R.mc], vaciar: true });
+    poner(r, R.personaje, x.personaje || '', { s: estilo[R.personaje], vaciar: true });
+    if(R.trad) poner(r, R.trad, x.personaje ? (x.trad || x.personaje) : '', { s: estilo[R.trad], vaciar: true });
+    if(R.nombre) conFormula(R.nombre, p[0]);
+    if(R.apellido) conFormula(R.apellido, p[1]);
+    if(R.legal) poner(r, R.legal, x.actor || '', { s: estilo[R.legal], vaciar: true });
+    if(R.edad) poner(r, R.edad, x.menor ? 'Menor' : 'Adulto', { s: estilo[R.edad], vaciar: true });
+  });
+  /* La hoja otra vez, fila a fila y celda a celda en orden. */
+  let maxR = 1, maxC = 1;
+  const cuerpo = [...L.filas.keys()].sort((a, b) => a - b).map(r => {
+    const f = L.filas.get(r), cs = [...f.celdas.keys()].sort((a, b) => a - b);
+    maxR = Math.max(maxR, r); if(cs.length) maxC = Math.max(maxC, cs[cs.length - 1]);
+    const attrs = /\br="/.test(f.attrs) ? f.attrs.replace(/\br="\d+"/, 'r="' + r + '"') : ' r="' + r + '"' + f.attrs;
+    return cs.length ? '<row' + attrs + '>' + cs.map(c => f.celdas.get(c).xml).join('') + '</row>' : '<row' + attrs + '/>';
+  }).join('');
+  let xml = L.xml.replace(/<sheetData\b[^>]*?(?:\/>|>[\s\S]*?<\/sheetData>)/, '<sheetData>' + cuerpo + '</sheetData>');
+  xml = xml.replace(/<dimension\b[^>]*\/>/, '<dimension ref="A1:' + pxColL(maxC) + maxR + '"/>');
+  const out = Object.assign({}, arch), enc = (t) => new TextEncoder().encode(t), dec = (r) => new TextDecoder().decode(arch[r]);
+  out[L.ruta] = enc(xml);
+  /* Que Excel recalcule al abrir; la cadena de cálculo vieja ya no vale. */
+  if(out['xl/calcChain.xml']){
+    delete out['xl/calcChain.xml'];
+    if(out['[Content_Types].xml']) out['[Content_Types].xml'] = enc(dec('[Content_Types].xml').replace(/<Override\b[^>]*calcChain[^>]*\/>/g, ''));
+    if(out['xl/_rels/workbook.xml.rels']) out['xl/_rels/workbook.xml.rels'] = enc(dec('xl/_rels/workbook.xml.rels').replace(/<Relationship\b[^>]*calcChain[^>]*\/>/g, ''));
+  }
+  let wb = dec('xl/workbook.xml');
+  if(/<calcPr\b/.test(wb)){ if(!/<calcPr\b[^>]*fullCalcOnLoad/.test(wb)) wb = wb.replace(/<calcPr\b/, '<calcPr fullCalcOnLoad="1"'); }
+  else wb = /<\/definedNames>/.test(wb) ? wb.replace('</definedNames>', '</definedNames><calcPr fullCalcOnLoad="1"/>') : wb.replace('</sheets>', '</sheets><calcPr fullCalcOnLoad="1"/>');
+  out['xl/workbook.xml'] = enc(wb);
+  return out;
+}
+
+/** Subir la plantilla de un programa: tiene que ser .xlsx y tener la tabla de reparto. */
+async function pxTplSubir(file){
+  const S = ST.px;
+  if(!file) return;
+  const serie = String(S.cfg.serie || '').trim();
+  if(!serie){ aviso('Escribe primero el título del proyecto (PROJECT TITLE): la plantilla queda para ese programa'); return; }
+  if(!/\.xlsx$/i.test(file.name)){ aviso(/\.(xls|xlsm)$/i.test(file.name) ? 'Ábrela en Excel y guárdala como .xlsx (libro de Excel)' : 'La plantilla tiene que ser un Excel .xlsx'); return; }
+  try{
+    const bytes = new Uint8Array(await readFileBuffer(file));
+    const L = pxTplLibro(fflate.unzipSync(bytes)), M = pxTplMapa(L);
+    let b = ''; for(let i = 0; i < bytes.length; i += 0x8000) b += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    const todas = pxTplTodas();
+    todas[pxClave(serie)] = { serie: serie, nombre: file.name, b64: btoa(b), ts: Date.now() };
+    try{ localStorage.setItem(PX_TPL_KEY, JSON.stringify(todas)); }
+    catch(e){ aviso('No cabe en el almacén de este equipo: quita alguna plantilla de otro programa o usa una más ligera'); return; }
+    aviso('Plantilla de «' + serie + '»: ' + file.name + ' · hoja «' + L.hoja + '», ' + M.proyecto.length + ' datos del proyecto, ' + M.creditos.length + ' créditos y el reparto desde la fila ' + (M.reparto.fila + 1));
+  }catch(e){ aviso('Esa plantilla no sirve: ' + e.message); }
+  repintar();
+}
+/** Volver a la plantilla de siempre para este programa. */
+function pxTplQuitar(){
+  const S = ST.px, todas = pxTplTodas(), k = pxClave(S.cfg.serie);
+  if(!k || !todas[k]) return;
+  delete todas[k];
+  try{ localStorage.setItem(PX_TPL_KEY, JSON.stringify(todas)); }catch(e){ /* sin almacén: vale para esta vez */ }
+  aviso('«' + S.cfg.serie + '» vuelve a la plantilla de siempre');
+  repintar();
+}
+
+function pxTplHtml(){
+  const S = ST.px, serie = String(S.cfg.serie || '').trim(), todas = pxTplTodas(), g = serie ? todas[pxClave(serie)] : null;
+  const otros = Object.keys(todas).filter(k => k !== pxClave(serie)).map(k => todas[k].serie || k);
+  return '<div class="dct-sec-t">Plantilla <i>(una por programa)</i></div>'
+    + '<div class="dct-fila dct-px-tpl"><div class="dct-crece dct-tenue">' + (serie
+        ? 'Plantilla de «' + E(serie) + '»: <b>' + E(g ? g.nombre : 'la de siempre (Contract Inventory de Pixelogic)') + '</b>'
+        : 'Escribe el título del proyecto para subir su plantilla') + '</div>'
+    +   '<button class="cs-b" data-dct="pxTplElegir"' + (serie ? '' : ' disabled') + '>' + ico('subir', 13) + '<span>' + (g ? 'Cambiar la plantilla (.xlsx)' : 'Subir otra plantilla (.xlsx)') + '</span></button>'
+    +   (g ? '<button class="cs-b" data-dct="pxTplQuitar">' + ico('cerrar', 13) + '<span>Usar la de siempre</span></button>' : '')
+    +   '<input type="file" id="dctPxTpl" accept=".xlsx" hidden></div>'
+    + (otros.length ? '<div class="dct-tenue">Otros programas con su plantilla: ' + E(otros.join(', ')) + '</div>' : '');
 }
 
 /** Lee los desgloses subidos. */
@@ -1964,6 +2219,7 @@ function pxHtml(){
     +     campo('alpha', 'Alpha', cfg.alpha) + lista('tipo', 'Type', cfg.tipo, PX_TIPOS) + lista('derechos', 'Rights', cfg.derechos, PX_DERECHOS) + campo('idioma', 'Language', cfg.idioma)
     +     campo('cliente', 'Client', cfg.cliente) + lista('producto', 'Product type', cfg.producto, PX_PRODUCTOS) + campo('totalEps', 'Total number of episodes', cfg.totalEps, '12')
     +     campo('idLengua', 'Language identifier', cfg.idLengua) + campo('sufijo', 'Final del nombre del archivo', cfg.sufijo) + '</div>'
+    +   pxTplHtml()
     +   '<div class="dct-sec-t">Créditos técnicos</div>'
     +   '<div class="dct-pm-campos">' + campo('estudio', 'Studio', cfg.estudio) + campo('estudioEn', 'Studio (inglés)', cfg.estudioEn)
     +     PX_CREDITOS.map(k => campo('cr.' + k[0], k[1], cr[k[0]], k[0] === 'director' || k[0] === 'ingeniero' ? 'El del desglose' : 'Nombre Apellido')).join('') + '</div></div>'
@@ -2016,7 +2272,10 @@ function pxCablear(raiz){
     else if(que === 'pxCfg'){
       const fn = () => { if(k.indexOf('cr.') === 0) S.cfg.creditos[k.slice(3)] = el.value; else S.cfg[k] = el.value; pxCfgGuardar(S.cfg); };
       if(el.tagName === 'SELECT') el.onchange = fn; else el.oninput = fn;
+      if(k === 'serie' && el.tagName !== 'SELECT') el.onchange = repintar;   // la plantilla es la de ese programa
     }
+    else if(que === 'pxTplElegir') el.onclick = () => { const t = raiz.querySelector('#dctPxTpl'); if(t) t.click(); };
+    else if(que === 'pxTplQuitar') el.onclick = pxTplQuitar;
     else if(que === 'pxProcesar') el.onclick = () => { pxProcesar().catch(e => aviso('No se pudo procesar: ' + e.message)); };
     else if(que === 'pxEp') el.oninput = () => { if(S.eps[i]) S.eps[i][k] = el.value; };
     else if(que === 'pxFila') el.oninput = () => { const f = x(); if(f) f[k] = el.value; };
@@ -2035,6 +2294,8 @@ function pxCablear(raiz){
     else if(que === 'pxBajarTodo') el.onclick = () => { pxDescargarVarios(S.eps.slice()).then(repintar).catch(e => aviso('No se pudieron descargar: ' + e.message)); };
   });
   if(input) input.onchange = () => { pxAnadir(input.files); input.value = ''; };
+  const tplIn = raiz.querySelector('#dctPxTpl');
+  if(tplIn) tplIn.onchange = () => { const f = tplIn.files && tplIn.files[0]; tplIn.value = ''; pxTplSubir(f).catch(e => aviso('Esa plantilla no sirve: ' + e.message)); };
 }
 
 /* ── DUBCARD de Pipeline Studio (PRO-59) ───────────────────────────────────
@@ -2696,7 +2957,7 @@ return { html: html, cablear: cablear, ST: ST, dcParseFile: dcParseFile, dcProce
          ciNombre: ciNombre, ciReparto: ciReparto, ciMain: ciMain, ciNumero: ciNumero, ciLlenarXml: ciLlenarXml, ciDocumentos: ciDocumentos,
          ciLeerDubcard: ciLeerDubcard, ciCargarDubcard: ciCargarDubcard, ciEquipoDe: ciEquipoDe,
          pmDatosDeHojas: pmDatosDeHojas, pmEpisodio: pmEpisodio, pmEsTraduccion: pmEsTraduccion, pmArchivosXlsx: pmArchivosXlsx, pmNombreArchivo: pmNombreArchivo, pmProcesar: pmProcesar, pmCfgCargar: pmCfgCargar, pmSerieConocida: pmSerieConocida, pmDescargarVarios: pmDescargarVarios,
-         pxEpisodio: pxEpisodio, pxArchivosXlsx: pxArchivosXlsx, pxNombreArchivo: pxNombreArchivo, pxProcesar: pxProcesar, pxCfgCargar: pxCfgCargar, pxDescargarVarios: pxDescargarVarios, pxPartes: pxPartes,
+         pxEpisodio: pxEpisodio, pxArchivosXlsx: pxArchivosXlsx, pxNombreArchivo: pxNombreArchivo, pxProcesar: pxProcesar, pxCfgCargar: pxCfgCargar, pxDescargarVarios: pxDescargarVarios, pxPartes: pxPartes, pxLlenarPlantilla: pxLlenarPlantilla, pxTplLibro: pxTplLibro, pxTplMapa: pxTplMapa, pxTplDe: pxTplDe, pxTplSubir: pxTplSubir, pxTplQuitar: pxTplQuitar, pxDescargar: pxDescargar,
          plEpisodio: plEpisodio, plActor: plActor, plArchivosXlsx: plArchivosXlsx, plNombreArchivo: plNombreArchivo, plProcesar: plProcesar, plCfgCargar: plCfgCargar, plDescargarVarios: plDescargarVarios };
 })();
 
