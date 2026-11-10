@@ -3112,7 +3112,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.96.0-nube';
+const APP_VER_NUM = 'v11.96.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -9864,9 +9864,11 @@ function castHojaXml(arch, nombre){
   const m = wbx.match(new RegExp('<sheet[^>]*name="' + esc + '"[^>]*/>', 'i'));
   if(!m) throw new Error('el desglose no tiene una hoja «' + nombre + '»');
   const rid = (m[0].match(/r:id="([^"]+)"/) || [])[1];
-  const t = rels.match(new RegExp('Id="' + rid + '"[^>]*Target="([^"]+)"'));
+  /* Los atributos pueden venir en cualquier orden (Target antes que Id), y la ruta, desde la raíz («/xl/worksheets/…»). */
+  const rel = (rels.match(/<Relationship\b[^>]*>/g) || []).find(x => (x.match(/\bId="([^"]+)"/) || [])[1] === rid);
+  const t = rel && rel.match(/\bTarget="([^"]+)"/);
   if(!t) throw new Error('no se encuentra la hoja «' + nombre + '» dentro del archivo');
-  return 'xl/' + t[1].replace(/^\/+/, '');
+  return /^\//.test(t[1]) ? t[1].replace(/^\/+/, '') : 'xl/' + t[1];
 }
 
 /* Una celda es <c r="D13" s="99"/> o <c r="D13" s="99" t="s"><v>903</v></c>.
@@ -10158,6 +10160,18 @@ function castCubiertosPorGemelo(sinCasar, personajes, valores, asign){
  * @param {Object} asign      {NOMBRE DE PERSONAJE: 'Talento'}
  * @returns {{datos:Uint8Array, puestos:number, sinCasar:string[], enExcel:number}}
  */
+/**
+ * La extensión que corresponde a lo que el Excel ES por dentro (CAST-45).
+ * Un desglose sin macros (.xlsx) que se descargaba como «.xlsm» no lo abría
+ * Excel: «el formato o la extensión no son válidos». Con macros (vbaProject o
+ * el tipo macroEnabled en [Content_Types].xml), .xlsm; sin ellas, .xlsx.
+ */
+function castFormatoSalida(arch){
+  const tipos = arch && arch['[Content_Types].xml'] ? new TextDecoder().decode(arch['[Content_Types].xml']) : '';
+  const conMacros = !!(arch && arch['xl/vbaProject.bin']) || /PartName="\/xl\/workbook\.xml"[^>]*macroEnabled|macroEnabled[^>]*PartName="\/xl\/workbook\.xml"/i.test(tipos);
+  return conMacros ? { ext: 'xlsm', mime: 'application/vnd.ms-excel.sheet.macroEnabled.12' }
+                   : { ext: 'xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
+}
 function castRellenar(buf, asign, meta, training){
   if(typeof fflate === 'undefined') throw new Error('falta la librería de ZIP');
   const arch = fflate.unzipSync(new Uint8Array(buf));
@@ -10203,7 +10217,8 @@ function castRellenar(buf, asign, meta, training){
   xmlFinal = tr.xml; delete tr.xml;
   arch[ruta] = new TextEncoder().encode(xmlFinal);
   castForzarRecalculo(arch);   // que las demás hojas se enteren del cambio
-  return { datos: fflate.zipSync(arch, { level: 6 }), puestos: r.puestos,
+  const formato = castFormatoSalida(arch);
+  return { datos: fflate.zipSync(arch, { level: 6 }), ext: formato.ext, mime: formato.mime, puestos: r.puestos,
            sinCasar: sinCasar, enBlanco: enBlanco,
            enExcel: Object.keys(personajes).length, cabecera: cabecera, training: tr,
            porParecido: porParecido, cubiertos: cubiertos };
@@ -13063,9 +13078,10 @@ async function castDescargar(){
     const ep = (LDB.epsAll || []).find(e => e.id === currentEp.id);
     const base = ((ep && (ep.xls_name || ep.name)) || currentEp.name || 'desglose')
                    .replace(/\.(xlsm|xlsx|xls)$/i, '');
-    const nombre = base + ' · CASTING.xlsm';
+    /* Con la extensión de lo que el archivo es: .xlsm solo si trae macros (CAST-45). */
+    const nombre = base + ' · CASTING.' + (r.ext || 'xlsx');
     const url = URL.createObjectURL(new Blob([r.datos],
-      { type: 'application/vnd.ms-excel.sheet.macroEnabled.12' }));
+      { type: r.mime || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
     const a = document.createElement('a');
     a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
