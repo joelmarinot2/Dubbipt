@@ -101,7 +101,7 @@ function armar(o){
   const LDB = { showId: ('showId' in o) ? o.showId : null, browse: false, dataEps: new Set(['e1']) };
   let vivo = !!o.vivo;
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
-    ['CS', 'CS_SECCIONES', 'CS_ICO', 'csIco', 'csResumen', 'csOcupacion', 'csTalentos', 'csProduccion', 'csHtml', 'csNavHtml', 'csPintar', 'csIr', 'csRepintar', 'csCablear', 'csActualizar',
+    ['CS', 'CS_SECCIONES', 'CS_ICO', 'csIco', 'csResumen', 'csProduccion', 'csHtml', 'csNavHtml', 'csPintar', 'csIr', 'csRepintar', 'csCablear', 'csActualizar',
      'csNumeroDe', 'csProgramas', 'csFiltrarProgramas', 'csEpisodios', 'csCastingDe', 'csActual', 'csRegistroDe', 'csRealizarCasting', 'csTablaCasting', 'csBorrarPrograma', 'csBorrarEpisodio'],
     { castNorm: PR.prodCasarPrograma && ((t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim()),
       document: doc, prodPuede: () => (o.puede !== undefined ? o.puede : true), PROD: PROD, PROD_ET: PR.PROD_ET,
@@ -157,25 +157,6 @@ exports.pruebas = async function(t){
        'el capítulo en producción no avisa de Miami, y el finalizado no avisa de nada');
   t.eq('los tráilers pendientes, el más urgente primero y los sin fecha al final', r.trailers.map(x => x.titulo + ':' + x.texto).join(' | '), 'Tráiler oficial:Mañana | Tráiler 2:Sin fecha');
   t.eq('sin datos, todo a cero', JSON.stringify(M.csResumen(null, HOY)), JSON.stringify({ enCurso: 0, programas: 0, capitulos: 0, talentos: 0, asignaciones: 0, sinTalento: 0, trailersPendientes: 0, entregas: [], trailers: [] }));
-
-  t.seccion('3 · la Ocupación');
-  const oc = M.csOcupacion(d);
-  t.eq('por líneas: personajes, capítulos y líneas de cada talento', oc.map(o => o.talento + ' ' + o.personajes + '/' + o.capitulos + '/' + o.lineas).join(' | '), 'ANA ROJAS 1/2/276 | BEATRIZ SOL 1/1/54 | CARLOS RUIZ 1/1/40',
-       'ALLY en dos capítulos es un personaje; el casting repetido no suma dos veces sus 186 líneas');
-  t.eq('con sus programas', oc[0].programas.join(','), 'A Filipino Christmas');
-  t.eq('quien no tiene asignaciones no sale', oc.some(o => o.talento === 'DIANA PAZ'), false);
-  t.eq('primero quien más líneas tiene, aunque el nombre vaya después', M.csOcupacion(PR.prodNormalizar({ series: [{ id: 1, name: 'A' }], episodes: [{ id: 1, series_id: 1 }], characters: [{ id: 1, canonical_name: 'P1' }, { id: 2, canonical_name: 'P2' }],
-       talents: [{ id: 1, name: 'ZOE' }, { id: 2, name: 'ANA' }], appearances: [{ character_id: 1, episode_id: 1, line_count: 100 }, { character_id: 2, episode_id: 1, line_count: 10 }],
-       castings: [{ character_id: 1, talent_id: 1, episode_id: 1 }, { character_id: 2, talent_id: 2, episode_id: 1 }] })).map(o => o.talento).join(','), 'ZOE,ANA');
-  t.eq('limitada a un programa', M.csOcupacion(d, 2).map(o => o.talento).join(',') + ' · ' + M.csOcupacion(d, '1').map(o => o.talento).join(','), 'CARLOS RUIZ · ANA ROJAS,BEATRIZ SOL');
-  t.eq('un mismo nombre de personaje en dos programas son dos personajes', M.csOcupacion(PR.prodNormalizar({ series: [{ id: 1, name: 'A' }, { id: 2, name: 'B' }], episodes: [{ id: 1, series_id: 1 }, { id: 2, series_id: 2 }], characters: [{ id: 9, canonical_name: 'MAMÁ' }], talents: [{ id: 1, name: 'LUZ MAR' }], castings: [{ character_id: 9, talent_id: 1, episode_id: 1 }, { character_id: 9, talent_id: 1, episode_id: 2 }] }))[0].personajes, 2);
-  t.eq('sin datos, vacía', M.csOcupacion(null).length, 0);
-
-  t.seccion('4 · los Talentos');
-  const ta = M.csTalentos(d, '');
-  t.eq('todos, por nombre, con su ficha', ta.map(x => x.nombre + (x.ficha ? ' (' + x.ficha + ')' : '')).join(' | '), 'ANA ROJAS (Femenino · Adulto · Agudo) | BEATRIZ SOL | CARLOS RUIZ (Barítono) | DIANA PAZ');
-  t.eq('con sus papeles por programa, sin repetir', JSON.stringify(ta[0].programas), '[{"programa":"A Filipino Christmas","personajes":["ALLY"]}]');
-  t.eq('buscando, sin mayúsculas ni acentos', M.csTalentos(d, 'ruiz').map(x => x.nombre).join(',') + ' · ' + M.csTalentos(d, 'zzz').length, 'CARLOS RUIZ · 0');
 
   t.seccion('5 · Producción');
   const pr = M.csProduccion(d, HOY, false);
@@ -403,7 +384,7 @@ exports.pruebas = async function(t){
 
   t.seccion('10 · sin emojis en lo que se ve de Casting');
   const comentario = (l) => /^\s*(\*|\/\*|\/\/)/.test(l);
-  for(const f of ['js/castingvistas.js', 'js/dublajecast.js', 'js/produccion.js', 'dublajecast/puente.js']){
+  for(const f of ['js/castingvistas.js', 'js/dublajecast.js', 'js/produccion.js']){
     const malas = fs.readFileSync(path.join(RAIZ, f), 'utf8').split(/\r?\n/).map((l, i) => [i + 1, l]).filter(([, l]) => !comentario(l) && EMOJI.test(l));
     t.eq(f + ': ninguno', malas.map(([n]) => n).join(','), '');
   }

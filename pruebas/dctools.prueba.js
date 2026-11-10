@@ -191,9 +191,7 @@ exports.pruebas = async function(t){
       t.eq('el proxy: sin la cabecera, 403 y nada sale; con ella, reenvía', r1.status + ' ' + r2.status + ' ' + fuera.join(), '403 200 https://api.groq.com/openai/v1/chat/completions');
     }finally{ globalThis.fetch = antes; }
     const VJ = JSON.parse(fs.readFileSync(path.join(RAIZ, 'vercel.json'), 'utf8'));
-    const csp = (VJ.headers.find(h => h.source === '/dublajecast(.*)').headers.find(x => x.key === 'Content-Security-Policy') || {}).value || '';
-    const conn = (csp.match(/connect-src[^;]*/) || [''])[0];
-    t.ok('la copia de DublajeCast ya no puede llamar a una IA directamente', !/ https: /.test(conn + ' ') && !/anthropic|groq|openrouter|nvidia/.test(conn) && /fhzxfbxrwnjwucgtjkar\.supabase\.co/.test(conn));
+    t.ok('la copia de DublajeCast ya no existe ni tiene reglas propias (PRO-64)', !VJ.headers.some(h => /dublajecast/.test(h.source)) && !fs.existsSync(path.join(RAIZ, 'dublajecast')));
   }
 
   t.seccion('3 · sin Pegado de casting (PRO-57), y dónde está todo');

@@ -7,19 +7,9 @@ sql/
 *.sql
 *.md
 *.pdf
-*.dc.html
-support.js
-doc-page.js
-auth.js
-desglose-auto.js
-settings.json
-settings.local.json
-manifest.webmanifest
-retropix.ttf
 Dubbipt-main/
 # herramientas para correrlo en un PC: no pintan nada en el sitio publicado
 local/
 *.cmd
-protools-overlay/
 # fuentes del revisor ASREC: se publica solo el revisor-asrec.html construido
 revisor-asrec/

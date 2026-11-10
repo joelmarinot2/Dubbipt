@@ -213,57 +213,7 @@ function csResumen(d, hoy){
   return out;
 }
 
-/**
- * La ocupación de cada talento: cuántos personajes, en cuántos capítulos,
- * cuántas líneas y en qué programas. Un casting repetido cuenta una vez.
- * `programa` (opcional) la limita a un programa de Casting, por su id.
- */
-function csOcupacion(d, programa){
-  if(!d) return [];
-  const ix = prodIndices(d);
-  const lineas = {};
-  for(const a of d.appearances) lineas[String(a.episode_id) + ':' + String(a.character_id)] = +a.line_count || 0;
-  const por = {}, vistos = new Set();
-  for(const c of d.castings){
-    const clave = String(c.episode_id) + ':' + String(c.character_id) + ':' + String(c.talent_id);
-    if(vistos.has(clave)) continue;
-    vistos.add(clave);
-    const t = ix.talent[String(c.talent_id)], e = ix.ep[String(c.episode_id)], ch = ix.char[String(c.character_id)];
-    if(!t || !t.name || csEsMarca(t.name) || !e || !ch) continue;
-    const s = ix.serie[String(e.series_id)];
-    if(programa != null && programa !== '' && String(e.series_id) !== String(programa)) continue;
-    const o = (por[String(t.id)] = por[String(t.id)] || { talento: t.name, personajes: new Set(), capitulos: new Set(), lineas: 0, programas: new Set() });
-    o.personajes.add(String(e.series_id) + ':' + castNorm(ch.name));
-    o.capitulos.add(String(e.id));
-    o.lineas += lineas[String(c.episode_id) + ':' + String(c.character_id)] || 0;
-    if(s) o.programas.add(s.name);
-  }
-  return Object.keys(por).map(k => {
-    const o = por[k];
-    return { talento: o.talento, personajes: o.personajes.size, capitulos: o.capitulos.size, lineas: o.lineas, programas: [...o.programas].sort((a, b) => a.localeCompare(b, 'es')) };
-  }).sort((a, b) => b.lineas - a.lineas || b.personajes - a.personajes || a.talento.localeCompare(b.talento, 'es'));
-}
 
-/** Los talentos con su ficha y sus papeles, por programa. */
-function csTalentos(d, buscar){
-  if(!d) return [];
-  const ix = prodIndices(d);
-  const f = castNorm(buscar);
-  const papeles = {};
-  for(const c of d.castings){
-    const e = ix.ep[String(c.episode_id)], s = e ? ix.serie[String(e.series_id)] : null, ch = ix.char[String(c.character_id)];
-    if(!s || !ch) continue;
-    const m = (papeles[String(c.talent_id)] = papeles[String(c.talent_id)] || {});
-    (m[s.name] = m[s.name] || new Set()).add(ch.name);
-  }
-  return d.talents.filter(t => t.name && !csEsMarca(t.name) && (!f || castNorm(t.name).indexOf(f) >= 0))
-    .map(t => {
-      const pp = papeles[String(t.id)] || {};
-      return { id: t.id, nombre: t.name, ficha: prodFichaTexto(t), correo: t.email || '', genero: t.genero || '', edad: t.edad_aparente || '', tono: t.tono_de_voz || '', registro: t.registro || '',
-               programas: Object.keys(pp).sort((a, b) => a.localeCompare(b, 'es')).map(n => ({ programa: n, personajes: [...pp[n]].sort((a, b) => a.localeCompare(b, 'es')) })) };
-    })
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-}
 
 /** Las filas de Producción: un capítulo por fila, con sus fechas, su DUBCARD y sus alertas. */
 function csProduccion(d, hoy, soloAlertas){

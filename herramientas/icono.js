@@ -3,9 +3,9 @@
  *   node herramientas/icono.js
  *
  * Se hace con un script y no a mano para que sea REPETIBLE: si mañana hay que
- * cambiar un color o el grosor de la letra, se toca aqui y salen los cinco
- * archivos otra vez iguales entre si. Un icono editado a mano en cinco tamanos
- * acaba siendo cinco iconos distintos.
+ * cambiar un color o el grosor de la letra, se toca aqui y salen los cuatro
+ * archivos otra vez iguales entre si. Un icono editado a mano en cuatro tamanos
+ * acaba siendo cuatro iconos distintos.
  *
  * No usa ninguna libreria: el PNG se escribe a mano con el zlib que ya trae
  * Node. Son cuatro trozos -IHDR, IDAT, IEND- y un CRC.
@@ -179,7 +179,7 @@ function png(rgba, lado){
   ]);
 }
 
-/* ── Los cinco archivos ────────────────────────────────────────────────── */
+/* ── Los cuatro archivos ────────────────────────────────────────────────── */
 
 /* `rej` es el lado de la rejilla: cuanto mas grande, mas margen deja la letra.
    La D mide 15 casillas de ancho, asi que con rejilla 18 ocupa el 83 % y con
@@ -188,7 +188,6 @@ const ICONOS = [
   { archivo: 'icon-512.png',       lado: 512, rej: 20, para: 'el icono normal' },
   { archivo: 'icon-192.png',       lado: 192, rej: 20, para: 'el icono normal, pequeno' },
   { archivo: 'apple-touch-icon.png', lado: 180, rej: 21, para: 'iOS, que redondea las esquinas' },
-  { archivo: 'favicon-64.png',     lado: 64,  rej: 17, para: 'la pestana del navegador' },
   { archivo: 'icon-512-mask.png',  lado: 512, rej: 26, para: 'Android, que recorta en circulo' }
 ];
 

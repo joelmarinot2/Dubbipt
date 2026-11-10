@@ -30,7 +30,7 @@ exports.pruebas = async function(t){
   {
     const estados = {}, ED = { pl: null, que: '' };
     const lista = [{ clave: 's:s1', nombre: 'AGENTE KIM', show: { id: 's1', name: 'AGENTE KIM' }, serie: serie, eps: [{ id: 'e1', name: 'Episodio 101' }], dcEps: [] }];
-    const M = montar([['/* ── Las entregas de un capítulo: lo que de verdad falta', '/**\n * La ocupación de cada talento']],
+    const M = montar([['/* ── Las entregas de un capítulo: lo que de verdad falta', '/** Las filas de Producción: un capítulo por fila']],
       ['csAlertasEp', 'csFilaProduccionDe', 'csDcCompletadosEnDubbipt', 'csResumen', 'csProgRequiereDubcard'],
       { castNorm: castNorm, prodAlertasEp: PR.prodAlertasEp, prodIndices: PR.prodIndices, prodPlazo: () => ({ nivel: 'hecho' }), csContexto: () => null,
         dcxSerie: (pl, id, c) => { const x = pl.series.find(y => y.id === id); if(!x || x.requiere_dubcard === c.requiere_dubcard) return false; x.requiere_dubcard = c.requiere_dubcard; return true; },
@@ -54,7 +54,7 @@ exports.pruebas = async function(t){
   {
     const ED = { pl: null, que: '' }, estados = {};
     const lista = [];
-    const M = montar([['/* ── Las entregas de un capítulo: lo que de verdad falta', '/**\n * La ocupación de cada talento']],
+    const M = montar([['/* ── Las entregas de un capítulo: lo que de verdad falta', '/** Las filas de Producción: un capítulo por fila']],
       ['csAlertasEp', 'csProgRequiereDubcard'],
       { castNorm: castNorm, prodAlertasEp: PR.prodAlertasEp, prodIndices: PR.prodIndices, prodPlazo: () => ({ nivel: 'hecho' }), csContexto: () => null, csActual: () => ({ lista: lista }), csEpisodios: () => [], csEstadoEp: () => 'en_curso',
         dcxSerie: (pl, id, c) => { const x = pl.series.find(y => y.id === id); if(!x || x.requiere_dubcard === c.requiere_dubcard) return false; x.requiere_dubcard = c.requiere_dubcard; return true; },

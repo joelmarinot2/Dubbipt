@@ -190,8 +190,6 @@ function anaAviso(r, mal, dudoso){
   return (+r.dif >= oido.dif - 1e-9 || +r.sim < oido.u) ? 'dudoso' : null;
 }
 
-/** Los avisos que cuentan como CAMBIO: los otros dos se listan aparte. */
-function anaCuentaComoCambio(nivel){ return nivel === 'mal' || nivel === 'dudoso'; }
 
 /* ── 1 · Dónde hay voz ────────────────────────────────────────────────────── */
 
@@ -561,24 +559,6 @@ function anaUnir(x, y){
   return (c === y[0] && /[aeobdfjklmnpstx§]/.test(c)) ? x + y.slice(1) : x + y;
 }
 
-/**
- * Junta las palabras que el reconocedor partió, o que partió el libreto.
- *
- * Oye bien, pero corta mal: «está vais» por «estabais», «hoy es» por «oyes»,
- * «adormido» por «ha dormido». Dos palabras seguidas de un lado que juntas son
- * una del otro lado se tratan como una. Solo si juntas son esa palabra y no
- * son ya las dos palabras del otro lado: «de la» contra «de la» no se toca.
- *
- * Y a veces corta por OTRO sitio: «de lospital» por «del hospital», «cerebre
- * be» por «seré breve». Mismas letras, otro corte: dos y dos que juntas suenan
- * igual se juntan en los dos lados. Medido con el oído fiel: la mitad de los
- * avisos falsos eran esto.
- * Devuelve `[escritas, oidas]`, las dos ya juntadas.
- */
-function anaJuntar(a, b){
-  const [x, y] = anaJuntarIx(a, b);
-  return [x.map(t => t.p), y.map(t => t.p)];
-}
 
 /**
  * Lo mismo, pero cada palabra juntada sabe DE QUÉ palabras salió: `[{ p, ix }]`,

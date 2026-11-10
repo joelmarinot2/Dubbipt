@@ -7,7 +7,7 @@
  * Producción (js/produccion.js), en la nube de Dubbipt. Lo que queda aquí
  * es cómo se casan esos datos con la biblioteca de Dubbipt: el programa y el
  * capítulo que corresponden, y las filas del casting de un capítulo. La
- * copia de DublajeCast (dublajecast/) sigue publicada, pero suelta.
+ * copia de DublajeCast que se publicaba aparte (dublajecast/) ya no existe.
  *
  * Es un script clásico, no un módulo: comparte el ámbito global con los
  * <script> en línea de index.html y se carga después de ellos.
@@ -17,24 +17,6 @@
 
 /* ═══ DUBLAJECAST ENTERO ═══════════════════════════════════════════════════ */
 
-const DCAST = { ov: null, marco: null };
-
-/**
- * El capítulo de Dubbipt que corresponde a uno de DublajeCast: primero por
- * título igual; si no, por número, cuando solo un capítulo lleva ese número en
- * el nombre («Episodio 2», «E02», «2 - La boda»). Si hay duda, ninguno.
- */
-function dcastCasarCapitulo(numero, titulo, eps){
-  const lista = eps || [];
-  const t = castNorm(titulo);
-  if(t){
-    const igual = lista.filter(e => castNorm(e.name) === t);
-    if(igual.length === 1) return igual[0];
-  }
-  const n = parseInt(numero, 10);              // si no es número da NaN, que no casa con nada
-  const conNumero = lista.filter(e => (String(e.name || '').match(/\d+/g) || []).some(x => parseInt(x, 10) === n));
-  return conNumero.length === 1 ? conNumero[0] : null;
-}
 
 /** DublajeCast ya no se abre dentro de Dubbipt (PRO-49): se dice, y nada más. */
 function dcastAbrir(){
@@ -144,6 +126,5 @@ function dcastNumerosDe(nombre, programa){
   return quedan.length ? quedan : todos;
 }
 
-function dcastCerrar(){ /* ya no hay marco que cerrar (PRO-49) */ }
 
 /* ═══ FIN DE DUBLAJECAST ENTERO ═══ */

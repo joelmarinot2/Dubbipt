@@ -49,7 +49,7 @@ function almacen(inicial, roto){
 function oidos(ls){
   return montar([R_OIDOS],
     ['ANA_OIDOS', 'ANA_OIDO_DEFECTO', 'ANA_OIDO_GUARDADO', 'ANA_RITMO_GUARDADO', 'anaOido', 'anaOidoElegido',
-     'anaOidoElegir', 'anaRitmo', 'anaRitmoGuardar', 'anaEstima', 'anaAviso', 'anaCuentaComoCambio'],
+     'anaOidoElegir', 'anaRitmo', 'anaRitmoGuardar', 'anaEstima', 'anaAviso'],
     { localStorage: ls || almacen(), console: callado });
 }
 
@@ -57,7 +57,7 @@ function oidos(ls){
 function logica(ana){
   return montar([R_VOZ, R_TRAMOS, R_PALAB, R_REPARTO],
     ['anaEnergia', 'anaUmbral', 'anaVoces', 'anaPartir', 'anaTramos', 'anaMontar', 'anaTiempo',
-     'anaNumero', 'anaSinAcotaciones', 'anaFonetica', 'anaPalabras', 'anaUnir', 'anaJuntar', 'anaCasi', 'anaOidas',
+     'anaNumero', 'anaSinAcotaciones', 'anaFonetica', 'anaPalabras', 'anaUnir', 'anaCasi', 'anaOidas',
      'anaCasar', 'anaParlamento', 'anaRepartir',
      'anaTrozos', 'anaEsGrafica', 'anaLigera', 'anaJuntarIx', 'anaDistancia', 'anaHolgura', 'ANA_GRAFICAS',
      'anaNombres', 'anaNombresDe', 'anaCasiNombre', 'anaTipo', 'ANA_TIPOS'],
@@ -329,11 +329,6 @@ exports.pruebas = async function(t){
   t.eq('«está vais» es «estabais»', sim('¿Se puede saber dónde estabais?', 'se puede saber dónde está, vais'), 1);
   t.eq('«hoy es» es «oyes»', sim('Hermano, ¿me oyes? Soy yo.', 'hermano, me hoy es. Soy yo.'), 1);
   t.eq('«adormido» es «ha dormido»', sim('Ha dormido bien', 'Adormido bien'), 1);
-  t.eq('«de la» contra «de la» no se toca', L.anaJuntar(['de', 'la'], ['de', 'la']).map(x => x.join(' ')).join('|'),
-       'de la|de la', 'dos palabras que son dos palabras en los dos lados son dos palabras');
-  t.eq('ni se juntan dos que YA son palabras del otro lado, aunque juntas también lo sean',
-       L.anaJuntar(['sin', 'fin', 'sinfin'], ['sin', 'fin'])[1].join(' '), 'sin fin',
-       'si no, «sin fin» se comería la palabra que viene detrás');
   t.eq('idéntico', sim('Esta es la casa de su madre', 'esta es la casa de su madre'), 1);
   t.cerca('una palabra cambiada de ocho', L.anaCasar(L.anaPalabras('Si todo va bien, en unos diez días.'),
           L.anaPalabras('si todo va bien en unos quince días')).sim, 7 / 8, 1e-9);
@@ -353,15 +348,10 @@ exports.pruebas = async function(t){
   t.eq('«de lospital» es «del hospital»: mismas letras, otro corte',
        sim('Son las normas del hospital.', 'son las normas de lospital'), 1);
   t.eq('«cerebre be» es «seré breve»', sim('No se preocupe, seré breve.', 'no se preocupe cerebre be'), 1);
-  t.eq('«leer» partido en «le er» sigue siendo «leer»',
-       L.anaJuntar(L.anaPalabras('quiero leer'), L.anaPalabras('quiero le er'))[1].join(' '),
-       L.anaPalabras('quiero leer').join(' '), 'juntas tal cual, aunque fundidas no casen');
   t.eq('la erre no se funde: «dar risa» no es «darisa»', L.anaUnir('dar', 'risa'), 'darrisa');
   t.eq('ni la i', L.anaUnir('casi', 'ido'), 'casiido');
   t.eq('la ese sí', L.anaUnir('estas', 'segura'), 'estasegura');
   t.eq('y con una vacía, la otra tal cual', L.anaUnir('', 'sol') + '|' + L.anaUnir('sol', ''), 'sol|sol');
-  t.eq('dos parejas que están tal cual en el otro lado no se tocan',
-       L.anaJuntar(['de', 'la', 'sal'], ['de', 'la', 'sal']).map(x => x.join(' ')).join('|'), 'de la sal|de la sal');
   t.eq('una palabra cambiada sigue siendo un cambio', sim('Tuerce a la derecha.', 'tuerce a la izquierda') < 1, true);
   [['esta', 'estas'], ['deje', 'dejen'], ['puede', 'puedes'], ['de', 'del']]
     .forEach(([a, b]) => t.ok('«' + a + '» y «' + b + '» son casi iguales', L.anaCasi(L.anaFonetica(a), L.anaFonetica(b))
@@ -482,8 +472,6 @@ exports.pruebas = async function(t){
     t.eq('muy corto y se oye claramente otra frase: no cuadra', av({ sim: 0.1, dif: 3, pesada: 3, n: 3, corto: true }), 'mal');
     t.eq('muy corto que cuadra, cuadra', av({ sim: 1, dif: 0, pesada: 0, n: 2, corto: true }), null);
     t.eq('un resultado de antes, sin marcas, se mide como antes', av({ sim: 0.9, dif: 1 }), 'dudoso');
-    t.ok('solo no cuadra y dudoso cuentan como cambio',
-         A.anaCuentaComoCambio('mal') && A.anaCuentaComoCambio('dudoso') && !A.anaCuentaComoCambio('leve') && !A.anaCuentaComoCambio('sin') && !A.anaCuentaComoCambio(null));
   }
 
   t.seccion('6d · gráficas en inglés, nombres propios y lo que se cruza del vecino');

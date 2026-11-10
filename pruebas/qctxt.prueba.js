@@ -20,7 +20,7 @@ const QC = montar([['/* Los cuatro tipos de corrección', '/** Cuántas quedan p
                   ['QC_TIPOS', 'QC_TIPO_POR_DEFECTO', 'qcTipo', 'qcTipoSugerido', 'qcCuentaTipos'],
                   { window: {}, qcDatos: () => [], console: { warn: () => {}, log: () => {} } });
 const M = montar([['/* ── Medidas de la hoja', '/* ── Dibujar'], ['/* ── Leer el informe que entra', '/* ── Los paneles del dashboard']],
-  ['qcpdfDecodificar', 'qcpdfPuntosCastellano', 'qcpdfEsTxtProTools', 'qcpdfLeerTxt', 'qcpdfQuitadoTexto', 'qcpdfDeInforme', 'QCTXT_SITIO'],
+  ['qcpdfDecodificar', 'qcpdfPuntosCastellano', 'qcpdfLeerTxt', 'qcpdfQuitadoTexto', 'qcpdfDeInforme', 'QCTXT_SITIO'],
   { TextDecoder: TextDecoder, QC_TIPOS: QC.QC_TIPOS, qcTipoSugerido: QC.qcTipoSugerido, qcCuentaTipos: QC.qcCuentaTipos, pdfjsLib: {}, console: { warn: () => {} } });
 
 const T = '\t';
@@ -69,7 +69,6 @@ exports.pruebas = function(t){
   t.eq('cuántas letras del castellano trae', M.qcpdfPuntosCastellano('¿Año? ¡Sí!') + ' ' + M.qcpdfPuntosCastellano('Àacaso'), '4 -1');
 
   t.seccion('2 · quedarse con lo que sirve');
-  t.ok('se reconoce como listado de marcadores', M.qcpdfEsTxtProTools(LISTADO) && !M.qcpdfEsTxtProTools('hola\tmundo'));
   const inf = M.qcpdfLeerTxt(LISTADO, 'Serie de prueba 3_QC.txt');
   t.eq('tres columnas: dónde, quién y qué', inf.columnas.join(' | '), 'LOCATION | NAME | COMMENTS');
   t.eq('lo demás, fuera: número, muestras, unidades, pista y tipo', inf.quitado.columnas.join(', '), '#, TIME REFERENCE, UNITS, TRACK NAME, TRACK TYPE');

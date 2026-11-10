@@ -87,10 +87,10 @@ exports.pruebas = async function(t){
   {
     const sync = { marks: {} };
     const M = montar([['function studioTc0(){', '/** El selector del frame rate, con de dónde sale. */']],
-      ['studioTc0', 'studioFps', 'studioFpsNominal', 'studioK', 'studioTcDeVid', 'studioVidDeTc'],
+      ['studioTc0', 'studioFpsNominal', 'studioK', 'studioTcDeVid', 'studioVidDeTc'],
       { sync, studioFine: () => 0, vfpsK: A.vfpsK, vfpsNominal: A.vfpsNominal, $: () => null, fallo(){}, cloudSaveMarks(){} });
     sync.marks._tcOff = { v: 3600 };
-    t.eq('sin frame rate guardado: 25 y factor 1, como antes', M.studioFps() + ' ' + M.studioK() + ' ' + M.studioVidDeTc(3610), '25 1 10');
+    t.eq('sin frame rate guardado: 25 y factor 1, como antes', M.studioFpsNominal() + ' ' + M.studioK() + ' ' + M.studioVidDeTc(3610), '25 1 10');
     sync.marks._fps = { v: 23.976, de: 'video' };
     t.eq('a 23.976, TC 01:00:10 está a 10,01 s del inicio del video', M.studioVidDeTc(3610).toFixed(3), '10.010');
     t.eq('y a la hora de programa, 3,6 s más (lo que antes se desfasaba)', (M.studioVidDeTc(7200) - 3600).toFixed(1), '3.6');

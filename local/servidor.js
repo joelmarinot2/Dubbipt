@@ -20,8 +20,7 @@ const PUERTO = Number(process.env.PUERTO || process.argv[2] || 8080);
 
 // las cabeceras salen de vercel.json: una sola fuente de verdad. Como en
 // Vercel, valen TODAS las reglas cuya ruta case, en orden, y si dos ponen la
-// misma cabecera manda la última. (DublajeCast, en /dublajecast/, lleva las
-// suyas: compila en el navegador y carga librerías que Dubbipt no permite.)
+// misma cabecera manda la última.
 function reglasDeVercel(){
   try{
     const v = JSON.parse(fs.readFileSync(path.join(RAIZ, 'vercel.json'), 'utf8'));

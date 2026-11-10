@@ -228,13 +228,6 @@ function prodAlertasEp(ep, serie, hoy){
 
 /* ── La ficha de un talento ─────────────────────────────────────────────── */
 
-/** La ficha de un talento por su nombre, como se dice: «Femenino · Adulto · Agudo». Vacío si no se sabe nada. */
-function prodFicha(nombre){
-  if(!PROD.datos || !nombre) return null;
-  const k = castNorm(nombre);
-  const t = PROD.datos.talents.find(x => castNorm(x.name) === k);
-  return t || null;
-}
 function prodFichaTexto(t){
   if(!t) return '';
   const partes = [PROD_ET.genero[t.genero] || '', PROD_ET.edad[t.edad_aparente] || '', PROD_ET.tono[t.tono_de_voz] || ''].filter(Boolean);

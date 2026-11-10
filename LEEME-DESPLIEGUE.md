@@ -9,8 +9,6 @@ un guion **PDF o Word**. Sin paso de compilación: son archivos estáticos.
 | Archivo | Qué hace |
 |---|---|
 | `index.html` | La app completa (biblioteca + carga de guion + desglose + avance) |
-| `auth.js` | Login, registro y guarda de ruta (nada abre sin sesión) |
-| `desglose-auto.js` | Motor que lee PDF/DOCX y arma el desglose editable |
 | `config.js` | Tus claves de Supabase (ya vienen las actuales) |
 | `esquema-v11-auth.sql` | Crea las tablas, seguridad (RLS) y el bucket `guiones` |
 | `sw.js`, `manifest.json`, `vercel.json` | PWA + hosting |
@@ -51,7 +49,7 @@ un guion **PDF o Word**. Sin paso de compilación: son archivos estáticos.
 
 ## Cómo se cumplen las 4 directrices
 
-1. **Autenticación:** `auth.js` (Supabase Auth = contraseñas cifradas en el
+1. **Autenticación:** dentro de `index.html` (Supabase Auth = contraseñas cifradas en el
    servidor + JWT). Interfaz de login/registro con validación en cliente y
    servidor; ruta protegida: la app no arranca sin sesión. Roles en `profiles`.
 2. **Base de datos nueva:** capa de acceso centralizada en `config.js` +
