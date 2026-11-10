@@ -2859,10 +2859,6 @@ function fallo(donde, e, nota){
   }catch(x){ /* el avisador no puede tirar la aplicacion */ }
 }
 
-/** Cuántos fallos distintos se han apuntado. */
-function falloCuantos(){
-  try{ return DDL_FALLOS.lista.length; }catch(e){ /* el avisador no puede tirar la aplicacion */ return 0; }
-}
 
 /* ── El aviso de la esquina ────────────────────────────────────────────── */
 
@@ -3452,11 +3448,6 @@ function pickRole(){
   card.querySelector('#rTab').onclick=()=>choose('tablet');
   card.querySelector('#rPc').onclick=()=>choose('pc');
 }
-// compatibilidad con nombres antiguos (siguen funcionando en el resto del código)
-function showStudioPicker(){ showWorkspacePicker(true); }
-function ensureStudio(){ ensureWorkspace(); }
-function applyStudio(){ applyWorkspace(); }
-function updateStudioChip(){ updateWorkspaceChip(); }
 /* ═══ AL RECARGAR, DONDE SE ESTABA ═════════════════════════════════════
    Pedido de sala: «quiero que si recargo la página no se ponga desde el
    inicio, sino donde estaba trabajando». Cada carga era una sesión nueva:
@@ -7392,11 +7383,6 @@ function persistMerges(){
 function persistMergesLocalOnly(){
   try{ localStorage.setItem('ddl-merges::'+fileScope(), JSON.stringify(charMerges)); }catch(e){}
 }
-function loadMerges(){
-  charMerges = {};
-  try{ const raw = localStorage.getItem('ddl-merges::'+fileScope()); if(raw) charMerges = JSON.parse(raw)||{}; }catch(e){}
-  rebuildAliasMap();
-}
 
 function extractCastingTalents(wb){
   const map={};
@@ -9141,77 +9127,6 @@ function sbEps(showId){
   return showId ? all.filter(e=> e.show_id===showId) : all;
 }
 
-async function downloadEpFile(ep, kind){
-  const path = kind==='pdf' ? ep.pdf_path : ep.xls_path;
-  const name = kind==='pdf' ? (ep.pdf_name || ep.name+'.pdf') : (ep.xls_name || ep.name+'.xlsm');
-  if(!path){ libMsg('Este capítulo no tiene ese archivo en la nube'); return; }
-  libMsg('⬇ Descargando '+name+'…');
-  try{
-    // usar la precarga local si existe (instantáneo)
-    let blob = null;
-    try{
-      const f = await idbGet('ddl-files::'+ep.id);
-      if(f && f[kind] && (f.stamp===ep.updated_at || f.stamp===(await epStamp(ep)))) blob = new Blob([f[kind]]);
-    }catch(e){}
-    if(!blob){
-      const { data, error } = await sb.storage.from('libretos').download(path);
-      if(error || !data){ libMsg('❌ No se pudo descargar: '+(error?error.message:'sin datos')); return; }
-      blob = data;
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = name;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=> URL.revokeObjectURL(url), 4000);
-    libMsg('✓ '+name+' descargado');
-  }catch(e){ console.error(e); libMsg('❌ Error al descargar: '+e.message); }
-}
-// precarga de TODOS los capítulos del programa (al entrar, quedan listos al instante)
-async function precacheShow(showId){
-  if(!sb || !showId) return;
-  const eps = sbEps(showId).filter(e=> e.xls_path || e.pdf_path);
-  let done = 0, total = 0;
-  const need = [];
-  for(const ep of eps){
-    let f = null;
-    try{ f = await idbGet('ddl-files::'+ep.id); }catch(e){}
-    if(f && f.stamp===ep.updated_at) continue;
-    need.push(ep);
-  }
-  total = need.length;
-  if(!total) return;
-  const note = (t)=>{
-    let el = document.getElementById('preChip');
-    if(!t){ if(el) el.remove(); return; }
-    if(!el){
-      el = document.createElement('span'); el.id='preChip';
-      el.style.cssText='margin-left:12px;font-size:12px;color:#FFC862;font-weight:600';
-      const cr = document.getElementById('libCrumb'); if(cr) cr.appendChild(el);
-    }
-    el.textContent = t;
-  };
-  // descargas en PARALELO por lotes de 4 (antes en serie: muy lento con muchos capítulos)
-  const POOL = 4;
-  let cursor = 0;
-  async function worker(){
-    while(cursor < need.length){
-      if(LDB.showId !== showId) return;   // cambió de programa: parar
-      const ep = need[cursor++];
-      note('☁️ precargando '+Math.min(done+1,total)+'/'+total+'…');
-      try{
-        const nf = { stamp: await epStamp(ep), xls_name: ep.xls_name, pdf_name: ep.pdf_name };
-        const jobs = [];
-        if(ep.xls_path) jobs.push(sb.storage.from('libretos').download(ep.xls_path).then(async r=>{ if(r && r.data) nf.xls = await r.data.arrayBuffer(); }));
-        if(ep.pdf_path) jobs.push(sb.storage.from('libretos').download(ep.pdf_path).then(async r=>{ if(r && r.data) nf.pdf = await r.data.arrayBuffer(); }));
-        await Promise.all(jobs);
-        if(nf.xls || nf.pdf) await idbSet('ddl-files::'+ep.id, nf);
-      }catch(e){ console.warn('precache', ep.name, e); }
-      done++;
-    }
-  }
-  await Promise.all(Array.from({length: Math.min(POOL, need.length)}, worker));
-  note(null);
-}
 /* Aviso cuando la cuenta tiene programas en OTRO espacio de trabajo.
    Es la causa mas comun de "en este equipo no me salen todos": no faltan, estan
    en otro espacio. Aqui se dice cuantos y donde, con un clic para cambiar. */
@@ -9597,67 +9512,6 @@ async function renderLibrary(silent){
 }
 
 function pubUrl(path){ try{ return path ? sb.storage.from('portadas').getPublicUrl(path).data.publicUrl : ''; }catch(e){ return ''; } }
-function dlgOpen(html){
-  const old=document.getElementById('dlgOv'); if(old) old.remove();
-  const ov=document.createElement('div'); ov.id='dlgOv'; ov.className='dlgov';
-  ov.innerHTML='<div class="dlgcard">'+html+'</div>';
-  document.body.appendChild(ov);
-  const close=()=> ov.remove();
-  ov.addEventListener('mousedown', e=>{ if(e.target===ov) close(); });
-  return { ov, card:ov.querySelector('.dlgcard'), close };
-}
-function renderProgHeader(sh){
-  const ph=document.getElementById('progHeader'); if(!ph) return;
-  ph.style.display='';
-  const bn = sh && sh.banner_path ? pubUrl(sh.banner_path) : '';
-  ph.innerHTML =
-    '<div class="ph-inner">'
-    +'<button class="ph-edit" id="phEdit" title="Editar programa">\u270F\uFE0F</button>'
-    +'<span class="ph-ws">'+esc((WORKSPACE&&WORKSPACE.name)||'')+'</span>'
-    +'<h1 class="ph-title">'+esc(sh?sh.name:'')+'</h1>'
-    +'<button class="ph-back" id="phBack">\u2039 Episodios</button>'
-    +'</div>';
-  // La portada se aplica por propiedad (no por concatenación en la cadena HTML):
-  // así una URL con comillas/paréntesis no puede romper el CSS ni inyectar nada.
-  if(bn){ const inner = ph.querySelector('.ph-inner');
-    if(inner) inner.style.backgroundImage =
-      "linear-gradient(rgba(20,15,48,.5),rgba(20,15,48,.72)),url('"+encodeURI(bn).replace(/'/g,'%27')+"')"; }
-  const pb=document.getElementById('phBack'); if(pb) pb.onclick=()=>{ try{document.body.classList.remove('ep-open');}catch(e){} LDB.browse=true; libView='shows'; LDB.showId=null; renderLibrary(true); };
-  const pe=document.getElementById('phEdit'); if(pe) pe.onclick=()=> editShow(sh);
-}
-function editShow(sh){
-  if(!sh) return;
-  const { card, close } = dlgOpen(
-    '<h2 class="dlgtitle">Editar Programa</h2>'
-    +'<div class="dlgfield"><input id="epName" value="'+esc(sh.name||'')+'" placeholder="Nombre"></div>'
-    +'<div class="dlglabel">Cambiar carátula</div>'
-    +'<label class="dlgdrop" id="epCarD"><span class="pl">\uFF0B</span><img id="epCarImg" alt=""'+(sh.cover_path?(' src="'+pubUrl(sh.cover_path)+'" style="display:block"'):'')+'><input type="file" id="epCar" accept="image/*"></label>'
-    +'<div class="dlglabel">Cambiar portada</div>'
-    +'<label class="dlgdrop wide" id="epPorD"><span class="pl">\uFF0B</span><img id="epPorImg" alt=""'+(sh.banner_path?(' src="'+pubUrl(sh.banner_path)+'" style="display:block"'):'')+'><input type="file" id="epPor" accept="image/*"></label>'
-    +'<div class="dlgerr" id="epErr"></div>'
-    +'<button class="dlgbtn" id="epGo">Guardar</button>'
-  );
-  const q=(id)=>card.querySelector('#'+id);
-  if(sh.cover_path){ const pl=q('epCarD').querySelector('.pl'); if(pl) pl.style.display='none'; }
-  if(sh.banner_path){ const pl=q('epPorD').querySelector('.pl'); if(pl) pl.style.display='none'; }
-  function prev(inp,img){ inp.addEventListener('change',()=>{ const f=inp.files[0]; if(f){ img.src=URL.createObjectURL(f); img.style.display='block'; const pl=inp.parentNode.querySelector('.pl'); if(pl) pl.style.display='none'; } }); }
-  prev(q('epCar'),q('epCarImg')); prev(q('epPor'),q('epPorImg'));
-  q('epGo').addEventListener('click', async ()=>{
-    const name=(q('epName').value||'').trim(); if(!name){ q('epErr').textContent='Escribe el nombre'; return; }
-    const btn=q('epGo'); btn.disabled=true; btn.textContent='Guardando\u2026';
-    const up=async(inp,kind)=>{ const f=inp.files[0]; if(!f) return null;
-      const ext=((f.name.split('.').pop())||'jpg').toLowerCase(); const path='covers/'+sh.id+'/'+kind+'.'+ext;
-      const u=await sb.storage.from('portadas').upload(path,f,{upsert:true,contentType:f.type||undefined});
-      return u.error?null:path; };
-    const patch={ name };
-    try{ const cp=await up(q('epCar'),'caratula'); if(cp) patch.cover_path=cp;
-         const bp=await up(q('epPor'),'portada'); if(bp) patch.banner_path=bp; }catch(e){ console.warn('cover',e); }
-    const { error } = await sb.from('shows').update(patch).eq('id', sh.id);
-    if(error){ btn.disabled=false; btn.textContent='Guardar'; q('epErr').textContent=error.message; return; }
-    close(); await libFetchAll(); renderLibrary(true);
-  });
-  setTimeout(()=>{ const n=q('epName'); if(n) n.focus(); }, 60);
-}
 function sortedChars(){
   const list = chars.slice();
   if(window._sortMode==='abc') list.sort((a,b)=> (a.display||'').localeCompare(b.display||'','es'));
@@ -11109,80 +10963,7 @@ async function dcImportar(){
 
 /* ── Llevar ────────────────────────────────────────────────────────────── */
 
-/** Qué cambiaría en DublajeCast si se exporta ahora. No escribe nada. */
-function dcPrevioExportar(p){
-  const loc = dcLocalizar(p);
-  if(!loc.ep) return { error: 'no encuentro el capítulo «' + loc.nomEp + '» en DublajeCast' };
-  const ix = loc.ix;
-  const chars = {}; ix.chars.forEach(c => { chars[dcN(ix.nombre(c))] = c; });
-  const tals  = {}; ix.talents.forEach(t => { tals[dcN(ix.nombre(t))] = t; });
-  const yaHay = {};
-  for(const c of ix.castings) if(String(c.episode_id) === String(loc.ep.id)) yaHay[String(c.character_id)] = c;
 
-  const nuevos = [], cambios = [], talentosNuevos = [], sinPersonaje = [];
-  for(const k in charIdx){
-    const c = charIdx[k];
-    const tal = c && c.talent && String(c.talent).trim();
-    if(!tal) continue;
-    const ch = chars[dcN(c.display || k)];
-    if(!ch){ sinPersonaje.push(c.display || k); continue; }
-    const t = tals[dcN(tal)];
-    if(!t && talentosNuevos.indexOf(tal) < 0) talentosNuevos.push(tal);
-    const actual = yaHay[String(ch.id)];
-    const idTal = t ? t.id : null;
-    if(!actual) nuevos.push({ personaje: c.display, talento: tal, charId: ch.id, talId: idTal });
-    else if(String(actual.talent_id) !== String(idTal))
-      cambios.push({ personaje: c.display, talento: tal, charId: ch.id, talId: idTal,
-                     antes: (ix.talents.find(x => String(x.id) === String(actual.talent_id)) || {}).name || '(vacío)' });
-  }
-  return { ep: loc.ep, nuevos, cambios, talentosNuevos, sinPersonaje };
-}
-
-/** Escribe el casting de este capítulo en DublajeCast. */
-async function dcExportar(){
-  const p = await dcLeer();                      // siempre releer: la rev tiene que ser fresca
-  const prev = dcPrevioExportar(p);
-  if(prev.error){ castAviso('⚠️ ' + prev.error); return 0; }
-  const total = prev.nuevos.length + prev.cambios.length;
-  if(!total && !prev.talentosNuevos.length){ castAviso('DublajeCast ya está al día con este capítulo'); return 0; }
-
-  let aviso = 'Se va a escribir en DublajeCast:\n\n'
-    + '· ' + prev.nuevos.length + ' asignaciones nuevas\n'
-    + '· ' + prev.cambios.length + ' cambiadas'
-    + (prev.cambios.length ? '\n   ' + prev.cambios.slice(0,5).map(c => c.personaje + ': ' + c.antes + ' → ' + c.talento).join('\n   ') : '')
-    + '\n· ' + prev.talentosNuevos.length + ' talentos nuevos en su catálogo';
-  if(prev.sinPersonaje.length)
-    aviso += '\n\n⚠️ Sin ese personaje en DublajeCast (se quedan fuera):\n   ' + prev.sinPersonaje.slice(0,8).join(', ');
-  aviso += '\n\n¿Seguir?';
-  if(!confirm(aviso)) return 0;
-
-  // copia del JSON: se toca lo que este puente entiende y nada más
-  const nuevo = JSON.parse(JSON.stringify(p));
-  if(!Array.isArray(nuevo.talents))  nuevo.talents = [];
-  if(!Array.isArray(nuevo.castings)) nuevo.castings = [];
-
-  const nuevoId = () => 'ddl-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
-  const idsTal = {};
-  for(const nom of prev.talentosNuevos){
-    const id = nuevoId();
-    idsTal[dcN(nom)] = id;
-    nuevo.talents.push({ id: id, name: nom, genero: '', edad_aparente: '', tono_de_voz: '' });
-  }
-  const resolver = (x) => x.talId != null ? x.talId : idsTal[dcN(x.talento)];
-
-  for(const x of prev.nuevos)
-    nuevo.castings.push({ id: nuevoId(), episode_id: prev.ep.id, character_id: x.charId, talent_id: resolver(x) });
-  for(const x of prev.cambios){
-    const c = nuevo.castings.find(c => String(c.episode_id) === String(prev.ep.id)
-                                    && String(c.character_id) === String(x.charId));
-    if(c) c.talent_id = resolver(x);
-  }
-
-  await dcEscribir(nuevo);
-  castAviso('✅ DublajeCast actualizado: ' + prev.nuevos.length + ' nuevas, ' + prev.cambios.length
-    + ' cambiadas' + (prev.talentosNuevos.length ? ', ' + prev.talentosNuevos.length + ' talentos añadidos' : ''));
-  return total;
-}
 
 /** Panel del puente con DublajeCast. */
 async function dcPanel(){
@@ -14034,15 +13815,6 @@ async function idbClearAll(){
     return true;
   }catch(e){ return false; }
 }
-// Vaciar la caché local de capítulos de ESTE dispositivo y recargar limpio.
-// Corrige de inmediato cualquier capítulo que muestre datos equivocados
-// (los archivos se re-descargan de la nube; nada se pierde allá).
-async function ddlResetCache(){
-  if(!confirm('¿Vaciar la caché local de capítulos de este dispositivo?\n\n• Los capítulos se descargarán de nuevo la próxima vez que los abras.\n• No se pierde nada en la nube.\n• Vuelves al mismo capítulo y libreto, ya con datos correctos.\n\nÚsalo si un capítulo muestra el libreto o los archivos de OTRO programa.')) return;
-  try{ await idbClearAll(); }catch(e){}
-  try{ window._dataEpId = null; }catch(e){}
-  location.reload();
-}
 // reconstruir todo el estado desde la caché (sin descargar ni re-procesar)
 function _epOpen(v){ try{ document.body.classList.toggle('ep-open', !!v); }catch(e){} try{ refreshTopbar(); }catch(e){ fallo('refreshTopbar · index.html:8637', e); } }
 function hydrateEpisode(d){ _epOpen(true);
@@ -14376,28 +14148,6 @@ async function openEpisodeFromJson(ep){
       if(typeof pop2!=='undefined' && pop2.doc){ refreshOpenLibretoForEpisode(); } }catch(e){ fallo('cloudLoadProgress · index.html:8929', e); } })();
     return true;
   }catch(e){ console.error('openEpisodeFromJson', e); return false; }
-}
-// Sube el JSON de un capítulo viejo ya procesado en memoria (auto-migración).
-async function ensureLibretoJson(ep){
-  try{
-    if(!ep || !ep.show_id || !ep.id || !script || !script.length) return;
-    if(window._dataEpId !== ep.id) return;
-    const jsonPath = ep.show_id+'/'+ep.id+'/libreto.json';
-    const payload = JSON.stringify({ v:2, epId:ep.id, name:ep.name, chars, script, numPages, tcIndex,
-      traducido: (typeof libTraducidoParaGuardar === 'function') ? libTraducidoParaGuardar() : null,
-      pdfName, xlsName:xlsFileName, charsRaw: window._charsRaw || null,
-      adr: (window._adrDatos && Object.keys(window._adrDatos).length) ? window._adrDatos : null,
-      cortes: (typeof CORTES !== 'undefined' && CORTES.lista.length) ? CORTES.lista : null,
-      cotejo: (window._cotejo && Object.keys(window._cotejo).length) ? window._cotejo : null,
-      qc: qcParaGuardar(),
-      qcMeta: qcMetaParaGuardar() });
-    const { error } = await sb.storage.from('libretos').upload(jsonPath, new Blob([payload], {type:'application/json'}), {upsert:true, contentType:'application/json'});
-    if(error) return;
-    await sb.from('episodes').update({ json_path: jsonPath }).eq('id', ep.id);
-    try{ idbSet('json:'+ep.id, { stamp: ep.updated_at, text: payload }); }catch(e){}
-    try{ await libFetchAll(); }catch(e){}
-    libMsg('✅ Libreto optimizado — la próxima vez abre al instante');
-  }catch(e){ console.warn('ensureLibretoJson', e); }
 }
 
 async function openEpisode(id){
@@ -16000,7 +15750,7 @@ body.clean .lrec{display:none!important}
 /* ---- layout tablet horizontal: cajones laterales ---- */
 body.haschips .lh .goto, body.haschips .lh #lScope, body.haschips .lh #lTheme,
 body.haschips .lh #lTablet, body.haschips .lh #lTp, body.haschips .lh #lEye,
-body.haschips .lh #lFontDn, body.haschips .lh #lFontUp, body.haschips .lh #lPron, body.haschips .lh #lClean, body.haschips .lh #lFind, body.haschips .lh #lPip{display:none}
+body.haschips .lh #lFontDn, body.haschips .lh #lFontUp, body.haschips .lh #lPron, body.haschips .lh #lClean, body.haschips .lh #lFind{display:none}
 body.haschips .lfind{position:fixed;left:0;right:0;top:0;z-index:40}
 body.haschips .lchips{position:fixed;left:0;top:calc(var(--lhH,54px) + var(--lbarsH,0px));bottom:0;width:88px;display:flex;
   flex-direction:column;align-items:stretch;overflow-y:auto;overflow-x:hidden;
@@ -18623,21 +18373,6 @@ function gotoLibretoPage(pg, fromRemote){
   }
   markChipCur(pg);
 }
-function libretoFollow(eff){
-  if(typeof TP!=='undefined' && TP.on) return;   // modo trackpad: este dispositivo no es libreto
-  if(!pop2.win || pop2.win.closed || !pop2.els || !pop2.blockMap) return;
-  let target = -1;
-  for(let vi=0; vi<pop2.blockMap.length; vi++){
-    const b = script[pop2.blockMap[vi]];
-    if(b.tcEff!=null && b.tcEff <= eff + 0.05) target = vi; else if(b.tcEff>eff) break;
-  }
-  if(target<0) return;
-  pop2.els.live.textContent = (pop2.prompter?'🎬 ':'👁 ')+fmtTC4(eff);
-  if(target !== pop2.activeBlock){
-    setActiveBlock(target);
-    if(pop2.prompter && performance.now() - (pop2._navAt||0) > 1500) centerBlock(target, true);
-  }
-}
 // ---- marcas del libreto: pausas y acentos por palabra ----
 // Modelo por intervención (si): { text?, pauses:[wordIdx], accents:[wordIdx] }
 // pauses = índices de palabra ANTES de las cuales va una pausa "/"
@@ -18693,15 +18428,6 @@ function applyMarks(si, rawText){
   }
   if(pauses.has(wi)) html += ' <span class="pause" data-wi="'+wi+'">/</span>';
   return html;
-}
-function caretCharOffset(el, sel){
-  try{
-    const range = sel.getRangeAt(0);
-    const pre = range.cloneRange();
-    pre.selectNodeContents(el);
-    pre.setEnd(range.endContainer, range.endOffset);
-    return pre.toString().length;
-  }catch(e){ return null; }
 }
 // marcar/desmarcar visualmente una página como grabada en el libreto digital
 function libSyncDoneBtns(page){
@@ -19284,14 +19010,6 @@ function rtCfg(extra){
 const sync = { channel:null, room:null, isOn:false, role:null, marks:{},
                _saveTmr:null, meId:Math.random().toString(36).slice(2,8), peers:0 };
 
-function syncToggle(){
-  if(sync.isOn){ syncDisconnect(); return; }
-  if(!sb){ libMsg('La sincronía solo está en la versión nube'); return; }
-  if(!(WORKSPACE && WORKSPACE.id)){ showWorkspacePicker(true); return; }
-  if(!DEVROLE){ pickRole(); return; }
-  syncConnect(DEVROLE);
-}
-function askRole(){ pickRole(); }
 function appBack(){
   const li = document.getElementById('libInline');
   if(li && li.style.display!=='none'){ hideLibretoInline(); updateBackBtn(); return; }
@@ -20684,13 +20402,6 @@ function syncSendPos(pos){
   if(typeof isTalent==='function' && isTalent()) return;
   syncEmit('pos', pos);
 }
-function remoteGuard(ms){
-  if(!pop2) return;
-  pop2._applyRemote = true;
-  clearTimeout(pop2._appTmr);
-  pop2._appTmr = setTimeout(()=>{ pop2._applyRemote = false; }, ms||700);
-  pop2._navAt = performance.now();
-}
 function onRemotePos(p){
   try{ if(typeof sesionRemota === 'function') sesionRemota(); }catch(e){ /* la inactividad se mira igual */ }
   if(typeof talentFree==='function' && talentFree()) return;   // actor en libre: no le mueven la pagina
@@ -20839,243 +20550,6 @@ function ensureMirrorLoop(){
     pop2._mirrorRaf = raf(step);
   };
   pop2._mirrorRaf = raf(step);
-}
-function stopMirrorLoop(){
-  if(pop2._mirrorRaf){ try{ (pop2._mirrorWin||window).cancelAnimationFrame(pop2._mirrorRaf); }catch(e){} pop2._mirrorRaf = 0; }
-}
-
-/* ===== VISTA SOBRE PRO TOOLS: ventana Picture-in-Picture siempre encima =====
-   Muestra la intervención en curso (y la siguiente) en una ventana que el
-   sistema mantiene ARRIBA de todo — incluida la ventana de Pro Tools.
-   Se redimensiona libre (ancho/alto a gusto) y la letra se ajusta con A− / A+. */
-const pip = { win:null, fs:26, tmr:0, lastKey:'' };
-try{ const v = localStorage.getItem('ddl_pip_fs'); if(v) pip.fs = Math.max(14, Math.min(64, +v||26)); }catch(e){}
-
-async function openPipOverlay(hostWin){
-  if(pip.win && !pip.win.closed){ try{ pip.win.close(); }catch(e){} pip.win = null; return; }
-  const host = hostWin || window;                       // la ventana DONDE ocurrió el clic
-  if(!script || !script.length){
-    try{ host.alert('Abre primero un capítulo'); }catch(e){ libMsg('Abre primero un capítulo'); }
-    return;
-  }
-  let pw = null, real = false, err = null;
-  // 1º) ventana siempre-encima, pedida desde la ventana del clic (ahí vive el permiso)
-  try{
-    if(host.documentPictureInPicture){
-      pw = await host.documentPictureInPicture.requestWindow({ width: 980, height: 210 });
-      real = true;
-    }
-  }catch(e){ err = e; }
-  // 2º) fallback: ventana flotante normal, abierta TAMBIÉN desde la ventana del clic
-  if(!pw){
-    try{ pw = host.open('', 'ddl_karaoke', 'width=980,height=230,menubar=no,toolbar=no,location=no,status=no'); }catch(e){ if(!err) err = e; }
-    if(pw){
-      try{ pw.document.open(); pw.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"></head><body></body></html>'); pw.document.close(); }catch(e){}
-    }
-  }
-  if(!pw){
-    const msg = 'No se pudo abrir la vista karaoke'+(err?': '+err.message:'')+'\nRevisa el bloqueador de ventanas emergentes.';
-    try{ host.alert(msg); }catch(e){ alert(msg); }
-    return;
-  }
-  pip.win = pw; pip.real = real; pip.err = err;
-  pipMount(pw, real);
-}
-function pipMount(pw, real){
-  const d = pw.document;
-  try{ d.title = 'Karaoke · Libreto'; }catch(e){}
-  const st = d.createElement('style');
-  st.textContent = `
-    :root{ --fs:${pip.fs}px }
-    html,body{margin:0;height:100%;background:#000;color:#F5F2FF;
-      font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden}
-    #box{position:relative;z-index:1;height:100%;overflow:hidden}
-    #track{position:absolute;left:0;right:0;top:0;will-change:transform;
-      transition:transform .16s linear;padding:0 22px}
-    .ln{text-align:center;padding:7px 6px;line-height:1.28;
-      font-size:calc(var(--fs) * .62);font-weight:600;color:#6E678F;opacity:.8;
-      transition:font-size .16s ease,color .16s ease,opacity .16s ease}
-    .ln .w{color:#8f86c9;font-size:.72em;font-weight:700;letter-spacing:.5px;
-      text-transform:uppercase;margin-right:8px}
-    .ln .meta{display:none}
-    .ln.cur{font-size:var(--fs);opacity:1;font-weight:700}
-    .ln.cur .w{display:none}
-    .ln.cur .meta{display:flex;justify-content:center;align-items:baseline;gap:14px;
-      margin-bottom:3px}
-    .ln.cur .meta .tc{font-family:ui-monospace,monospace;font-weight:800;color:#FFB020;
-      font-size:calc(var(--fs) * .6);letter-spacing:.5px}
-    .ln.cur .meta .who{font-weight:700;color:#A9E6A9;font-size:calc(var(--fs) * .5);
-      letter-spacing:.6px;text-transform:uppercase}
-    /* barrido karaoke: el texto de la línea actual se pinta de ámbar según avanza */
-    .ln.cur .txt{
-      background-image:linear-gradient(90deg,#FFB020 0 var(--p,0%),#F5F2FF var(--p,0%) 100%);
-      -webkit-background-clip:text;background-clip:text;
-      -webkit-text-fill-color:transparent;color:#F5F2FF}
-    .ln.cur .txt .pause{-webkit-text-fill-color:#FB923C;font-weight:800}
-    .ln.cur .txt .acc{text-decoration:underline}
-    .ln.cur .txt .pr,.ln.cur .txt .prn{-webkit-text-fill-color:#22D3EE;font-weight:700}
-    .ln .txt .pause{color:#FB923C;font-weight:800}
-    .ln .txt .pr,.ln .txt .prn{color:#22D3EE}
-    #ctl{position:fixed;top:6px;right:8px;display:flex;gap:6px;opacity:.25;transition:opacity .2s;z-index:2}
-    #ctl:hover{opacity:1}
-    #ctl button{border:1px solid #3a3358;background:rgba(23,18,50,.85);color:#ECE9FB;
-      border-radius:8px;padding:4px 10px;font-size:13px;font-weight:700;cursor:pointer}
-    #empty{color:#8B84B0;font-size:15px;text-align:center;padding-top:40px}
-    #fbnote{position:fixed;left:0;right:0;bottom:0;background:#2a1f0a;color:#FFC862;
-      font-size:11.5px;padding:4px 10px;text-align:center;z-index:2}
-    #pbg{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none}
-    body.live #pbg{display:block}
-    body.live .ln{color:#a9a3c6;text-shadow:0 2px 8px rgba(0,0,0,.95)}
-    body.live .ln.cur .txt,body.live .ln.cur .meta .tc,body.live .ln.cur .meta .who{
-      text-shadow:0 2px 10px rgba(0,0,0,.95), 0 0 4px #000}
-    body.live .ln.cur .txt{color:#fff}
-  `;
-  d.head.appendChild(st);
-  const bg = d.createElement('video'); bg.id='pbg'; bg.muted=true; bg.autoplay=true; bg.playsInline=true;
-  d.body.appendChild(bg);
-  const box = d.createElement('div'); box.id = 'box';
-  box.innerHTML = '<div id="empty">Siguiendo el libreto…</div>';
-  d.body.appendChild(box);
-  const ctl = d.createElement('div'); ctl.id = 'ctl';
-  ctl.innerHTML = '<button id="pbgBtn" title="Fondo transparente: elige la ventana de Pro Tools y la verás detrás del texto">🪟 Fondo</button><button id="fdn">A−</button><button id="fup">A+</button>';
-  d.body.appendChild(ctl);
-  if(!real){
-    const n = d.createElement('div'); n.id='fbnote';
-    n.textContent = 'Modo ventana normal — mantenla sobre Pro Tools. Motivo: '+((pip.err&&pip.err.message)?pip.err.message:'siempre-encima no disponible; actualiza Chrome/Edge');
-    d.body.appendChild(n);
-  }
-  const setFs = (v)=>{ pip.fs = Math.max(14, Math.min(64, v));
-    d.documentElement.style.setProperty('--fs', pip.fs+'px');
-    try{ localStorage.setItem('ddl_pip_fs', pip.fs); }catch(e){} };
-  d.getElementById('fdn').addEventListener('click', ()=> setFs(pip.fs-2));
-  d.getElementById('fup').addEventListener('click', ()=> setFs(pip.fs+2));
-  d.getElementById('pbgBtn').addEventListener('click', ()=> togglePipBg());
-  pw.addEventListener('pagehide', ()=>{ try{ (pip.tmrWin||window).clearInterval(pip.tmr); }catch(e){} pip.tmr=0; stopPipBg(); pip.win=null; });
-  pip.lastKey = ''; pip.winFrom = -1; pip.winTo = -1; pip.curSi = -1;
-  try{ (pip.tmrWin||window).clearInterval(pip.tmr); }catch(e){}
-  // el reloj del karaoke corre en SU propia ventana: así no se congela aunque
-  // la pestaña principal quede oculta o tapada por Pro Tools
-  pip.tmrWin = pw;
-  try{ pip.tmr = pw.setInterval(pipTick, 160); }catch(e){ pip.tmrWin = window; pip.tmr = setInterval(pipTick, 160); }
-  pipTick();
-}
-// fondo "transparente": captura la ventana de Pro Tools y la muestra en vivo
-// detrás del texto (el navegador no permite ventanas transparentes de verdad,
-// pero ver la ventana capturada a través es el mismo efecto en la práctica).
-function stopPipBg(){
-  if(pip.bgStream){ try{ pip.bgStream.getTracks().forEach(t=>t.stop()); }catch(e){} pip.bgStream = null; }
-  if(pip.win && !pip.win.closed){
-    const d = pip.win.document, v = d.getElementById('pbg');
-    if(v) v.srcObject = null;
-    d.body.classList.remove('live');
-    const b = d.getElementById('pbgBtn'); if(b) b.textContent = '🪟 Fondo';
-  }
-}
-async function togglePipBg(){
-  if(!pip.win || pip.win.closed) return;
-  if(pip.bgStream){ stopPipBg(); return; }
-  const pw = pip.win, d = pw.document;
-  try{
-    const md = (pw.navigator && pw.navigator.mediaDevices) || navigator.mediaDevices;
-    const stream = await md.getDisplayMedia({ video:{ displaySurface:'window' }, audio:false });
-    pip.bgStream = stream;
-    const v = d.getElementById('pbg');
-    v.srcObject = stream;
-    try{ await v.play(); }catch(e){}
-    d.body.classList.add('live');
-    const b = d.getElementById('pbgBtn'); if(b) b.textContent = '🪟 Quitar fondo';
-    const tr = stream.getVideoTracks()[0];
-    if(tr) tr.onended = ()=> stopPipBg();   // si el usuario corta la captura desde el navegador
-  }catch(e){
-    if(e && e.name!=='NotAllowedError') console.error('pip bg', e);
-  }
-}
-function pipCurrentPos(){
-  // 1º: lo que se ve en el libreto local (que ya sigue a la tablet);
-  // 2º: si el libreto local está cerrado, la última posición recibida de la tablet.
-  if(pop2 && pop2.win && !pop2.win.closed && pop2.els){
-    const pos = libViewPos();
-    if(pos && pos.si!=null) return pos;
-  }
-  const rp = sync._lastRemotePos;
-  if(rp && rp.si!=null) return { si: rp.si, f: rp.f||0 };
-  return null;
-}
-function pipCurrentSi(){ const p = pipCurrentPos(); return p ? p.si : null; }
-// línea con diálogo en o después de si (los bloques sin texto no se cantan)
-function pipDlgAt(si){
-  let i = Math.max(0, Math.min(si, script.length-1));
-  while(i < script.length && (!script[i].lines || !script[i].lines.length)) i++;
-  return i < script.length ? i : null;
-}
-function pipLineHtml(b){
-  const tc = (b.tcEff!=null && typeof fmtTC4==='function') ? fmtTC4(b.tcEff) : '';
-  const tx = (typeof applyMarks==='function') ? applyMarks(b.idx, blockText(b)) : esc(blockText(b));
-  return '<div class="ln" data-si="'+b.idx+'">'
-    + '<div class="meta">'+(tc?'<span class="tc">'+tc+'</span>':'')+(b.display?'<span class="who">'+esc(b.display)+'</span>':'')+'</div>'
-    + (b.display?'<span class="w">'+esc(b.display)+'</span>':'')
-    + '<span class="txt">'+tx+'</span></div>';
-}
-function pipRenderWindow(d, box, centerSi){
-  // ventana de líneas alrededor de la actual (estilo MiniLyrics)
-  const lines = [];
-  let i = centerSi, back = 0;
-  // 3 anteriores con diálogo
-  const prev = [];
-  for(let j = centerSi-1; j >= 0 && prev.length < 3; j--){
-    if(script[j].lines && script[j].lines.length) prev.unshift(j);
-  }
-  // la actual + 6 siguientes con diálogo
-  const nexts = [];
-  for(let j = centerSi; j < script.length && nexts.length < 7; j++){
-    if(script[j].lines && script[j].lines.length) nexts.push(j);
-  }
-  const all = prev.concat(nexts);
-  if(!all.length) return false;
-  box.innerHTML = '<div id="track">' + all.map(si=> pipLineHtml(script[si])).join('') + '</div>';
-  pip.winFrom = all[0]; pip.winTo = all[all.length-1];
-  return true;
-}
-function pipTick(){
- try{
-  if(!pip.win || pip.win.closed){ try{ (pip.tmrWin||window).clearInterval(pip.tmr); }catch(e){} pip.tmr=0; return; }
-  const d = pip.win.document;
-  const box = d.getElementById('box'); if(!box) return;
-  const pos = pipCurrentPos();
-  if(!pos || !script || !script.length){
-    if(pip.lastKey!=='empty'){
-      box.innerHTML = '<div id="empty">'+((script&&script.length)?'Esperando movimiento: desliza el libreto aquí o en la tablet':'Abre un capítulo para empezar')+'</div>';
-      pip.lastKey='empty'; pip.winFrom = -1; pip.curSi = -1;
-    }
-    return;
-  }
-  const cur = pipDlgAt(pos.si);
-  if(cur==null) return;
-  const f = (cur === pos.si) ? Math.max(0, Math.min(1, pos.f||0)) : 0;
-  // re-armar la ventana de líneas si la actual salió del rango cargado
-  const marksLen = (sync.marks && sync.marks[cur]) ? JSON.stringify(sync.marks[cur]).length : 0;
-  const wkey = 'w'+pip.winFrom+':'+pip.winTo+':'+marksLen;
-  if(cur < pip.winFrom || cur > pip.winTo || pip.lastKey.indexOf(wkey)!==0){
-    if(!pipRenderWindow(d, box, cur)) return;
-    pip.lastKey = wkey; pip.curSi = -1;
-  }
-  const track = d.getElementById('track'); if(!track) return;
-  // marcar la línea actual
-  if(pip.curSi !== cur){
-    const old = track.querySelector('.ln.cur'); if(old) old.classList.remove('cur');
-    const el = track.querySelector('.ln[data-si="'+cur+'"]');
-    if(el) el.classList.add('cur');
-    pip.curSi = cur;
-  }
-  const el = track.querySelector('.ln[data-si="'+cur+'"]');
-  if(el){
-    // barrido karaoke: pinta la línea según la fracción deslizada
-    el.style.setProperty('--p', Math.round(f*100)+'%');
-    // desplazamiento continuo: la línea actual centrada (con su avance)
-    const y = (box.clientHeight/2) - (el.offsetTop + el.offsetHeight * (0.5 + f*0.5));
-    track.style.transform = 'translateY('+Math.round(y)+'px)';
-  }
- }catch(e){ console.error('karaoke', e); }
 }
 
 // ---- herramientas espejadas (👤/📖, tema, 🎬, 👁) — la tablet manda ----
@@ -21407,7 +20881,6 @@ function studioTc0(){ const m = sync.marks && sync.marks._tcOff; return (m && +m
    Se guarda con el capítulo (marca _fps: {v, df, de: 'video'|'medido'|'mano'}).
    Sin dato, 25 y factor 1: exactamente lo de antes. */
 function studioFpsDato(){ const m = (typeof sync !== 'undefined' && sync && sync.marks) ? sync.marks._fps : null; return (m && +m.v > 0) ? m : null; }
-function studioFps(){ const m = studioFpsDato(); return m ? +m.v : 25; }
 function studioFpsNominal(){ const m = studioFpsDato(); return (m && typeof vfpsNominal === 'function') ? vfpsNominal(+m.v) : 25; }
 /** Segundos de video por segundo de timecode: 1.001 en 23.976 / 29.97 / 59.94 sin drop frame; 1 en los demás. */
 function studioK(){ const m = studioFpsDato(); return (m && typeof vfpsK === 'function') ? vfpsK(+m.v, !!m.df) : 1; }

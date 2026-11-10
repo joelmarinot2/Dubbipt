@@ -20,7 +20,7 @@ const RECORTES = [
   ['/* ═══ PRODUCCIÓN · LO QUE VIENE DE DUBLAJECAST', '/* ═══ FIN DE PRODUCCIÓN']
 ];
 const EXPORTA = ['PROD', 'PROD_CLAVES', 'prodVacio', 'prodNormalizar', 'prodEsVolcado', 'prodResumen', 'prodIndices', 'prodFecha', 'prodDias',
-                 'prodAlertaMiami', 'prodAlertaDubcard', 'prodPlazo', 'prodFormatoDubcard', 'prodAlertasEp', 'prodFicha', 'prodFichaTexto',
+                 'prodAlertaMiami', 'prodAlertaDubcard', 'prodPlazo', 'prodFormatoDubcard', 'prodAlertasEp', 'prodFichaTexto',
                  'prodCasarPrograma', 'prodAplicar', 'prodGuardar', 'prodCargar', 'prodImportar', 'prodImportarArchivo', 'prodExportarJson',
                  'prodResumenTexto', 'prodSinTabla', 'prodHtmlProgramas', 'prodHtmlTalentos', 'prodHtmlTrailers',
                  'prodPuede', 'prodPintarBoton', 'prodPanel', 'PROD_SIN_PERMISO',
@@ -138,8 +138,6 @@ exports.pruebas = async function(t){
 
   t.seccion('3 · la ficha de un talento y casar programas');
   M.PROD.datos = d;
-  t.eq('la ficha, como se dice', M.prodFichaTexto(M.prodFicha('ana rojas')) + ' | ' + M.prodFichaTexto(M.prodFicha('CARLOS RUIZ')), 'Femenino · Adulto · Agudo | Masculino · Mayor · Grave · Barítono');
-  t.eq('sin ficha, vacío; sin talento, nulo', M.prodFichaTexto({ name: 'X' }) + '|' + M.prodFicha('NADIE'), '|null');
   const shows = [{ id: 's1', name: 'A FILIPINO CHRISTMAS' }, { id: 's2', name: 'Akka (Netflix)' }, { id: 's3', name: 'Dofus, temporada 2' }];
   t.eq('por nombre exacto, sin mayúsculas ni espacios', M.prodCasarPrograma(' a filipino christmas ', shows).id, 's1');
   t.eq('o muy parecido', (M.prodCasarPrograma('Dofus temporada 2 ', shows) || {}).id + ' ' + (M.prodCasarPrograma('Dofus temporadas 2', shows) || {}).id, 's3 s3');

@@ -411,15 +411,6 @@ async function bdExtractText(file){
   if(/\.doc$/.test(name))throw new Error("Formato .doc antiguo no soportado: guárdalo como .docx o .pdf");
   throw new Error("Formato no soportado: usa .docx, .pdf o .txt");
 }
-/* Lista de modelos disponibles del proveedor (GET /models) */
-async function bdListModels(cfg){
-  const pr=BD_PROVIDERS[cfg.provider]||BD_PROVIDERS.custom;
-  if(pr.kind==="anthropic")return pr.models.slice();
-  const res=await fetch(bdEndpoint(cfg,"/models"),{headers:{"Authorization":"Bearer "+cfg.apiKey,[BD_IA_HDR]:"autorizada"}});
-  if(!res.ok){let msg="HTTP "+res.status;try{const j=await res.json();msg=(j.error&&(j.error.message||j.error))||j.detail||msg;}catch(e){/* lo mismo que en Casting: sin eso se sigue */}throw new Error(typeof msg==="string"?msg:JSON.stringify(msg));}
-  const j=await res.json();const arr=Array.isArray(j.data)?j.data:(Array.isArray(j)?j:[]);
-  return arr.map(m=>m.id||m.name).filter(Boolean).sort();
-}
 /* Llamada con streaming (SSE). Devuelve {text,stop,model,usage}. Soporta Anthropic y APIs compatibles con OpenAI. */
 async function bdGenerate({cfg,system,user,onDelta,signal}){
   bdIaComprobar(cfg);   // contenido confidencial (ENT-22): sin permiso no sale nada

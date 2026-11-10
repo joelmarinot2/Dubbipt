@@ -44,7 +44,7 @@ exports.pruebas = async function(t){
                      { personaje: 'MULTITUD', progClave: 's:1', programa: 'A', talento: 'TODOS', eps: [1], lineas: 4 },
                      { personaje: 'GRITO', progClave: 's:1', programa: 'A', talento: 'original', eps: [2], lineas: 1 }];
     t.eq('en el directorio de Talentos, solo las personas', F.csFichasTalentosHacer(d, [], [], papeles).map(f => f.nombre).join(','), 'ANA ROJAS');
-    t.ok('ni en la ocupación, ni en el resumen, ni en el reparto por talento, ni como fichas repetidas', /if\(!t \|\| !t\.name \|\| csEsMarca\(t\.name\)/.test(CV) && /out\.talentos = d\.talents\.filter\(t => t && t\.name && !csEsMarca\(t\.name\)\)/.test(CV)
+    t.ok('ni en el resumen, ni en el reparto por talento, ni como fichas repetidas', /out\.talentos = d\.talents\.filter\(t => t && t\.name && !csEsMarca\(t\.name\)\)/.test(CV)
       && /if\(!tr\.talento \|\| csEsMarca\(tr\.talento\)\) continue;/.test(CV) && /if\(k && !csEsMarca\(t\.name\)\) \(por\[k\]/.test(CV) && (CV.match(/if\(!pp\.talento \|\| csEsMarca\(pp\.talento\)\) continue;/g) || []).length === 2);
     const D = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ DISPONIBILIDAD DE LOS TALENTOS', '/* ═══ FIN DE DISPONIBILIDAD DE LOS TALENTOS']],
       ['dispFilas'], { castNorm: undefined, csEsMarca: csEsMarca, prodFichaTexto: () => '', esc: csEsc, fallo: () => {} });

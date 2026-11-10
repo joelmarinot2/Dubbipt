@@ -803,10 +803,6 @@ const QCTXT_QUEDAN = [['LOCATION', /^location$/i], ['NAME', /^name$/i], ['COMMEN
 /** Un sitio: timecode, compases o minutos y segundos, como los pone Pro Tools. */
 const QCTXT_SITIO = /^\d{1,2}:\d{2}:\d{2}[:;.]\d{2,3}$|^\d+\|\d+\|\d+$|^\d{1,3}:\d{2}(?:\.\d+)?$/;
 
-/** ¿Es este texto un listado de marcadores de Pro Tools? */
-function qcpdfEsTxtProTools(txt){
-  return /M\s*A\s*R\s*K\s*E\s*R\s*S\s+L\s*I\s*S\s*T\s*I\s*N\s*G/i.test(txt) || /^\s*#?\s*\t\s*LOCATION\s*\t/im.test(txt);
-}
 
 /**
  * El listado de marcadores leído, con la misma forma que un informe en PDF

@@ -7,7 +7,6 @@
  * quitó en la limpieza (PRO-64).
  *
  * Lo que protege esta prueba:
- *  · que casar un capítulo de Casting con uno de Dubbipt siga como estaba;
  *  · que Dubbipt ya no abra DublajeCast ni tenga botón para ello;
  *  · que la copia ya no esté ni tenga reglas propias, y que la seguridad de
  *    Dubbipt no se afloje.
@@ -23,7 +22,7 @@ const RECORTES = [
   ['function castNorm(t){', 'async function castRegCargar(showId){'],
   ['/* ═══ DUBLAJECAST ENTERO', '/* ═══ FIN DE DUBLAJECAST ENTERO']
 ];
-const EXPORTA = ['DCAST', 'dcastCasarCapitulo', 'dcastAbrir', 'dcastCerrar', 'dcastDatos'];
+const EXPORTA = ['dcastAbrir', 'dcastDatos'];
 
 const EPS = [{ id: 'e1', show_id: 's1', name: 'Episodio 1' }, { id: 'e2', show_id: 's1', name: 'Episodio 2' },
              { id: 'e3', show_id: 's1', name: '3 - La boda' }, { id: 'e12', show_id: 's1', name: 'E12 The Last New Year' }];
@@ -39,23 +38,11 @@ function armar(o){
 exports.pruebas = async function(t){
   const { M } = armar();
 
-  t.seccion('1 · el capítulo de Dubbipt que corresponde');
-  t.eq('por título igual, sin mayúsculas ni signos', (M.dcastCasarCapitulo(12, 'e12 the last new year!', EPS) || {}).id, 'e12');
-  t.eq('o por número, cuando solo uno lo lleva en el nombre', [1, 2, 3, 12].map(n => (M.dcastCasarCapitulo(n, '', EPS) || {}).id).join(' '), 'e1 e2 e3 e12');
-  t.eq('el número como texto también', (M.dcastCasarCapitulo('2', '', EPS) || {}).id, 'e2');
-  t.eq('«12» no es «1» ni «2»', (M.dcastCasarCapitulo(1, '', [{ id: 'x', name: 'Episodio 12' }]) || {}).id, undefined);
-  const dudosos = [{ id: 'a', name: 'Episodio 2' }, { id: 'b', name: 'Episodio 2 (versión cine)' }];
-  t.eq('dos con el mismo número: ninguno, mejor abrir el programa que equivocarse', M.dcastCasarCapitulo(2, '', dudosos), null);
-  t.eq('pero si el título casa, ese', (M.dcastCasarCapitulo(2, 'Episodio 2 (versión cine)', dudosos) || {}).id, 'b');
-  t.eq('dos con el mismo título tampoco: ninguno', M.dcastCasarCapitulo(null, 'Piloto', [{ id: 'p1', name: 'Piloto' }, { id: 'p2', name: 'PILOTO' }]), null);
-  t.eq('sin número ni título, ninguno', M.dcastCasarCapitulo(null, '', EPS) + ' ' + M.dcastCasarCapitulo('dos', '', EPS), 'null null');
-
   t.seccion('2 · Dubbipt ya no abre DublajeCast ni le obedece (PRO-49)');
   {
     const A = armar();
     t.eq('abrir DublajeCast: se dice que ya no está enlazado, y no se abre nada', A.M.dcastAbrir('series', 1) + ' ' + A.avisos[0], 'false DublajeCast ya no está enlazado con Dubbipt: todo el casting se hace aquí, con los datos de Dubbipt');
     t.eq('los datos son siempre los de Dubbipt, nunca «en vivo»', (A.M.dcastDatos().datos === A.PROD.datos) + ' ' + A.M.dcastDatos().vivo, 'true false');
-    t.eq('cerrar no hace nada', A.M.dcastCerrar(), undefined);
     const JS = fs.readFileSync(path.join(RAIZ, 'js', 'dublajecast.js'), 'utf8');
     t.ok('ni marco, ni puente, ni mensajes', !/createElement\('iframe'\)/.test(JS) && !/addEventListener\('message'/.test(JS) && !/dcastAtender|dcastMensajeValido|__dcDatos/.test(JS));
   }

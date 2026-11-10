@@ -97,7 +97,7 @@ function armar(o){
   const PROD = { datos: ('datos' in o) ? o.datos : PR.prodNormalizar(VOLCADO), cuando: new Date(2026, 9, 6).getTime() };
   const LDB = { showId: ('showId' in o) ? o.showId : 's1' };
   const M = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ DUBLAJECAST ENTERO', '/* ═══ FIN DE DUBLAJECAST ENTERO']],
-    ['DCAST', 'dcastAbrir', 'dcastDatos', 'dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting'],
+    ['dcastAbrir', 'dcastDatos', 'dcastSerieDe', 'dcastEpDeDc', 'dcastFilasCasting'],
     { castNorm: undefined, document: doc, window: { addEventListener: () => {} }, location: { origin: 'https://dubbipt.vercel.app' },
       prodPuede: () => (o.puede !== undefined ? o.puede : true), PROD_SIN_PERMISO: '🔒 solo admin', prodPintarBoton: () => {},
       prodCasarPrograma: PR.prodCasarPrograma, prodNormalizar: PR.prodNormalizar, prodIndices: PR.prodIndices, PROD: PROD,
@@ -157,7 +157,7 @@ exports.pruebas = async function(t){
     const A = armar();
     t.eq('pedir una pantalla de DublajeCast: se dice que ya no está enlazado', A.M.dcastAbrir('talents') + ' ' + /ya no está enlazado/.test(A.avisos[0]), 'false true');
     const N = armar({ puede: false });
-    t.eq('con o sin permiso, lo mismo: no hay nada que abrir', N.M.dcastAbrir('talents') + ' ' + N.M.DCAST.ov, 'false null');
+    t.eq('con o sin permiso, lo mismo: no hay nada que abrir', N.M.dcastAbrir('talents'), false);
   }
 
   t.seccion('8 · el recorrido entero');

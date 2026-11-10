@@ -237,11 +237,10 @@ exports.pruebas = async function(t){
   t.ok('QC lo llama, eso sí', /cotejarTodo\(\)/.test(TODO));
 
   t.seccion('11 · las correcciones viajan con el capítulo');
-  t.eq('se guardan en los dos sitios donde se sube el capítulo',
-       (TODO.match(/qc: qcParaGuardar\(\)/g) || []).length, 2,
-       'hay dos caminos de subida; si solo se toca uno, se pierden según cómo guardes');
-  t.eq('y los dos nombres, en los mismos dos sitios',
-       (TODO.match(/qcMeta: qcMetaParaGuardar\(\)/g) || []).length, 2);
+  t.eq('se guardan donde se sube el capítulo (el otro camino, la auto-migración que nadie llamaba, se quitó en PRO-64)',
+       (TODO.match(/qc: qcParaGuardar\(\)/g) || []).length, 1);
+  t.eq('y los dos nombres, en el mismo sitio',
+       (TODO.match(/qcMeta: qcMetaParaGuardar\(\)/g) || []).length, 1);
   t.ok('y se cargan al abrirlo', /qcCargar\(d\.qc\)/.test(TODO));
   t.ok('los nombres también, con el último escrito de respaldo',
        /qcMetaCargar\(d\.qcMeta \|\| qcMetaUltima\(\)\)/.test(TODO),
