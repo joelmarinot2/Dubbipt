@@ -169,9 +169,4 @@ exports.pruebas = async function(t){
   t.ok('y la tabla vieja de capítulos ya no pinta su casting aparte', !/dcastPintarCastings/.test(HTML));
   const PROD_JS = fs.readFileSync(path.join(RAIZ, 'js', 'produccion.js'), 'utf8');
   t.ok('cambiar de perfil, o saber el rol después de pintar, repinta la biblioteca', /const activo = \(typeof csActivo === 'function'\) && csActivo\(\);\s+const clave = activo \+ '\|' \+ prodPuede\(\);\s+const nav = document\.getElementById\('csNav'\);\s+if\(typeof csRepintar === 'function' && \(!!nav !== activo \|\| \(prodPintarBoton\.clave !== undefined && prodPintarBoton\.clave !== clave\)\)\) csRepintar\(\);\s+prodPintarBoton\.clave = clave;/.test(PROD_JS));
-  const COPIA = fs.readFileSync(path.join(RAIZ, 'dublajecast', 'index.html'), 'utf8');
-  t.ok('DublajeCast se deja llevar a una pantalla y enseña sus datos', /window\.__dcNav=\(v,sid,eid\)=>\{if\(sid!=null\)store\.setSelSeriesId\(sid\);if\(eid!==undefined&&store\.setSelEpId\)store\.setSelEpId\(eid\);store\.navTo\(v\);\};window\.__dcDatos=\(\)=>__dbDatos\.current;/.test(COPIA)
-       && /window\.dubbiptPedir\("listo"\)/.test(COPIA));
-  t.ok('y dice si está al día con su nube: después de saberlo, no antes', /const cloudStatus=cloud\.status;[\s\S]{0,400}__dbNube\.current=cloudStatus;[\s\S]{0,600}window\.__dcNube=\(\)=>__dbNube\.current;/.test(COPIA)
-       && /window\.__dcNube=null;/.test(COPIA));
 };

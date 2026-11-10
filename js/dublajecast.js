@@ -7,7 +7,7 @@
  * Producción (js/produccion.js), en la nube de Dubbipt. Lo que queda aquí
  * es cómo se casan esos datos con la biblioteca de Dubbipt: el programa y el
  * capítulo que corresponden, y las filas del casting de un capítulo. La
- * copia de DublajeCast (dublajecast/) sigue publicada, pero suelta.
+ * copia de DublajeCast que se publicaba aparte (dublajecast/) ya no existe.
  *
  * Es un script clásico, no un módulo: comparte el ámbito global con los
  * <script> en línea de index.html y se carga después de ellos.

@@ -1,15 +1,16 @@
-/* DublajeCast, copiado dentro de Dubbipt pero suelto · especificacion 09, PRO-9, PRO-10 y PRO-49
+/* DublajeCast, desvinculado de Dubbipt · especificacion 09, PRO-9, PRO-10, PRO-49 y PRO-64
  *
  * Pedido de sala (PRO-9): traer la plataforma entera dentro de Dubbipt; y
  * luego (PRO-49): «desvincula DublajeCast de Dubbipt, pero mantén todos los
  * datos que hay». Dubbipt ya no abre DublajeCast ni le obedece: los datos de
- * Casting son de Dubbipt. La copia (dublajecast/) sigue publicada y suelta.
+ * Casting son de Dubbipt. La copia que se publicaba aparte (dublajecast/) se
+ * quitó en la limpieza (PRO-64).
  *
  * Lo que protege esta prueba:
  *  · que casar un capítulo de Casting con uno de Dubbipt siga como estaba;
  *  · que Dubbipt ya no abra DublajeCast ni tenga botón para ello;
- *  · que la copia publicada siga sin lo que rompería Dubbipt (service worker
- *    propio, borrado de cachés) y que la seguridad de Dubbipt no se afloje.
+ *  · que la copia ya no esté ni tenga reglas propias, y que la seguridad de
+ *    Dubbipt no se afloje.
  */
 'use strict';
 const fs = require('fs');
@@ -59,58 +60,25 @@ exports.pruebas = async function(t){
     t.ok('ni marco, ni puente, ni mensajes', !/createElement\('iframe'\)/.test(JS) && !/addEventListener\('message'/.test(JS) && !/dcastAtender|dcastMensajeValido|__dcDatos/.test(JS));
   }
 
-  t.seccion('5 · la copia de DublajeCast');
-  const { retocar, RETOQUES } = require('../local/traer-dublajecast.js');
-  const falso = '<html><head>\n<meta name="dc-version" content="9.9"/>\n' + RETOQUES.map(r => r[1]).join('\n') + '\n</head><body>\n</body>\n</html>';
-  const r = retocar(falso);
-  t.eq('dice qué versión es', r.version, '9.9');
-  t.ok('los cuatro retoques puestos', /if\(false\/\*/.test(r.html) && !/caches\.delete/.test(r.html) && !/rel="manifest"/.test(r.html) && /window\.DubbiptBarra&&s\.curSeries/.test(r.html));
-  t.ok('y el puente al final del cuerpo, con su ruta entera', /<script src="\/dublajecast\/puente\.js"><\/script>\n<\/body>/.test(r.html));
-  t.eq('los iconos también con su ruta entera: Vercel la sirve sin barra al final', retocar(falso.replace('<head>', '<head><link rel="icon" href="icons/a.png"/>')).html.indexOf('href="/dublajecast/icons/a.png"') > 0, true);
-  let err = '';
-  try{ retocar(falso.replace(RETOQUES[1][1], '')); }catch(e){ err = e.message; }
-  t.ok('si DublajeCast cambia por dentro, se para y lo dice', /«la versión nueva no borra las cachés de Dubbipt»: lo que se busca aparece 0 veces/.test(err), err);
-  err = '';
-  try{ retocar(falso + RETOQUES[2][1]); }catch(e){ err = e.message; }
-  t.ok('también si aparece dos veces', /aparece 2 veces/.test(err), err);
-  const copia = fs.readFileSync(path.join(RAIZ, 'dublajecast', 'index.html'), 'utf8');
-  t.ok('la copia que se publica está retocada', /Copia de DublajeCast [\d.]+ dentro de Dubbipt/.test(copia) && /if\(false\/\* Dubbipt/.test(copia)
-       && !/caches\.delete\(k\)/.test(copia) && !/rel="manifest"/.test(copia) && /<script src="\/dublajecast\/puente\.js"><\/script>/.test(copia)
-       && !/(src|href)="(\.\/|icons\/)/.test(copia));
-  t.ok('y su atajo a la IA está al lado', fs.existsSync(path.join(RAIZ, 'api', 'llm.js')) && fs.existsSync(path.join(RAIZ, 'dublajecast', 'puente.js')));
+  t.seccion('5 · la copia de DublajeCast ya no está (PRO-64)');
+  t.ok('ni la carpeta ni el script que la traía', !fs.existsSync(path.join(RAIZ, 'dublajecast')) && !fs.existsSync(path.join(RAIZ, 'local', 'traer-dublajecast.js')));
+  t.ok('el atajo a la IA sigue, para los breakdowns', fs.existsSync(path.join(RAIZ, 'api', 'llm.js')));
 
   t.seccion('6 · la seguridad de Dubbipt no se afloja');
   const V = JSON.parse(fs.readFileSync(path.join(RAIZ, 'vercel.json'), 'utf8'));
   const regla = (src) => (V.headers.find(h => h.source === src) || { headers: [] }).headers.reduce((m, h) => (m[h.key] = h.value, m), {});
-  const dc = regla('/dublajecast(.*)'), gen = regla('/((?!dublajecast|dctools).*)'), dct = regla('/dctools/(.*)');
-  t.ok('DublajeCast se deja meter solo en Dubbipt', /frame-ancestors 'self'/.test(dc['Content-Security-Policy']) && dc['X-Frame-Options'] === 'SAMEORIGIN');
-  t.ok('compilar en el navegador, solo en su carpeta', /'unsafe-eval'/.test(dc['Content-Security-Policy']) && !/'unsafe-eval'/.test(gen['Content-Security-Policy']) && !/unpkg\.com|sheetjs/.test((gen['Content-Security-Policy'].match(/script-src[^;]*/) || [''])[0]));
-  const re = new RegExp('^' + '/((?!dublajecast|dctools).*)' + '$'), reDc = new RegExp('^' + '/dublajecast(.*)' + '$');
-  t.eq('la regla general cubre todo lo demás y no su carpeta', [re.test('/index.html'), re.test('/js/dublajecast.js'), re.test('/dublajecast/index.html'), re.test('/dublajecast'), re.test('/api/llm')].join(' '), 'true true false false true');
-  t.ok('las herramientas copiadas de DublajeCast (dctools) tienen su regla: su SheetJS, sin compilar en el navegador ni nada de fuera más', re.test('/dctools/pegado-casting.html') === false && /cdn\.sheetjs\.com/.test(dct['Content-Security-Policy'] || '') && !/'unsafe-eval'/.test(dct['Content-Security-Policy'] || '') && /frame-ancestors 'self'/.test(dct['Content-Security-Policy'] || '') && /connect-src 'self';/.test(dct['Content-Security-Policy'] || ''));
+  const gen = regla('/((?!dctools).*)'), dct = regla('/dctools/(.*)');
+  t.ok('ya no hay regla aparte para /dublajecast: le toca la general, la estricta', !V.headers.some(h => /dublajecast/.test(h.source)));
+  t.ok('en ningún sitio se compila en el navegador ni se carga de unpkg o sheetjs en la regla general', !V.headers.some(h => h.headers.some(x => /'unsafe-eval'/.test(x.value)))
+       && !/unpkg\.com|sheetjs/.test((gen['Content-Security-Policy'].match(/script-src[^;]*/) || [''])[0]));
+  const re = new RegExp('^' + '/((?!dctools).*)' + '$');
+  t.eq('la regla general lo cubre todo menos dctools', [re.test('/index.html'), re.test('/js/dublajecast.js'), re.test('/dublajecast'), re.test('/api/llm'), re.test('/dctools/x.html')].join(' '), 'true true true true false');
+  t.ok('las herramientas de dctools tienen su regla: su SheetJS, sin compilar en el navegador', /cdn\.sheetjs\.com/.test(dct['Content-Security-Policy'] || '') && !/'unsafe-eval'/.test(dct['Content-Security-Policy'] || ''));
   t.ok('y Dubbipt puede hablar con Anthropic, para los breakdowns', /connect-src [^;]*https:\/\/api\.anthropic\.com/.test(gen['Content-Security-Policy']));
-  t.eq('y la suya cubre también /dublajecast sin barra, que es como la sirve Vercel', [reDc.test('/dublajecast'), reDc.test('/dublajecast/puente.js'), reDc.test('/js/dublajecast.js')].join(' '), 'true true false');
   const SW = fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8');
   const pasa = (ruta) => { const m = SW.match(/if \(url\.origin === self\.location\.origin && (\/.+\/)\.test\(url\.pathname\)\) return;/); return !!m && eval(m[1]).test(ruta); };
-  t.eq('el service worker de Dubbipt deja pasar su carpeta, con y sin barra, y la IA', ['/dublajecast', '/dublajecast/index.html', '/api/llm', '/index.html', '/js/dublajecast.js'].map(pasa).join(' '), 'true true true false false');
+  t.eq('el service worker deja pasar solo la IA', ['/api/llm', '/api', '/dublajecast', '/index.html', '/js/dublajecast.js'].map(pasa).join(' '), 'true true false false false');
   t.ok('y carga el módulo', /'\.\/js\/dublajecast\.js'/.test(SW));
-
-  t.seccion('7 · el puente, por dentro');
-  const PUENTE = fs.readFileSync(path.join(RAIZ, 'dublajecast', 'puente.js'), 'utf8');
-  const correr = (dentro) => {
-    const enviados = [];
-    const padre = { location: { origin: 'https://dubbipt.vercel.app' }, postMessage: (d, o) => enviados.push([d, o]) };
-    const R = { createElement: () => ({}), useState: (v) => [v, () => {}], useEffect: () => {} };
-    const win = { addEventListener: () => {}, React: R };
-    win.parent = dentro ? padre : win;
-    new Function('window', 'location', 'React', PUENTE)(win, { origin: 'https://dubbipt.vercel.app' }, R);
-    return { win, enviados };
-  };
-  const dentro = correr(true);
-  t.eq('dentro de Dubbipt, con React, hay barra', typeof dentro.win.DubbiptBarra, 'function');
-  t.eq('dentro de Dubbipt, pide con su firma y solo a nuestro sitio', dentro.win.dubbiptPedir('consulta', { programa: 'X' }) + ' ' + JSON.stringify(dentro.enviados[0]), 'true [{"fuente":"dublajecast","accion":"consulta","programa":"X"},"https://dubbipt.vercel.app"]');
-  const fuera = correr(false);
-  t.eq('abierto suelto, no pide nada ni pinta barra', fuera.win.dubbiptPedir('consulta') + ' ' + fuera.enviados.length + ' ' + typeof fuera.win.DubbiptBarra, 'false 0 undefined');
 
   t.seccion('8 · por dónde se entraba, ya no');
   const HTML = fs.readFileSync(path.join(RAIZ, 'index.html'), 'utf8');

@@ -403,7 +403,7 @@ exports.pruebas = async function(t){
 
   t.seccion('10 · sin emojis en lo que se ve de Casting');
   const comentario = (l) => /^\s*(\*|\/\*|\/\/)/.test(l);
-  for(const f of ['js/castingvistas.js', 'js/dublajecast.js', 'js/produccion.js', 'dublajecast/puente.js']){
+  for(const f of ['js/castingvistas.js', 'js/dublajecast.js', 'js/produccion.js']){
     const malas = fs.readFileSync(path.join(RAIZ, f), 'utf8').split(/\r?\n/).map((l, i) => [i + 1, l]).filter(([, l]) => !comentario(l) && EMOJI.test(l));
     t.eq(f + ': ninguno', malas.map(([n]) => n).join(','), '');
   }

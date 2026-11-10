@@ -89,7 +89,7 @@ exports.pruebas = async function(t){
     t.ok('lo leído se añade al texto, se revisa y se casa como siempre', /tx\.value = \(ya \? ya \+ '\\n' : ''\) \+ lineas\.join\('\\n'\);/.test(CV) && /zona\.classList\.remove\('leyendo'\);\s*\n\s*ver\(\);/.test(CV));
     t.ok('si falla, se dice y se puede pegar el texto', /No se pudo leer la captura: /.test(CV));
     const V = JSON.parse(fs.readFileSync(path.join(RAIZ, 'vercel.json'), 'utf8'));
-    const csp = V.headers.find(h => h.source === '/((?!dublajecast|dctools).*)').headers.find(h => h.key === 'Content-Security-Policy').value;
+    const csp = V.headers.find(h => h.source === '/((?!dctools).*)').headers.find(h => h.key === 'Content-Security-Policy').value;
     t.ok('la política de seguridad ya lo deja: el script y su idioma de jsDelivr, el lector en un blob, y WebAssembly', /script-src[^;]*https:\/\/cdn\.jsdelivr\.net/.test(csp) && /connect-src[^;]*https:\/\/cdn\.jsdelivr\.net/.test(csp) && /worker-src[^;]*blob:/.test(csp) && /'wasm-unsafe-eval'/.test(csp));
     t.ok('ni un emoji', !/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u.test(CV.slice(CV.indexOf('const CS_OCR = {'), CV.indexOf('/** Aplica la lista: los activos en producción'))));
   }

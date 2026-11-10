@@ -23,7 +23,3 @@ jobs:
 
       - name: Pruebas del web app
         run: node pruebas/correr.js
-
-      - name: Pruebas del overlay de Pro Tools
-        working-directory: protools-overlay
-        run: node --test test/

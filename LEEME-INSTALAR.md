@@ -25,11 +25,6 @@ pasó una vez — la función de IA funcionaba en local y estaba rota en el siti
 publicado, porque la CSP no dejaba compilar WebAssembly ni llegar a
 huggingface.co.
 
-## El overlay de Pro Tools
-
-Doble clic en **`protools-overlay\abrir-overlay.cmd`**. La primera vez se baja
-Electron (unos 100 MB); las siguientes arranca directo.
-
 ## Trabajar en el proyecto
 
 - **`index.html`** es la aplicación entera: interfaz, lógica y estilos.

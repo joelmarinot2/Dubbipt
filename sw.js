@@ -71,9 +71,9 @@ self.addEventListener('fetch', e => {
 
   if (url.hostname.includes('supabase') || /\/(rest|auth|storage|realtime)\//.test(url.pathname)) return;
 
-  // DublajeCast copiado dentro (dublajecast/) y su atajo a la IA (api/): van
-  // directos. Sin conexión, mejor que fallen a que se sirva Dubbipt en su lugar.
-  if (url.origin === self.location.origin && /^\/(dublajecast|api)(\/|$)/.test(url.pathname)) return;
+  // El atajo a la IA (api/) va directo. Sin conexión, mejor que falle a que
+  // se sirva Dubbipt en su lugar.
+  if (url.origin === self.location.origin && /^\/api(\/|$)/.test(url.pathname)) return;
 
   // Solo se gestiona lo NUESTRO y las librerias fijadas de arriba. Todo lo
   // demas que salga a la red -por ejemplo el modelo de voz, que baja en trozos
