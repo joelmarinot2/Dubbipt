@@ -3112,7 +3112,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.98.0-nube';
+const APP_VER_NUM = 'v11.98.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -9082,7 +9082,7 @@ function libFaltaEstado(err){ return !!err && /42703|estado/i.test(String(err.co
 async function libFetchAll(){
   if(window.OFFLINE){   // modo local: la biblioteca sale solo de la caché IndexedDB
     const c = await idbGet('library');
-    if(c && c.shows){ LDB.shows = c.shows; LDB.epsAll = c.eps || []; }
+    if(c && c.shows){ LDB.shows = progMayusShows(c.shows); LDB.epsAll = c.eps || []; }
     _libLoaded = true;
     return;
   }
@@ -9103,7 +9103,7 @@ async function libFetchAll(){
     _libSinEstadoEp = true;                         // sin la columna `estado`: como antes
     ep = await sb.from('episodes').select(libColsEps()).order('name');
   }
-  if(!sh.error) LDB.shows = sh.data || [];
+  if(!sh.error) LDB.shows = progMayusShows(sh.data);
   if(!ep.error) LDB.epsAll = ep.data || [];
   try{ if(typeof saludNota === 'function'){ saludNota(sh); saludNota(ep); } }catch(e){ /* sin vigía, igual */ }
   _libLoaded = true;
@@ -9120,13 +9120,17 @@ async function libEnsure(){
   }
   const c = await idbGet('library');
   if(c && c.shows){
-    LDB.shows = c.shows; LDB.epsAll = c.eps || []; _libLoaded = true;
+    LDB.shows = progMayusShows(c.shows); LDB.epsAll = c.eps || []; _libLoaded = true;
     _libLastBg = Date.now();
     if(!window.OFFLINE) libFetchAll().then(()=> renderLibrary(true)).catch(()=>{});
     return;
   }
   await libFetchAll();
 }
+/* El título del programa, siempre en MAYÚSCULAS (PRO-63): al crearlo, al renombrarlo y al leerlo de la nube
+   (los que ya estaban escritos de otra forma se ven igual en mayúsculas). */
+function progMayus(s){ return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLocaleUpperCase('es'); }
+function progMayusShows(lista){ return (lista || []).map(sh => (sh && typeof sh.name === 'string' && sh.name !== progMayus(sh.name)) ? Object.assign({}, sh, { name: progMayus(sh.name) }) : sh); }
 function sbShows(){
   const all = LDB.shows || [];
   if(!WORKSPACE || !WORKSPACE.id) return [];               // sin espacio elegido: nada
@@ -9453,12 +9457,12 @@ async function renderLibrary(silent){
           +'</div>';
         c.addEventListener('click', async ev=>{
           if(ev.target.closest('.lren')){   // renombrar programa
-            const nn = prompt('Nuevo nombre del programa:', sh.name);
-            if(nn && nn.trim() && nn.trim()!==sh.name){
-              await sb.from('shows').update({ name: nn.trim() }).eq('id', sh.id);
+            const nn0 = prompt('Nuevo nombre del programa:', sh.name), nn = nn0 == null ? null : progMayus(nn0);
+            if(nn && nn!==sh.name){
+              await sb.from('shows').update({ name: nn }).eq('id', sh.id);
               await libFetchAll(); renderLibrary(true);
               if(typeof libPing==='function') libPing('show', sh.id);
-              if(typeof DDL_UI!=='undefined') DDL_UI.toast('Programa renombrado a «'+nn.trim()+'»');
+              if(typeof DDL_UI!=='undefined') DDL_UI.toast('Programa renombrado a «'+nn+'»');
             }
             return;
           }
@@ -10368,7 +10372,7 @@ function castNombreDescarga(programa, capitulo, num, completo, ext, pelicula){
   else if(pelicula || !c || castClave(c) === castClave(p)) nombre = p;
   else if(castClave(c).indexOf(castClave(p)) === 0) nombre = c;                 // el capítulo ya lleva el programa
   else nombre = n ? p + ' ' + n : p + ' ' + c;
-  return 'DES_' + nombre + '_' + (completo ? 'COMPLETO' : 'INCOMPLETO') + '.' + (ext || 'xlsx');
+  return 'DES_' + nombre.toLocaleUpperCase('es') + '_' + (completo ? 'COMPLETO' : 'INCOMPLETO') + '.' + (ext || 'xlsx');   // el título, en mayúsculas (PRO-63)
 }
 function castRellenar(buf, asign, meta, training){
   if(typeof fflate === 'undefined') throw new Error('falta la librería de ZIP');
@@ -13894,7 +13898,7 @@ async function newShow(){
     +'<div class="ddlm-cover">'
       +'<label class="ddlm-cov-box" id="npCovBox" title="Portada (opcional)"><span class="pl">＋</span><img id="npCovImg" alt=""><input type="file" id="npCov" accept="image/*"></label>'
       +'<div class="ddlm-cov-meta">'
-        +'<div class="ddlm-field" style="margin:0"><label for="npName">Nombre del programa</label><input id="npName" placeholder="Ej. La Vida en Seúl"></div>'
+        +'<div class="ddlm-field" style="margin:0"><label for="npName">Nombre del programa</label><input id="npName" placeholder="Ej. LA VIDA EN SEÚL" style="text-transform:uppercase"></div>'
       +'</div>'
     +'</div>'
     +'<div class="ddlm-field"><label for="npCasa">Casa</label><select id="npCasa"><option value="">Elige la casa…</option>'
@@ -13936,7 +13940,7 @@ async function newShow(){
   // preview de portada
   $q('npCov').addEventListener('change', ()=>{ const f=$q('npCov').files[0]; if(f){ const img=$q('npCovImg'); img.src=URL.createObjectURL(f); img.style.display='block'; const pl=$q('npCovBox').querySelector('.pl'); if(pl) pl.style.display='none'; } });
   $q('npGo').addEventListener('click', async ()=>{
-    const name=($q('npName').value||'').trim();
+    const name=progMayus($q('npName').value||'');   // siempre en mayúsculas (PRO-63)
     if(!name){ $q('npErr').textContent='Escribe el nombre del programa'; $q('npName').focus(); return; }
     /* La casa se elige cada vez que se crea un proyecto: de ella sale el TC inicial del video (EST-5). */
     const casa = ($q('npCasa').value==='__otra' ? $q('npCasaOtra').value : $q('npCasa').value).replace(/\s+/g,' ').trim();
