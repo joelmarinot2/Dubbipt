@@ -3112,7 +3112,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.97.0-nube';
+const APP_VER_NUM = 'v11.97.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -10138,12 +10138,33 @@ function castCompartidos(arch){
  * Pone formato de hora a la columna del timecode de cada hoja CASTING. Devuelve
  * { hoja: celdas arregladas } (vacío si no hacía falta).
  */
+/** «0,0416782407» o «0.0416782407» → 0.0416782407; nulo si no es una hora de Excel (un número de 0 a 1). */
+function castNumHora(t){
+  const x = String(t == null ? '' : t).trim();
+  if(!/^\d+(?:[.,]\d+)?(?:E-?\d+)?$/i.test(x)) return null;
+  const v = +x.replace(',', '.');
+  return isFinite(v) && v >= 0 && v < 1 ? v : null;
+}
+/** 0.0416782407 → «01:00:01». */
+function castHoraTexto(v){
+  const s = Math.round(v * 86400), d = (n) => String(n).padStart(2, '0');
+  return d(Math.floor(s / 3600)) + ':' + d(Math.floor(s % 3600 / 60)) + ':' + d(s % 60);
+}
+/** La fórmula que da texto con un número de hora dentro, envuelta para que dé «hh:mm:ss» (y lo mismo si no es un número). */
+const castEnvolverHora = (f) => 'IFERROR(TEXT(VALUE(' + f + '),"hh:mm:ss"),' + f + ')';
+/**
+ * El timecode de las hojas CASTING, como timecode. Los tiempos vienen del
+ * DESGLOCE con fórmulas; según cómo, llegan como número (se les pone formato
+ * hh:mm:ss), como texto con el número dentro («0,0416782407»: la fórmula se
+ * envuelve con TEXT) o escritos a mano como texto (se pasan a número con
+ * formato). La columna es la de la cabecera TIME / TIME CODE; en CASTING 1,
+ * si no se encuentra, la B desde la fila 17. Devuelve { hoja: celdas arregladas }.
+ */
 function castFormatoTiempos(arch){
   const out = {};
   const stRuta = 'xl/styles.xml', wbx = arch['xl/workbook.xml'] ? new TextDecoder().decode(arch['xl/workbook.xml']) : '';
-  if(!arch[stRuta] || !wbx) return out;
-  const est = castEstilosHora(new TextDecoder().decode(arch[stRuta]));
-  if(!est) return out;
+  if(!wbx) return out;
+  const est = arch[stRuta] ? castEstilosHora(new TextDecoder().decode(arch[stRuta])) : null;
   const comp = castCompartidos(arch);
   const hojas = [...wbx.matchAll(/<sheet\b[^>]*\bname="([^"]*)"/g)].map(m => castDesXml(m[1])).filter(n => /^CASTING\b/i.test(n.trim()));
   for(const hoja of hojas){
@@ -10155,24 +10176,63 @@ function castFormatoTiempos(arch){
     const texto = (m) => { const a = m[3], b = m[4] || '', v = b.match(CAST_RE_V), t = b.match(/<t[^>]*>([\s\S]*?)<\/t>/);
       return /\bt="s"/.test(a) ? (v ? comp[+v[1]] || '' : '') : (t ? castDesXml(t[1]) : (v ? castDesXml(v[1]) : '')); };
     const cab = celdas.find(m => +m[2] <= 40 && CAST_RE_CAB_TC.test(String(texto(m) || '').replace(/\s+/g, ' ').trim().toUpperCase()));
-    if(!cab) continue;
-    const col = cab[1], fila0 = +cab[2];
+    let col, fila0;
+    if(cab){ col = cab[1]; fila0 = +cab[2]; }
+    else if(/^CASTING 1$/i.test(hoja.trim())){ col = 'B'; fila0 = 16; }   // CASTING 1: el TIME va en la B, desde la 17
+    else continue;
+    /* Las fórmulas compartidas (arrastradas hacia abajo): solo se envuelve la principal si toda ella está en esta columna. */
+    const principal = {};
+    for(const m of celdas){
+      const f = (m[4] || '').match(/<f\b([^>]*)>([\s\S]*?)<\/f>/);
+      if(!f || !/\bt="shared"/.test(f[1])) continue;
+      const si = (f[1].match(/\bsi="(\d+)"/) || [])[1], rf = (f[1].match(/\bref="([A-Z]+)\d+(?::([A-Z]+)\d+)?"/) || []);
+      if(si != null) principal[si] = { ref: m[1] + m[2], unaColumna: rf[1] === col && (!rf[2] || rf[2] === col) };
+    }
+    const envueltas = new Set();
     let n = 0;
     for(const m of celdas){
       if(m[1] !== col || +m[2] <= fila0 || +m[2] > fila0 + 600) continue;
-      const a = m[3], b = m[4] || '', v = b.match(CAST_RE_V);
-      const esNumero = !/\bt="(s|str|inlineStr|b|e)"/.test(a) && v && isFinite(+v[1]) && +v[1] >= 0 && +v[1] < 1;
-      const formula = /<f\b/.test(b) && !(v && isFinite(+v[1]) && +v[1] >= 1 && !/\bt="/.test(a));
-      if(!esNumero && !formula) continue;
+      const ref = col + m[2], a = m[3], b = m[4] || '', v = b.match(CAST_RE_V), tipo = (a.match(/\bt="([^"]*)"/) || [])[1] || '';
+      const fx = b.match(/<f\b([^>]*?)(?:\/>|>([\s\S]*?)<\/f>)/);
       const s = (a.match(/\bs="(\d+)"/) || [])[1];
-      if(est.esHora(s)) continue;
-      const ref = col + m[2];
-      xml = castCeldaEstilo(xml, ref, est.estilo);
-      n++;
+      const sNuevo = () => (est && !est.esHora(s)) ? est.estilo(s == null ? 0 : +s) : (s == null ? null : +s);
+      const conS = (x) => x == null ? '' : ' s="' + x + '"';
+      let celda = null;
+      if(!fx){
+        if(!tipo || tipo === 'n'){                                        // un número
+          if(v && castNumHora(v[1]) != null && est && !est.esHora(s)) celda = '<c r="' + ref + '"' + conS(sNuevo()) + '><v>' + v[1] + '</v></c>';
+        }else{                                                           // un texto con el número dentro, escrito a mano
+          const h = castNumHora(texto(m));
+          if(h != null) celda = '<c r="' + ref + '"' + conS(est ? sNuevo() : s) + '><v>' + h + '</v></c>';
+        }
+      }else{
+        const atr = fx[1] || '', cuerpo = fx[2], si = (atr.match(/\bsi="(\d+)"/) || [])[1];
+        const valor = v ? castDesXml(v[1]) : '';
+        if((!tipo || tipo === 'n') && v && +valor >= 1) continue;          // un total, no una hora
+        const hTexto = (tipo === 'str' || tipo === 's' || tipo === 'inlineStr') ? castNumHora(tipo === 'str' ? valor : texto(m)) : null;
+        if(hTexto != null){
+          /* La fórmula da TEXTO («0,0416782407»): se envuelve para que dé «01:00:01». */
+          if(cuerpo != null && !/\bt="shared"/.test(atr)){
+            celda = '<c r="' + ref + '"' + conS(s) + ' t="str"><f>' + castEsc(castEnvolverHora(castDesXml(cuerpo))) + '</f><v>' + castHoraTexto(hTexto) + '</v></c>';
+          }else if(si != null && principal[si] && principal[si].unaColumna){
+            if(cuerpo != null && !envueltas.has(si)){
+              envueltas.add(si);
+              celda = '<c r="' + ref + '"' + conS(s) + ' t="str"><f' + atr + '>' + castEsc(castEnvolverHora(castDesXml(cuerpo))) + '</f><v>' + castHoraTexto(hTexto) + '</v></c>';
+            }else celda = '<c r="' + ref + '"' + conS(s) + ' t="str"><f' + atr + '/><v>' + castHoraTexto(hTexto) + '</v></c>';
+          }
+        }else if((tipo === 'str' || tipo === 's' || tipo === 'inlineStr') && String(tipo === 'str' ? valor : texto(m)).trim()){
+          continue;                                                      // da un texto que no es una hora: se deja
+        }else if(est && !est.esHora(s)){
+          /* Da un número (o nada todavía): formato de hora. */
+          xml = castCeldaEstilo(xml, ref, est.estilo); n++;
+          continue;
+        }
+      }
+      if(celda){ xml = xml.replace(m[0], () => celda); n++; }
     }
     if(n){ arch[ruta] = new TextEncoder().encode(xml); out[hoja] = n; }
   }
-  if(est.usados()) arch[stRuta] = new TextEncoder().encode(est.final());
+  if(est && est.usados()) arch[stRuta] = new TextEncoder().encode(est.final());
   return out;
 }
 

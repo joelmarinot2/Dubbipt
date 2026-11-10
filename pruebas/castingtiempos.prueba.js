@@ -74,6 +74,33 @@ exports.pruebas = function(t){
     const a = libro(); a['xl/styles.xml'] = enc('<styleSheet><cellXfs count="9"><xf/></cellXfs></styleSheet>');
     t.eq('si los estilos no cuadran, no se tocan', JSON.stringify(M.castFormatoTiempos(a)) + ' ' + dec(a['xl/styles.xml']).length, '{} 59');
   }
+  t.seccion('3 · los tiempos que vienen del DESGLOCE como texto (B17 hacia abajo)');
+  {
+    const a = libro();
+    a['xl/worksheets/sheet2.xml'] = enc('<worksheet><sheetData>'
+      + '<row r="17"><c r="B17" s="1" t="str"><f>DESGLOCE!B17&amp;""</f><v>0,0416782407</v></c></row>'
+      + '<row r="18"><c r="B18" s="1" t="str"><f t="shared" ref="B18:B20" si="0">IF(DESGLOCE!B18="","",DESGLOCE!B18&amp;"")</f><v>0,0419907407</v></c></row>'
+      + '<row r="19"><c r="B19" s="1" t="str"><f t="shared" si="0"/><v>0,0525</v></c></row>'
+      + '<row r="20"><c r="B20" s="1" t="str"><f t="shared" si="0"/><v></v></c></row>'
+      + '<row r="21"><c r="B21" s="1" t="inlineStr"><is><t>0.0436921296</t></is></c></row>'
+      + '<row r="22"><c r="B22" s="1" t="str"><f>DESGLOCE!C22</f><v>MARLON</v></c></row>'
+      + '<row r="23"><c r="B23" s="1"><v>0.0525</v></c></row>'
+      + '</sheetData></worksheet>');
+    const r = M.castFormatoTiempos(a), h = dec(a['xl/worksheets/sheet2.xml']);
+    t.eq('sin cabecera TIME, en CASTING 1 se toma la B desde la fila 17', JSON.stringify(r), '{"CASTING 1":6}');
+    t.ok('la fórmula que da texto («0,0416782407») se envuelve para que dé «01:00:01»',
+         h.indexOf('<c r="B17" s="1" t="str"><f>IFERROR(TEXT(VALUE(DESGLOCE!B17&amp;""),"hh:mm:ss"),DESGLOCE!B17&amp;"")</f><v>01:00:01</v></c>') >= 0);
+    t.ok('la arrastrada hacia abajo: se envuelve la principal y las demás la siguen', /<c r="B18" s="1" t="str"><f t="shared" ref="B18:B20" si="0">IFERROR\(TEXT\(VALUE\(IF\(DESGLOCE!B18/.test(h)
+         && h.indexOf('<c r="B19" s="1" t="str"><f t="shared" si="0"/><v>01:15:36</v></c>') >= 0);
+    t.ok('el texto escrito a mano pasa a número con formato de hora', /<c r="B21" s="4"><v>0.0436921296<\/v><\/c>/.test(h) && /<c r="B23" s="4"><v>0.0525<\/v><\/c>/.test(h));
+    t.ok('un texto que no es una hora (MARLON) no se toca', h.indexOf('<c r="B22" s="1" t="str"><f>DESGLOCE!C22</f><v>MARLON</v></c>') >= 0);
+  }
+  {
+    const a = libro();
+    a['xl/worksheets/sheet2.xml'] = enc('<worksheet><sheetData><row r="17"><c r="B17" s="1" t="str"><f t="shared" ref="A17:C20" si="3">X17&amp;""</f><v>0,0416782407</v></c></row></sheetData></worksheet>');
+    M.castFormatoTiempos(a);
+    t.ok('una fórmula compartida que pasa por otras columnas no se envuelve (cambiaría las otras)', /<f t="shared" ref="A17:C20" si="3">X17&amp;""<\/f><v>0,0416782407<\/v>/.test(dec(a['xl/worksheets/sheet2.xml'])));
+  }
   t.eq('qué es un formato de hora', [[21, {}], [0, {}], [164, { 164: 'General' }], [164, { 164: '[$-409]h:mm:ss AM/PM' }], [164, { 164: '[h]:mm' }], [164, { 164: 'dd/mm/yyyy' }], [164, { 164: '0.00 "s"' }], [164, { 164: 'Standard' }]]
        .map(x => M.castEsFormatoHora(x[0], x[1]) ? 1 : 0).join(''), '10011000');
 };
