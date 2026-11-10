@@ -41,9 +41,9 @@ exports.pruebas = function(t){
   t.eq('programa y número del capítulo', N('THE WAYANS BROS', '415_INDEPENDENCE DAY', 415, true, 'xlsx'), 'DES_THE WAYANS BROS 415_COMPLETO.xlsx');
   t.eq('incompleto', N('THE WAYANS BROS', '415_INDEPENDENCE DAY', 415, false, 'xlsx'), 'DES_THE WAYANS BROS 415_INCOMPLETO.xlsx');
   t.eq('si el capítulo ya lleva el nombre del programa, el del capítulo', N('The Wayans Bros', 'THE WAYANS BROS 415', 415, true, 'xlsx'), 'DES_THE WAYANS BROS 415_COMPLETO.xlsx');
-  t.eq('una película: su nombre', N('Independence Day', 'Independence Day', null, false, 'xlsx', true), 'DES_Independence Day_INCOMPLETO.xlsx');
+  t.eq('una película: su nombre', N('Independence Day', 'Independence Day', null, false, 'xlsx', true), 'DES_INDEPENDENCE DAY_INCOMPLETO.xlsx');
   t.eq('con macros sigue siendo .xlsm (CAST-45)', N('FINAL TABLE', 'Ep 103', 103, true, 'xlsm'), 'DES_FINAL TABLE 103_COMPLETO.xlsm');
-  t.eq('sin número, el programa y el capítulo', N('LA VIDA', 'Especial navidad', null, true, 'xlsx'), 'DES_LA VIDA Especial navidad_COMPLETO.xlsx');
+  t.eq('sin número, el programa y el capítulo', N('LA VIDA', 'Especial navidad', null, true, 'xlsx'), 'DES_LA VIDA ESPECIAL NAVIDAD_COMPLETO.xlsx');
   t.eq('sin caracteres que Windows no deja', N('WHO: "THE" SHOW?', 'ep 2', 2, true, 'xlsx'), 'DES_WHO THE SHOW 2_COMPLETO.xlsx');
 
   t.seccion('2 · completo es que todos los personajes tienen actor');

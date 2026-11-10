@@ -336,7 +336,7 @@ function csEstadoDe(show, serie){
 
 function csProg(show, serie, eps, d){
   const dcEps = (serie && d) ? ((typeof prodIndices === 'function' ? prodIndices(d).epsPorSerie[String(serie.id)] : null) || []) : [];
-  return { clave: show ? 's:' + show.id : 'dc:' + serie.id, nombre: show ? show.name : serie.name, show: show || null, serie: serie || null,
+  return { clave: show ? 's:' + show.id : 'dc:' + serie.id, nombre: show ? show.name : (typeof progMayus === 'function' ? progMayus(serie.name) : serie.name), show: show || null, serie: serie || null,
            estado: csEstadoDe(show, serie), cliente: (serie && serie.cliente) || '', director: (serie && serie.director) || '',
            tipo: (serie && serie.type) || '', eps: eps || [], dcEps: dcEps };
 }
@@ -1352,7 +1352,7 @@ async function csFusionarProgramas(a, b){
       const { error } = await sb.from('shows').delete().eq('id', b.show.id);
       if(error) extra += ' · «' + b.nombre + '» ya está vacío, pero no se pudo borrar: ' + error.message;
     }else{
-      const { error } = await sb.from('shows').update({ name: a.nombre }).eq('id', b.show.id);
+      const { error } = await sb.from('shows').update({ name: (typeof progMayus === 'function' ? progMayus(a.nombre) : a.nombre) }).eq('id', b.show.id);
       if(error){ castAviso('No se pudo renombrar «' + b.nombre + '» en Dubbipt: ' + error.message); return 'error'; }
     }
   }
@@ -2564,7 +2564,7 @@ async function csImportarTodo(){
   let progs = 0, eps = 0;
   try{
     for(const x of plan.programas){
-      const r = await sb.from('shows').insert({ name: x.nombre, workspace_id: WORKSPACE.id }).select().single();
+      const r = await sb.from('shows').insert({ name: (typeof progMayus === 'function' ? progMayus(x.nombre) : x.nombre), workspace_id: WORKSPACE.id }).select().single();
       if(r.error) throw new Error('«' + x.nombre + '»: ' + r.error.message);
       progs++;
       if(x.eps.length){
@@ -2674,6 +2674,7 @@ function csCambiadorHtml(talentos, ambito){
  */
 async function csRenombrarPrograma(p, nombre){
   nombre = String(nombre == null ? '' : nombre).replace(/\s+/g, ' ').trim();
+  if(typeof progMayus === 'function') nombre = progMayus(nombre);                 // el título, en mayúsculas (PRO-63)
   if(!p || !nombre || nombre === p.nombre) return 'igual';
   const ctx = csContexto(p, null), que = 'Programa renombrado: «' + p.nombre + '» → «' + nombre + '»';
   if(p.serie){
