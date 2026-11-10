@@ -41,6 +41,6 @@ exports.pruebas = function(t){
   t.seccion('3 · la descarga');
   const HTML = fs.readFileSync(INDEX, 'utf8');
   t.ok('el nombre y el tipo del archivo descargado salen del resultado, no van fijos en .xlsm',
-       /const nombre = base \+ ' · CASTING\.' \+ \(r\.ext \|\| 'xlsx'\);/.test(HTML) && /\{ type: r\.mime \|\| /.test(HTML) && !/' · CASTING\.xlsm'/.test(HTML)
+       /const nombre = castNombreDescarga\(programa, capitulo, num, r\.completo, r\.ext, pelicula\);/.test(HTML) && /\{ type: r\.mime \|\| /.test(HTML) && !/' · CASTING\.xlsm'/.test(HTML)
        && /return \{ datos: fflate\.zipSync\(arch, \{ level: 6 \}\), ext: formato\.ext, mime: formato\.mime,/.test(HTML));
 };

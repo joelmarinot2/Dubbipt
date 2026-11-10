@@ -3112,7 +3112,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.96.2-nube';
+const APP_VER_NUM = 'v11.97.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -10278,6 +10278,38 @@ function castFormatoSalida(arch){
   return conMacros ? { ext: 'xlsm', mime: 'application/vnd.ms-excel.sheet.macroEnabled.12' }
                    : { ext: 'xlsx', mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' };
 }
+/* ── El nombre del archivo descargado (CAST-47) ────────────────────────────
+   Pedido de sala: «DES_<nombre del programa>_COMPLETO o INCOMPLETO; se
+   determina si está completo o incompleto si se llenan todos los personajes».
+   El nombre es el del programa con el número del capítulo (THE WAYANS BROS
+   415), o el del capítulo si ya lo lleva; en una película, el de la película.
+   COMPLETO si, después de escribir, TODOS los personajes de la hoja CASTING
+   tienen su actor (también los que ya lo traían escrito, TODOS u ORIGINAL). */
+/** Los personajes de la hoja CASTING (debajo de la cabecera NOMBRE DEL ACTOR): { total, faltan: los que se quedan sin actor }. */
+function castFaltanActor(personajes, actores){
+  const filaCab = Object.keys(actores).map(Number).filter(f => /ACTOR/i.test(String(actores[f] || ''))).sort((a, b) => a - b)[0];
+  const faltan = [];
+  let total = 0;
+  for(const f of Object.keys(personajes).map(Number).sort((a, b) => a - b)){
+    if(filaCab != null && f <= filaCab) continue;
+    const nombre = String(personajes[f] || '').replace(/\s+/g, ' ').trim();
+    if(!nombre || /^\d+$/.test(nombre) || /:$/.test(nombre) || !castClave(nombre)) continue;
+    total++;
+    if(!String(actores[f] || '').trim()) faltan.push(nombre);
+  }
+  return { total: total, faltan: faltan };
+}
+/** «DES_THE WAYANS BROS 415_COMPLETO.xlsx». `programa` y `capitulo`: los nombres; `num`: el número del capítulo si se sabe. */
+function castNombreDescarga(programa, capitulo, num, completo, ext, pelicula){
+  const limpia = (x) => String(x == null ? '' : x).replace(/\.(xlsm|xlsx|xls)$/i, '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const p = limpia(programa), c = limpia(capitulo), n = String(num == null ? '' : num).trim();
+  let nombre;
+  if(!p) nombre = c || 'DESGLOSE';
+  else if(pelicula || !c || castClave(c) === castClave(p)) nombre = p;
+  else if(castClave(c).indexOf(castClave(p)) === 0) nombre = c;                 // el capítulo ya lleva el programa
+  else nombre = n ? p + ' ' + n : p + ' ' + c;
+  return 'DES_' + nombre + '_' + (completo ? 'COMPLETO' : 'INCOMPLETO') + '.' + (ext || 'xlsx');
+}
 function castRellenar(buf, asign, meta, training){
   if(typeof fflate === 'undefined') throw new Error('falta la librería de ZIP');
   const arch = fflate.unzipSync(new Uint8Array(buf));
@@ -10322,13 +10354,16 @@ function castRellenar(buf, asign, meta, training){
   const tr = castAplicarTraining(arch, xmlFinal, personajes, training);
   xmlFinal = tr.xml; delete tr.xml;
   arch[ruta] = new TextEncoder().encode(xmlFinal);
+  /* ¿Completo? Todos los personajes con su actor, después de escribir (CAST-47). */
+  const llenos = castFaltanActor(personajes, castLeerColumnaTexto(arch, xmlFinal, CAST_COL_ACTOR)), faltanActor = llenos.faltan;
   const tiempos = castFormatoTiempos(arch);   // el TIME de CASTING 1, como hh:mm:ss (CAST-46)
   castForzarRecalculo(arch);   // que las demás hojas se enteren del cambio
   const formato = castFormatoSalida(arch);
   return { datos: fflate.zipSync(arch, { level: 6 }), ext: formato.ext, mime: formato.mime, puestos: r.puestos,
            sinCasar: sinCasar, enBlanco: enBlanco,
            enExcel: Object.keys(personajes).length, cabecera: cabecera, training: tr,
-           porParecido: porParecido, cubiertos: cubiertos, tiempos: tiempos };
+           porParecido: porParecido, cubiertos: cubiertos, tiempos: tiempos,
+           completo: llenos.total > 0 && !faltanActor.length, faltanActor: faltanActor };
 }
 
 /** Catálogo de talentos de la hoja TALENTOS, para autocompletar. */
@@ -13183,10 +13218,15 @@ async function castDescargar(){
     const r = castRellenar(buf, asign, meta, training);
 
     const ep = (LDB.epsAll || []).find(e => e.id === currentEp.id);
-    const base = ((ep && (ep.xls_name || ep.name)) || currentEp.name || 'desglose')
-                   .replace(/\.(xlsm|xlsx|xls)$/i, '');
-    /* Con la extensión de lo que el archivo es: .xlsm solo si trae macros (CAST-45). */
-    const nombre = base + ' · CASTING.' + (r.ext || 'xlsx');
+    /* DES_<programa y capítulo>_COMPLETO / _INCOMPLETO (CAST-47), con la extensión de lo que el archivo es (CAST-45). */
+    const showId = (currentEp && currentEp.showId) || LDB.showId;
+    let programa = '', pelicula = false;
+    try{ const sh = (typeof sbShows === 'function') ? sbShows().find(x => String(x.id) === String(showId)) : null; programa = sh ? sh.name : ''; }catch(e){ programa = ''; }
+    try{ pelicula = (typeof tciCargar === 'function') && ((await tciCargar(showId)) || {}).tipo === 'pelicula'; }catch(e){ pelicula = false; }   // serie o película (PRO-61)
+    const capitulo = (ep && ep.name) || currentEp.name || '';
+    let num = '';
+    try{ num = (typeof tciNumEp === 'function') ? (tciNumEp(capitulo) || tciNumEp((ep && ep.xls_name) || '') || '') : ''; }catch(e){ num = ''; }
+    const nombre = castNombreDescarga(programa, capitulo, num, r.completo, r.ext, pelicula);
     const url = URL.createObjectURL(new Blob([r.datos],
       { type: r.mime || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
     const a = document.createElement('a');
@@ -13213,6 +13253,10 @@ async function castDescargar(){
     }else{
       msg = '✅ ' + r.puestos + ' de ' + n + ' talentos escritos en «' + fuente.nombre + '»';
     }
+    msg += r.completo ? ' · COMPLETO: todos los personajes tienen actor'
+         : ' · INCOMPLETO: ' + r.faltanActor.length + ' personaje' + (r.faltanActor.length === 1 ? '' : 's') + ' sin actor'
+           + (r.faltanActor.length ? ' (' + r.faltanActor.slice(0, 5).join(', ') + (r.faltanActor.length > 5 ? '…' : '') + ')' : '');
+    msg += ' · ' + nombre;
     msg += (r.cabecera ? ' · cabecera con ' + r.cabecera + ' datos' : ' · ⚠️ sin cabecera: rellénala en «Cabecera»');
     if(r.porParecido && r.porParecido.length)
       msg += ' · ✎ escrito' + (r.porParecido.length === 1 ? '' : 's') + ' por nombre parecido, revísalo: '
