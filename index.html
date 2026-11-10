@@ -3112,7 +3112,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.96.1-nube';
+const APP_VER_NUM = 'v11.96.2-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -10070,6 +10070,112 @@ function castAplicarTraining(arch, xmlCasting, personajes, training){
   return out;
 }
 
+/* ── El timecode de las hojas CASTING, como timecode (CAST-46) ──────────────
+   Llegó de sala con THE WAYANS BROS 415: en CASTING 1 la columna TIME salía
+   «0,0416782407…» en vez de «01:00:01». Esa hoja lee los tiempos del desglose
+   con fórmulas; el valor es una hora de Excel (una fracción del día) y su
+   celda no tenía formato de hora, así que Excel enseñaba el número. Al
+   descargar, las celdas de la columna TIME / TIME CODE de las hojas CASTING
+   que no tienen formato de hora reciben una copia de su estilo con «hh:mm:ss»
+   (letra, bordes y relleno se quedan); los valores no se tocan. */
+const CAST_FMT_HORA = 'hh:mm:ss';
+const CAST_RE_CAB_TC = /^(TIME|TIME ?CODE|TC|TIMECODE)$/;
+/** ¿Este formato de número es de hora? (sin contar lo entrecomillado ni colores como [Red]) */
+function castEsFormatoHora(id, codigos){
+  if([18, 19, 20, 21, 22, 45, 46, 47].indexOf(+id) >= 0) return true;
+  const c = codigos[+id];
+  if(c == null || /^(GENERAL|STANDARD)$/i.test(String(c).trim())) return false;
+  const limpio = String(c).replace(/"[^"]*"/g, '').replace(/\[(?![hms]+\])[^\]]*\]/gi, '').replace(/\\./g, '');
+  return /[hs]/i.test(limpio);
+}
+/** Estilos con formato de hora: { esHora(s), estilo(s) → índice nuevo, final() → styles.xml } o null si no se entiende el styles.xml. */
+function castEstilosHora(stylesXml){
+  const mX = stylesXml.match(/<cellXfs count="(\d+)">([\s\S]*?)<\/cellXfs>/);
+  if(!mX) return null;
+  const items = mX[2].match(/<xf\b[^>]*?\/>|<xf\b[^>]*?>[\s\S]*?<\/xf>/g) || [];
+  if(items.length !== +mX[1]) return null;                       // no cuadra: mejor no tocar los estilos
+  const codigos = {};
+  let maxId = 163;
+  for(const m of stylesXml.matchAll(/<numFmt\b[^>]*numFmtId="(\d+)"[^>]*formatCode="([^"]*)"/g)){ codigos[+m[1]] = castDesXml(m[2]); maxId = Math.max(maxId, +m[1]); }
+  let idHora = Object.keys(codigos).find(k => codigos[k] === CAST_FMT_HORA);
+  const nuevoFmt = idHora == null;
+  if(nuevoFmt) idHora = maxId + 1;
+  const fmtDe = (i) => { const x = items[i]; const m = x && x.match(/\bnumFmtId="(\d+)"/); return m ? +m[1] : 0; };
+  const cache = {}, nuevos = [];
+  const poner = (attrs, k, v) => new RegExp('\\s' + k + '="[^"]*"').test(attrs) ? attrs.replace(new RegExp('\\s' + k + '="[^"]*"'), ' ' + k + '="' + v + '"') : attrs + ' ' + k + '="' + v + '"';
+  return {
+    esHora: (s) => castEsFormatoHora(fmtDe(s == null ? 0 : +s), codigos),
+    estilo: (s) => {
+      const i = s == null ? 0 : +s;
+      if(cache[i] != null) return cache[i];
+      const base = items[i];
+      if(!base) return (cache[i] = i);
+      nuevos.push(base.replace(/^<xf\b([^>]*?)(\/?)>/, (m, a, c) => '<xf' + poner(poner(a, 'numFmtId', idHora), 'applyNumberFormat', '1') + c + '>'));
+      return (cache[i] = items.length + nuevos.length - 1);
+    },
+    usados: () => nuevos.length,
+    final: () => {
+      if(!nuevos.length) return stylesXml;
+      let x = stylesXml.replace(mX[0], () => '<cellXfs count="' + (items.length + nuevos.length) + '">' + mX[2] + nuevos.join('') + '</cellXfs>');
+      if(nuevoFmt){
+        const fmt = '<numFmt numFmtId="' + idHora + '" formatCode="' + CAST_FMT_HORA + '"/>';
+        const mN = x.match(/<numFmts count="(\d+)">/);
+        if(mN) x = x.replace(mN[0], '<numFmts count="' + (+mN[1] + 1) + '">' + fmt);
+        else if(/<numFmts\s*\/>/.test(x)) x = x.replace(/<numFmts\s*\/>/, '<numFmts count="1">' + fmt + '</numFmts>');
+        else x = x.replace(/(<styleSheet\b[^>]*>)/, '$1<numFmts count="1">' + fmt + '</numFmts>');
+      }
+      return x;
+    }
+  };
+}
+/** Los textos compartidos del libro (para leer cabeceras). */
+function castCompartidos(arch){
+  if(!arch['xl/sharedStrings.xml']) return [];
+  const t = new TextDecoder().decode(arch['xl/sharedStrings.xml']);
+  return (t.match(/<si>[\s\S]*?<\/si>/g) || []).map(si => castDesXml((si.match(/<t[^>]*>([\s\S]*?)<\/t>/g) || []).map(x => x.replace(/<[^>]+>/g, '')).join('')));
+}
+/**
+ * Pone formato de hora a la columna del timecode de cada hoja CASTING. Devuelve
+ * { hoja: celdas arregladas } (vacío si no hacía falta).
+ */
+function castFormatoTiempos(arch){
+  const out = {};
+  const stRuta = 'xl/styles.xml', wbx = arch['xl/workbook.xml'] ? new TextDecoder().decode(arch['xl/workbook.xml']) : '';
+  if(!arch[stRuta] || !wbx) return out;
+  const est = castEstilosHora(new TextDecoder().decode(arch[stRuta]));
+  if(!est) return out;
+  const comp = castCompartidos(arch);
+  const hojas = [...wbx.matchAll(/<sheet\b[^>]*\bname="([^"]*)"/g)].map(m => castDesXml(m[1])).filter(n => /^CASTING\b/i.test(n.trim()));
+  for(const hoja of hojas){
+    let ruta;
+    try{ ruta = castHojaXml(arch, hoja); }catch(e){ continue; }    // una hoja que no se encuentra se queda como está
+    if(!arch[ruta]) continue;
+    let xml = new TextDecoder().decode(arch[ruta]);
+    const celdas = [...xml.matchAll(/<c r="([A-Z]+)(\d+)"([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)];
+    const texto = (m) => { const a = m[3], b = m[4] || '', v = b.match(CAST_RE_V), t = b.match(/<t[^>]*>([\s\S]*?)<\/t>/);
+      return /\bt="s"/.test(a) ? (v ? comp[+v[1]] || '' : '') : (t ? castDesXml(t[1]) : (v ? castDesXml(v[1]) : '')); };
+    const cab = celdas.find(m => +m[2] <= 40 && CAST_RE_CAB_TC.test(String(texto(m) || '').replace(/\s+/g, ' ').trim().toUpperCase()));
+    if(!cab) continue;
+    const col = cab[1], fila0 = +cab[2];
+    let n = 0;
+    for(const m of celdas){
+      if(m[1] !== col || +m[2] <= fila0 || +m[2] > fila0 + 600) continue;
+      const a = m[3], b = m[4] || '', v = b.match(CAST_RE_V);
+      const esNumero = !/\bt="(s|str|inlineStr|b|e)"/.test(a) && v && isFinite(+v[1]) && +v[1] >= 0 && +v[1] < 1;
+      const formula = /<f\b/.test(b) && !(v && isFinite(+v[1]) && +v[1] >= 1 && !/\bt="/.test(a));
+      if(!esNumero && !formula) continue;
+      const s = (a.match(/\bs="(\d+)"/) || [])[1];
+      if(est.esHora(s)) continue;
+      const ref = col + m[2];
+      xml = castCeldaEstilo(xml, ref, est.estilo);
+      n++;
+    }
+    if(n){ arch[ruta] = new TextEncoder().encode(xml); out[hoja] = n; }
+  }
+  if(est.usados()) arch[stRuta] = new TextEncoder().encode(est.final());
+  return out;
+}
+
 /** Marca el libro para que Excel RECALCULE todo al abrirlo.
  *
  *  Sin esto, cambiar la celda del actor no bastaba: las demás hojas -CASTING 1,
@@ -10216,12 +10322,13 @@ function castRellenar(buf, asign, meta, training){
   const tr = castAplicarTraining(arch, xmlFinal, personajes, training);
   xmlFinal = tr.xml; delete tr.xml;
   arch[ruta] = new TextEncoder().encode(xmlFinal);
+  const tiempos = castFormatoTiempos(arch);   // el TIME de CASTING 1, como hh:mm:ss (CAST-46)
   castForzarRecalculo(arch);   // que las demás hojas se enteren del cambio
   const formato = castFormatoSalida(arch);
   return { datos: fflate.zipSync(arch, { level: 6 }), ext: formato.ext, mime: formato.mime, puestos: r.puestos,
            sinCasar: sinCasar, enBlanco: enBlanco,
            enExcel: Object.keys(personajes).length, cabecera: cabecera, training: tr,
-           porParecido: porParecido, cubiertos: cubiertos };
+           porParecido: porParecido, cubiertos: cubiertos, tiempos: tiempos };
 }
 
 /** Catálogo de talentos de la hoja TALENTOS, para autocompletar. */
