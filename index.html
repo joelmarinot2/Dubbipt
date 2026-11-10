@@ -3112,7 +3112,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.97.1-nube';
+const APP_VER_NUM = 'v11.98.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -10415,15 +10415,25 @@ function castRellenar(buf, asign, meta, training){
   xmlFinal = tr.xml; delete tr.xml;
   arch[ruta] = new TextEncoder().encode(xmlFinal);
   /* ¿Completo? Todos los personajes con su actor, después de escribir (CAST-47). */
-  const llenos = castFaltanActor(personajes, castLeerColumnaTexto(arch, xmlFinal, CAST_COL_ACTOR)), faltanActor = llenos.faltan;
+  const actoresFinal = castLeerColumnaTexto(arch, xmlFinal, CAST_COL_ACTOR);
+  const llenos = castFaltanActor(personajes, actoresFinal), faltanActor = llenos.faltan;
+  const completo = llenos.total > 0 && !faltanActor.length;
   const tiempos = castFormatoTiempos(arch);   // el TIME de CASTING 1, como hh:mm:ss (CAST-46)
+  /* Completo: CASTING 1 se ordena por talento (CAST-48), solo esa hoja; las fórmulas, tal cual. */
+  let orden1 = null;
+  if(completo && typeof corOrdenarCasting1 === 'function'){
+    const actorDe = {};
+    for(const f in personajes){ const k = castClave(personajes[f]); if(k && String(actoresFinal[f] || '').trim()) actorDe[k] = String(actoresFinal[f]).trim(); }
+    try{ orden1 = corOrdenarCasting1(arch, { actorDe: (p) => actorDe[castClave(p)] || null }); }
+    catch(e){ orden1 = { hecho: false, motivo: e.message }; fallo('corOrdenarCasting1 · index.html:castRellenar', e, 'CASTING 1 se queda en su orden'); }
+  }
   castForzarRecalculo(arch);   // que las demás hojas se enteren del cambio
   const formato = castFormatoSalida(arch);
   return { datos: fflate.zipSync(arch, { level: 6 }), ext: formato.ext, mime: formato.mime, puestos: r.puestos,
            sinCasar: sinCasar, enBlanco: enBlanco,
            enExcel: Object.keys(personajes).length, cabecera: cabecera, training: tr,
            porParecido: porParecido, cubiertos: cubiertos, tiempos: tiempos,
-           completo: llenos.total > 0 && !faltanActor.length, faltanActor: faltanActor };
+           completo: completo, faltanActor: faltanActor, orden1: orden1 };
 }
 
 /** Catálogo de talentos de la hoja TALENTOS, para autocompletar. */
@@ -13316,6 +13326,8 @@ async function castDescargar(){
     msg += r.completo ? ' · COMPLETO: todos los personajes tienen actor'
          : ' · INCOMPLETO: ' + r.faltanActor.length + ' personaje' + (r.faltanActor.length === 1 ? '' : 's') + ' sin actor'
            + (r.faltanActor.length ? ' (' + r.faltanActor.slice(0, 5).join(', ') + (r.faltanActor.length > 5 ? '…' : '') + ')' : '');
+    if(r.orden1) msg += r.orden1.hecho ? (r.orden1.igual ? ' · CASTING 1 ya estaba por talento' : ' · CASTING 1 ordenado por talento (' + r.orden1.bloques + ' personajes)')
+                                       : ' · ⚠️ CASTING 1 no se ordenó: ' + r.orden1.motivo;
     msg += ' · ' + nombre;
     msg += (r.cabecera ? ' · cabecera con ' + r.cabecera + ' datos' : ' · ⚠️ sin cabecera: rellénala en «Cabecera»');
     if(r.porParecido && r.porParecido.length)
@@ -24473,3 +24485,4 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/videofps.js"></script>
 <script src="./js/continuidad.js"></script>
 <script src="./js/qcpdf.js"></script>
+<script src="./js/castorden.js"></script>
