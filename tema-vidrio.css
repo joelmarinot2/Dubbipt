@@ -536,3 +536,87 @@ html[data-tema] #csNav.tv-con-luz .cs-nav-b.cs-nav-dc.on{ background:transparent
   @keyframes tv-ventana{ from{ opacity:0; transform:translateY(16px) scale(.955); } to{ opacity:1; transform:none; } }
   @keyframes tv-aviso{ from{ opacity:0; transform:translateX(26px); } to{ opacity:1; transform:none; } }
 }
+
+/* ═══ EL CÓDIGO DEL AUTENTICADOR, EN CASILLAS DE VIDRIO (ENT-28) ═══════════
+   Pedido de sala, con un video: «quiero esta animación para el código OTP».
+   El campo de verdad (.mfa-codigo) sigue ahí, encima e invisible: recibe el
+   teclado, el pegado y el autocompletado. Las casillas enseñan lo que lleva.
+   js/otp.js pone las clases (activa, llena, entra, otp-verificando,
+   otp-fundiendo, otp-ok, otp-mal) y manda cada casilla a su sitio del anillo. */
+html[data-tema] .otp{ position:relative; height:74px; margin:6px 0 2px; }
+html[data-tema] .otp .mfa-codigo{
+  position:absolute; inset:0; width:100%; height:100%; z-index:3; margin:0; padding:0;
+  opacity:0; cursor:text; border:none !important; background:transparent !important; box-shadow:none !important;
+  font-size:16px !important; letter-spacing:0 !important; caret-color:transparent; color:transparent;
+}
+html[data-tema] .otp-casillas{
+  position:absolute; inset:0; z-index:1; display:flex; align-items:center; justify-content:center; gap:9px; pointer-events:none;
+}
+html[data-tema] .otp-c{
+  position:relative; flex:0 0 auto; width:44px; height:54px; border-radius:14px;
+  display:grid; place-items:center;
+  font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace; font-size:23px; font-weight:700; color:var(--tv-tinta);
+  background:var(--tv-campo); border:1.5px solid var(--tv-linea);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 6px 16px rgba(18,60,52,.08);
+}
+html[data-tema] .otp-c.llena{ border-color:var(--tv-acento); }
+html[data-tema] .otp-c.activa{
+  border-color:var(--tv-acento);
+  box-shadow:0 0 0 4px var(--tv-foco), 0 0 20px rgba(143,230,205,.55), inset 0 1px 0 rgba(255,255,255,.35);
+}
+/* El cursor, en la casilla que toca. */
+html[data-tema] .otp-c.activa::after{ content:''; width:2px; height:24px; border-radius:2px; background:var(--tv-acento); }
+/* Verificando: durazno, como la llamada a la acción. */
+html[data-tema] .otp.otp-verificando .otp-c{ border-color:var(--tv-durazno); box-shadow:0 0 0 3px rgba(246,168,119,.20), 0 0 18px rgba(246,168,119,.55); }
+html[data-tema] .otp.otp-mal .otp-c{ border-color:var(--tv-peligro); box-shadow:0 0 0 3px rgba(224,60,84,.16); }
+/* El sello del final: el visto bueno, en el centro. */
+html[data-tema] .otp-sello{
+  position:absolute; left:50%; top:50%; z-index:2; width:58px; height:58px; margin:-29px 0 0 -29px; border-radius:17px;
+  display:grid; place-items:center; pointer-events:none;
+  color:#fff; background:linear-gradient(135deg,#22b98f,#12805f); border:1.5px solid rgba(255,255,255,.55);
+  box-shadow:0 0 0 6px rgba(34,185,143,.18), 0 0 34px rgba(34,185,143,.6);
+  opacity:0; transform:scale(.3);
+}
+html[data-tema] .otp.otp-ok .otp-sello{ opacity:1; transform:none; }
+html[data-tema] .otp.otp-ok .otp-casillas{ visibility:hidden; }
+/* La tarjeta, verificada: el título y el botón, en verde. */
+html[data-tema] .mfa-card.otp-tarjeta-ok h2{ color:#149a76 !important; }
+html[data-tema="oscuro"] .mfa-card.otp-tarjeta-ok h2{ color:#5fe0bb !important; }
+html[data-tema] .mfa-card .mfa-ok{ display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%; }
+html[data-tema] .mfa-card .mfa-ok.otp-btn-ok{
+  background:linear-gradient(135deg,#22b98f,#12805f) !important; border-color:transparent !important; color:#fff !important;
+  box-shadow:0 10px 26px rgba(34,185,143,.42) !important; opacity:1 !important;
+}
+html[data-tema] .mfa-card .mfa-ok[disabled]{ opacity:.92; cursor:default; }
+@media(max-width:420px){
+  html[data-tema] .otp-casillas{ gap:6px; }
+  html[data-tema] .otp-c{ width:38px; height:50px; font-size:21px; border-radius:12px; }
+}
+
+@media (prefers-reduced-motion: no-preference){
+  html[data-tema] .otp-c{ transition:transform .55s cubic-bezier(.3,1.25,.4,1), opacity .35s ease, border-color .25s ease, box-shadow .25s ease; }
+  html[data-tema] .otp-c.entra{ animation:otp-entra .32s cubic-bezier(.3,1.5,.5,1); }   /* sin «both»: al acabar no debe quedarse mandando sobre la posición */
+  html[data-tema] .otp-c.activa::after{ animation:otp-cursor 1s steps(1) infinite; }
+  /* La órbita: las casillas ya están en su anillo (js/otp.js); lo que gira es la fila entera. */
+  html[data-tema] .otp.otp-verificando .otp-casillas{ animation:otp-orbita 1.25s cubic-bezier(.45,.05,.55,.95) .28s infinite; }
+  html[data-tema] .otp.otp-fundiendo .otp-c{ transition:transform .42s cubic-bezier(.5,0,.3,1), opacity .42s ease; }
+  html[data-tema] .otp-sello{ transition:transform .5s cubic-bezier(.3,1.6,.45,1), opacity .25s ease; }
+  html[data-tema] .otp.otp-ok .otp-sello{ animation:otp-onda 1s ease-out .05s both; }
+  html[data-tema] .otp.otp-ok .otp-sello svg{ stroke-dasharray:26; stroke-dashoffset:26; animation:otp-trazo .45s ease-out .22s forwards; }
+  html[data-tema] .otp.otp-mal .otp-casillas{ animation:otp-tiembla .45s cubic-bezier(.36,.07,.19,.97) both; }
+  html[data-tema] .mfa-card h2,
+  html[data-tema] .mfa-card .mfa-ok{ transition:color .35s ease, background .35s ease, box-shadow .35s ease; }
+  html[data-tema] .otp-gira{ animation:otp-vuelta .8s linear infinite; }
+
+  @keyframes otp-entra{ from{ transform:translateY(8px) scale(.82); } to{ transform:none; } }
+  @keyframes otp-cursor{ 0%{ opacity:1; } 50%{ opacity:0; } 100%{ opacity:1; } }
+  @keyframes otp-orbita{ from{ transform:rotate(0deg); } to{ transform:rotate(360deg); } }
+  @keyframes otp-vuelta{ to{ transform:rotate(360deg); } }
+  @keyframes otp-onda{
+    0%{ box-shadow:0 0 0 0 rgba(34,185,143,.55), 0 0 0 0 rgba(34,185,143,.35), 0 0 34px rgba(34,185,143,.6); }
+    70%{ box-shadow:0 0 0 26px rgba(34,185,143,0), 0 0 0 48px rgba(34,185,143,0), 0 0 34px rgba(34,185,143,.6); }
+    100%{ box-shadow:0 0 0 6px rgba(34,185,143,.18), 0 0 0 0 rgba(34,185,143,0), 0 0 34px rgba(34,185,143,.6); }
+  }
+  @keyframes otp-trazo{ to{ stroke-dashoffset:0; } }
+  @keyframes otp-tiembla{ 10%,90%{ transform:translateX(-2px); } 20%,80%{ transform:translateX(4px); } 30%,50%,70%{ transform:translateX(-7px); } 40%,60%{ transform:translateX(7px); } }
+}
