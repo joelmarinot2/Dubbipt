@@ -38,7 +38,7 @@ html[data-tema="claro"]{
   --tv-campo:#ffffff;
   --tv-hueco:rgba(255,255,255,.38);
   --tv-foco:rgba(22,122,99,.14);
-  --tv-sombra:0 10px 30px rgba(18,60,52,.10), 0 2px 6px rgba(18,60,52,.05);
+  --tv-sombra:0 6px 18px rgba(18,60,52,.09);
   --tv-sombra-alta:0 24px 60px rgba(18,60,52,.18), 0 4px 12px rgba(18,60,52,.08);
   --tv-barra-desliz:rgba(18,48,43,.18);
   --tv-peligro:#c0263b;
@@ -67,7 +67,7 @@ html[data-tema="oscuro"]{
   --tv-campo:rgba(255,255,255,.05);
   --tv-hueco:rgba(255,255,255,.025);
   --tv-foco:rgba(143,230,205,.18);
-  --tv-sombra:0 10px 30px rgba(0,0,0,.34), 0 2px 6px rgba(0,0,0,.2);
+  --tv-sombra:0 6px 18px rgba(0,0,0,.32);
   --tv-sombra-alta:0 24px 60px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.3);
   --tv-barra-desliz:rgba(255,255,255,.16);
   --tv-peligro:#ff8a9b;
@@ -105,8 +105,8 @@ html[data-tema] #topbar .tb-perfil:hover,
 html[data-tema] #topbar .tb-icon:hover,
 html[data-tema] #topbar .tb-user:hover{ background:rgba(143,230,205,.22) !important; border-color:rgba(143,230,205,.55) !important; }
 html[data-tema] #topbar .tb-user{ background:var(--tv-menta) !important; color:#06231e !important; border-color:transparent !important; box-shadow:0 0 0 4px rgba(143,230,205,.18), 0 0 18px rgba(143,230,205,.55); }
-html[data-tema] #topbar .tb-perfil *,
-html[data-tema] #topbar .tb-icon *{ color:inherit !important; }
+html[data-tema] #topbar .tb-perfil :is(span,b,i,em,strong,small,svg),
+html[data-tema] #topbar .tb-icon :is(span,b,i,em,strong,small,svg){ color:inherit !important; }
 html[data-tema] #topbar svg{ stroke:currentColor; }
 html[data-tema] #topbar .tb-crumb,
 html[data-tema] #topbar .tb-ep,
@@ -149,7 +149,7 @@ html[data-tema] .cs-cab h2{ color:#fff !important; font-weight:600 !important; l
 html[data-tema] #dashHead .dh-sub,
 html[data-tema] .cs-cab .cs-cab-sub,
 html[data-tema] .cs-cab .cs-de{ color:rgba(255,255,255,.62) !important; }
-html[data-tema] .cs-cab .cs-cab-sub *{ color:inherit !important; }
+html[data-tema] .cs-cab .cs-cab-sub :is(span,b,i,em,strong,small,svg){ color:inherit !important; }
 html[data-tema] .cs-cab .cs-cab-sub b,
 html[data-tema] .cs-cab .cs-cab-sub .cs-rojo{ color:#ffc7a3 !important; }
 /* Lo que va dentro del banner: vidrio sobre oscuro, y la llamada a la acción en durazno. */
@@ -171,7 +171,7 @@ html[data-tema] .cs-cab .cs-b.cs-pri{
 }
 html[data-tema] #dashHead .dh-new:hover,
 html[data-tema] .cs-cab .cs-b.cs-pri:hover{ background:var(--tv-durazno-2) !important; border-color:var(--tv-durazno-2) !important; }
-html[data-tema] .cs-cab .cs-b *{ color:inherit !important; }
+html[data-tema] .cs-cab .cs-b :is(span,b,i,em,strong,small,svg){ color:inherit !important; }
 
 /* ── Las superficies: vidrio blanco, muy redondeado, con sombra suave ── */
 html[data-tema] #libGrid.dashgrid,
@@ -241,8 +241,8 @@ html[data-tema] .cs-b.cs-pri:hover,
 html[data-tema] .ddlm-go:hover,
 html[data-tema] .epbtn.pri:hover,
 html[data-tema] .gbtn:hover{ background:var(--tv-principal-alza) !important; border-color:var(--tv-principal-alza) !important; }
-html[data-tema] .cs-b.cs-pri *,
-html[data-tema] .ddlm-go *{ color:inherit !important; }
+html[data-tema] .cs-b.cs-pri :is(span,b,i,em,strong,small,svg),
+html[data-tema] .ddlm-go :is(span,b,i,em,strong,small,svg){ color:inherit !important; }
 /* «Abrir» un programa en curso: la llamada a la acción, en durazno. */
 html[data-tema] .cs-b.cs-pri.cs-prog-abrir-curso{ background:var(--tv-durazno) !important; border-color:var(--tv-durazno) !important; color:var(--tv-durazno-tinta) !important; box-shadow:0 8px 20px rgba(246,168,119,.38) !important; }
 html[data-tema] .cs-b.cs-pri.cs-prog-abrir-curso:hover{ background:var(--tv-durazno-2) !important; border-color:var(--tv-durazno-2) !important; }
@@ -256,9 +256,9 @@ html[data-tema] .cs-seg .on{ background:var(--tv-principal) !important; border-c
 html[data-tema] .dct-modo,
 html[data-tema] .cs-filtro,
 html[data-tema] .cs-tab{ border-radius:999px !important; }
-html[data-tema] .dct-modo.on *,
-html[data-tema] .cs-filtro.on *,
-html[data-tema] .cs-tab.on *{ color:inherit !important; }
+html[data-tema] .dct-modo.on :is(span,b,i,em,strong,small,svg),
+html[data-tema] .cs-filtro.on :is(span,b,i,em,strong,small,svg),
+html[data-tema] .cs-tab.on :is(span,b,i,em,strong,small,svg){ color:inherit !important; }
 
 /* ── Campos ── */
 html[data-tema] input[type="text"],
@@ -280,7 +280,6 @@ html[data-tema] .dlgov,
 html[data-tema] .modo-cap,
 html[data-tema] .meta-ov{
   background:var(--tv-velo) !important;
-  -webkit-backdrop-filter:blur(14px) saturate(1.1); backdrop-filter:blur(14px) saturate(1.1);
 }
 html[data-tema] .ddlm-card,
 html[data-tema] .dlgcard,
@@ -301,14 +300,13 @@ html[data-tema] #gate{ background:transparent !important; }
 html[data-tema] #gate .gcard{
   background:var(--tv-vidrio) !important; border:1px solid var(--tv-borde) !important; border-radius:28px !important;
   box-shadow:var(--tv-sombra-alta) !important; padding:34px 34px 30px !important;
-  -webkit-backdrop-filter:blur(20px) saturate(1.2); backdrop-filter:blur(20px) saturate(1.2);
 }
 html[data-tema] #gate input{ border-radius:14px !important; background:var(--tv-campo) !important; }
 html[data-tema] #gate .gbtn{ border-radius:999px !important; }
 
 /* ── Avisos y la versión ── */
 html[data-tema] .ddl-toast{ background:var(--tv-barra-2) !important; color:#eafaf5 !important; border:1px solid rgba(255,255,255,.1) !important; border-radius:18px !important; box-shadow:0 16px 36px rgba(12,43,39,.3) !important; }
-html[data-tema] .ddl-toast *{ color:inherit !important; }
+html[data-tema] .ddl-toast :is(span,b,i,em,strong,small,svg){ color:inherit !important; }
 html[data-tema] #verBox{ background:var(--tv-boton) !important; border-color:var(--tv-borde) !important; border-radius:999px !important; color:var(--tv-tinta-tenue) !important; }
 
 /* ── Tablas dentro de las tarjetas ── */
@@ -322,9 +320,10 @@ html[data-tema] ::-webkit-scrollbar-thumb:hover{ background:var(--tv-acento); ba
 html[data-tema] ::-webkit-scrollbar-track{ background:transparent; }
 
 /* ── El marco: toda la aplicación va dentro de un panel de vidrio, como en el diseño ── */
+/* Sin desenfoque (ENT-29): detrás solo hay un degradado suave, así que no se veía, y un desenfoque del tamaño
+   de la pantalla obligaba a rehacerlo en cada cuadro al desplazar: de 59 a 25 cuadros por segundo, medido. */
 html[data-tema] .wrap{
   background:var(--tv-hueco) !important;
-  -webkit-backdrop-filter:blur(22px) saturate(1.15); backdrop-filter:blur(22px) saturate(1.15);
   border:1px solid var(--tv-borde) !important;
   border-radius:30px !important;
   box-shadow:var(--tv-sombra-alta) !important;
@@ -363,7 +362,7 @@ html[data-tema] .cp-nuevo{
   background:var(--tv-durazno) !important; color:var(--tv-durazno-tinta) !important; border-color:transparent !important;
   border-radius:999px !important; box-shadow:0 12px 28px rgba(246,168,119,.5) !important;
 }
-html[data-tema] .cp-nuevo *{ color:inherit !important; }
+html[data-tema] .cp-nuevo :is(span,b,i,em,strong,small,svg){ color:inherit !important; }
 
 /* ── El Video Estudio: un panel oscuro en los dos temas (la onda y el video están hechos para fondo oscuro) ── */
 html[data-tema] #libInline{ background:#07110f !important; }
@@ -378,7 +377,7 @@ html[data-tema] #floatCtl{
   background:var(--tv-principal) !important; color:var(--tv-principal-tinta) !important; border:none !important;
   border-radius:999px !important; box-shadow:0 12px 30px var(--tv-barra-sombra) !important;
 }
-html[data-tema] #floatCtl *{ color:inherit !important; }
+html[data-tema] #floatCtl :is(span,b,i,em,strong,small,svg){ color:inherit !important; }
 
 /* ═══ ANIMACIONES (ENT-27) ═════════════════════════════════════════════════
    Pedido de sala: «quiero también los efectos de animación; la barra de
@@ -388,7 +387,7 @@ html[data-tema] #floatCtl *{ color:inherit !important; }
    lo tiene pedido en su equipo no ve nada moverse. Solo se animan transform,
    opacity y poco más, que no obligan a recolocar la página. */
 
-/* La luz de la barra de Casting: el activo, que se desliza. Sin animación también está (colocada, sin viajar). */
+/* La luz de la barra de Casting: el activo, que se desliza. Solo existe mientras viaja (js/animaciones.js). */
 html[data-tema] #csNav .cs-nav-b,
 html[data-tema] #csNav .cs-nav-t{ position:relative; z-index:1; }
 html[data-tema] #csNav .tv-luz{
@@ -404,9 +403,16 @@ html[data-tema] #csNav .tv-luz::after{
 }
 html[data-tema] #csNav.tv-con-luz .cs-nav-b.on,
 html[data-tema] #csNav.tv-con-luz .cs-nav-b.cs-nav-dc.on{ background:transparent !important; box-shadow:none !important; }
+/* En reposo no hay luz: el activo es el propio botón, con su muesca. (La luz solo existe mientras viaja.) */
+html[data-tema] #csNav .cs-nav-b.on::after{
+  content:''; position:absolute; top:50%; right:-18px; width:14px; height:14px; margin-top:-7px;
+  border-radius:50%; background:var(--tv-barra-2);
+}
+html[data-tema] #csNav.tv-con-luz .cs-nav-b.on::after{ display:none; }
 @media(max-width:900px){
   html[data-tema] #csNav{ position:relative; }
-  html[data-tema] #csNav .tv-luz::after{ display:none; }
+  html[data-tema] #csNav .tv-luz::after,
+  html[data-tema] #csNav .cs-nav-b.on::after{ display:none; }
 }
 
 @media (prefers-reduced-motion: no-preference){
@@ -416,7 +422,6 @@ html[data-tema] #csNav.tv-con-luz .cs-nav-b.cs-nav-dc.on{ background:transparent
   }
   html[data-tema] #csNav .tv-luz.tv-quieta{ transition:none !important; }
   html[data-tema] #csNav .tv-luz.tv-llega{ animation:tv-destello .8s ease-out both; }
-  html[data-tema] #csNav .tv-luz.tv-nace-luz{ animation:tv-aparece .5s ease-out both; }
   html[data-tema] #csNav.tv-con-luz .cs-nav-b{ transition:color .28s ease .08s, transform .22s cubic-bezier(.2,.8,.2,1), background-color .2s ease; }
   html[data-tema] #csNav .cs-nav-b svg{ transition:transform .22s cubic-bezier(.2,.8,.2,1); }
   html[data-tema] #csNav .cs-nav-b:hover{ transform:translateX(4px); }
@@ -441,31 +446,16 @@ html[data-tema] #csNav.tv-con-luz .cs-nav-b.cs-nav-dc.on{ background:transparent
     html[data-tema] #csNav.tv-nace{ animation:tv-aparece .5s ease-out both; }
   }
 
-  /* ── Al cambiar de sección: lo nuevo entra desenfocado y subiendo, en cascada ── */
-  html[data-tema] #csVista.tv-cambio > *,
-  html[data-tema] #csVista.tv-cambio .cs-kpi,
-  html[data-tema] #csVista.tv-cambio .cs-prog,
-  html[data-tema] #csVista.tv-cambio .cs-tal,
-  html[data-tema] #libGrid.tv-cambio > *{ animation:tv-sube .56s cubic-bezier(.2,.8,.2,1) both; }
-  html[data-tema] #dashHead.tv-cambio,
-  html[data-tema] #epsHead.tv-cambio{ animation:tv-baja .56s cubic-bezier(.2,.8,.2,1) both; }
-  html[data-tema] .tv-cambio > :nth-child(2), html[data-tema] .tv-cambio .cs-kpi:nth-child(2), html[data-tema] .tv-cambio .cs-prog:nth-child(2), html[data-tema] .tv-cambio .cs-tal:nth-child(2){ animation-delay:.06s; }
-  html[data-tema] .tv-cambio > :nth-child(3), html[data-tema] .tv-cambio .cs-kpi:nth-child(3), html[data-tema] .tv-cambio .cs-prog:nth-child(3), html[data-tema] .tv-cambio .cs-tal:nth-child(3){ animation-delay:.12s; }
-  html[data-tema] .tv-cambio > :nth-child(4), html[data-tema] .tv-cambio .cs-kpi:nth-child(4), html[data-tema] .tv-cambio .cs-prog:nth-child(4), html[data-tema] .tv-cambio .cs-tal:nth-child(4){ animation-delay:.18s; }
-  html[data-tema] .tv-cambio > :nth-child(5), html[data-tema] .tv-cambio .cs-kpi:nth-child(5), html[data-tema] .tv-cambio .cs-prog:nth-child(5), html[data-tema] .tv-cambio .cs-tal:nth-child(5){ animation-delay:.24s; }
-  html[data-tema] .tv-cambio > :nth-child(6), html[data-tema] .tv-cambio .cs-kpi:nth-child(6), html[data-tema] .tv-cambio .cs-prog:nth-child(6), html[data-tema] .tv-cambio .cs-tal:nth-child(6){ animation-delay:.30s; }
-  html[data-tema] .tv-cambio > :nth-child(7), html[data-tema] .tv-cambio .cs-prog:nth-child(7), html[data-tema] .tv-cambio .cs-tal:nth-child(7){ animation-delay:.36s; }
-  html[data-tema] .tv-cambio > :nth-child(n+8), html[data-tema] .tv-cambio .cs-prog:nth-child(n+8), html[data-tema] .tv-cambio .cs-tal:nth-child(n+8){ animation-delay:.42s; }
+  /* Al cambiar de sección, lo nuevo aparece: eso lo hace js/animaciones.js (animEntra) con UNA animación de
+     opacidad sobre la sección entera. Aquí no hay reglas para ello: una clase en el contenedor obligaba a
+     recalcular el estilo de miles de elementos, y una animación por pieza, a preparar una capa por cada una (ENT-29). */
 
-  /* ── Al entrar: la aplicación se descubre con un círculo que se abre, y la barra baja ── */
-  html[data-tema] .wrap.tv-revela{ animation:tv-revela 1s cubic-bezier(.3,.7,.2,1) both; }
+  /* ── Al entrar: la aplicación aparece creciendo un poco, y la barra baja (sin recortes, que repintan la pantalla entera) ── */
+  html[data-tema] .wrap.tv-revela{ animation:tv-revela .6s cubic-bezier(.2,.8,.2,1) both; }
   html[data-tema] #topbar.tv-baja{ animation:tv-baja .7s cubic-bezier(.2,.8,.2,1) .15s both; }
 
-  /* ── Ventanas: el velo aparece y la tarjeta sube con un poco de rebote ── */
-  html[data-tema] .ddlm-ov,
-  html[data-tema] .dlgov,
-  html[data-tema] .modo-cap,
-  html[data-tema] .meta-ov{ animation:tv-aparece .24s ease-out both; }
+  /* ── Ventanas: la tarjeta sube con un poco de rebote ── */
+  /* El velo no se desvanece: lleva un desenfoque de fondo, y animar su opacidad obliga a rehacerlo en cada cuadro (ENT-29). */
   html[data-tema] .ddlm-card,
   html[data-tema] .dlgcard,
   html[data-tema] .modo-caja,
@@ -516,7 +506,7 @@ html[data-tema] #csNav.tv-con-luz .cs-nav-b.cs-nav-dc.on{ background:transparent
   html[data-tema] .card,
   html[data-tema] .cs-prog,
   html[data-tema] .cs-tal,
-  html[data-tema] .cs-kpi{ transition:transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s ease, border-color .2s ease; }
+  html[data-tema] .cs-kpi{ transition:transform .22s cubic-bezier(.2,.8,.2,1); }
   html[data-tema] .cs-kpi:hover{ transform:translateY(-3px); box-shadow:var(--tv-sombra-alta) !important; }
   /* El botón del tema gira al cambiar. */
   html[data-tema] #btnTema svg{ transition:transform .5s cubic-bezier(.3,1.4,.5,1); }
@@ -530,9 +520,8 @@ html[data-tema] #csNav.tv-con-luz .cs-nav-b.cs-nav-dc.on{ background:transparent
   @keyframes tv-aparece{ from{ opacity:0; } to{ opacity:1; } }
   @keyframes tv-barra-nace{ from{ clip-path:inset(0 0 100% 0 round 28px); } to{ clip-path:inset(0 0 0 0 round 28px); } }
   @keyframes tv-entra-lado{ from{ opacity:0; transform:translateX(-14px); } to{ opacity:1; transform:none; } }
-  @keyframes tv-sube{ from{ opacity:0; transform:translateY(18px) scale(.985); filter:blur(8px); } to{ opacity:1; transform:none; filter:blur(0); } }
   @keyframes tv-baja{ from{ opacity:0; transform:translateY(-18px); } to{ opacity:1; transform:none; } }
-  @keyframes tv-revela{ from{ clip-path:circle(0% at 50% 38%); } to{ clip-path:circle(150% at 50% 38%); } }
+  @keyframes tv-revela{ from{ opacity:0; transform:scale(.975); } to{ opacity:1; transform:none; } }
   @keyframes tv-ventana{ from{ opacity:0; transform:translateY(16px) scale(.955); } to{ opacity:1; transform:none; } }
   @keyframes tv-aviso{ from{ opacity:0; transform:translateX(26px); } to{ opacity:1; transform:none; } }
 }

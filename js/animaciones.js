@@ -9,8 +9,7 @@
  *   · el activo es una LUZ menta que no salta: se desliza de una sección a la
  *     otra con un poco de rebote, y al llegar da un destello; a su derecha,
  *     la muesca que asoma de la barra viaja con ella;
- *   · al cambiar de sección, lo de antes se va y lo nuevo entra desenfocado y
- *     subiendo, en cascada;
+ *   · al cambiar de sección, lo de antes se va y lo nuevo aparece;
  *   · los números cuentan desde cero hasta su valor;
  *   · al entrar, la aplicación se descubre con un círculo que se abre.
  * Las formas y los tiempos están en tema-vidrio.css; aquí va lo que el CSS
@@ -21,10 +20,20 @@
  * Quien tiene puesto «reducir movimiento» en su equipo no ve nada de esto: la
  * luz se coloca en su sitio sin viajar y los números salen ya puestos.
  *
+ * Que no cueste (ENT-29, «con la interfaz nueva está menos fluido»): medido
+ * con 300 talentos y la máquina frenada como una tablet, la primera versión
+ * bajaba un cambio de sección de 22-35 cuadros por segundo a 1-9. Por eso:
+ *   · lo nuevo ya no entra pieza a pieza, desenfocado y subiendo: aparece de
+ *     una vez, con una sola animación de opacidad sobre la sección entera (ver
+ *     animEntra). Ni clases en el contenedor ni un retraso por pieza;
+ *   · la luz existe SOLO mientras viaja. Casting se repinta a menudo (cada
+ *     dato que llega), y en reposo el activo es el propio botón: un repintado
+ *     no crea nada ni obliga a medir la página.
+ *
  * Es un script clásico: comparte el ámbito global con index.html.
  */
 
-const ANIM = { luz: null, clave: null, bib: null, nacio: false, seguia: false };
+const ANIM = { luz: null, clave: null, bib: null, nacio: false, seguia: false, finLuz: 0 };
 
 /** ¿Se puede animar? No, si el equipo pide reducir el movimiento. */
 function animPuede(){
@@ -41,41 +50,64 @@ function animPonerLuz(luz, c){
   luz.style.height = c.h + 'px';
   luz.style.transform = 'translate(' + c.x + 'px,' + c.y + 'px)';
 }
+const ANIM_VIAJE_MS = 620;      // lo que tarda la luz en llegar (con el rebote)
 
 /**
- * La luz de la barra de Casting. La barra se vuelve a pintar entera en cada
- * cambio, así que la luz se crea otra vez DONDE ESTABA y, un instante después,
- * se manda a la sección activa: el navegador anima el viaje.
+ * La luz de la barra de Casting. En reposo no existe: el activo es el propio
+ * botón (su fondo menta y su muesca, por CSS), y un repintado no cuesta nada.
+ * Solo cuando la sección activa CAMBIA se crea la luz donde estaba la de
+ * antes, viaja a la nueva y, al llegar, se quita y el botón vuelve a mandar.
+ * `nace`: la barra acaba de aparecer (no hay de dónde venir).
  */
-function animLuz(nav){
+function animLuz(nav, nace){
   if(!nav || typeof nav.querySelector !== 'function') return null;
   const activo = nav.querySelector('.cs-nav-b.on');
+  const v = activo ? (activo.dataset ? activo.dataset.v : null) || activo.getAttribute('data-v') : null;
+  const antes = ANIM.luz;
+  ANIM.luz = v;
   const vieja = nav.querySelector('.tv-luz');
+  /* Sin viaje: nada que crear. Si la barra se repintó a medio viaje, la luz ya no está: que mande el botón. */
+  if(!activo || nace || antes == null || antes === v || !animPuede()){
+    if(!vieja) nav.classList.remove('tv-con-luz');
+    return { viaja: false, hacia: v };
+  }
+  let origen = null;
+  nav.querySelectorAll('.cs-nav-b').forEach(b => { if(((b.dataset && b.dataset.v) || b.getAttribute('data-v')) === antes) origen = b; });
+  if(!origen){ if(!vieja) nav.classList.remove('tv-con-luz'); return { viaja: false, hacia: v }; }
   if(vieja) vieja.remove();
-  if(!activo){ ANIM.luz = null; nav.classList.remove('tv-con-luz'); return null; }
   const luz = document.createElement('span');
-  luz.className = 'tv-luz';
+  luz.className = 'tv-luz tv-quieta';
   luz.setAttribute('aria-hidden', 'true');
   nav.insertBefore(luz, nav.firstChild);
-  nav.classList.add('tv-con-luz');
-  const destino = animCaja(activo), origen = ANIM.luz;
-  const viaja = animPuede() && origen && (origen.x !== destino.x || origen.y !== destino.y || origen.w !== destino.w);
-  if(viaja){
-    luz.classList.add('tv-quieta');                 // sin transición: aparece donde estaba
-    animPonerLuz(luz, origen);
-    void luz.offsetWidth;                           // que el navegador lo dé por pintado
-    luz.classList.remove('tv-quieta');
-    animPonerLuz(luz, destino);
-    luz.classList.add('tv-llega');                  // el destello, al llegar
-  }else{
-    luz.classList.add('tv-quieta');
-    animPonerLuz(luz, destino);
-    void luz.offsetWidth;
-    luz.classList.remove('tv-quieta');
-    if(animPuede() && !origen) luz.classList.add('tv-nace-luz');
-  }
-  ANIM.luz = destino;
-  return { viaja: !!viaja, destino: destino };
+  nav.classList.add('tv-con-luz');                // mientras viaja, el botón activo no pinta su fondo
+  animPonerLuz(luz, animCaja(origen));
+  void luz.offsetWidth;                           // que el navegador la dé por pintada donde estaba
+  luz.classList.remove('tv-quieta');
+  luz.classList.add('tv-llega');                  // el destello, al llegar
+  animPonerLuz(luz, animCaja(activo));
+  clearTimeout(ANIM.finLuz);
+  ANIM.finLuz = setTimeout(() => {
+    try{ if(luz.parentNode){ luz.parentNode.classList.remove('tv-con-luz'); luz.remove(); } }catch(e){ /* la barra ya no está */ }
+  }, ANIM_VIAJE_MS);
+  return { viaja: true, hacia: v, desde: antes };
+}
+
+const ANIM_ENTRA_MS = 320;      // lo que tarda lo nuevo en aparecer
+
+/**
+ * Lo nuevo aparece: UNA sola animación, de opacidad, sobre el bloque entero.
+ * Antes entraba pieza a pieza, cada una subiendo con su retraso; medido, eso
+ * era lo que más pesaba —cada pieza que arranca es una capa nueva que el
+ * navegador tiene que preparar, y con dieciséis el cambio de sección bajaba a
+ * 10-15 cuadros por segundo—. Una opacidad sobre un solo bloque no mueve
+ * nada, no recalcula estilos y no cambia de sitio lo que va fijo dentro.
+ */
+function animEntra(el){
+  if(!el || typeof el.animate !== 'function' || !animPuede()) return false;
+  try{
+    el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: ANIM_ENTRA_MS, easing: 'ease-out' });
+    return true;
+  }catch(e){ return false; /* entra sin efecto */ }
 }
 
 /** Cuenta desde cero hasta el número que el elemento ya enseña. Solo enteros («12», «1.204»). */
@@ -109,32 +141,35 @@ function animMarcar(el, clase, ms){
 
 /**
  * Después de pintar Casting. `clave` dice qué se ve (sección, programa,
- * capítulo, pestaña): solo cuando cambia entra lo nuevo en cascada y cuentan
- * los números. La luz se coloca siempre.
+ * capítulo, pestaña): solo cuando cambia aparece lo nuevo y cuentan los
+ * números. Un repintado de lo mismo no hace nada.
  */
 function animVista(nav, vista, clave){
   let r = null;
+  const nace = !ANIM.seguia;                      // Casting no estaba en pantalla: la barra nace
   try{
-    /* La barra se vuelve a crear en cada pintado de la biblioteca: «nace» solo cuando Casting no estaba ya en pantalla. */
-    if(nav && !ANIM.seguia){ ANIM.luz = null; if(animPuede()) animMarcar(nav, 'tv-nace', 1400); }
+    if(nav && nace && animPuede()) animMarcar(nav, 'tv-nace', 1400);
     ANIM.seguia = true;
-    r = animLuz(nav);
+    r = animLuz(nav, nace);
   }catch(e){ if(typeof fallo === 'function') fallo('animLuz · js/animaciones.js', e); }
   const cambio = clave !== ANIM.clave;
   ANIM.clave = clave;
   if(!cambio || !animPuede() || !vista) return { cambio: cambio, luz: r };
-  animMarcar(vista, 'tv-cambio', 1200);
-  try{ vista.querySelectorAll('.cs-kpi b, .tr-kpi b, .cs-tr-kpi b').forEach(b => animContar(b)); }
-  catch(e){ /* los números se quedan como estaban */ }
+  try{
+    animEntra(vista);
+    vista.querySelectorAll('.cs-kpi b, .tr-kpi b, .cs-tr-kpi b').forEach(b => animContar(b));
+  }catch(e){ /* entra sin efecto */ }
   return { cambio: true, luz: r };
 }
 
-/** Después de pintar la biblioteca: los programas, o los episodios de uno. Entra en cascada solo al cambiar. */
+/** Después de pintar la biblioteca: los programas, o los episodios de uno. Aparece solo al cambiar. */
 function animBiblioteca(clave){
   const cambio = clave !== ANIM.bib;
   ANIM.bib = clave;
   if(!cambio || !animPuede()) return false;
-  ['libGrid', 'dashHead', 'epsHead'].forEach(id => { const el = document.getElementById(id); if(el) animMarcar(el, 'tv-cambio', 1200); });
+  try{
+    animEntra(document.getElementById('libGrid'));
+  }catch(e){ /* entra sin efecto */ }
   return true;
 }
 
@@ -158,10 +193,8 @@ if(typeof document !== 'undefined' && typeof MutationObserver !== 'undefined'){
     }catch(e){ /* sin observador: la aplicación entra sin efecto */ }
   };
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', alEstar); else alEstar();
-  /* Si la ventana cambia de tamaño, la luz se recoloca sin viajar. */
-  window.addEventListener('resize', () => { const nav = document.getElementById('csNav'); if(nav){ ANIM.luz = null; try{ animLuz(nav); }catch(e){ /* se recolocará al cambiar de sección */ } } });
 }
 
 if(typeof module !== 'undefined' && module.exports){
-  module.exports = { ANIM, animPuede, animLuz, animContar, animVista, animBiblioteca, animEntrada, animMarcar };
+  module.exports = { ANIM, animPuede, animLuz, animEntra, animContar, animVista, animBiblioteca, animEntrada, animMarcar };
 }

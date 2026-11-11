@@ -559,7 +559,7 @@ body.compacta .pla td{padding:9px 10px}
 }
 </style>
 <link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#140F30">
+<meta name="theme-color" content="#06100e">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2521,16 +2521,16 @@ body.modo-casting #btnExport{ display:none !important; }
 </style>
 <!-- El tema «vidrio» (ENT-26), en claro y en oscuro: capas sobre el CSS de siempre. Las dos «auto» las genera
      herramientas/tema.js (los colores de cada regla, convertidos); tema-vidrio.css es lo que va a mano y vale
-     para las dos. Se aplica la capa del tema elegido (ddl_tema: «claro» si no se ha elegido). -->
-<link rel="stylesheet" href="./tema-claro-auto.css" id="temaClaro">
-<link rel="stylesheet" href="./tema-oscuro-auto.css" id="temaOscuro" media="not all">
+     para las dos. Se aplica la capa del tema elegido (ddl_tema: «oscuro» si no se ha elegido). -->
+<link rel="stylesheet" href="./tema-claro-auto.css" id="temaClaro" media="not all">
+<link rel="stylesheet" href="./tema-oscuro-auto.css" id="temaOscuro">
 <link rel="stylesheet" href="./tema-vidrio.css" id="temaVidrio">
 <script>
-/** Pone el tema («claro» u «oscuro») y lo recuerda en este equipo. Sin argumento, el guardado. */
+/** Pone el tema («claro» u «oscuro») y lo recuerda en este equipo. Sin argumento, el guardado (o el oscuro). */
 function temaPoner(t){
   if(t !== 'claro' && t !== 'oscuro'){
-    try{ t = localStorage.getItem('ddl_tema'); }catch(e){ t = null; /* sin almacén: el claro */ }
-    if(t !== 'oscuro') t = 'claro';
+    try{ t = localStorage.getItem('ddl_tema'); }catch(e){ t = null; /* sin almacén: el oscuro */ }
+    if(t !== 'claro') t = 'oscuro';                // el de entrada es el oscuro (ENT-29); quien eligió el claro, lo conserva
   }else{
     try{ localStorage.setItem('ddl_tema', t); }catch(e){ /* vale para esta vez */ }
   }
@@ -3095,7 +3095,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v12.2.0-nube';
+const APP_VER_NUM = 'v12.3.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -16287,11 +16287,13 @@ function buildLibretoDoc(pc){
   d.documentElement.innerHTML = '<head><meta charset="utf-8"><title>Libreto</title>'
     +'<link rel="preconnect" href="https://fonts.googleapis.com">'
     +'<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></head><body></body>';
-  const st = d.createElement('style'); st.textContent = LIB_CSS; d.head.appendChild(st);
-  const st2 = d.createElement('style'); st2.textContent = LIB_OVERRIDE; d.head.appendChild(st2);
+  /* Con la paleta del tema, convertida en el sitio (ENT-26, ENT-29): sin reglas de más, que aquí es donde más se notarían. */
+  const _lt = (css) => (typeof temaReescribir === 'function') ? temaReescribir(css, 'oscuro') : css;
+  const st = d.createElement('style'); st.textContent = _lt(LIB_CSS); d.head.appendChild(st);
+  const st2 = d.createElement('style'); st2.textContent = _lt(LIB_OVERRIDE); d.head.appendChild(st2);
   /* El tema (ENT-26): la paleta nueva encima de su CSS, y de entrada el modo del tema de la aplicación. */
   try{
-    if(typeof temaLibretoCss === 'function'){ const st3 = d.createElement('style'); st3.id = 'temaLib'; st3.textContent = temaLibretoCss(LIB_CSS + '\n' + LIB_OVERRIDE); d.head.appendChild(st3); }
+    if(typeof temaLibretoCss === 'function'){ const st3 = d.createElement('style'); st3.id = 'temaLib'; st3.textContent = temaLibretoCss(); d.head.appendChild(st3); }
     d.documentElement.setAttribute('data-tema', temaActual());
     if(pop2._temaDe !== temaActual()){ pop2._temaDe = temaActual(); pop2.theme = temaActual() === 'claro' ? 'light' : 'dark'; }
   }catch(e){ fallo('temaLibretoCss · index.html:libreto', e, 'el libreto se ve con sus colores de siempre'); }
@@ -18692,7 +18694,7 @@ function libOcupacion(){
   if(!d.getElementById('lOcuCss')){
     const st = d.createElement('style');
     st.id = 'lOcuCss';
-    st.textContent = LIB_OCU_CSS + (typeof temaCapa === 'function' ? '\n' + temaCapa(LIB_OCU_CSS, 'oscuro') : '');
+    st.textContent = (typeof temaReescribir === 'function') ? temaReescribir(LIB_OCU_CSS, 'oscuro') : LIB_OCU_CSS;
     d.head.appendChild(st);
   }
   if(!caja){
@@ -22866,7 +22868,7 @@ function karWinAbierta(){
 function karWinMontar(win){
   const d = win.document;
   d.head.innerHTML = '<meta charset="utf-8"><title>Karaoke</title>';
-  const st = d.createElement('style'); st.textContent = KARWIN_CSS + (typeof temaCapa === 'function' ? '\n' + temaCapa(KARWIN_CSS, 'oscuro') : ''); d.head.appendChild(st);
+  const st = d.createElement('style'); st.textContent = (typeof temaReescribir === 'function') ? temaReescribir(KARWIN_CSS, 'oscuro') : KARWIN_CSS; d.head.appendChild(st);
   d.body.innerHTML =
       '<div id="kbar">'
     +   '<span id="kwho"></span>'

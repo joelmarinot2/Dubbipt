@@ -3423,7 +3423,7 @@ function csPintarVista(nav, vista){
   vista.innerHTML = csHtml(CS.vista);
   csCablear(vista);
   if(CS.vista === 'programa' && CS.tab === 'continuidad' && typeof contCablear === 'function'){ try{ contCablear(vista, csActual().p); }catch(e){ fallo('contCablear · js/castingvistas.js', e); } }
-  /* Las animaciones del tema (ENT-27): la luz de la barra viaja a la sección activa y, si la sección cambió, lo nuevo entra en cascada. */
+  /* Las animaciones del tema (ENT-27): la luz de la barra viaja a la sección activa y, si la sección cambió, lo nuevo aparece. */
   if(typeof animVista === 'function'){ try{ animVista(nav, vista, [CS.vista, CS.prog, CS.ep, CS.tab].join('|')); }catch(e){ fallo('animVista · js/castingvistas.js', e); } }
 }
 
