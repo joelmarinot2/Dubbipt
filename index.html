@@ -2583,6 +2583,7 @@ temaPoner();
 document.addEventListener('DOMContentLoaded', temaPintarBoton);
 </script>
 <script src="./js/tema.js"></script>
+<script src="./js/otp.js"></script>
 </head>
 <body class="locked">
 <div class="appbar appbar-top"></div>
@@ -3094,7 +3095,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v12.1.0-nube';
+const APP_VER_NUM = 'v12.2.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -3965,17 +3966,39 @@ function mfaError(e){
   if(/network|fetch|failed to fetch/i.test(m)) return 'Sin conexión con el servidor. Revisa la red y vuelve a probar.';
   return 'No se pudo verificar: ' + m;
 }
-/** Cablea la tarjeta: el campo del código (se envía solo al llegar a 6 cifras), el botón y «usar otra cuenta». */
-function mfaCablear(c, verificar){
+/** El campo del código: en casillas de vidrio con su animación (ENT-28, js/otp.js) o, si ese módulo no está, el campo de siempre. */
+function mfaCampoCodigo(){
+  return (typeof otpHtml === 'function') ? otpHtml()
+    : '<input type="text" id="mfaCodigo" class="mfa-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">';
+}
+/**
+ * Cablea la tarjeta: el campo del código (se envía solo al llegar a 6 cifras), el botón y «usar otra cuenta».
+ * `verificar(code)` comprueba el código (lanza si es malo); `alAcertar()` es lo que se hace después —quitar la
+ * tarjeta, entrar—, cuando la animación del visto bueno ya se ha visto.
+ */
+function mfaCablear(c, verificar, alAcertar){
   const inp = c.querySelector('.mfa-codigo'), btn = c.querySelector('.mfa-ok'), err = c.querySelector('.gerr');
+  let otp = null;
+  try{ otp = (typeof otpMontar === 'function') ? otpMontar(c) : null; }
+  catch(e){ otp = null; fallo('otpMontar · index.html:mfaCablear', e, 'el código se escribe en el campo de siempre'); }
+  const rotulo = btn ? btn.textContent : '';
   let yendo = false;
   const enviar = async () => {
     const code = String(inp.value || '').replace(/\D/g, '');
     if(code.length !== 6){ err.textContent = 'El código tiene 6 cifras.'; inp.focus(); return; }
     if(yendo) return;
     yendo = true; btn.disabled = true; err.textContent = '';
-    try{ await verificar(code); }
-    catch(e){ err.textContent = mfaError(e); inp.value = ''; inp.focus(); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake'); }
+    if(otp){ otp.verificando(); otpBotonVerificando(btn); }
+    try{
+      await verificar(code);
+      if(otp) await otp.exito();                 // el visto bueno, antes de entrar
+      if(alAcertar) alAcertar();
+    }
+    catch(e){
+      err.textContent = mfaError(e); inp.value = '';
+      if(otp){ otp.error(); btn.textContent = rotulo; }
+      inp.focus(); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
+    }
     finally{ yendo = false; btn.disabled = false; }
   };
   inp.addEventListener('input', () => { inp.value = inp.value.replace(/\D/g, '').slice(0, 6); if(inp.value.length === 6) enviar(); });
@@ -3992,7 +4015,7 @@ function mfaPedirCodigo(factores){
     const c = mfaTarjeta('<div class="mfa-ic" aria-hidden="true">' + MFA_ICONO + '</div><h2>Verificación en dos pasos</h2>'
       + '<p>Escribe el código de 6 dígitos que muestra tu app autenticadora.</p>'
       + (varios ? '<label for="mfaFactor">Dispositivo</label><select id="mfaFactor" class="mfa-factor">' + factores.map(f => '<option value="' + mfaEsc(f.id) + '">' + mfaEsc(f.friendly_name || 'Autenticador') + '</option>').join('') + '</select>' : '')
-      + '<label for="mfaCodigo">Código</label><input type="text" id="mfaCodigo" class="mfa-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">'
+      + '<label for="mfaCodigo">Código</label>' + mfaCampoCodigo()
       + '<div class="gerr"></div><button type="button" class="gbtn mfa-ok">Verificar</button>'
       + '<p class="mfa-nota">¿Perdiste el teléfono? Pide al administrador que reinicie tu autenticador.</p>' + MFA_PIE);
     mfaCablear(c, async (code) => {
@@ -4000,8 +4023,7 @@ function mfaPedirCodigo(factores){
       const factorId = (varios && sel && sel.value) || factores[0].id;
       const { error } = await sb.auth.mfa.challengeAndVerify({ factorId: factorId, code: code });
       if(error) throw error;
-      mfaQuitarTarjeta(); resolve(true);
-    });
+    }, () => { mfaQuitarTarjeta(); resolve(true); });
   });
 }
 /** Aún no tiene autenticador: darlo de alta (QR o clave), y confirmar con el primer código. */
@@ -4021,11 +4043,12 @@ async function mfaActivar(f){
       + '<div class="mfa-qr"><img alt="Código QR para la app autenticadora" src="' + mfaEsc(data.totp && data.totp.qr_code) + '"></div>'
       + '<p class="mfa-nota">¿No puedes escanearlo? Escribe esta clave en la app:<br><code class="mfa-clave">' + mfaEsc(clave) + '</code></p>'
       + '<ol class="mfa-pasos" start="3"><li>Escribe el código de 6 dígitos que te muestra la app.</li></ol>'
-      + '<label for="mfaCodigo">Código</label><input type="text" id="mfaCodigo" class="mfa-codigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">'
+      + '<label for="mfaCodigo">Código</label>' + mfaCampoCodigo()
       + '<div class="gerr"></div><button type="button" class="gbtn mfa-ok">Activar y entrar</button>' + MFA_PIE);
     mfaCablear(c, async (code) => {
       const { error: e2 } = await sb.auth.mfa.challengeAndVerify({ factorId: data.id, code: code });
       if(e2) throw e2;
+    }, () => {
       mfaQuitarTarjeta();
       try{ DDL_UI.toast('Verificación en dos pasos activada. A partir de ahora te pedirá el código al entrar.'); }catch(e){ /* sin avisos */ }
       resolve(true);
