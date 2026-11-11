@@ -379,3 +379,160 @@ html[data-tema] #floatCtl{
   border-radius:999px !important; box-shadow:0 12px 30px var(--tv-barra-sombra) !important;
 }
 html[data-tema] #floatCtl *{ color:inherit !important; }
+
+/* ═══ ANIMACIONES (ENT-27) ═════════════════════════════════════════════════
+   Pedido de sala: «quiero también los efectos de animación; la barra de
+   secciones de Casting, con el efecto del video». Las formas y los tiempos
+   van aquí; cuándo se disparan lo decide js/animaciones.js (que pone las
+   clases tv-…). Todo dentro de «sin preferencia de movimiento reducido»: quien
+   lo tiene pedido en su equipo no ve nada moverse. Solo se animan transform,
+   opacity y poco más, que no obligan a recolocar la página. */
+
+/* La luz de la barra de Casting: el activo, que se desliza. Sin animación también está (colocada, sin viajar). */
+html[data-tema] #csNav .cs-nav-b,
+html[data-tema] #csNav .cs-nav-t{ position:relative; z-index:1; }
+html[data-tema] #csNav .tv-luz{
+  position:absolute; left:0; top:0; z-index:0; pointer-events:none;
+  border-radius:999px; background:var(--tv-menta);
+  box-shadow:0 0 0 4px rgba(143,230,205,.16), 0 0 22px rgba(143,230,205,.55);
+  will-change:transform;
+}
+/* La muesca que asoma de la barra, a la altura del activo. */
+html[data-tema] #csNav .tv-luz::after{
+  content:''; position:absolute; top:50%; right:-18px; width:14px; height:14px; margin-top:-7px;
+  border-radius:50%; background:var(--tv-barra-2);
+}
+html[data-tema] #csNav.tv-con-luz .cs-nav-b.on,
+html[data-tema] #csNav.tv-con-luz .cs-nav-b.cs-nav-dc.on{ background:transparent !important; box-shadow:none !important; }
+@media(max-width:900px){
+  html[data-tema] #csNav{ position:relative; }
+  html[data-tema] #csNav .tv-luz::after{ display:none; }
+}
+
+@media (prefers-reduced-motion: no-preference){
+  /* ── La barra de Casting ── */
+  html[data-tema] #csNav .tv-luz{
+    transition:transform .56s cubic-bezier(.34,1.42,.5,1), width .42s cubic-bezier(.3,.9,.3,1), height .42s cubic-bezier(.3,.9,.3,1);
+  }
+  html[data-tema] #csNav .tv-luz.tv-quieta{ transition:none !important; }
+  html[data-tema] #csNav .tv-luz.tv-llega{ animation:tv-destello .8s ease-out both; }
+  html[data-tema] #csNav .tv-luz.tv-nace-luz{ animation:tv-aparece .5s ease-out both; }
+  html[data-tema] #csNav.tv-con-luz .cs-nav-b{ transition:color .28s ease .08s, transform .22s cubic-bezier(.2,.8,.2,1), background-color .2s ease; }
+  html[data-tema] #csNav .cs-nav-b svg{ transition:transform .22s cubic-bezier(.2,.8,.2,1); }
+  html[data-tema] #csNav .cs-nav-b:hover{ transform:translateX(4px); }
+  html[data-tema] #csNav .cs-nav-b:hover svg{ transform:scale(1.16); }
+  html[data-tema] #csNav .cs-nav-b:active{ transform:translateX(2px) scale(.97); }
+  /* Nace creciendo desde arriba, y sus botones entran uno tras otro. */
+  html[data-tema] #csNav.tv-nace{ animation:tv-barra-nace .8s cubic-bezier(.2,.8,.2,1) both; }
+  html[data-tema] #csNav.tv-nace .cs-nav-t,
+  html[data-tema] #csNav.tv-nace .cs-nav-b{ animation:tv-entra-lado .5s cubic-bezier(.2,.8,.2,1) both; }
+  html[data-tema] #csNav.tv-nace > :nth-child(2){ animation-delay:.14s; }
+  html[data-tema] #csNav.tv-nace > :nth-child(3){ animation-delay:.19s; }
+  html[data-tema] #csNav.tv-nace > :nth-child(4){ animation-delay:.24s; }
+  html[data-tema] #csNav.tv-nace > :nth-child(5){ animation-delay:.29s; }
+  html[data-tema] #csNav.tv-nace > :nth-child(6){ animation-delay:.34s; }
+  html[data-tema] #csNav.tv-nace > :nth-child(7){ animation-delay:.39s; }
+  html[data-tema] #csNav.tv-nace > :nth-child(8){ animation-delay:.44s; }
+  html[data-tema] #csNav.tv-nace > :nth-child(9){ animation-delay:.49s; }
+  html[data-tema] #csNav.tv-nace > :nth-child(10){ animation-delay:.54s; }
+  html[data-tema] #csNav.tv-nace > :nth-child(n+11){ animation-delay:.59s; }
+  @media(max-width:900px){
+    html[data-tema] #csNav .cs-nav-b:hover{ transform:translateY(-2px); }
+    html[data-tema] #csNav.tv-nace{ animation:tv-aparece .5s ease-out both; }
+  }
+
+  /* ── Al cambiar de sección: lo nuevo entra desenfocado y subiendo, en cascada ── */
+  html[data-tema] #csVista.tv-cambio > *,
+  html[data-tema] #csVista.tv-cambio .cs-kpi,
+  html[data-tema] #csVista.tv-cambio .cs-prog,
+  html[data-tema] #csVista.tv-cambio .cs-tal,
+  html[data-tema] #libGrid.tv-cambio > *{ animation:tv-sube .56s cubic-bezier(.2,.8,.2,1) both; }
+  html[data-tema] #dashHead.tv-cambio,
+  html[data-tema] #epsHead.tv-cambio{ animation:tv-baja .56s cubic-bezier(.2,.8,.2,1) both; }
+  html[data-tema] .tv-cambio > :nth-child(2), html[data-tema] .tv-cambio .cs-kpi:nth-child(2), html[data-tema] .tv-cambio .cs-prog:nth-child(2), html[data-tema] .tv-cambio .cs-tal:nth-child(2){ animation-delay:.06s; }
+  html[data-tema] .tv-cambio > :nth-child(3), html[data-tema] .tv-cambio .cs-kpi:nth-child(3), html[data-tema] .tv-cambio .cs-prog:nth-child(3), html[data-tema] .tv-cambio .cs-tal:nth-child(3){ animation-delay:.12s; }
+  html[data-tema] .tv-cambio > :nth-child(4), html[data-tema] .tv-cambio .cs-kpi:nth-child(4), html[data-tema] .tv-cambio .cs-prog:nth-child(4), html[data-tema] .tv-cambio .cs-tal:nth-child(4){ animation-delay:.18s; }
+  html[data-tema] .tv-cambio > :nth-child(5), html[data-tema] .tv-cambio .cs-kpi:nth-child(5), html[data-tema] .tv-cambio .cs-prog:nth-child(5), html[data-tema] .tv-cambio .cs-tal:nth-child(5){ animation-delay:.24s; }
+  html[data-tema] .tv-cambio > :nth-child(6), html[data-tema] .tv-cambio .cs-kpi:nth-child(6), html[data-tema] .tv-cambio .cs-prog:nth-child(6), html[data-tema] .tv-cambio .cs-tal:nth-child(6){ animation-delay:.30s; }
+  html[data-tema] .tv-cambio > :nth-child(7), html[data-tema] .tv-cambio .cs-prog:nth-child(7), html[data-tema] .tv-cambio .cs-tal:nth-child(7){ animation-delay:.36s; }
+  html[data-tema] .tv-cambio > :nth-child(n+8), html[data-tema] .tv-cambio .cs-prog:nth-child(n+8), html[data-tema] .tv-cambio .cs-tal:nth-child(n+8){ animation-delay:.42s; }
+
+  /* ── Al entrar: la aplicación se descubre con un círculo que se abre, y la barra baja ── */
+  html[data-tema] .wrap.tv-revela{ animation:tv-revela 1s cubic-bezier(.3,.7,.2,1) both; }
+  html[data-tema] #topbar.tv-baja{ animation:tv-baja .7s cubic-bezier(.2,.8,.2,1) .15s both; }
+
+  /* ── Ventanas: el velo aparece y la tarjeta sube con un poco de rebote ── */
+  html[data-tema] .ddlm-ov,
+  html[data-tema] .dlgov,
+  html[data-tema] .modo-cap,
+  html[data-tema] .meta-ov{ animation:tv-aparece .24s ease-out both; }
+  html[data-tema] .ddlm-card,
+  html[data-tema] .dlgcard,
+  html[data-tema] .modo-caja,
+  html[data-tema] .meta-card{ animation:tv-ventana .36s cubic-bezier(.2,.9,.3,1.12) both; }
+  html[data-tema] .ddl-toast{ animation:tv-aviso .42s cubic-bezier(.2,.9,.3,1.1) both; }
+
+  /* ── Botones y tarjetas: responden al pasar y al pulsar ── */
+  html[data-tema] .cs-b,
+  html[data-tema] .dh-new,
+  html[data-tema] .dh-tools,
+  html[data-tema] .eh-new,
+  html[data-tema] .enav-btn,
+  html[data-tema] .ddlm-go,
+  html[data-tema] .ddlm-cancel,
+  html[data-tema] .gbtn,
+  html[data-tema] .cp-nuevo,
+  html[data-tema] .dct-modo,
+  html[data-tema] #floatCtl,
+  html[data-tema] #topbar .tb-perfil,
+  html[data-tema] #topbar .tb-icon,
+  html[data-tema] #topbar .tb-user{
+    transition:transform .18s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease, background-color .2s ease, border-color .2s ease, color .2s ease;
+  }
+  html[data-tema] .cs-b:hover,
+  html[data-tema] .dh-new:hover,
+  html[data-tema] .dh-tools:hover,
+  html[data-tema] .eh-new:hover,
+  html[data-tema] .enav-btn:hover,
+  html[data-tema] .ddlm-go:hover,
+  html[data-tema] .gbtn:hover,
+  html[data-tema] .cp-nuevo:hover,
+  html[data-tema] #floatCtl:hover,
+  html[data-tema] #topbar .tb-icon:hover,
+  html[data-tema] #topbar .tb-user:hover{ transform:translateY(-2px); }
+  html[data-tema] .cs-b:active,
+  html[data-tema] .dh-new:active,
+  html[data-tema] .dh-tools:active,
+  html[data-tema] .eh-new:active,
+  html[data-tema] .enav-btn:active,
+  html[data-tema] .ddlm-go:active,
+  html[data-tema] .ddlm-cancel:active,
+  html[data-tema] .gbtn:active,
+  html[data-tema] .cp-nuevo:active,
+  html[data-tema] #floatCtl:active,
+  html[data-tema] #topbar .tb-icon:active,
+  html[data-tema] #topbar .tb-user:active{ transform:translateY(0) scale(.96); }
+  html[data-tema] .fcard,
+  html[data-tema] .card,
+  html[data-tema] .cs-prog,
+  html[data-tema] .cs-tal,
+  html[data-tema] .cs-kpi{ transition:transform .28s cubic-bezier(.2,.8,.2,1), box-shadow .28s ease, border-color .2s ease; }
+  html[data-tema] .cs-kpi:hover{ transform:translateY(-3px); box-shadow:var(--tv-sombra-alta) !important; }
+  /* El botón del tema gira al cambiar. */
+  html[data-tema] #btnTema svg{ transition:transform .5s cubic-bezier(.3,1.4,.5,1); }
+  html[data-tema="oscuro"] #btnTema svg{ transform:rotate(180deg); }
+
+  @keyframes tv-destello{
+    0%{ box-shadow:0 0 0 4px rgba(143,230,205,.16), 0 0 22px rgba(143,230,205,.55); }
+    55%{ box-shadow:0 0 0 10px rgba(143,230,205,.26), 0 0 44px rgba(143,230,205,.95); }
+    100%{ box-shadow:0 0 0 4px rgba(143,230,205,.16), 0 0 22px rgba(143,230,205,.55); }
+  }
+  @keyframes tv-aparece{ from{ opacity:0; } to{ opacity:1; } }
+  @keyframes tv-barra-nace{ from{ clip-path:inset(0 0 100% 0 round 28px); } to{ clip-path:inset(0 0 0 0 round 28px); } }
+  @keyframes tv-entra-lado{ from{ opacity:0; transform:translateX(-14px); } to{ opacity:1; transform:none; } }
+  @keyframes tv-sube{ from{ opacity:0; transform:translateY(18px) scale(.985); filter:blur(8px); } to{ opacity:1; transform:none; filter:blur(0); } }
+  @keyframes tv-baja{ from{ opacity:0; transform:translateY(-18px); } to{ opacity:1; transform:none; } }
+  @keyframes tv-revela{ from{ clip-path:circle(0% at 50% 38%); } to{ clip-path:circle(150% at 50% 38%); } }
+  @keyframes tv-ventana{ from{ opacity:0; transform:translateY(16px) scale(.955); } to{ opacity:1; transform:none; } }
+  @keyframes tv-aviso{ from{ opacity:0; transform:translateX(26px); } to{ opacity:1; transform:none; } }
+}

@@ -3094,7 +3094,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v12.0.0-nube';
+const APP_VER_NUM = 'v12.1.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -9321,6 +9321,7 @@ async function renderLibrary(silent){
       { const dt=head.querySelector('#dashTools'); if(dt) dt.onclick=()=> herramientasPanel(); }
       /* Con el perfil Casting: las secciones de DublajeCast (Dashboard, Talentos, Ocupación…). */
       try{ csPintar('shows', head, grid); }catch(e){ fallo('csPintar · index.html:renderLibrary', e); }
+      if(typeof animBiblioteca === 'function'){ try{ animBiblioteca('programas'); }catch(e){ /* sin animación */ } }
       { const dO=head.querySelector('#dhOther'); if(dO) dO.onclick=()=> showWorkspacePicker(true); }
       // breadcrumb de espacio (queda como migaja discreta encima del panel)
       crumb.className='dashcrumb';
@@ -9418,6 +9419,7 @@ async function renderLibrary(silent){
       +'<button class="eh-new" id="epsNew">＋ Nuevo episodio</button>';
     { const en=ehead.querySelector('#epsNew'); if(en) en.onclick=newEpisodeModal; }
     try{ csPintar('eps', ehead, grid); }catch(e){ fallo('csPintar · index.html:renderLibrary', e); }
+    if(typeof animBiblioteca === 'function'){ try{ animBiblioteca('episodios|' + LDB.showId); }catch(e){ /* sin animación */ } }
 
     // ⚡ Optimizar programa (si hay capítulos lentos)
     let optBtn = '';
@@ -23955,3 +23957,4 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/continuidad.js"></script>
 <script src="./js/qcpdf.js"></script>
 <script src="./js/castorden.js"></script>
+<script src="./js/animaciones.js"></script>
