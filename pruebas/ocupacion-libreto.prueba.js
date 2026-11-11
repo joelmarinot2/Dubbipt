@@ -20,6 +20,7 @@ const { montar } = require('./ayuda');
 
 exports.nombre = 'La ocupación dentro del libreto';
 
+const CHQ = require('../js/castchoques.js');
 const RECORTES = [['/* ═══ LA OCUPACIÓN, DENTRO DEL LIBRETO',
                     '/* ═══ CUÁNTAS LÍNEAS TIENE ESTE PERSONAJE']];
 /* `ocuAbierto` se REASIGNA dentro, y al ser parametro la reasignacion no se ve
@@ -70,6 +71,7 @@ function correr(opts){
     ocuAbierto: !!opts.abierto,
     castOcupacion: () => opts.filas || [],
     castChoques: () => opts.choques || {},
+    chqTexto: CHQ.chqTexto, chqSeguido: CHQ.chqSeguido,
     castNorm: (s) => String(s || '').toUpperCase(),
     castPintarOcupacion: () => {},
     openPopup: () => {},
@@ -172,7 +174,13 @@ exports.pruebas = function(t){
     choques: { 'HARI MORENO': { choques: [{ a:'MARLON', b:'SHAWN', dist:2, pagina:4 }] } } });
   CH.libOcupacion();
   t.ok('se cuenta arriba', CH._caja.innerHTML.includes('1 choque de reparto'));
-  t.ok('y se dice cuál', CH._caja.innerHTML.includes('«MARLON» y «SHAWN» a 2 líneas'),
+  t.ok('y se dice cuál', CH._caja.innerHTML.includes('«MARLON» y «SHAWN» hablan seguidos (a 2 líneas)'),
        'el aviso sin el detalle obliga a ir a buscarlo');
   t.ok('con su página', CH._caja.innerHTML.includes('pág. 4'));
+  t.ok('los que hablan seguidos, en negrita', CH._caja.innerHTML.includes('<b>«MARLON» y «SHAWN» hablan seguidos'));
+  const CT = correr({ chars: CHARS, filas: FILAS, abierto: true,
+    choques: { 'HARI MORENO': { choques: [{ a:'MARLON', b:'SHAWN', por:'tc', seg:130, dist:30, tcA:3730, tcB:3860, pagA:4, pagB:5, pagina:5, escena:null, veces:3 }] } } });
+  CT.libOcupacion();
+  t.ok('uno por timecode dice a cuánto salen, dónde y cuántas veces se cruzan (CAST-49)',
+       CT._caja.innerHTML.includes('«MARLON» y «SHAWN» salen a 2 min 10 s · TC 01:02:10 y 01:04:20 · págs. 4 y 5 · se cruzan 3 veces'), CT._caja.innerHTML.slice(-400));
 };

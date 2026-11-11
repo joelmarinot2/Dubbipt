@@ -18,7 +18,7 @@ exports.nombre = 'Ocupación de talentos';
 exports.pruebas = function(t){
   const charIdx = {};
   const O = montar(
-    [['const CAST_CERCA', '/** Página de un bloque del libreto'],
+    [['const OCU_NO_ACTOR', '/**\n * Choques: dos personajes del MISMO talento'],
      ['function castNorm(t){', '/** El número final']],
     ['castOcupacion', 'castEsActor'],
     { charIdx, script: [], scriptByKey: {} }
