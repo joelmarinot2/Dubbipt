@@ -1426,7 +1426,7 @@ body.modo-casting{ transition:padding-right .2s cubic-bezier(.22,.61,.36,1); }
 /* en pantallas estrechas el cajon abierto tapa: se cierra solo al pulsar fuera */
 @media (max-width:820px){ .ocu-cajon{ top:80px; } }
 
-/* Tarjeta con choque: un actor haciendo dos personajes que hablan seguidos.
+/* Tarjeta con choque: un actor haciendo dos personajes que salen cerca (CAST-49).
    Rojo, distinto del naranja de «heredado» y del verde de «completado». */
 body.modo-casting .card.choque{
   border-color:#ff6b6b !important;
@@ -3095,7 +3095,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v12.4.0-nube';
+const APP_VER_NUM = 'v12.5.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -11541,9 +11541,7 @@ function imprimirPlanilla(){
     const pgs = Array.from(e.paginas).sort((a,b)=>a-b);
     html += '<tr><td class="pers">' + impEsc(e.talento) + '</td>'
       + '<td>' + e.personajes.map(p => impEsc(p.display) + ' (' + p.ints + ')').join('<br>')
-      + (ch ? '<div class="choque">⚠ ' + ch.choques.map(x =>
-          impEsc(x.a) + ' y ' + impEsc(x.b) + ' a ' + x.dist + ' línea' + (x.dist===1?'':'s')
-          + (x.pagina != null ? ', pág. ' + x.pagina : '')).join('; ') + '</div>' : '')
+      + (ch ? '<div class="choque">⚠ ' + ch.choques.map(x => impEsc(chqTexto(x))).join('<br>⚠ ') + '</div>' : '')
       + '</td>'
       + '<td class="num">' + e.personajes.length + '</td>'
       + '<td class="num">' + e.ints + '</td>'
@@ -11564,15 +11562,12 @@ function imprimirPlanilla(){
 /* ═══ OCUPACIÓN DE TALENTOS ═══════════════════════════════════════════════
 
    Cuánto carga cada actor en este capítulo y, sobre todo, si se pisa a sí
-   mismo: un actor no puede hacer dos personajes que hablan seguidos, porque
-   no le da tiempo a cambiar de voz y en sala hay que rehacerlo.
+   mismo: un actor no puede hacer dos personajes que salen cerca, porque en
+   sala tendría que hacer las dos voces en el mismo rato.
 
-   La cercanía se mide en LÍNEAS del libreto, no en páginas: dos personajes
-   pueden compartir página y estar a treinta líneas, o estar en páginas
-   distintas y hablar uno detrás de otro. Lo que importa es cuántas
-   intervenciones hay en medio. */
-
-const CAST_CERCA = 4;        // líneas de margen: por debajo, se avisa
+   Qué es «cerca» lo decide js/castchoques.js (CAST-49): sobre todo el
+   TIMECODE —a 5 minutos o menos, antes o después—; siempre, si hablan
+   seguidos; y sin timecode, la escena y las páginas. */
 
 /* Casillas que se rellenan con algo que NO es un actor: «X» y «ORIGINAL»
    (se deja el audio original, no se dobla), «X ORIGINAL», «TODOS» (ambientes
@@ -11610,40 +11605,17 @@ function castOcupacion(){
     .sort((a,b)=> b.ints - a.ints || a.talento.localeCompare(b.talento,'es'));
 }
 
-/** Página de un bloque del libreto, si se sabe. */
-function castPagDe(idx){
-  try{ const b = script[idx]; return b && b.page != null ? b.page : null; }catch(e){ return null; }
-}
-
 /**
- * Choques: dos personajes del MISMO talento hablando a menos de CAST_CERCA
- * líneas. Devuelve {claveTalento: [{a, b, dist, pagina}]}.
+ * Choques: dos personajes del MISMO talento que salen cerca (js/castchoques.js, CAST-49).
+ * Devuelve { claveTalento: { talento, choques: [{ a, b, aKey, bKey, por, seg, dist, tcA, tcB, pagA, pagB, escena, veces }] } },
+ * lo peor primero.
  */
 function castChoques(){
   const out = {};
+  const ctx = chqContexto((typeof script !== 'undefined' && script) || [], (typeof scriptByKey !== 'undefined' && scriptByKey) || {});
   for(const e of castOcupacion()){
     if(e.personajes.length < 2) continue;
-    // todas sus intervenciones en una sola lista ordenada por posición
-    const puntos = [];
-    for(const p of e.personajes){
-      const idxs = (typeof scriptByKey !== 'undefined' && scriptByKey[p.key]) || [];
-      for(const i of idxs) puntos.push({ i: i, key: p.key, display: p.display });
-    }
-    if(puntos.length < 2) continue;
-    puntos.sort((x, y) => x.i - y.i);
-    const choques = [];
-    const vistos = new Set();
-    for(let n = 1; n < puntos.length; n++){
-      const a = puntos[n-1], b = puntos[n];
-      if(a.key === b.key) continue;             // el mismo personaje seguido: normal
-      const dist = b.i - a.i;
-      if(dist > CAST_CERCA) continue;
-      const par = [a.key, b.key].sort().join('|');
-      if(vistos.has(par)) continue;             // un aviso por pareja, no por línea
-      vistos.add(par);
-      choques.push({ a: a.display, b: b.display, aKey: a.key, bKey: b.key,
-                     dist: dist, pagina: castPagDe(b.i) });
-    }
+    const choques = chqDeTalento(e.personajes, ctx);
     if(choques.length) out[castNorm(e.talento)] = { talento: e.talento, choques: choques };
   }
   return out;
@@ -11665,9 +11637,8 @@ function castAvisarChoque(key){
     const hit = castChoqueDe(key);
     if(!hit) return false;
     const ch = hit.ch;
-    castAviso('⚠️ ' + hit.talento + ' hace «' + ch.a + '» y «' + ch.b + '», que hablan a '
-      + ch.dist + ' línea' + (ch.dist === 1 ? '' : 's')
-      + (ch.pagina != null ? ' (pág. ' + ch.pagina + ')' : '') + ' — no le da tiempo a cambiar de voz');
+    castAviso('⚠️ ' + hit.talento + ' hace ' + chqTexto(ch)
+      + (chqSeguido(ch) ? ' — no le da tiempo a cambiar de voz' : ' — choque de reparto'));
     return true;
   }catch(e){ return false; }
 }
@@ -11680,7 +11651,7 @@ function castAvisarChoquesTodos(){
   const n = claves.reduce((t, c) => t + m[c].choques.length, 0);
   const ej = m[claves[0]].choques[0];
   castAviso('⚠️ ' + n + ' choque' + (n===1?'':'s') + ' de reparto: ' + m[claves[0]].talento
-    + ' hace «' + ej.a + '» y «' + ej.b + '» a ' + ej.dist + ' línea' + (ej.dist===1?'':'s')
+    + ' hace ' + chqTexto(ej)
     + (claves.length > 1 ? ' · y ' + (claves.length-1) + ' talento' + (claves.length===2?'':'s') + ' más' : '')
     + ' — míralo en «Ocupación de talentos»');
   return n;
@@ -11739,7 +11710,8 @@ function castPintarOcupacion(){
     + '<div class="ocu-resumen">' + filas.length + ' talento' + (filas.length===1?'':'s')
     + ' · ' + totalInts + ' líneas'
     + (sinTal ? '<br>' + sinTal + ' personaje' + (sinTal===1?'':'s') + ' sin asignar' : '')
-    + (nChoques ? '<br><b class="ocu-alerta">' + nChoques + ' choque' + (nChoques===1?'':'s') + ' de reparto</b>' : '')
+    + (nChoques ? '<br><b class="ocu-alerta">' + nChoques + ' choque' + (nChoques===1?'':'s') + ' de reparto</b>'
+                + '<br><small>el mismo talento con dos personajes a 5 min o menos (por timecode)</small>' : '')
     + '</div>';
 
   {
@@ -11752,7 +11724,7 @@ function castPintarOcupacion(){
         const ch = mapa[castNorm(e.talento)];
         html += '<div class="ocu-fila' + (ch ? ' con-choque' : '') + '">'
           + '<div class="ocu-nom">' + esc(e.talento)
-          + (ch ? '<span class="ocu-bdg" title="Se pisa a sí mismo">⚠ choque</span>' : '')
+          + (ch ? '<span class="ocu-bdg" title="Hace dos personajes que salen cerca">⚠ ' + (ch.choques.length > 1 ? ch.choques.length + ' choques' : 'choque') + '</span>' : '')
           + '</div>'
           + '<div class="ocu-barra"><i style="width:' + Math.max(3, Math.round(100*e.ints/max)) + '%"></i></div>'
           + '<div class="ocu-num">' + e.ints + ' líneas</div>'
@@ -11761,9 +11733,9 @@ function castPintarOcupacion(){
               + esc(p.display) + ' <b>' + p.ints + '</b></span>').join('')
           + '</div>';
         if(ch){
+          /* Lo más grave, en negrita: los que hablan seguidos. */
           html += '<div class="ocu-choques">' + ch.choques.map(x =>
-            '«' + esc(x.a) + '» y «' + esc(x.b) + '» a ' + x.dist + ' línea' + (x.dist===1?'':'s')
-            + (x.pagina != null ? ' · pág. ' + x.pagina : '')).join('<br>') + '</div>';
+            chqSeguido(x) ? '<b>' + esc(chqTexto(x)) + '</b>' : esc(chqTexto(x))).join('<br>') + '</div>';
         }
         html += '</div>';
       }
@@ -18761,8 +18733,7 @@ function libOcupacion(){
         + '</div>';
       if(ch){
         html += '<div class="locu-ch">' + ch.choques.map(x =>
-          '«' + esc(x.a) + '» y «' + esc(x.b) + '» a ' + x.dist + ' línea' + (x.dist===1?'':'s')
-          + (x.pagina != null ? ' · pág. ' + x.pagina : '')).join('<br>') + '</div>';
+          chqSeguido(x) ? '<b>' + esc(chqTexto(x)) + '</b>' : esc(chqTexto(x))).join('<br>') + '</div>';
       }
       html += '</div>';
     }
@@ -23982,4 +23953,5 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/continuidad.js"></script>
 <script src="./js/qcpdf.js"></script>
 <script src="./js/castorden.js"></script>
+<script src="./js/castchoques.js"></script>
 <script src="./js/animaciones.js"></script>
