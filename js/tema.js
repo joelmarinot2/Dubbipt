@@ -265,6 +265,42 @@ function reglaConvertida(cuerpo, modo){
   return out;
 }
 
+/**
+ * El mismo CSS con sus colores convertidos EN EL SITIO: ni una regla más. Es lo que se usa donde el CSS es una
+ * cadena que pone el código (el libreto, la ventana de karaoke): una capa encima duplicaría las reglas que el
+ * navegador tiene que casar con cada elemento, y el libreto es justo donde más se nota.
+ */
+function reescribir(css, modo){
+  let out = '', i = 0;
+  const n = css.length;
+  while(i < n){
+    const j = css.indexOf('{', i);
+    if(j < 0){ out += css.slice(i); break; }
+    const pto = css.indexOf(';', i);
+    /* @import, @charset…: tal cual (un «;» fuera de un bloque y antes de la llave). */
+    if(pto >= 0 && pto < j && css.slice(i, pto).indexOf('}') < 0 && /^\s*(\/\*[\s\S]*?\*\/\s*)*@/.test(css.slice(i, pto))){ out += css.slice(i, pto + 1); i = pto + 1; continue; }
+    const sel = css.slice(i, j);
+    let d = 0, k = j;
+    for(; k < n; k++){
+      if(css.startsWith('/*', k)){ const f = css.indexOf('*/', k + 2); k = f < 0 ? n : f + 1; continue; }
+      if(css[k] === '"' || css[k] === "'"){ const q = css[k]; k++; while(k < n && css[k] !== q){ if(css[k] === '\\') k++; k++; } continue; }
+      if(css[k] === '{') d++;
+      else if(css[k] === '}'){ d--; if(d === 0) break; }
+    }
+    const cuerpo = css.slice(j + 1, k);
+    i = k + 1;
+    const limpio = sel.replace(/\/\*[\s\S]*?\*\//g, '').trim();
+    if(/^@(media|supports|layer|container|(-webkit-)?keyframes)\b/i.test(limpio)) out += sel + '{' + reescribir(cuerpo, modo) + '}';
+    else if(/^@/.test(limpio)) out += sel + '{' + cuerpo + '}';                // @font-face, @page…
+    else out += sel + '{' + declaraciones(cuerpo).map(x => {
+      const imp = /!important\s*$/.test(x.valor), v = x.valor.replace(/\s*!important\s*$/, '');
+      const nv = convertirValor(x.prop, v, false, modo);
+      return x.prop + ':' + (nv == null ? v : nv) + (imp ? ' !important' : '');
+    }).join(';') + '}';
+  }
+  return out;
+}
+
 /** «a, b» con un prefijo delante de cada selector («P a, P b»); en html y :root, el prefijo los sustituye. */
 function conPrefijo(sel, prefijo){
   const partes = [];
@@ -326,7 +362,7 @@ function capa(css, modo, op){
 }
 
 
-return { convertir: convertir, convertirOscuro: convertirOscuro, leerColor: leerColor, capa: capa, conPrefijo: conPrefijo, familia: familia, aHsl: aHsl, esRelleno: esRelleno, convertirValor: convertirValor, declaraciones: declaraciones };
+return { convertir: convertir, convertirOscuro: convertirOscuro, leerColor: leerColor, capa: capa, reescribir: reescribir, conPrefijo: conPrefijo, familia: familia, aHsl: aHsl, esRelleno: esRelleno, convertirValor: convertirValor, declaraciones: declaraciones };
 })();
 
 /** La capa de colores de un CSS: sus reglas, solo con los colores, convertidos a `modo` ('claro' u 'oscuro'). */
@@ -342,7 +378,8 @@ function temaDosCapas(css){
 
 /* El libreto es otro documento (un marco o una ventana) con su propio CSS y su propio botón claro/oscuro.
    Lleva la misma paleta: sus colores pasados al verde petróleo y la menta (con las claridades que tenía, así
-   vale para sus dos modos), y la barra de arriba en verde petróleo, como la de la aplicación. */
+   vale para sus dos modos), y la barra de arriba en verde petróleo, como la de la aplicación. Sus colores se
+   convierten EN EL SITIO (temaReescribir), sin capa encima: ni una regla más que casar (ENT-29). */
 const TEMA_LIBRETO_MANO = [
   /* La barra: verde petróleo; lo que lleva dentro, vidrio claro sobre oscuro. */
   'html body .lh{ background:linear-gradient(180deg,#143c36,#0c2b27) !important; box-shadow:0 10px 28px rgba(4,20,17,.28) !important; }',
@@ -369,12 +406,21 @@ const TEMA_LIBRETO_MANO = [
   'html body.dark .lbar button.act{ background:#8fe6cd !important; border-color:#8fe6cd !important; color:#06231e !important; }',
   'html body.light{ background:#f1f6f5 !important; }'
 ].join('\n');
-let _temaLibretoMemo = null;
-/** El CSS de tema del libreto, para añadir detrás del suyo. Se calcula una vez. */
-function temaLibretoCss(css){
-  const k = String(css).length;
-  if(!_temaLibretoMemo || _temaLibretoMemo.k !== k) _temaLibretoMemo = { k: k, css: TEMA.capa(css, 'oscuro') + '\n' + TEMA_LIBRETO_MANO };
-  return _temaLibretoMemo.css;
+const _temaMemo = new Map();
+/**
+ * Un CSS del libreto (o de la ventana de karaoke) con la paleta del tema: sus colores, convertidos en el sitio.
+ * Se calcula una vez por cadena. Si algo falla, el CSS de siempre.
+ */
+function temaReescribir(css, modo){
+  const m = modo === 'claro' ? 'claro' : 'oscuro', k = m + ':' + String(css).length + ':' + String(css).slice(0, 80);
+  if(!_temaMemo.has(k)){
+    let r = css;
+    try{ r = TEMA.reescribir(css, m); }catch(e){ r = css; }
+    _temaMemo.set(k, r);
+  }
+  return _temaMemo.get(k);
 }
+/** Lo que el libreto lleva a mano encima de su CSS (la barra en verde petróleo, su modo claro). */
+function temaLibretoCss(){ return TEMA_LIBRETO_MANO; }
 
-if(typeof module !== 'undefined' && module.exports){ module.exports = TEMA; Object.assign(module.exports, { temaCapa: temaCapa, temaDosCapas: temaDosCapas, temaLibretoCss: temaLibretoCss, TEMA_LIBRETO_MANO: TEMA_LIBRETO_MANO }); }
+if(typeof module !== 'undefined' && module.exports){ module.exports = TEMA; Object.assign(module.exports, { temaCapa: temaCapa, temaDosCapas: temaDosCapas, temaReescribir: temaReescribir, temaLibretoCss: temaLibretoCss, TEMA_LIBRETO_MANO: TEMA_LIBRETO_MANO }); }

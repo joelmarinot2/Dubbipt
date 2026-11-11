@@ -86,13 +86,14 @@ exports.pruebas = function(t){
     return { F: ctx.F, els, html, ls, avisos, ctx };
   };
   let V = mk(null);
-  t.eq('sin nada guardado: el claro, con su capa puesta y la otra apagada', [V.html.attrs['data-tema'], V.els.temaClaro.media, V.els.temaOscuro.media].join(' | '), 'claro | all | not all');
-  t.eq('el botón pasa al oscuro, lo guarda y lo dice', [V.F.temaBoton(), V.html.attrs['data-tema'], V.els.temaClaro.media, V.els.temaOscuro.media, V.ls.ddl_tema, V.avisos[0]].join(' | '), 'oscuro | oscuro | not all | all | oscuro | Tema oscuro');
-  t.ok('y su dibujo cambia: el sol para volver al claro', /circle cx="12" cy="12" r="4"/.test(V.els.btnTema.innerHTML) && V.els.btnTema.title === 'Cambiar al tema claro');
-  V = mk('oscuro');
-  t.eq('al volver a entrar, el guardado', [V.html.attrs['data-tema'], V.els.temaOscuro.media].join(' | '), 'oscuro | all');
+  t.eq('sin nada guardado: el oscuro, con su capa puesta y la otra apagada', [V.html.attrs['data-tema'], V.els.temaClaro.media, V.els.temaOscuro.media].join(' | '), 'oscuro | not all | all');
+  t.eq('el botón pasa al claro, lo guarda y lo dice', [V.F.temaBoton(), V.html.attrs['data-tema'], V.els.temaClaro.media, V.els.temaOscuro.media, V.ls.ddl_tema, V.avisos[0]].join(' | '), 'claro | claro | all | not all | claro | Tema claro');
+  t.ok('y su dibujo cambia: la luna para volver al oscuro', !/circle cx="12" cy="12" r="4"/.test(V.els.btnTema.innerHTML) && V.els.btnTema.title === 'Cambiar al tema oscuro');
+  t.eq('y otra vez, al oscuro: el sol para volver al claro', [V.F.temaBoton(), V.ls.ddl_tema, /circle cx="12" cy="12" r="4"/.test(V.els.btnTema.innerHTML), V.els.btnTema.title].join(' | '), 'oscuro | oscuro | true | Cambiar al tema claro');
+  V = mk('claro');
+  t.eq('al volver a entrar, el guardado: quien eligió el claro, lo conserva', [V.html.attrs['data-tema'], V.els.temaClaro.media, V.els.temaOscuro.media].join(' | '), 'claro | all | not all');
   V = mk('cualquier cosa');
-  t.eq('un valor raro guardado: el claro', V.html.attrs['data-tema'], 'claro');
+  t.eq('un valor raro guardado: el oscuro', V.html.attrs['data-tema'], 'oscuro');
   {
     const W = mk('claro');
     const lTheme = { click(){ this.clics = (this.clics || 0) + 1; } }, raiz = { attrs: {}, setAttribute(k, v){ this.attrs[k] = v; } };
@@ -104,12 +105,20 @@ exports.pruebas = function(t){
   }
 
   t.seccion('6 · cableado');
-  t.ok('las tres hojas después del CSS de siempre, y el módulo', /<link rel="stylesheet" href="\.\/tema-claro-auto\.css" id="temaClaro">\s*<link rel="stylesheet" href="\.\/tema-oscuro-auto\.css" id="temaOscuro" media="not all">\s*<link rel="stylesheet" href="\.\/tema-vidrio\.css" id="temaVidrio">/.test(HTML)
+  t.ok('las tres hojas después del CSS de siempre (de entrada, la oscura), y el módulo', /<link rel="stylesheet" href="\.\/tema-claro-auto\.css" id="temaClaro" media="not all">\s*<link rel="stylesheet" href="\.\/tema-oscuro-auto\.css" id="temaOscuro">\s*<link rel="stylesheet" href="\.\/tema-vidrio\.css" id="temaVidrio">/.test(HTML)
        && HTML.lastIndexOf('</style>', HTML.indexOf('id="temaClaro"')) > HTML.indexOf('<style>') && /<script src="\.\/js\/tema\.js"><\/script>/.test(HTML));
   t.ok('el botón, en la barra', /<button class="tb-icon" id="btnTema" onclick="temaBoton\(\)"/.test(HTML));
-  t.ok('el libreto recibe su paleta y arranca en el modo del tema', /st3\.textContent = temaLibretoCss\(LIB_CSS \+ '\\n' \+ LIB_OVERRIDE\)/.test(HTML) && /pop2\.theme = temaActual\(\) === 'claro' \? 'light' : 'dark';/.test(HTML));
-  t.ok('la paleta del libreto: sus colores en menta y petróleo, y la barra de arriba en petróleo', /html body \.lh\{ background:linear-gradient\(180deg,#143c36,#0c2b27\) !important;/.test(T.temaLibretoCss('.x{color:#4ADE80}')) && /^\.x\{color:#[0-9a-f]{6}\}/.test(T.temaLibretoCss('.x{color:#4ADE80}')));
-  t.ok('lo que se inyecta en la ventana principal y la ventana de karaoke, también', (HTML.match(/document\.head\.appendChild\(temaVestir\(st\)\)/g) || []).length === 2 && /temaCapa\(KARWIN_CSS, 'oscuro'\)/.test(HTML));
+  t.ok('el libreto: su CSS con los colores convertidos EN EL SITIO (ni una regla más), lo de a mano encima, y arranca en el modo del tema',
+       /const _lt = \(css\) => \(typeof temaReescribir === 'function'\) \? temaReescribir\(css, 'oscuro'\) : css;/.test(HTML) && /st\.textContent = _lt\(LIB_CSS\)/.test(HTML) && /st2\.textContent = _lt\(LIB_OVERRIDE\)/.test(HTML)
+       && /st3\.textContent = temaLibretoCss\(\);/.test(HTML) && /pop2\.theme = temaActual\(\) === 'claro' \? 'light' : 'dark';/.test(HTML));
+  {
+    const css = '.x{color:#4ADE80;margin:0}\n.y{background:#0B0920}\n.z{display:flex}', r = T.temaReescribir(css, 'oscuro');
+    t.ok('convertir en el sitio: las mismas reglas, con otro color; lo que no es color, igual', /^\.x\{color:#[0-9a-f]{6};margin:0\}\n\.y\{background:#[0-9a-f]{6}\}\n\.z\{display:flex\}$/.test(r) && r.indexOf('#4ADE80') < 0 && r.split('{').length === css.split('{').length, r);
+    t.ok('se calcula una vez por cadena', T.temaReescribir(css, 'oscuro') === r);
+  }
+  t.ok('lo de a mano del libreto: la barra de arriba en petróleo, y nada más que eso', /html body \.lh\{ background:linear-gradient\(180deg,#143c36,#0c2b27\) !important;/.test(T.temaLibretoCss()) && T.temaLibretoCss() === T.TEMA_LIBRETO_MANO && T.temaLibretoCss().split('\n').length < 40);
+  t.ok('lo que se inyecta en la ventana principal lleva sus dos capas; la ventana de karaoke y el libreto oculto, sus colores en el sitio', (HTML.match(/document\.head\.appendChild\(temaVestir\(st\)\)/g) || []).length === 2
+       && /temaReescribir\(KARWIN_CSS, 'oscuro'\) : KARWIN_CSS/.test(HTML) && /temaReescribir\(LIB_OCU_CSS, 'oscuro'\) : LIB_OCU_CSS/.test(HTML));
   const SW = fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8');
   t.ok('todo queda en la caché, para trabajar sin conexión', ["'./js/tema.js'", "'./tema-claro-auto.css'", "'./tema-oscuro-auto.css'", "'./tema-vidrio.css'"].every(x => SW.indexOf(x) > 0));
   const MANO = fs.readFileSync(path.join(RAIZ, 'tema-vidrio.css'), 'utf8');
