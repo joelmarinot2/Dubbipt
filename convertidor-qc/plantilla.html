@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Convertidor QC · Dubbipt</title>
+<!-- Se construye con `node convertidor-qc/construir.js`: no edites
+     convertidor-qc.html a mano. La pantalla está en convertidor-qc/plantilla.html
+     y el motor es el mismo js/qcpdf.js de la aplicación. -->
+<style>
+:root{
+  --fondo:#08110f; --panel:#0f1d1a; --caja:#142622; --linea:rgba(143,230,205,.16); --linea-fuerte:rgba(143,230,205,.34);
+  --tinta:#e8f3f0; --suave:#8fa8a2; --menta:#8fe6cd; --menta-tinta:#06231e; --mal:#ff8a80; --durazno:#f6b48a;
+  --sans:system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme:dark;
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; }
+body{
+  min-height:100vh; font-family:var(--sans); color:var(--tinta); background:var(--fondo);
+  background-image:radial-gradient(900px 500px at 12% -10%, rgba(143,230,205,.10), transparent 60%),
+                   radial-gradient(700px 420px at 100% 0%, rgba(246,180,138,.07), transparent 60%);
+  background-attachment:fixed; padding:28px 16px 40px;
+}
+.pagina{ width:min(640px, 100%); margin:0 auto; }
+.cab{ display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+.cab-marca{ flex:0 0 auto; width:38px; height:38px; border-radius:12px; background:var(--menta); color:var(--menta-tinta);
+  display:flex; align-items:center; justify-content:center; }
+.cab h1{ margin:0; font-size:19px; font-weight:800; letter-spacing:-.2px; }
+.cab p{ margin:2px 0 0; font-size:12.5px; color:var(--suave); }
+
+/* El convertidor: las mismas clases que pinta js/qcpdf.js en la aplicación. */
+.dlgcard{ background:var(--panel); border:1px solid var(--linea); border-radius:22px; padding:22px 22px 20px;
+  box-shadow:0 18px 50px rgba(0,0,0,.35); }
+/* El título ya está arriba, en la cabecera de la página. */
+.herr-h{ display:none; }
+.herr-sub{ font-size:12.5px; color:var(--suave); margin-bottom:16px; line-height:1.5; }
+.herr-fb{ display:flex; gap:9px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap; }
+.herr-fb button{ background:var(--caja); border:1px solid var(--linea); color:var(--tinta); border-radius:999px;
+  padding:10px 18px; font:inherit; font-size:13px; font-weight:700; cursor:pointer; min-height:40px; }
+.herr-fb button:hover:not([disabled]){ border-color:var(--linea-fuerte); }
+.herr-fb button[disabled]{ opacity:.45; cursor:default; }
+.herr-fb .conv-go{ background:var(--menta); border-color:var(--menta); color:var(--menta-tinta); }
+.conv-meta{ display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+.conv-meta label{ flex:1 1 220px; display:flex; flex-direction:column; gap:5px; }
+.conv-meta span{ font-size:10.5px; letter-spacing:.8px; text-transform:uppercase; color:var(--suave); font-weight:700; }
+.conv-meta input{ width:100%; background:var(--caja); border:1px solid var(--linea); color:var(--tinta);
+  border-radius:11px; padding:10px 12px; font:inherit; font-size:13.5px; }
+.conv-meta input::placeholder{ color:#6f8782; }
+.conv-zona{ border:2px dashed var(--linea-fuerte); border-radius:16px; padding:30px 16px; text-align:center;
+  cursor:pointer; display:flex; flex-direction:column; gap:6px; background:rgba(143,230,205,.03); }
+.conv-zona:hover{ background:rgba(143,230,205,.06); }
+.conv-zona.sobre{ border-color:var(--menta); background:rgba(143,230,205,.12); }
+.conv-zona b{ font-size:14px; }
+.conv-zona i{ font-style:normal; font-size:12px; color:var(--suave); }
+.conv-post{ display:flex; align-items:center; gap:8px; margin-top:10px; font-size:12.5px;
+  background:var(--caja); border:1px solid var(--linea); border-radius:12px; padding:10px 12px; }
+.conv-post i{ font-style:normal; color:var(--suave); font-size:11.5px; }
+.conv-post .conv-q{ margin-left:auto; }
+.conv-lista{ margin-top:12px; display:flex; flex-direction:column; gap:7px; }
+.conv-it{ display:flex; align-items:center; gap:4px 9px; background:var(--caja); border:1px solid var(--linea);
+  border-radius:12px; padding:10px 12px; flex-wrap:wrap; }
+.conv-n{ flex:1 1 0; min-width:0; font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Lo que pasó con cada archivo, en su propio renglón debajo del nombre: puede ser largo (lo que se quitó del TXT). */
+.conv-st{ order:9; flex:1 1 100%; font-size:11.5px; line-height:1.45; color:var(--suave); }
+.conv-st.ok{ color:var(--menta); }
+.conv-st.mal{ color:var(--mal); }
+.conv-dl,.conv-q{ flex:0 0 auto; background:none; border:0; color:var(--suave); cursor:pointer; padding:6px;
+  border-radius:8px; display:inline-flex; align-items:center; }
+.conv-dl:hover,.conv-q:hover{ color:var(--tinta); background:rgba(143,230,205,.10); }
+.conv-vacio{ margin-top:12px; font-size:12.5px; color:var(--suave); text-align:center; padding:12px; }
+button:focus-visible, input:focus-visible, .conv-zona:focus-visible{ outline:2px solid var(--menta); outline-offset:2px; }
+
+.notas{ margin-top:18px; display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px; }
+.nota{ border:1px solid var(--linea); border-radius:16px; padding:14px 16px; background:rgba(15,29,26,.6); }
+.nota h2{ margin:0 0 6px; font-size:11px; letter-spacing:.9px; text-transform:uppercase; color:var(--menta); }
+.nota ul{ margin:0; padding-left:17px; font-size:12.5px; line-height:1.55; color:var(--suave); }
+.nota li + li{ margin-top:3px; }
+.nota b{ color:var(--tinta); font-weight:600; }
+.pie{ margin-top:18px; font-size:11px; color:#6f8782; text-align:center; }
+.aviso{ margin-bottom:14px; border:1px solid var(--mal); color:var(--mal); border-radius:12px; padding:10px 12px; font-size:12.5px; }
+</style>
+</head>
+<body>
+<div class="pagina">
+  <header class="cab">
+    <div class="cab-marca" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 14l2 2 4-4"/></svg>
+    </div>
+    <div>
+      <h1>Convertidor de informes de QC</h1>
+      <p>Funciona en este equipo, sin internet. Los archivos no salen de aquí.</p>
+    </div>
+  </header>
+
+  <div id="avisos"></div>
+  <main id="convOv"></main>
+
+  <section class="notas" aria-label="Qué hace">
+    <div class="nota">
+      <h2>Qué acepta</h2>
+      <ul>
+        <li>Un <b>informe de QC en PDF</b> (el de marcas de memoria de Pro Tools).</li>
+        <li>El <b>TXT de marcadores</b> de Pro Tools («Export Session Info as Text»).</li>
+        <li>Un <b>llamado de actores</b> en PDF: sale agrupado por Mañana y Tarde.</li>
+        <li>Una <b>imagen</b> (el póster), opcional: el informe sale en escala de grises con el póster en la primera hoja.</li>
+      </ul>
+    </div>
+    <div class="nota">
+      <h2>Qué sale</h2>
+      <ul>
+        <li>Un <b>PDF A4 por cada archivo</b>, de dos hojas como mucho, que se descarga solo.</li>
+        <li><b>No se cambia ni una palabra</b>: mayúsculas, erratas y abreviaturas salen tal cual.</li>
+        <li>Cada corrección lleva su <b>tipo</b> (Falta, Cambiar, Pegar, Ajuste) y un círculo para marcarla a mano.</li>
+      </ul>
+    </div>
+  </section>
+
+  <p class="pie">Dubbipt · Convertidor QC · construido el @@FECHA@@ · el mismo motor que la aplicación</p>
+</div>
+
+<script id="lib-jspdf">/*@@JSPDF@@*/</script>
+<script id="lib-pdfjs">/*@@PDFJS@@*/</script>
+<script id="lib-pdfworker" type="text/plain">@@PDFWORKER@@</script>
+<script id="de-index">/*@@DE_INDEX@@*/</script>
+<script id="motor">/*@@MOTOR@@*/</script>
+<script id="pantalla">
+'use strict';
+/* La pantalla de este archivo: lo justo para que el convertidor de la
+   aplicación (qcConvPintar y compañía, en el motor) viva solo en una página. */
+(function(){
+  const CLAVE = 'dubbipt_convqc';
+  const avisar = (texto) => {
+    const a = document.getElementById('avisos'); if(!a) return;
+    const d = document.createElement('div'); d.className = 'aviso'; d.textContent = texto; a.appendChild(d);
+  };
+
+  /* El lector de PDF trabaja en un hilo aparte. Desde un archivo abierto con
+     doble clic no se puede cargar otro archivo como hilo, así que va dentro,
+     como texto, y se le da al navegador desde la memoria. */
+  try{
+    const codigo = document.getElementById('lib-pdfworker').textContent;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([codigo], { type: 'text/javascript' }));
+  }catch(e){
+    avisar('El lector de PDF no ha podido arrancar en este navegador (' + ((e && e.message) || e) + '). El TXT de Pro Tools sí se puede convertir.');
+  }
+
+  /* Los dos nombres se recuerdan en este equipo: casi siempre revisa la misma persona. */
+  try{
+    const g = JSON.parse(localStorage.getItem(CLAVE) || 'null');
+    if(g && typeof g === 'object'){
+      QCCONV.revisor = String(g.revisor || '').slice(0, 90);
+      QCCONV.estudio = String(g.estudio || '').slice(0, 90);
+    }
+  }catch(e){ /* sin almacén (modo privado): se teclean cada vez */ }
+  const recordar = () => {
+    try{ localStorage.setItem(CLAVE, JSON.stringify({ revisor: QCCONV.revisor || '', estudio: QCCONV.estudio || '' })); }
+    catch(e){ /* sin almacén: no se recuerdan, y no pasa nada más */ }
+  };
+
+  /* En la aplicación el convertidor es una ventana que se cierra. Aquí es la
+     página: «Cerrar» vacía la lista para empezar otra tanda. */
+  qcConvCerrar = function(){
+    QCCONV.archivos = []; QCCONV.poster = null; QCCONV.trabajando = false;
+    qcConvPintar();
+  };
+  const pintarDeSiempre = qcConvPintar;
+  qcConvPintar = function(){
+    pintarDeSiempre();
+    const ov = document.getElementById('convOv'); if(!ov) return;
+    const x = ov.querySelector('#convX');
+    if(x){
+      x.textContent = 'Vaciar la lista';
+      if(!QCCONV.archivos.length && !QCCONV.poster) x.disabled = true;
+    }
+    const zona = ov.querySelector('#convZona');
+    if(zona){
+      zona.setAttribute('role', 'button'); zona.setAttribute('tabindex', '0');
+      zona.addEventListener('keydown', (e) => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); zona.click(); } });
+    }
+    ['#convRev', '#convEst'].forEach(sel => { const i = ov.querySelector(sel); if(i) i.addEventListener('input', recordar); });
+  };
+
+  /* Un archivo soltado fuera del recuadro no debe abrirse en la pestaña y llevarse la página: también cuenta. */
+  ['dragover', 'drop'].forEach(ev => document.addEventListener(ev, (e) => { e.preventDefault(); }));
+  document.addEventListener('drop', (e) => { qcConvAnadir(e.dataTransfer && e.dataTransfer.files); });
+
+  qcConvPintar();
+})();
+</script>
+</body>
+</html>

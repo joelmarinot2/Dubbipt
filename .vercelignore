@@ -13,3 +13,5 @@ local/
 *.cmd
 # fuentes del revisor ASREC: se publica solo el revisor-asrec.html construido
 revisor-asrec/
+# fuentes del convertidor de QC: se publica solo el convertidor-qc.html construido
+convertidor-qc/
