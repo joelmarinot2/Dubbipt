@@ -2519,6 +2519,70 @@ body.modo-casting #btnExport{ display:none !important; }
 .loading .lprog i{ display:block; height:100%; width:0%; background:linear-gradient(90deg,#16A34A,#4ADE80); border-radius:99px; transition:width .3s ease; }
 .loading .lpct{ font-family:'JetBrains Mono',monospace; font-size:11.5px; color:#4ADE80; margin-top:6px; }
 </style>
+<!-- El tema «vidrio» (ENT-26), en claro y en oscuro: capas sobre el CSS de siempre. Las dos «auto» las genera
+     herramientas/tema.js (los colores de cada regla, convertidos); tema-vidrio.css es lo que va a mano y vale
+     para las dos. Se aplica la capa del tema elegido (ddl_tema: «claro» si no se ha elegido). -->
+<link rel="stylesheet" href="./tema-claro-auto.css" id="temaClaro">
+<link rel="stylesheet" href="./tema-oscuro-auto.css" id="temaOscuro" media="not all">
+<link rel="stylesheet" href="./tema-vidrio.css" id="temaVidrio">
+<script>
+/** Pone el tema («claro» u «oscuro») y lo recuerda en este equipo. Sin argumento, el guardado. */
+function temaPoner(t){
+  if(t !== 'claro' && t !== 'oscuro'){
+    try{ t = localStorage.getItem('ddl_tema'); }catch(e){ t = null; /* sin almacén: el claro */ }
+    if(t !== 'oscuro') t = 'claro';
+  }else{
+    try{ localStorage.setItem('ddl_tema', t); }catch(e){ /* vale para esta vez */ }
+  }
+  var c = document.getElementById('temaClaro'), o = document.getElementById('temaOscuro');
+  if(c) c.media = t === 'claro' ? 'all' : 'not all';
+  if(o) o.media = t === 'oscuro' ? 'all' : 'not all';
+  document.documentElement.setAttribute('data-tema', t);
+  var m = document.querySelector('meta[name="theme-color"]');
+  if(m) m.setAttribute('content', t === 'oscuro' ? '#06100e' : '#eef4f2');
+  return t;
+}
+function temaActual(){ return document.documentElement.getAttribute('data-tema') === 'oscuro' ? 'oscuro' : 'claro'; }
+function temaCambiar(){ return temaPoner(temaActual() === 'oscuro' ? 'claro' : 'oscuro'); }
+/** El dibujo del botón: la luna en el tema claro (lleva al oscuro), el sol en el oscuro. */
+function temaPintarBoton(){
+  var b = document.getElementById('btnTema');
+  if(!b) return;
+  var osc = temaActual() === 'oscuro';
+  b.innerHTML = osc
+    ? '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>';
+  b.title = osc ? 'Cambiar al tema claro' : 'Cambiar al tema oscuro';
+  b.setAttribute('aria-label', b.title);
+}
+/** El libreto (otro documento) sigue al tema de la aplicación: claro con el claro, oscuro con el oscuro. */
+function temaAlLibreto(){
+  try{
+    if(typeof pop2 === 'undefined' || !pop2 || !pop2.doc) return;
+    pop2.doc.documentElement.setAttribute('data-tema', temaActual());
+    var quiere = temaActual() === 'claro' ? 'light' : 'dark';
+    pop2._temaDe = temaActual();
+    if(pop2.theme !== quiere){ var b = pop2.doc.getElementById('lTheme'); if(b) b.click(); }
+  }catch(e){ /* el libreto se pondrá al día al volver a abrirlo */ }
+}
+/** El botón de la barra: cambia de tema, y el libreto abierto con él. */
+function temaBoton(){
+  var t = temaCambiar();
+  temaPintarBoton();
+  temaAlLibreto();
+  try{ if(typeof DDL_UI !== 'undefined') DDL_UI.toast(t === 'oscuro' ? 'Tema oscuro' : 'Tema claro'); }catch(e){ /* sin aviso */ }
+  return t;
+}
+/** Un <style> que el código inyecta en la ventana principal: se le añaden sus dos capas de tema. */
+function temaVestir(st){
+  try{ if(st && !st._tema && typeof temaDosCapas === 'function'){ st._tema = 1; st.textContent += '\n' + temaDosCapas(st.textContent); } }
+  catch(e){ /* se queda con sus colores de siempre */ }
+  return st;
+}
+temaPoner();
+document.addEventListener('DOMContentLoaded', temaPintarBoton);
+</script>
+<script src="./js/tema.js"></script>
 </head>
 <body class="locked">
 <div class="appbar appbar-top"></div>
@@ -2586,6 +2650,7 @@ body.modo-casting #btnExport{ display:none !important; }
       <span class="tb-dev" id="devStat" role="status" aria-live="polite">Listo</span>
       <button class="tb-sync" id="syncChip" onclick="syncMenu()" title="Sincronización tablet ↔ escritorio" aria-label="Estado de sincronización entre tablet y escritorio" style="display:none">sincronización</button>
       <div class="tb-divider" aria-hidden="true"></div>
+      <button class="tb-icon" id="btnTema" onclick="temaBoton()" title="Tema claro / oscuro" aria-label="Cambiar entre tema claro y oscuro"></button>
       <button class="tb-icon" id="btnNotif" onclick="toggleNotif(event)" title="Notificaciones" aria-label="Notificaciones"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg></button>
       <button class="tb-icon" id="userBtn" onclick="toggleUserMenu(event)" title="Configuración" aria-label="Configuración y cuenta"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
       <button class="tb-user" id="avatarBtn" onclick="toggleUserMenu(event)" title="Tu cuenta" aria-label="Tu cuenta">JP</button>
@@ -3029,7 +3094,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v11.99.0-nube';
+const APP_VER_NUM = 'v12.0.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -8956,7 +9021,7 @@ function taskPanelEl(){
     + '#taskPanel .tp-b{height:5px;background:#23262b;border-radius:99px;margin-top:10px;overflow:hidden}'
     + '#taskPanel .tp-f{height:100%;width:0;background:linear-gradient(90deg,#16A34A,#4ADE80);border-radius:99px;transition:width .25s}'
     + '#taskPanel.load .tp-f{background:linear-gradient(90deg,#0ea5e9,#4ADE80)}';
-  document.head.appendChild(st);
+  document.head.appendChild(temaVestir(st));
   p = document.createElement('div'); p.id = 'taskPanel';
   document.body.appendChild(p);
   return p;
@@ -16199,6 +16264,12 @@ function buildLibretoDoc(pc){
     +'<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"></head><body></body>';
   const st = d.createElement('style'); st.textContent = LIB_CSS; d.head.appendChild(st);
   const st2 = d.createElement('style'); st2.textContent = LIB_OVERRIDE; d.head.appendChild(st2);
+  /* El tema (ENT-26): la paleta nueva encima de su CSS, y de entrada el modo del tema de la aplicación. */
+  try{
+    if(typeof temaLibretoCss === 'function'){ const st3 = d.createElement('style'); st3.id = 'temaLib'; st3.textContent = temaLibretoCss(LIB_CSS + '\n' + LIB_OVERRIDE); d.head.appendChild(st3); }
+    d.documentElement.setAttribute('data-tema', temaActual());
+    if(pop2._temaDe !== temaActual()){ pop2._temaDe = temaActual(); pop2.theme = temaActual() === 'claro' ? 'light' : 'dark'; }
+  }catch(e){ fallo('temaLibretoCss · index.html:libreto', e, 'el libreto se ve con sus colores de siempre'); }
   try{ const c = libColorsGet();
        d.documentElement.style.setProperty('--boxc', c.boxc);
        d.documentElement.style.setProperty('--libbg', c.bg); }catch(e){}
@@ -18596,7 +18667,7 @@ function libOcupacion(){
   if(!d.getElementById('lOcuCss')){
     const st = d.createElement('style');
     st.id = 'lOcuCss';
-    st.textContent = LIB_OCU_CSS;
+    st.textContent = LIB_OCU_CSS + (typeof temaCapa === 'function' ? '\n' + temaCapa(LIB_OCU_CSS, 'oscuro') : '');
     d.head.appendChild(st);
   }
   if(!caja){
@@ -19923,7 +19994,7 @@ function ddlOvSync(){
         + ':not(#trackpad):not(#libInline):not(#tabChooser):not(#syncPop):not(#openLibPrompt)'
         + ':not(.modo-cap):not(.ddl-encima):not(script):not(style)'
         + '{display:none !important}';
-      document.head.appendChild(st);
+      document.head.appendChild(temaVestir(st));
     }
     const tp = document.getElementById('trackpad');
     const li = document.getElementById('libInline');
@@ -22770,7 +22841,7 @@ function karWinAbierta(){
 function karWinMontar(win){
   const d = win.document;
   d.head.innerHTML = '<meta charset="utf-8"><title>Karaoke</title>';
-  const st = d.createElement('style'); st.textContent = KARWIN_CSS; d.head.appendChild(st);
+  const st = d.createElement('style'); st.textContent = KARWIN_CSS + (typeof temaCapa === 'function' ? '\n' + temaCapa(KARWIN_CSS, 'oscuro') : ''); d.head.appendChild(st);
   d.body.innerHTML =
       '<div id="kbar">'
     +   '<span id="kwho"></span>'

@@ -1,0 +1,381 @@
+/* El tema «vidrio» de Dubbipt, lo que va a mano · ENT-26
+ *
+ * Pedido de sala: «quiero cambiar la interfaz gráfica general a esta» (un
+ * panel de vidrio: fondo pastel, tarjetas blancas muy redondeadas, barra y
+ * cabeceras en verde petróleo, el activo en menta que brilla, acentos
+ * esmeralda y durazno); y después: «también haz una interfaz dark».
+ *
+ * Dos versiones del mismo diseño, a elegir con el botón de la barra:
+ *   · claro  (html[data-tema="claro"]):  fondo pastel y vidrio blanco;
+ *   · oscuro (html[data-tema="oscuro"]): fondo verde muy oscuro y vidrio ahumado.
+ * Los colores de cada regla del CSS de siempre los convierte
+ * herramientas/tema.js (tema-claro-auto.css y tema-oscuro-auto.css, que se
+ * cargan antes). Aquí va lo que una conversión no puede dar: el fondo, el
+ * vidrio, las formas y las piezas en verde petróleo. Las formas son comunes
+ * (html[data-tema]); lo que cambia entre una y otra son estas variables.
+ */
+
+html[data-tema="claro"]{
+  --tv-fondo:
+    radial-gradient(900px 620px at 0% 0%, rgba(126,214,190,.55), transparent 62%),
+    radial-gradient(820px 640px at 100% 38%, rgba(250,214,190,.62), transparent 60%),
+    radial-gradient(900px 560px at 38% 110%, rgba(190,222,240,.62), transparent 62%),
+    #eef4f2;
+  --tv-barra-1:#123a34;  --tv-barra-2:#0c2b27;          /* la barra y las cabeceras */
+  --tv-barra-sombra:rgba(12,43,39,.26);
+  --tv-tinta:#12302b;    --tv-tinta-tenue:#5e736f;
+  --tv-menta:#8fe6cd;                                     /* el activo, que brilla */
+  --tv-acento:#167a63;                                    /* esmeralda: al pasar, el foco */
+  --tv-durazno:#f6a877;  --tv-durazno-2:#ffbd92;  --tv-durazno-tinta:#3b1d08;
+  --tv-vidrio:rgba(255,255,255,.80);
+  --tv-vidrio-fuerte:rgba(255,255,255,.92);
+  --tv-vidrio-alza:#ffffff;
+  --tv-borde:rgba(255,255,255,.85);
+  --tv-linea:rgba(18,48,43,.10);
+  --tv-velo:rgba(226,238,234,.62);
+  --tv-boton:rgba(255,255,255,.8);  --tv-boton-alza:#ffffff;
+  --tv-principal:#0c2b27;  --tv-principal-tinta:#ffffff;  --tv-principal-alza:#167a63;
+  --tv-campo:#ffffff;
+  --tv-hueco:rgba(255,255,255,.38);
+  --tv-foco:rgba(22,122,99,.14);
+  --tv-sombra:0 10px 30px rgba(18,60,52,.10), 0 2px 6px rgba(18,60,52,.05);
+  --tv-sombra-alta:0 24px 60px rgba(18,60,52,.18), 0 4px 12px rgba(18,60,52,.08);
+  --tv-barra-desliz:rgba(18,48,43,.18);
+  --tv-peligro:#c0263b;
+  color-scheme:light;
+}
+html[data-tema="oscuro"]{
+  --tv-fondo:
+    radial-gradient(900px 620px at 0% 0%, rgba(34,150,122,.30), transparent 62%),
+    radial-gradient(820px 640px at 100% 38%, rgba(246,168,119,.10), transparent 60%),
+    radial-gradient(900px 560px at 38% 110%, rgba(56,132,170,.16), transparent 62%),
+    #06100e;
+  --tv-barra-1:#164038;  --tv-barra-2:#0e2a25;
+  --tv-barra-sombra:rgba(0,0,0,.45);
+  --tv-tinta:#eaf6f2;    --tv-tinta-tenue:#8ea7a1;
+  --tv-menta:#8fe6cd;
+  --tv-acento:#5fd6b6;
+  --tv-durazno:#f6a877;  --tv-durazno-2:#ffbd92;  --tv-durazno-tinta:#3b1d08;
+  --tv-vidrio:rgba(255,255,255,.055);
+  --tv-vidrio-fuerte:rgba(14,30,27,.94);
+  --tv-vidrio-alza:rgba(255,255,255,.2);
+  --tv-borde:rgba(255,255,255,.09);
+  --tv-linea:rgba(255,255,255,.10);
+  --tv-velo:rgba(3,10,9,.66);
+  --tv-boton:rgba(255,255,255,.06);  --tv-boton-alza:rgba(255,255,255,.11);
+  --tv-principal:#8fe6cd;  --tv-principal-tinta:#06231e;  --tv-principal-alza:#b9f3e2;
+  --tv-campo:rgba(255,255,255,.05);
+  --tv-hueco:rgba(255,255,255,.025);
+  --tv-foco:rgba(143,230,205,.18);
+  --tv-sombra:0 10px 30px rgba(0,0,0,.34), 0 2px 6px rgba(0,0,0,.2);
+  --tv-sombra-alta:0 24px 60px rgba(0,0,0,.5), 0 4px 12px rgba(0,0,0,.3);
+  --tv-barra-desliz:rgba(255,255,255,.16);
+  --tv-peligro:#ff8a9b;
+  color-scheme:dark;
+}
+html[data-tema]{ --r:18px; }
+
+/* ── El fondo: menta arriba a la izquierda, durazno a la derecha, azul abajo ── */
+html[data-tema] body{
+  background:var(--tv-fondo);
+  background-attachment:fixed;
+  color:var(--tv-tinta);
+}
+
+/* ── La barra de arriba: una píldora en verde petróleo ── */
+html[data-tema] #topbar{
+  background:linear-gradient(180deg, var(--tv-barra-1), var(--tv-barra-2)) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+  border-radius:999px !important;
+  box-shadow:0 14px 34px var(--tv-barra-sombra), inset 0 1px 0 rgba(255,255,255,.08) !important;
+}
+html[data-tema] #topbar .tb-tab{ color:rgba(255,255,255,.72) !important; }
+html[data-tema] #topbar .tb-tab.on,
+html[data-tema] #topbar .tb-tab:hover{ color:#fff !important; }
+html[data-tema] #topbar .tb-tab.on::after{ background:var(--tv-menta) !important; box-shadow:0 0 12px rgba(143,230,205,.9); }
+html[data-tema] #topbar .tb-perfil,
+html[data-tema] #topbar .tb-icon,
+html[data-tema] #topbar .tb-user{
+  background:rgba(255,255,255,.08) !important;
+  border:1px solid rgba(255,255,255,.12) !important;
+  color:#eafaf5 !important;
+  border-radius:999px !important;
+}
+html[data-tema] #topbar .tb-perfil:hover,
+html[data-tema] #topbar .tb-icon:hover,
+html[data-tema] #topbar .tb-user:hover{ background:rgba(143,230,205,.22) !important; border-color:rgba(143,230,205,.55) !important; }
+html[data-tema] #topbar .tb-user{ background:var(--tv-menta) !important; color:#06231e !important; border-color:transparent !important; box-shadow:0 0 0 4px rgba(143,230,205,.18), 0 0 18px rgba(143,230,205,.55); }
+html[data-tema] #topbar .tb-perfil *,
+html[data-tema] #topbar .tb-icon *{ color:inherit !important; }
+html[data-tema] #topbar svg{ stroke:currentColor; }
+html[data-tema] #topbar .tb-crumb,
+html[data-tema] #topbar .tb-ep,
+html[data-tema] #topbar .tb-show,
+html[data-tema] #topbar > span,
+html[data-tema] #topbar .tb-right > span{ color:rgba(255,255,255,.78) !important; }
+
+/* ── La barra de Casting: la misma píldora, de pie ── */
+html[data-tema] #csNav{
+  background:linear-gradient(180deg, var(--tv-barra-1), var(--tv-barra-2)) !important;
+  border:1px solid rgba(255,255,255,.08) !important;
+  border-radius:28px !important;
+  box-shadow:0 18px 40px var(--tv-barra-sombra), inset 0 1px 0 rgba(255,255,255,.08) !important;
+  padding:16px 10px !important;
+}
+html[data-tema] .cs-nav-t{ color:rgba(255,255,255,.45) !important; }
+html[data-tema] .cs-nav-b{ color:rgba(255,255,255,.72) !important; border-radius:999px !important; border-color:transparent !important; background:transparent !important; }
+html[data-tema] .cs-nav-b:hover{ color:#fff !important; background:rgba(255,255,255,.08) !important; }
+html[data-tema] .cs-nav-b.on,
+html[data-tema] .cs-nav-b.cs-nav-dc.on{
+  background:var(--tv-menta) !important; color:#06231e !important; border-color:transparent !important;
+  box-shadow:0 0 0 4px rgba(143,230,205,.16), 0 0 22px rgba(143,230,205,.55);
+}
+html[data-tema] .cs-nav-b.cs-nav-dc{ color:rgba(255,255,255,.6) !important; }
+
+/* ── Las cabeceras: un banner en verde petróleo, como el del panel ── */
+html[data-tema] #dashHead,
+html[data-tema] .cs-cab{
+  background:
+    radial-gradient(420px 160px at 88% 0%, rgba(143,230,205,.20), transparent 70%),
+    linear-gradient(135deg, var(--tv-barra-1), var(--tv-barra-2)) !important;
+  border-radius:24px !important;
+  padding:18px 22px !important;
+  box-shadow:0 16px 36px var(--tv-barra-sombra) !important;
+  color:#fff !important;
+  margin-bottom:18px !important;
+}
+html[data-tema] #dashHead h2,
+html[data-tema] .cs-cab h2{ color:#fff !important; font-weight:600 !important; letter-spacing:-.01em; }
+html[data-tema] #dashHead .dh-sub,
+html[data-tema] .cs-cab .cs-cab-sub,
+html[data-tema] .cs-cab .cs-de{ color:rgba(255,255,255,.62) !important; }
+html[data-tema] .cs-cab .cs-cab-sub *{ color:inherit !important; }
+html[data-tema] .cs-cab .cs-cab-sub b,
+html[data-tema] .cs-cab .cs-cab-sub .cs-rojo{ color:#ffc7a3 !important; }
+/* Lo que va dentro del banner: vidrio sobre oscuro, y la llamada a la acción en durazno. */
+html[data-tema] #dashHead .dh-search,
+html[data-tema] #dashHead .dh-tools,
+html[data-tema] .cs-cab .cs-b:not(.cs-pri){
+  background:rgba(255,255,255,.10) !important; border:1px solid rgba(255,255,255,.16) !important; color:#eafaf5 !important; border-radius:999px !important;
+}
+html[data-tema] #dashHead .dh-search input{ color:#fff !important; }
+html[data-tema] #dashHead .dh-search input::placeholder{ color:rgba(255,255,255,.55) !important; }
+html[data-tema] #dashHead .dh-search svg,
+html[data-tema] #dashHead .dh-tools svg{ color:rgba(255,255,255,.8) !important; stroke:currentColor; }
+html[data-tema] #dashHead .dh-tools:hover,
+html[data-tema] .cs-cab .cs-b:not(.cs-pri):hover{ background:rgba(143,230,205,.22) !important; border-color:rgba(143,230,205,.55) !important; }
+html[data-tema] #dashHead .dh-new,
+html[data-tema] .cs-cab .cs-b.cs-pri{
+  background:var(--tv-durazno) !important; border-color:var(--tv-durazno) !important; color:var(--tv-durazno-tinta) !important; border-radius:999px !important;
+  box-shadow:0 8px 22px rgba(246,168,119,.42) !important;
+}
+html[data-tema] #dashHead .dh-new:hover,
+html[data-tema] .cs-cab .cs-b.cs-pri:hover{ background:var(--tv-durazno-2) !important; border-color:var(--tv-durazno-2) !important; }
+html[data-tema] .cs-cab .cs-b *{ color:inherit !important; }
+
+/* ── Las superficies: vidrio blanco, muy redondeado, con sombra suave ── */
+html[data-tema] #libGrid.dashgrid,
+html[data-tema] #csVista,
+html[data-tema] .lib-grid{
+  background:transparent !important; border-color:transparent !important; box-shadow:none !important;
+}
+html[data-tema] .fcard,
+html[data-tema] .card,
+html[data-tema] .pla,
+html[data-tema] .stat,
+html[data-tema] .drop,
+html[data-tema] .cs-kpi,
+html[data-tema] .cs-caja,
+html[data-tema] .cs-prog,
+html[data-tema] .cs-tal,
+html[data-tema] .cs-oc,
+html[data-tema] .cs-tabla-w,
+html[data-tema] .cs-filtros,
+html[data-tema] .cs-tal-filtros,
+html[data-tema] .cs-acc-filtros,
+html[data-tema] .dct-caja,
+html[data-tema] .dct-ep,
+html[data-tema] .dct-pm-cfg,
+html[data-tema] .eptable,
+html[data-tema] .ep-table,
+html[data-tema] #epTableW{
+  background:var(--tv-vidrio) !important;
+  border:1px solid var(--tv-borde) !important;
+  border-radius:20px !important;
+  box-shadow:var(--tv-sombra) !important;
+  /* Sin desenfoque en cada tarjeta: un desglose trae decenas, y en una tablet de sala eso se nota. El vidrio
+     de verdad (con desenfoque) queda para el marco, las ventanas y la entrada. */
+}
+html[data-tema] .fcard:hover,
+html[data-tema] .card:hover,
+html[data-tema] .cs-prog:hover,
+html[data-tema] .cs-tal:hover{ box-shadow:var(--tv-sombra-alta) !important; transform:translateY(-2px); border-color:var(--tv-vidrio-alza) !important; }
+html[data-tema] .fcard.dtile.dadd{ background:var(--tv-hueco) !important; border:1.5px dashed var(--tv-linea) !important; box-shadow:none !important; }
+html[data-tema] .fcard.dtile.dadd:hover{ background:var(--tv-boton) !important; border-color:var(--tv-acento) !important; }
+/* La portada de un programa: sus iniciales, en blanco sobre el color. */
+html[data-tema] .dtile .dcover{ border-radius:16px 16px 0 0; overflow:hidden; }
+html[data-tema] .dtile .dinit{ color:rgba(255,255,255,.92) !important; text-shadow:0 2px 10px rgba(0,0,0,.25); }
+html[data-tema] .dtile .dname{ color:var(--tv-tinta) !important; }
+
+/* ── Botones: en píldora. El principal, verde petróleo. ── */
+html[data-tema] .cs-b,
+html[data-tema] .btnv,
+html[data-tema] .chip,
+html[data-tema] .ddlm-go,
+html[data-tema] .ddlm-cancel,
+html[data-tema] .dh-new,
+html[data-tema] .dh-tools,
+html[data-tema] .ne-btn,
+html[data-tema] .epbtn{ border-radius:999px !important; }
+html[data-tema] .cs-b{ background:var(--tv-boton) !important; border-color:var(--tv-linea) !important; color:var(--tv-tinta) !important; }
+html[data-tema] .cs-b:hover{ border-color:var(--tv-acento) !important; background:var(--tv-boton-alza) !important; }
+html[data-tema] .cs-b.cs-pri,
+html[data-tema] .ddlm-go,
+html[data-tema] .dh-new,
+html[data-tema] .epbtn.pri,
+html[data-tema] .gbtn{
+  background:var(--tv-principal) !important; border-color:var(--tv-principal) !important; color:var(--tv-principal-tinta) !important;
+  box-shadow:0 8px 20px var(--tv-barra-sombra) !important;
+}
+html[data-tema] .cs-b.cs-pri:hover,
+html[data-tema] .ddlm-go:hover,
+html[data-tema] .epbtn.pri:hover,
+html[data-tema] .gbtn:hover{ background:var(--tv-principal-alza) !important; border-color:var(--tv-principal-alza) !important; }
+html[data-tema] .cs-b.cs-pri *,
+html[data-tema] .ddlm-go *{ color:inherit !important; }
+/* «Abrir» un programa en curso: la llamada a la acción, en durazno. */
+html[data-tema] .cs-b.cs-pri.cs-prog-abrir-curso{ background:var(--tv-durazno) !important; border-color:var(--tv-durazno) !important; color:var(--tv-durazno-tinta) !important; box-shadow:0 8px 20px rgba(246,168,119,.38) !important; }
+html[data-tema] .cs-b.cs-pri.cs-prog-abrir-curso:hover{ background:var(--tv-durazno-2) !important; border-color:var(--tv-durazno-2) !important; }
+html[data-tema] .cs-b.cs-borrar{ color:var(--tv-peligro) !important; }
+
+/* Pestañas y filtros de sección: el elegido, en verde petróleo. */
+html[data-tema] .dct-modo.on,
+html[data-tema] .cs-filtro.on,
+html[data-tema] .cs-tab.on,
+html[data-tema] .cs-seg .on{ background:var(--tv-principal) !important; border-color:var(--tv-principal) !important; color:var(--tv-principal-tinta) !important; }
+html[data-tema] .dct-modo,
+html[data-tema] .cs-filtro,
+html[data-tema] .cs-tab{ border-radius:999px !important; }
+html[data-tema] .dct-modo.on *,
+html[data-tema] .cs-filtro.on *,
+html[data-tema] .cs-tab.on *{ color:inherit !important; }
+
+/* ── Campos ── */
+html[data-tema] input[type="text"],
+html[data-tema] input[type="search"],
+html[data-tema] input[type="email"],
+html[data-tema] input[type="password"],
+html[data-tema] input[type="number"],
+html[data-tema] input[type="date"],
+html[data-tema] input:not([type]),
+html[data-tema] select,
+html[data-tema] textarea{ border-radius:12px; }
+html[data-tema] input:focus,
+html[data-tema] select:focus,
+html[data-tema] textarea:focus{ border-color:var(--tv-acento) !important; box-shadow:0 0 0 4px var(--tv-foco) !important; outline:none; }
+
+/* ── Ventanas: vidrio sobre un velo claro ── */
+html[data-tema] .ddlm-ov,
+html[data-tema] .dlgov,
+html[data-tema] .modo-cap,
+html[data-tema] .meta-ov{
+  background:var(--tv-velo) !important;
+  -webkit-backdrop-filter:blur(14px) saturate(1.1); backdrop-filter:blur(14px) saturate(1.1);
+}
+html[data-tema] .ddlm-card,
+html[data-tema] .dlgcard,
+html[data-tema] .modo-caja,
+html[data-tema] .meta-card{
+  background:var(--tv-vidrio-fuerte) !important;
+  border:1px solid var(--tv-borde) !important;
+  border-radius:26px !important;
+  box-shadow:var(--tv-sombra-alta) !important;
+}
+html[data-tema] .ddlm-kicker{ color:var(--tv-acento) !important; }
+html[data-tema] .modo-op{ border-radius:20px !important; background:var(--tv-boton) !important; box-shadow:var(--tv-sombra) !important; }
+html[data-tema] .modo-op:hover,
+html[data-tema] .modo-op.on{ border-color:var(--tv-acento) !important; box-shadow:0 0 0 4px rgba(143,230,205,.35), var(--tv-sombra) !important; }
+
+/* ── La entrada ── */
+html[data-tema] #gate{ background:transparent !important; }
+html[data-tema] #gate .gcard{
+  background:var(--tv-vidrio) !important; border:1px solid var(--tv-borde) !important; border-radius:28px !important;
+  box-shadow:var(--tv-sombra-alta) !important; padding:34px 34px 30px !important;
+  -webkit-backdrop-filter:blur(20px) saturate(1.2); backdrop-filter:blur(20px) saturate(1.2);
+}
+html[data-tema] #gate input{ border-radius:14px !important; background:var(--tv-campo) !important; }
+html[data-tema] #gate .gbtn{ border-radius:999px !important; }
+
+/* ── Avisos y la versión ── */
+html[data-tema] .ddl-toast{ background:var(--tv-barra-2) !important; color:#eafaf5 !important; border:1px solid rgba(255,255,255,.1) !important; border-radius:18px !important; box-shadow:0 16px 36px rgba(12,43,39,.3) !important; }
+html[data-tema] .ddl-toast *{ color:inherit !important; }
+html[data-tema] #verBox{ background:var(--tv-boton) !important; border-color:var(--tv-borde) !important; border-radius:999px !important; color:var(--tv-tinta-tenue) !important; }
+
+/* ── Tablas dentro de las tarjetas ── */
+html[data-tema] table thead th{ color:var(--tv-tinta-tenue); }
+html[data-tema] .cs-chip{ border-radius:999px !important; }
+
+/* Barras de desplazamiento, discretas. */
+html[data-tema] ::-webkit-scrollbar{ width:10px; height:10px; }
+html[data-tema] ::-webkit-scrollbar-thumb{ background:var(--tv-barra-desliz); border-radius:99px; border:2px solid transparent; background-clip:content-box; }
+html[data-tema] ::-webkit-scrollbar-thumb:hover{ background:var(--tv-acento); background-clip:content-box; }
+html[data-tema] ::-webkit-scrollbar-track{ background:transparent; }
+
+/* ── El marco: toda la aplicación va dentro de un panel de vidrio, como en el diseño ── */
+html[data-tema] .wrap{
+  background:var(--tv-hueco) !important;
+  -webkit-backdrop-filter:blur(22px) saturate(1.15); backdrop-filter:blur(22px) saturate(1.15);
+  border:1px solid var(--tv-borde) !important;
+  border-radius:30px !important;
+  box-shadow:var(--tv-sombra-alta) !important;
+  margin:14px !important;
+  max-width:calc(100% - 28px) !important;
+  min-height:calc(100dvh - 28px);
+  padding:16px 18px 34px !important;
+}
+@media(max-width:760px){ html[data-tema] .wrap{ margin:6px !important; max-width:calc(100% - 12px) !important; min-height:calc(100dvh - 12px); border-radius:22px !important; padding:10px 10px 26px !important; } }
+/* En la entrada no hay barra que enseñar detrás del velo. */
+html[data-tema] body.locked #topbar{ opacity:0; }
+
+/* ── La cabecera de un programa (sus episodios): el mismo banner ── */
+html[data-tema] #epsHead{
+  background:
+    radial-gradient(420px 160px at 88% 0%, rgba(143,230,205,.20), transparent 70%),
+    linear-gradient(135deg, var(--tv-barra-1), var(--tv-barra-2)) !important;
+  border-radius:24px !important; padding:16px 22px !important; margin-bottom:18px !important;
+  box-shadow:0 16px 36px var(--tv-barra-sombra) !important; border:none !important;
+}
+html[data-tema] #epsHead h2{ color:#fff !important; font-weight:600 !important; }
+html[data-tema] #epsHead .eh-sub{ color:rgba(255,255,255,.62) !important; }
+html[data-tema] #epsHead .enav-btn{ background:rgba(255,255,255,.10) !important; border:1px solid rgba(255,255,255,.16) !important; color:#eafaf5 !important; border-radius:999px !important; }
+html[data-tema] #epsHead .enav-btn:hover{ background:rgba(143,230,205,.22) !important; border-color:rgba(143,230,205,.55) !important; }
+html[data-tema] #epsHead .enav-sep{ background:rgba(255,255,255,.18) !important; }
+html[data-tema] #epsHead .eh-new{
+  background:var(--tv-durazno) !important; border-color:var(--tv-durazno) !important; color:var(--tv-durazno-tinta) !important;
+  border-radius:999px !important; box-shadow:0 8px 22px rgba(246,168,119,.42) !important;
+}
+html[data-tema] #epsHead .eh-new:hover{ background:var(--tv-durazno-2) !important; border-color:var(--tv-durazno-2) !important; }
+/* «Abrir un capítulo»: el rótulo de encima, sobrio. */
+html[data-tema] #libCrumb{ color:var(--tv-tinta-tenue) !important; }
+
+/* ── Producción: el «＋ Nuevo» flotante, en durazno ── */
+html[data-tema] .cp-nuevo{
+  background:var(--tv-durazno) !important; color:var(--tv-durazno-tinta) !important; border-color:transparent !important;
+  border-radius:999px !important; box-shadow:0 12px 28px rgba(246,168,119,.5) !important;
+}
+html[data-tema] .cp-nuevo *{ color:inherit !important; }
+
+/* ── El Video Estudio: un panel oscuro en los dos temas (la onda y el video están hechos para fondo oscuro) ── */
+html[data-tema] #libInline{ background:#07110f !important; }
+html[data-tema] #stLeft{ background:#07110f !important; color:#eaf6f2; color-scheme:dark; }
+html[data-tema] #stStrip{ background:linear-gradient(180deg,#143c36,#0c2b27) !important; border-bottom:1px solid rgba(255,255,255,.08) !important; }
+html[data-tema] #stStage, html[data-tema] #stVideo{ background:#030807 !important; }
+html[data-tema] #stWave{ background:#0a1614 !important; }
+html[data-tema] #stWaveGrip{ background:#12241f !important; }
+
+/* ── «Volver al libreto», el botón flotante ── */
+html[data-tema] #floatCtl{
+  background:var(--tv-principal) !important; color:var(--tv-principal-tinta) !important; border:none !important;
+  border-radius:999px !important; box-shadow:0 12px 30px var(--tv-barra-sombra) !important;
+}
+html[data-tema] #floatCtl *{ color:inherit !important; }
