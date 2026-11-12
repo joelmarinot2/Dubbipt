@@ -243,7 +243,13 @@ function corOrdenarCasting1(arch, o){
   otras.forEach(x => cambiarFormulas(x.L, false));
   /* Los nombres definidos que miran CASTING 1 (áreas de impresión, etc.). */
   let wbx = corDec(arch['xl/workbook.xml']);
-  wbx = wbx.replace(/(<definedName\b[^>]*>)([\s\S]*?)(<\/definedName>)/g, (m, a, t, z) => { const n = remapear(corDes(t), false); return a + (n === corDes(t) ? t : corEsc(n)) + z; });
+  /* Los nombres de Excel para la hoja (_xlnm.: área de impresión, títulos, el rango de un filtro) no calculan nada:
+     se dejan como están y no impiden ordenar. Pasó con CHOR NIKAL KE BHAAGA 2 (CAST-55): un filtro viejo en
+     'CASTING 1'!$AW$17:$AW$46 y un área de impresión hasta la fila 72 bloqueaban el orden. */
+  wbx = wbx.replace(/(<definedName\b[^>]*>)([\s\S]*?)(<\/definedName>)/g, (m, a, t, z) => {
+    if(/\bname="_xlnm\./.test(a)) return m;
+    const n = remapear(corDes(t), false); return a + (n === corDes(t) ? t : corEsc(n)) + z;
+  });
   /* 3 · Las celdas combinadas, la validación y los formatos condicionales de CASTING 1. */
   const moverSqref = (sq, estricto) => sq.split(/\s+/).map(rg => {
     const mm = rg.match(/^([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?$/);

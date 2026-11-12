@@ -3135,7 +3135,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v12.9.0-nube';
+const APP_VER_NUM = 'v12.9.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -13429,6 +13429,8 @@ async function castDescargar(){
     if(r.orden1) msg += r.orden1.hecho ? (r.orden1.igual ? ' · CASTING 1 ya estaba por talento' : ' · CASTING 1 ordenado por talento (' + r.orden1.bloques + ' personajes)')
                                        : ' · ⚠️ CASTING 1 no se ordenó: ' + r.orden1.motivo;
     msg += ' · ' + nombre;
+    /* Si CASTING 1 no se ordenó, se dice aparte, en un aviso propio: dentro del mensaje largo se perdía (CAST-55). */
+    if(r.orden1 && !r.orden1.hecho) setTimeout(() => castAviso('⚠️ CASTING 1 no se ordenó por talento: ' + r.orden1.motivo), 900);
     msg += (r.cabecera ? ' · cabecera con ' + r.cabecera + ' datos' : ' · ⚠️ sin cabecera: rellénala en «Cabecera»');
     if(r.porParecido && r.porParecido.length)
       msg += ' · ✎ escrito' + (r.porParecido.length === 1 ? '' : 's') + ' por nombre parecido, revísalo: '
