@@ -204,7 +204,7 @@ exports.pruebas = async function(t){
     t.ok('la tarjeta: clic derecho y la marca «training» con su teléfono; la tabla también',
          /card\.addEventListener\('contextmenu', ev=>\{ try\{ if\(typeof trnMenu==='function'\) trnMenu\(ev, c\.key\)/.test(HTML) && (HTML.match(/const t = \(typeof trnDe==='function'\) \? trnDe\(c\) : null; return t \? '<span class="ctrn"/g) || []).length === 2);
     t.ok('la descarga: los personajes de los talentos de training de ESTE capítulo, y avisa de los que no tienen teléfono ni fila',
-         /t = \(typeof trnDe === 'function'\) \? trnDe\(c\) : null; if\(t\) training\[castClave\(c\.display \|\| k\)\] = \{ tel: t\.tel \|\| '' \}/.test(HTML) && /castRellenar\(buf, asign, meta, training\)/.test(HTML) && /sin teléfono: /.test(HTML) && /sin fila en el Excel: /.test(HTML));
+         /t = \(typeof trnDe === 'function'\) \? trnDe\(c\) : null; if\(t\) training\[castClave\(c\.display \|\| k\)\] = \{ tel: t\.tel \|\| '' \}/.test(HTML) && /castRellenar\(buf, asign, meta, training, delCapitulo\)/.test(HTML) && /sin teléfono: /.test(HTML) && /sin fila en el Excel: /.test(HTML));
     t.ok('en amarillo, con su estilo', /\.ctrn\{[^}]*background:#FACC15/.test(HTML) && /\.trn-menu\{/.test(HTML));
   }
 };
