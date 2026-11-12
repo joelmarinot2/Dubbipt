@@ -1422,6 +1422,21 @@ body.modo-casting{ transition:padding-right .2s cubic-bezier(.22,.61,.36,1); }
 .ocu-p:hover{ background:rgba(255,255,255,.12); color:var(--ink); }
 .ocu-p b{ color:var(--ink); }
 .ocu-choques{ color:#ff9b9b; font-size:11px; line-height:1.55; margin-top:6px; }
+/* Con cuántos talentos se puede hacer el capítulo (CAST-50) */
+.ocu-min{ margin:0 15px 12px; padding:10px 12px; border-radius:12px; background:rgba(74,222,128,.07);
+  border:1px solid rgba(74,222,128,.22); font-size:12px; line-height:1.5; color:var(--ink-dim); flex:0 0 auto; }
+.ocu-min-t b{ color:#4ADE80; }
+.ocu-min-s{ margin-top:4px; font-size:11.5px; }
+.ocu-min-s.falta{ color:#FBBF24; }
+.ocu-min-d{ margin-top:6px; }
+.ocu-min-d summary{ cursor:pointer; color:var(--ink); font-weight:600; font-size:11.5px; }
+.ocu-min-d .ocu-min-l{ max-height:34vh; overflow-y:auto; margin-top:6px; padding-right:4px; }
+.ocu-min-d ol{ margin:4px 0 0; padding-left:20px; }
+.ocu-min-d li{ margin:3px 0; }
+.ocu-min-d li i, .ocu-min-prop i{ font-style:normal; color:var(--ink-faint); }
+.ocu-min-h{ margin-top:8px; font-size:10.5px; letter-spacing:.6px; text-transform:uppercase; color:var(--ink-faint); font-weight:700; }
+.ocu-min-prop{ margin:3px 0; }
+.ocu-min-nota{ margin-top:8px; font-size:10.5px; color:var(--ink-faint); }
 
 /* en pantallas estrechas el cajon abierto tapa: se cierra solo al pulsar fuera */
 @media (max-width:820px){ .ocu-cajon{ top:80px; } }
@@ -3095,7 +3110,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v12.5.0-nube';
+const APP_VER_NUM = 'v12.6.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -11712,7 +11727,8 @@ function castPintarOcupacion(){
     + (sinTal ? '<br>' + sinTal + ' personaje' + (sinTal===1?'':'s') + ' sin asignar' : '')
     + (nChoques ? '<br><b class="ocu-alerta">' + nChoques + ' choque' + (nChoques===1?'':'s') + ' de reparto</b>'
                 + '<br><small>el mismo talento con dos personajes a 5 min o menos (por timecode)</small>' : '')
-    + '</div>';
+    + '</div>'
+    + castMinimoHtml();
 
   {
     if(!filas.length){
@@ -11756,6 +11772,80 @@ function castPintarOcupacion(){
   if(head) head.addEventListener('click', alternar);
   box.querySelectorAll('.ocu-p').forEach(el =>
     el.addEventListener('click', ()=>{ try{ openPopup(el.dataset.k); }catch(e){} }));
+  /* El desplegable de «cómo repartirlo» sigue abierto entre repintados (se repinta en cada asignación). */
+  const det = box.querySelector('.ocu-min-d');
+  if(det) det.addEventListener('toggle', ()=>{ ocuMinAbierto = det.open; });
+}
+
+/* ═══ CON CUÁNTOS TALENTOS SE PUEDE HACER EL CAPÍTULO (CAST-50) ════════════
+
+   Pedido de sala: «quiero que me sugieras en cada episodio de casting con
+   cuántos talentos puedo rellenar todo el capítulo». La cuenta está en
+   js/castminimo.js; aquí se le dan los personajes que necesitan un actor y se
+   pinta. Lo caro (qué parejas chocarían) se guarda mientras el libreto y los
+   personajes no cambien: asignar un talento no lo repite. */
+let ocuMinAbierto = false;
+let _cmMemo = null;
+/** Una huella barata del libreto: si cambia un timecode, una página o quién habla, se rehace. */
+function castMinimoHuella(sc){
+  let h = sc.length;
+  for(const b of sc){
+    if(!b) continue;
+    h = (h * 31 + (b.tcSec != null ? Math.round(+b.tcSec * 10) : 7) + (b.page || 0) * 13 + String(b.key || '').length + (b.lines ? b.lines.length : 0)) | 0;
+  }
+  return h;
+}
+/** La sugerencia del capítulo abierto, o null si no se puede calcular. */
+function castMinimo(){
+  if(typeof cmSugerir !== 'function' || typeof chqContexto !== 'function') return null;
+  const sc = (typeof script !== 'undefined' && Array.isArray(script)) ? script : [];
+  const porClave = (typeof scriptByKey !== 'undefined' && scriptByKey) || {};
+  const lista = [];
+  for(const c of (chars || [])){
+    if(!c || c.noRec) continue;
+    const t = c.talent ? String(c.talent).trim() : '';
+    if(t && !castEsActor(t)) continue;                 // TODOS, ORIGINAL, X…: no necesitan un actor
+    const n = (porClave[c.key] || []).length;
+    if(!n && !(c.totalInts > 0)) continue;              // ni habla en el libreto ni tiene intervenciones
+    lista.push({ key: c.key, display: c.display || c.key, ints: c.totalInts || n, talento: t });
+  }
+  const clave = castMinimoHuella(sc) + '|' + lista.map(p => p.key).join(',');
+  if(!_cmMemo || _cmMemo.clave !== clave){
+    _cmMemo = { clave: clave, grafo: cmGrafo(lista, chqContexto(sc, porClave)) };
+  }
+  /* El grafo no depende de quién hace a quién: se le pone lo de ahora. */
+  _cmMemo.grafo.nodos.forEach((nd, i) => { nd.talento = lista[i].talento; nd.ints = lista[i].ints; });
+  return cmSugerir(lista, null, { grafo: _cmMemo.grafo, norm: castNorm });
+}
+/** La sugerencia en una línea (el panel de Ocupación del libreto). */
+function castMinimoLinea(){
+  let r = null;
+  try{ r = castMinimo(); }catch(e){ return ''; }
+  if(!r || r.personajes < 2) return '';
+  return '<br><span class="locu-min">' + esc(cmFrase(r)) + (r.ahora ? ' · ahora usas ' + r.ahora : '') + '</span>';
+}
+/** El recuadro del panel de Ocupación. '' si no hay nada que sugerir. */
+function castMinimoHtml(){
+  let r = null;
+  try{ r = castMinimo(); }catch(e){ fallo('castMinimo · index.html', e, 'el panel sale sin la sugerencia de talentos'); return ''; }
+  if(!r || r.personajes < 2) return '';
+  let h = '<div class="ocu-min"><div class="ocu-min-t"><b>' + esc(cmFrase(r)) + '</b>'
+    + (r.ahora ? ' · ahora usas ' + r.ahora : '') + '</div>';
+  const pq = cmPorQue(r);
+  if(pq) h += '<div class="ocu-min-s">' + esc(pq) + '</div>';
+  const fl = cmFraseFaltan(r);
+  if(fl) h += '<div class="ocu-min-s' + (r.conLoRepartido.nuevos ? ' falta' : '') + '">' + esc(fl) + '</div>';
+  h += '<details class="ocu-min-d"' + (ocuMinAbierto ? ' open' : '') + '><summary>Cómo repartirlo</summary><div class="ocu-min-l">';
+  if(r.sinTalento && r.ahora){
+    h += '<div class="ocu-min-h">Los que faltan, con lo ya repartido</div>'
+      + r.conLoRepartido.propuestas.map(p => '<div class="ocu-min-prop">' + esc(p.display) + ' <i>' + p.ints + '</i> → '
+          + (p.talento ? '<b>' + esc(p.talento) + '</b>' : 'talento nuevo ' + p.nuevo) + '</div>').join('');
+  }
+  h += '<div class="ocu-min-h">Desde cero, con ' + r.minimo + ' talento' + (r.minimo === 1 ? '' : 's') + '</div><ol>'
+    + r.grupos.map(g => '<li>' + g.personajes.map(p => esc(p.display) + ' <i>' + p.ints + '</i>').join(', ') + '</li>').join('')
+    + '</ol><div class="ocu-min-nota">Cada número es un talento. Solo cuenta lo que choca en el tiempo (a 5 min o menos por timecode, '
+    + 'o seguidos); el género y el tipo de voz los decides tú.</div></div></details></div>';
+  return h;
 }
 
 /* ═══ REGISTRO DE CASTING DEL PROGRAMA ═══════════════════════════════════
@@ -15468,6 +15558,7 @@ const LIB_OCU_CSS = `
 .locu-head span{ font-size:11.5px; color:var(--dim); }
 .locu-res{ font-size:12px; color:var(--dim); line-height:1.6; margin-bottom:12px; }
 .locu-al{ color:#ff6b6b; }
+.locu-min{ color:#4ADE80; font-weight:600; }
 .locu-vacio{ font-size:12.5px; color:var(--dim); line-height:1.6; }
 .locu-fila{ padding:9px 0; border-top:1px solid var(--card-b); }
 .locu-fila.con-choque .locu-nom{ color:#ff6b6b; }
@@ -18711,6 +18802,7 @@ function libOcupacion(){
     + (sinTal ? '<br>' + sinTal + ' personaje' + (sinTal===1?'':'s') + ' sin asignar' : '')
     + (nChoques ? '<br><b class="locu-al">' + nChoques + ' choque' + (nChoques===1?'':'s')
                 + ' de reparto</b>' : '')
+    + castMinimoLinea()
     + '</div>';
 
   if(!filas.length){
@@ -23954,4 +24046,5 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/qcpdf.js"></script>
 <script src="./js/castorden.js"></script>
 <script src="./js/castchoques.js"></script>
+<script src="./js/castminimo.js"></script>
 <script src="./js/animaciones.js"></script>

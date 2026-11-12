@@ -72,6 +72,7 @@ function correr(opts){
     castOcupacion: () => opts.filas || [],
     castChoques: () => opts.choques || {},
     chqTexto: CHQ.chqTexto, chqSeguido: CHQ.chqSeguido,
+    castMinimoLinea: () => opts.minimo || '',
     castNorm: (s) => String(s || '').toUpperCase(),
     castPintarOcupacion: () => {},
     openPopup: () => {},
@@ -177,6 +178,9 @@ exports.pruebas = function(t){
   t.ok('y se dice cuál', CH._caja.innerHTML.includes('«MARLON» y «SHAWN» hablan seguidos (a 2 líneas)'),
        'el aviso sin el detalle obliga a ir a buscarlo');
   t.ok('con su página', CH._caja.innerHTML.includes('pág. 4'));
+  const CM = correr({ chars: CHARS, filas: FILAS, abierto: true, minimo: '<br><span class="locu-min">Con 4 talentos se puede hacer todo el capítulo sin choques</span>' });
+  CM.libOcupacion();
+  t.ok('dice con cuántos talentos se puede hacer el capítulo (CAST-50)', CM._caja.innerHTML.includes('Con 4 talentos se puede hacer todo el capítulo sin choques'));
   t.ok('los que hablan seguidos, en negrita', CH._caja.innerHTML.includes('<b>«MARLON» y «SHAWN» hablan seguidos'));
   const CT = correr({ chars: CHARS, filas: FILAS, abierto: true,
     choques: { 'HARI MORENO': { choques: [{ a:'MARLON', b:'SHAWN', por:'tc', seg:130, dist:30, tcA:3730, tcB:3860, pagA:4, pagB:5, pagina:5, escena:null, veces:3 }] } } });
