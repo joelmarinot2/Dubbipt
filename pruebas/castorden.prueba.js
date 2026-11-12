@@ -102,6 +102,22 @@ exports.pruebas = function(t){
     t.ok('…y CASTING 1 queda como estaba', dec(b['xl/worksheets/sheet3.xml']) === antes && !!b['xl/calcChain.xml']);
   }
   {
+    /* CHOR NIKAL KE BHAAGA 2 (CAST-55): un filtro viejo en una columna de CASTING 1 y un área de impresión que no llega al
+       final de la tabla. Son nombres de Excel para la hoja (_xlnm.), no calculan nada: no deben impedir ordenar. */
+    const b = libro();
+    b['xl/workbook.xml'] = enc(dec(b['xl/workbook.xml']).replace('</definedNames>',
+      '<definedName name="_xlnm._FilterDatabase" localSheetId="1" hidden="1">\'CASTING 1\'!$AW$17:$AW$21</definedName>'
+      + '<definedName name="_xlnm.Print_Titles" localSheetId="1">\'CASTING 1\'!$15:$16</definedName></definedNames>')
+      .replace("\'CASTING 1\'!$A$1:$K$41", "\'CASTING 1\'!$A$1:$K$21"));
+    const x = C.O(b, { actorDe: (p) => ACT[p] });
+    const w = dec(b['xl/workbook.xml']);
+    t.eq('un filtro viejo y un área de impresión que coge media tabla no impiden ordenar', x.hecho + ' · ' + (x.motivo || ''), 'true · ');
+    t.ok('…y se quedan como estaban', /\$AW\$17:\$AW\$21<\/definedName>/.test(w) && /\$A\$1:\$K\$21<\/definedName>/.test(w) && /!\$15:\$16<\/definedName>/.test(w));
+    const c = libro();
+    c['xl/workbook.xml'] = enc(dec(c['xl/workbook.xml']).replace('</definedNames>', '<definedName name="TotalesParte">\'CASTING 1\'!$E$17:$E$21</definedName></definedNames>'));
+    t.eq('un nombre que sí calcula (de quien hizo la plantilla) y coge media tabla, sí lo impide', C.O(c, { actorDe: (p) => ACT[p] }).hecho, false);
+  }
+  {
     const b = libro({ merge: '<mergeCells count="1"><mergeCell ref="B19:B20"/></mergeCells>' });
     const x = C.O(b, { actorDe: (p) => ACT[p] });
     t.eq('una combinación entre dos personajes: no se ordena', x.hecho + ' · ' + x.motivo, 'false · las celdas combinadas B19:B20 cruzan dos personajes');
