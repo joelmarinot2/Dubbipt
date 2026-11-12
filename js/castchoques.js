@@ -3,6 +3,8 @@
  * Pedido de sala: «mejora la parte de los choques de personajes en Casting.
  * Ten en cuenta el contexto de la escena y las páginas, pero guíate más por el
  * timecode: si sale 5 minutos antes o después, se choca».
+ * Y después (CAST-52): «reduce el tiempo de 5 a 4 minutos. Y analiza la
+ * escena: si la escena ya se acabó, el tiempo mínimo es de 1 minuto».
  *
  * Antes un choque era solo «el mismo actor con dos personajes que hablan a
  * menos de 4 líneas». Se quedaba corto: dos personajes del mismo actor que
@@ -10,15 +12,21 @@
  * actor tenía que hacer las dos voces en el mismo rato.
  *
  * La regla, por orden de lo que manda:
- *   1. HABLAN SEGUIDOS (a 4 líneas o menos): choque siempre. No le da tiempo
- *      a cambiar de voz, diga lo que diga el timecode (que puede traer una
- *      errata).
- *   2. EL TIMECODE, si los dos lo tienen: choque si salen a 5 minutos o menos,
+ *   0. LA ESCENA YA SE ACABÓ (entre los dos hay un encabezado de escena: INT.,
+ *      EXT., ESC., ESCENA…): el margen baja a 1 MINUTO. Con timecode, choque
+ *      solo si salen a 1 minuto o menos; sin timecode, solo si hablan
+ *      seguidos. Lo demás no cuenta: la escena terminó y hay tiempo de
+ *      cambiar de voz.
+ *   1. HABLAN SEGUIDOS (a 4 líneas o menos), en la misma escena: choque
+ *      siempre. No le da tiempo a cambiar de voz, diga lo que diga el
+ *      timecode (que puede traer una errata).
+ *   2. EL TIMECODE, si los dos lo tienen: choque si salen a 4 minutos o menos,
  *      antes o después. Si están a más, NO es choque aunque compartan página.
  *   3. SIN TIMECODE (el libreto no lo trae, o todavía no ha salido ninguno):
- *      choque si salen en la misma escena —cuando el libreto trae encabezados
- *      de escena (INT., EXT., ESC., ESCENA…)— o en la misma página o la de al
+ *      choque si salen en la misma escena o en la misma página o la de al
  *      lado.
+ * Las escenas solo se saben si el libreto trae sus encabezados; si no, se
+ * aplican 1, 2 y 3 como si todo fuera una escena.
  * De cada pareja se da el cruce MÁS CERCANO, con su timecode, sus páginas y si
  * es la misma escena, y cuántas veces se cruzan (las que tendría que cambiar
  * de voz). Un aviso por pareja, no por línea.
@@ -31,7 +39,8 @@
  * libreto y sale la lista. Es un script clásico: comparte el ámbito global.
  */
 
-const CHQ_SEG = 300;        // 5 minutos, antes o después
+const CHQ_SEG = 240;        // 4 minutos, antes o después (CAST-52; antes eran 5)
+const CHQ_SEG_ESCENA = 60;  // si la escena ya se acabó entre los dos: 1 minuto (CAST-52)
 const CHQ_LINEAS = 4;       // a esta distancia o menos, hablan seguidos
 const CHQ_PAGINAS = 1;      // sin timecode: la misma página o la de al lado
 
@@ -88,7 +97,12 @@ function chqCruce(i, j, ctx){
     escena: ctx.escenas ? ctx.escenas[i] === ctx.escenas[j] : null,
     por: null
   };
-  if(c.dist <= CHQ_LINEAS) c.por = 'seguido';
+  if(c.escena === false){
+    /* La escena ya se acabó: 1 minuto. Sin timecode, solo si hablan seguidos. */
+    if(c.seg != null){ if(c.seg <= CHQ_SEG_ESCENA) c.por = c.dist <= CHQ_LINEAS ? 'seguido' : 'tc'; }
+    else if(c.dist <= CHQ_LINEAS) c.por = 'seguido';
+  }
+  else if(c.dist <= CHQ_LINEAS) c.por = 'seguido';
   else if(c.seg != null){ if(c.seg <= CHQ_SEG) c.por = 'tc'; }      // con timecode, manda el timecode
   else if(c.escena === true) c.por = 'escena';
   else if(c.pagA != null && c.pagB != null && Math.abs(c.pagB - c.pagA) <= CHQ_PAGINAS) c.por = 'pagina';
@@ -156,6 +170,7 @@ function chqDonde(ch){
   if(ch.pagA != null && ch.pagB != null) trozos.push(ch.pagA === ch.pagB ? 'pág. ' + ch.pagA : 'págs. ' + ch.pagA + ' y ' + ch.pagB);
   else if(ch.pagina != null) trozos.push('pág. ' + ch.pagina);
   if(ch.escena === true && ch.por !== 'escena') trozos.push('misma escena');
+  if(ch.escena === false) trozos.push('cambia de escena');
   return trozos.join(' · ');
 }
 
@@ -176,6 +191,6 @@ function chqTexto(ch){
 function chqSeguido(ch){ return !!ch && (ch.por === 'seguido' || (ch.por == null && ch.dist != null && ch.dist <= CHQ_LINEAS)); }
 
 if(typeof module !== 'undefined' && module.exports){
-  module.exports = { CHQ_SEG, CHQ_LINEAS, CHQ_PAGINAS, CHQ_ESCENA_RE, chqTiempos, chqEscenas, chqContexto, chqCruce, chqPeor, chqDeTalento,
+  module.exports = { CHQ_SEG, CHQ_SEG_ESCENA, CHQ_LINEAS, CHQ_PAGINAS, CHQ_ESCENA_RE, chqTiempos, chqEscenas, chqContexto, chqCruce, chqPeor, chqDeTalento,
                      chqHora, chqDura, chqDonde, chqTexto, chqSeguido };
 }
