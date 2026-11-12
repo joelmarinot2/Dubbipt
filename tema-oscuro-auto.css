@@ -475,6 +475,9 @@ body{background:radial-gradient(1200px 700px at 50% -8%, rgba(50,211,163,0.16), 
 .ocu-barra i{background:linear-gradient(90deg,#69debb,#32d3a3)}
 .ocu-p{background:rgba(255,255,255,0.06)}
 .ocu-p:hover{background:rgba(255,255,255,0.12)}
+.ocu-min{background:rgba(105,222,187,0.07);border:1px solid rgba(105,222,187,0.22)}
+.ocu-min-t b{color:#69debb}
+.ocu-min-s.falta{color:#fbbf24}
 body.modo-casting .card.choque{box-shadow:0 0 0 1px rgba(255,107,107,0.35), 0 6px 18px rgba(255,107,107,0.1)}
 body.modo-casting .pla tbody tr.heredado td{background:rgba(245,158,11,0.07)}
 body.modo-casting .pla tbody tr.heredado .ploc input{color:#f59e0b}
