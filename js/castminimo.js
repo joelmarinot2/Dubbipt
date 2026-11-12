@@ -5,7 +5,7 @@
  *
  * Un talento puede hacer varios personajes mientras no choquen entre sí, y
  * qué es chocar ya lo dice js/castchoques.js (CAST-49: hablan seguidos, salen
- * a 5 minutos o menos por timecode, o sin timecode en la misma escena o
+ * a 4 minutos o menos por timecode —1 si cambió la escena—, o sin timecode en la misma escena o
  * página). Así que la pregunta es: ¿en cuántos grupos, como poco, se pueden
  * repartir los personajes, de forma que dentro de cada grupo nadie choque con
  * nadie? Cada grupo es un talento.

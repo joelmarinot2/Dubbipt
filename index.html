@@ -3130,7 +3130,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v12.7.0-nube';
+const APP_VER_NUM = 'v12.8.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -11601,7 +11601,8 @@ function imprimirPlanilla(){
    sala tendría que hacer las dos voces en el mismo rato.
 
    Qué es «cerca» lo decide js/castchoques.js (CAST-49): sobre todo el
-   TIMECODE —a 5 minutos o menos, antes o después—; siempre, si hablan
+   TIMECODE —a 4 minutos o menos, antes o después; 1 si la escena ya se
+   acabó (CAST-52)—; siempre, si hablan
    seguidos; y sin timecode, la escena y las páginas. */
 
 /* Casillas que se rellenan con algo que NO es un actor: «X» y «ORIGINAL»
@@ -11762,7 +11763,7 @@ function castPintarOcupacion(){
     + ' · ' + totalInts + ' líneas'
     + (sinTal ? '<br>' + sinTal + ' personaje' + (sinTal===1?'':'s') + ' sin asignar' : '')
     + (nChoques ? '<br><b class="ocu-alerta">' + nChoques + ' choque' + (nChoques===1?'':'s') + ' de reparto</b>'
-                + '<br><small>el mismo talento con dos personajes a 5 min o menos (por timecode)</small>' : '')
+                + '<br><small>el mismo talento con dos personajes a 4 min o menos por timecode (1 min si cambia la escena)</small>' : '')
     + '</div>';
 
   {
@@ -11918,7 +11919,7 @@ function castRellenoHtml(r){
     h += '</div>';
   }
   if(r.relleno.length > lista.length) h += '<div class="ocu-min-s">y ' + (r.relleno.length - lista.length) + ' talentos más de relleno</div>';
-  h += '<div class="ocu-min-nota">No se cruzan con lo que ya hacen (a 5 min o menos por timecode, o seguidos) ni entre ellos. '
+  h += '<div class="ocu-min-nota">No se cruzan con lo que ya hacen (a 4 min o menos por timecode, 1 min si cambia la escena, o seguidos) ni entre ellos. '
     + 'H / M: el género del personaje; el de trazo discontinuo es una pista (por el nombre o el talento), pulsa para fijarlo.</div></div></details>';
   return h;
 }
@@ -11952,7 +11953,7 @@ function castMinimoHtml(ya){
   }
   h += '<div class="ocu-min-h">Desde cero, con ' + r.minimo + ' talento' + (r.minimo === 1 ? '' : 's') + '</div><ol>'
     + r.grupos.map(g => '<li>' + g.personajes.map(p => esc(p.display) + ' <i>' + p.ints + '</i>').join(', ') + '</li>').join('')
-    + '</ol><div class="ocu-min-nota">Cada número es un talento. Solo cuenta lo que choca en el tiempo (a 5 min o menos por timecode, '
+    + '</ol><div class="ocu-min-nota">Cada número es un talento. Solo cuenta lo que choca en el tiempo (a 4 min o menos por timecode, 1 min si cambia la escena, '
     + 'o seguidos) y el género (H / M) cuando se sabe; el tipo de voz lo decides tú.</div></div></details></div>';
   /* El relleno, lo primero (pedido: «indícame las personas que hay de relleno primero»). */
   return castRellenoHtml(r) + h;
