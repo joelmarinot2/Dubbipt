@@ -71,6 +71,12 @@ exports.pruebas = function(t){
   t.eq('por locutor; del mismo locutor, primero el de más intervenciones; TODOS al final', JSON.stringify(r.orden),
        '["POPS (ALEXANDER RIVERA)","HOMBRE EN TV 2 (ALEXANDER RIVERA)","RON WOO (JOHN GREY)","MARLON (JUAN D PEREZ)","GRUPO MIXTO (TODOS)"]');
   t.eq('cada personaje en su sitio nuevo', ['POPS', 'HOMBRE EN TV 2', 'RON WOO', 'MARLON', 'GRUPO MIXTO'].map(n => filaDe(h, n)).join(','), '17,19,20,21,24');
+  {
+    /* Un personaje sin actor en CASTING 1 sale como «0» o «#N/A» (lo deja la fórmula): va al final, no al principio (CAST-54). */
+    const raros = Object.assign({}, ACT); raros[Object.keys(raros)[0]] = '0';
+    const r0 = C.O(libro(), { actorDe: (p) => raros[p] });
+    t.eq('un locutor «0» (fórmula sin actor) va al final, con TODOS', JSON.stringify(r0.orden.slice(-2).map(x => String(x).split(' (')[0]).sort()), JSON.stringify(['GRUPO MIXTO', 'MARLON']), JSON.stringify(r0.orden));
+  }
 
   t.seccion('2 · se mueve con sus páginas, intervenciones y total; las fórmulas, iguales');
   t.ok('las fórmulas que leen del DESGLOCE no cambian: el dato va con su fila', celda(h, 'A17').indexOf('<f>IF(DESGLOCE!A23="","",DESGLOCE!A23)</f><v>POPS</v>') >= 0
