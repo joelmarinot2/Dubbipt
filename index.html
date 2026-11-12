@@ -1376,8 +1376,9 @@ body.modo-casting{ transition:padding-right .2s cubic-bezier(.22,.61,.36,1); }
    calc(var(--ocu-w) + 10px) y NO se resolvía: quedaba en 0 y el contenido
    nunca se estrechaba. Mismo problema que tuvo el propio cajón. */
 
+.ocu-tabs{ position:absolute; right:100%; top:0; z-index:2; display:flex; flex-direction:column; gap:8px; align-items:flex-end; }
 .ocu-tab{
-  position:absolute; right:100%; top:0; z-index:2;
+  position:relative;
   display:flex; flex-direction:column; align-items:center; gap:7px;
   background:var(--panel); color:var(--ink-dim);
   border:1px solid var(--line-soft); border-right:none;
@@ -1386,6 +1387,11 @@ body.modo-casting{ transition:padding-right .2s cubic-bezier(.22,.61,.36,1); }
   box-shadow:-4px 0 14px rgba(0,0,0,.3);
 }
 .ocu-tab:hover{ color:var(--ink); border-color:var(--violet); }
+.ocu-tab.activa{ color:var(--ink); border-color:#4ADE80; }
+.ocu-tab-n.ok{ background:#4ADE80; color:#06210f; }
+/* La pestaña de sugerencias: todo su contenido se desplaza junto. */
+.ocu-sug{ flex:1 1 auto; overflow-y:auto; padding-top:2px; }
+.ocu-sug .ocu-min-l, .ocu-sug .ocu-rel-l{ max-height:none; overflow:visible; }
 .ocu-tab-txt{ writing-mode:vertical-rl; text-orientation:mixed; letter-spacing:.08em; }
 .ocu-tab-fl{ font-size:14px; line-height:1; opacity:.6; }
 .ocu-tab-n{
@@ -1437,6 +1443,20 @@ body.modo-casting{ transition:padding-right .2s cubic-bezier(.22,.61,.36,1); }
 .ocu-min-h{ margin-top:8px; font-size:10.5px; letter-spacing:.6px; text-transform:uppercase; color:var(--ink-faint); font-weight:700; }
 .ocu-min-prop{ margin:3px 0; }
 .ocu-min-nota{ margin-top:8px; font-size:10.5px; color:var(--ink-faint); }
+/* Talentos de relleno y el género (CAST-51) */
+.ocu-rel > summary{ cursor:pointer; color:var(--ink); font-size:12px; }
+.ocu-rel > summary b{ color:#4ADE80; }
+.ocu-rel-l{ max-height:32vh; overflow-y:auto; margin-top:6px; padding-right:4px; }
+.ocu-rel-i{ padding:7px 0; border-top:1px solid var(--line-soft); }
+.ocu-rel-i:first-child{ border-top:none; }
+.ocu-rel-i i{ font-style:normal; color:var(--ink-faint); }
+.ocu-rel-g{ font-size:10.5px; color:var(--ink-faint); }
+.cg{ display:inline-flex; gap:2px; vertical-align:middle; }
+.cg-b{ font:inherit; font-size:9.5px; font-weight:800; line-height:1; width:17px; height:17px; padding:0; border-radius:5px; cursor:pointer;
+  background:transparent; color:var(--ink-faint); border:1px solid var(--line-soft); }
+.cg-b:hover{ color:var(--ink); border-color:var(--ink-faint); }
+.cg-b.ded{ color:var(--ink); border:1px dashed #4ADE80; }
+.cg-b.on{ background:#4ADE80; border-color:#4ADE80; color:#06210f; }
 
 /* en pantallas estrechas el cajon abierto tapa: se cierra solo al pulsar fuera */
 @media (max-width:820px){ .ocu-cajon{ top:80px; } }
@@ -3110,7 +3130,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v12.6.0-nube';
+const APP_VER_NUM = 'v12.7.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -11678,6 +11698,11 @@ let ocuAbierto = (function(){
   try{ const v = localStorage.getItem('ddl_ocu_abierto'); return v === '1'; }
   catch(e){ return false; }
 })();
+/* Qué pestaña del cajón se ve: «ocupacion» o «sugerencias» (CAST-50/51: «las sugerencias, en otra pestaña»). */
+let ocuVista = (function(){
+  try{ return localStorage.getItem('ddl_ocu_vista') === 'sugerencias' ? 'sugerencias' : 'ocupacion'; }
+  catch(e){ return 'ocupacion'; }
+})();
 
 function castPintarOcupacion(){
   const box = document.getElementById('ocupacion');
@@ -11715,20 +11740,30 @@ function castPintarOcupacion(){
 
   // Cajón al costado izquierdo. La pestaña se ve SIEMPRE, también plegado:
   // un panel que se esconde del todo es un panel que nadie encuentra.
-  let html = '<button class="ocu-tab" id="ocuTab" title="' + (ocuAbierto ? 'Plegar' : 'Ver la ocupación de talentos') + '">'
-    + '<span class="ocu-tab-txt">Ocupación</span>'
-    + (nChoques ? '<span class="ocu-tab-n">' + nChoques + '</span>' : '')
-    + '<span class="ocu-tab-fl">' + (ocuAbierto ? '›' : '‹') + '</span></button>'
+  /* Dos pestañas, una debajo de otra: Ocupación (con los choques) y Sugerencias (con cuántos talentos, el relleno y el género). */
+  const sug = ocuVista === 'sugerencias';
+  let rMin = null;
+  try{ rMin = castMinimo(); }catch(e){ fallo('castMinimo · index.html:castPintarOcupacion', e, 'la pestaña de sugerencias sale vacía'); }
+  const pest = (vista, txt, n, clase, titulo) => '<button class="ocu-tab' + (ocuAbierto && ocuVista === vista ? ' activa' : '') + '" data-ocuv="' + vista + '" title="' + titulo + '">'
+    + '<span class="ocu-tab-txt">' + txt + '</span>' + (n ? '<span class="ocu-tab-n' + clase + '">' + n + '</span>' : '')
+    + '<span class="ocu-tab-fl">' + (ocuAbierto && ocuVista === vista ? '›' : '‹') + '</span></button>';
+  let html = '<div class="ocu-tabs">'
+    + pest('ocupacion', 'Ocupación', nChoques, '', ocuAbierto && !sug ? 'Plegar' : 'Ver la ocupación de talentos')
+    + pest('sugerencias', 'Sugerencias', (rMin && rMin.personajes >= 2) ? rMin.minimo : 0, ' ok', ocuAbierto && sug ? 'Plegar' : 'Con cuántos talentos, el relleno y el género')
+    + '</div>'
     + '<div class="ocu"><div class="ocu-head" id="ocuHead">'
-    + '<h2>Ocupación de talentos</h2>'
-    + '<span class="tg">plegar ›</span></div>'
-    + '<div class="ocu-resumen">' + filas.length + ' talento' + (filas.length===1?'':'s')
+    + '<h2>' + (sug ? 'Sugerencias de reparto' : 'Ocupación de talentos') + '</h2>'
+    + '<span class="tg">plegar ›</span></div>';
+  if(sug){
+    const cuerpo = castMinimoHtml(rMin);
+    html += '<div class="ocu-sug">' + (cuerpo || '<div class="ocu-vacio">Hacen falta al menos dos personajes con libreto para sugerir algo.</div>') + '</div></div>';
+  }else{
+  html += '<div class="ocu-resumen">' + filas.length + ' talento' + (filas.length===1?'':'s')
     + ' · ' + totalInts + ' líneas'
     + (sinTal ? '<br>' + sinTal + ' personaje' + (sinTal===1?'':'s') + ' sin asignar' : '')
     + (nChoques ? '<br><b class="ocu-alerta">' + nChoques + ' choque' + (nChoques===1?'':'s') + ' de reparto</b>'
                 + '<br><small>el mismo talento con dos personajes a 5 min o menos (por timecode)</small>' : '')
-    + '</div>'
-    + castMinimoHtml();
+    + '</div>';
 
   {
     if(!filas.length){
@@ -11759,6 +11794,7 @@ function castPintarOcupacion(){
     }
   }
   html += '</div>';
+  }
   box.innerHTML = html;
 
   const alternar = ()=>{
@@ -11766,8 +11802,14 @@ function castPintarOcupacion(){
     try{ localStorage.setItem('ddl_ocu_abierto', ocuAbierto ? '1' : '0'); }catch(e){}
     castPintarOcupacion();
   };
-  const tab = document.getElementById('ocuTab');
-  if(tab) tab.addEventListener('click', alternar);
+  /* Una pestaña: si ya está abierta esa, se pliega; si no, se abre en ella. */
+  box.querySelectorAll('.ocu-tab[data-ocuv]').forEach(b => b.addEventListener('click', ()=>{
+    const v = b.dataset.ocuv;
+    if(ocuAbierto && ocuVista === v){ alternar(); return; }
+    ocuVista = v;
+    try{ localStorage.setItem('ddl_ocu_vista', v); }catch(e){}
+    if(!ocuAbierto) alternar(); else castPintarOcupacion();
+  }));
   const head = document.getElementById('ocuHead');
   if(head) head.addEventListener('click', alternar);
   box.querySelectorAll('.ocu-p').forEach(el =>
@@ -11775,6 +11817,16 @@ function castPintarOcupacion(){
   /* El desplegable de «cómo repartirlo» sigue abierto entre repintados (se repinta en cada asignación). */
   const det = box.querySelector('.ocu-min-d');
   if(det) det.addEventListener('toggle', ()=>{ ocuMinAbierto = det.open; });
+  const rel = box.querySelector('.ocu-rel');
+  if(rel) rel.addEventListener('toggle', ()=>{ ocuRelAbierto = rel.open; });
+  /* H / M: el género de un personaje, marcado a mano (CAST-51). Pulsar el que ya está marcado lo quita. */
+  box.querySelectorAll('.cg-b').forEach(b => b.addEventListener('click', (ev)=>{
+    ev.preventDefault(); ev.stopPropagation();
+    const showId = (currentEp && currentEp.showId) || LDB.showId;
+    const g = b.dataset.cgon ? '' : b.dataset.cgg;
+    cgMarcar(showId, b.dataset.cgn, g).catch(e => fallo('cgMarcar · index.html:castPintarOcupacion', e, 'el género se queda solo en este equipo'));
+    castPintarOcupacion();
+  }));
 }
 
 /* ═══ CON CUÁNTOS TALENTOS SE PUEDE HACER EL CAPÍTULO (CAST-50) ════════════
@@ -11784,7 +11836,8 @@ function castPintarOcupacion(){
    js/castminimo.js; aquí se le dan los personajes que necesitan un actor y se
    pinta. Lo caro (qué parejas chocarían) se guarda mientras el libreto y los
    personajes no cambien: asignar un talento no lo repite. */
-let ocuMinAbierto = false;
+let ocuMinAbierto = true;
+let ocuRelAbierto = true;
 let _cmMemo = null;
 /** Una huella barata del libreto: si cambia un timecode, una página o quién habla, se rehace. */
 function castMinimoHuella(sc){
@@ -11815,7 +11868,59 @@ function castMinimo(){
   }
   /* El grafo no depende de quién hace a quién: se le pone lo de ahora. */
   _cmMemo.grafo.nodos.forEach((nd, i) => { nd.talento = lista[i].talento; nd.ints = lista[i].ints; });
-  return cmSugerir(lista, null, { grafo: _cmMemo.grafo, norm: castNorm });
+  /* El género (CAST-51): lo marcado y quién lo hizo antes viven en el registro del programa; se traen una vez y se repinta. */
+  const showId = (typeof currentEp !== 'undefined' && currentEp && currentEp.showId) || (typeof LDB !== 'undefined' && LDB && LDB.showId) || null;
+  if(typeof cgHaceFalta === 'function' && cgHaceFalta(showId)) cgCargar(showId, () => { try{ castPintarOcupacion(); }catch(e){ /* se verá al repintar */ } });
+  const gen = lista.map(p => (typeof cgDePersonaje === 'function') ? cgDePersonaje({ key: p.key, display: p.display, talent: p.talento }) : { g: '', de: '' });
+  const generos = gen.map(x => x.g), generoTal = (typeof cgDeTalento === 'function') ? cgDeTalento : () => '';
+  /* Lo caro, una vez por combinación de géneros (cambia solo al marcar uno). */
+  const caches = _cmMemo.caches || (_cmMemo.caches = {}), firma = generos.join(',');
+  if(!caches[firma] && Object.keys(caches).length > 30) _cmMemo.caches = {};
+  const cache = (_cmMemo.caches[firma] = _cmMemo.caches[firma] || {});
+  const r = cmSugerir(lista, null, { grafo: _cmMemo.grafo, norm: castNorm, generos: generos, generoTal: generoTal, cache: cache });
+  r.nodos = _cmMemo.grafo.nodos;
+  r.genero = gen;
+  r.relleno = (typeof cmRelleno === 'function') ? cmRelleno(_cmMemo.grafo, { tope: CAST_RELLENO, norm: castNorm, generos: generos, generoTal: generoTal }) : [];
+  return r;
+}
+const CAST_RELLENO = 10;      // líneas en el capítulo: hasta aquí, un talento es de relleno (CAST-51)
+/** Los dos botoncitos H / M del género de un personaje. `gen`: { g, de } de cgDePersonaje. */
+function castGeneroBotones(nombre, gen){
+  const de = gen && gen.de, g = gen && gen.g;
+  const titulo = de === 'marcado' ? 'Marcado a mano · pulsa el mismo otra vez para quitarlo'
+    : de === 'nombre' ? 'Deducido del nombre (es una pista) · pulsa para confirmarlo o cambiarlo'
+    : (de === 'talento' || de === 'antes') ? 'Por el talento que lo ' + (de === 'antes' ? 'hizo antes' : 'hace') + ' · pulsa para fijarlo a mano'
+    : 'Género sin saber · pulsa H (hombre) o M (mujer)';
+  const b = (x) => '<button class="cg-b' + (g === x ? (de === 'marcado' ? ' on' : ' ded') : '') + '" data-cgn="' + esc(nombre) + '" data-cgg="' + x
+    + '" data-cgon="' + (g === x && de === 'marcado' ? '1' : '') + '">' + x + '</button>';
+  return '<span class="cg" title="' + esc(titulo) + '">' + b('H') + b('M') + '</span>';
+}
+/** Los talentos de relleno y lo que podrían hacer además (CAST-51). '' si no hay nada que proponer. */
+function castRellenoHtml(r){
+  if(!r || !r.sinTalento || !r.relleno || !r.relleno.length) return '';
+  const genDe = (nodo) => { const i = r.nodos.indexOf(nodo); return i >= 0 ? r.genero[i] : { g: '', de: '' }; };
+  const item = (nd) => esc(nd.display) + ' <i>' + nd.ints + '</i> ' + castGeneroBotones(nd.display, genDe(nd));
+  const lista = r.relleno.slice(0, 12);
+  let h = '<details class="ocu-min ocu-rel"' + (ocuRelAbierto ? ' open' : '') + '><summary><b>Talentos de relleno</b> · '
+    + r.relleno.length + ' con ' + CAST_RELLENO + ' líneas o menos</summary><div class="ocu-rel-l">';
+  for(const e of lista){
+    h += '<div class="ocu-rel-i"><div><b>' + esc(e.talento) + '</b> <span class="ocu-rel-g">'
+      + (e.genero ? cgPalabra(e.genero) : 'género sin saber') + '</span> · ' + e.ints + ' línea' + (e.ints === 1 ? '' : 's')
+      + ' (' + e.personajes.map(esc).join(', ') + ')</div>';
+    h += e.puede.length
+      ? '<div>Puede hacer además: ' + e.puede.map(item).join(' · ') + '</div>'
+      : '<div class="ocu-min-s">No le cabe ningún personaje sin talento sin cruzarse con lo suyo.</div>';
+    if(e.tambien.length) h += '<div class="ocu-min-s">O en lugar de alguno: ' + e.tambien.slice(0, 6).map(x => item(x.nodo)
+      + ' <i>(no junto con ' + x.cruzaCon.map(c => '«' + esc(c) + '»').join(', ') + ')</i>').join(' · ') + '</div>';
+    if(e.noGenero.length) h += '<div class="ocu-min-s">De ' + cgPalabra(e.genero === 'H' ? 'M' : 'H') + ', no: '
+      + e.noGenero.slice(0, 6).map(item).join(' · ') + (e.noGenero.length > 6 ? '…' : '') + '</div>';
+    if(!e.genero) h += '<div class="ocu-min-s">Ponle el género en Casting › Talentos para que solo le proponga personajes de su género.</div>';
+    h += '</div>';
+  }
+  if(r.relleno.length > lista.length) h += '<div class="ocu-min-s">y ' + (r.relleno.length - lista.length) + ' talentos más de relleno</div>';
+  h += '<div class="ocu-min-nota">No se cruzan con lo que ya hacen (a 5 min o menos por timecode, o seguidos) ni entre ellos. '
+    + 'H / M: el género del personaje; el de trazo discontinuo es una pista (por el nombre o el talento), pulsa para fijarlo.</div></div></details>';
+  return h;
 }
 /** La sugerencia en una línea (el panel de Ocupación del libreto). */
 function castMinimoLinea(){
@@ -11825,9 +11930,9 @@ function castMinimoLinea(){
   return '<br><span class="locu-min">' + esc(cmFrase(r)) + (r.ahora ? ' · ahora usas ' + r.ahora : '') + '</span>';
 }
 /** El recuadro del panel de Ocupación. '' si no hay nada que sugerir. */
-function castMinimoHtml(){
-  let r = null;
-  try{ r = castMinimo(); }catch(e){ fallo('castMinimo · index.html', e, 'el panel sale sin la sugerencia de talentos'); return ''; }
+function castMinimoHtml(ya){
+  let r = ya || null;
+  if(!r) try{ r = castMinimo(); }catch(e){ fallo('castMinimo · index.html', e, 'el panel sale sin la sugerencia de talentos'); return ''; }
   if(!r || r.personajes < 2) return '';
   let h = '<div class="ocu-min"><div class="ocu-min-t"><b>' + esc(cmFrase(r)) + '</b>'
     + (r.ahora ? ' · ahora usas ' + r.ahora : '') + '</div>';
@@ -11838,14 +11943,19 @@ function castMinimoHtml(){
   h += '<details class="ocu-min-d"' + (ocuMinAbierto ? ' open' : '') + '><summary>Cómo repartirlo</summary><div class="ocu-min-l">';
   if(r.sinTalento && r.ahora){
     h += '<div class="ocu-min-h">Los que faltan, con lo ya repartido</div>'
-      + r.conLoRepartido.propuestas.map(p => '<div class="ocu-min-prop">' + esc(p.display) + ' <i>' + p.ints + '</i> → '
-          + (p.talento ? '<b>' + esc(p.talento) + '</b>' : 'talento nuevo ' + p.nuevo) + '</div>').join('');
+      + r.conLoRepartido.propuestas.map(p => {
+          const i = r.nodos ? r.nodos.findIndex(nd => nd.key === p.key) : -1;
+          return '<div class="ocu-min-prop">' + esc(p.display) + ' <i>' + p.ints + '</i>'
+            + (i >= 0 && r.genero ? ' ' + castGeneroBotones(p.display, r.genero[i]) : '') + ' → '
+            + (p.talento ? '<b>' + esc(p.talento) + '</b>' : 'talento nuevo ' + p.nuevo) + '</div>';
+        }).join('');
   }
   h += '<div class="ocu-min-h">Desde cero, con ' + r.minimo + ' talento' + (r.minimo === 1 ? '' : 's') + '</div><ol>'
     + r.grupos.map(g => '<li>' + g.personajes.map(p => esc(p.display) + ' <i>' + p.ints + '</i>').join(', ') + '</li>').join('')
     + '</ol><div class="ocu-min-nota">Cada número es un talento. Solo cuenta lo que choca en el tiempo (a 5 min o menos por timecode, '
-    + 'o seguidos); el género y el tipo de voz los decides tú.</div></div></details></div>';
-  return h;
+    + 'o seguidos) y el género (H / M) cuando se sabe; el tipo de voz lo decides tú.</div></div></details></div>';
+  /* El relleno, lo primero (pedido: «indícame las personas que hay de relleno primero»). */
+  return castRellenoHtml(r) + h;
 }
 
 /* ═══ REGISTRO DE CASTING DEL PROGRAMA ═══════════════════════════════════
@@ -11972,6 +12082,14 @@ function castRegFusionar(local, nube){
   for(const k in ((local && local.personajes) || {})){
     const a = local.personajes[k], b = out.personajes[k];
     if(!b || (+(a && a.ts) || 0) >= (+(b && b.ts) || 0)) out.personajes[k] = a;
+  }
+  /* El género marcado a mano de cada personaje (CAST-51): de cada uno, el más reciente. */
+  if((nube && nube.generos) || (local && local.generos)){
+    out.generos = Object.assign({}, (nube && nube.generos) || {});
+    for(const k in ((local && local.generos) || {})){
+      const a = local.generos[k], b = out.generos[k];
+      if(!b || (+(a && a.ts) || 0) >= (+(b && b.ts) || 0)) out.generos[k] = a;
+    }
   }
   out.capitulos = Object.assign({}, (nube && nube.capitulos) || {});
   for(const k in ((local && local.capitulos) || {})){
@@ -24047,4 +24165,5 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/castorden.js"></script>
 <script src="./js/castchoques.js"></script>
 <script src="./js/castminimo.js"></script>
+<script src="./js/castgenero.js"></script>
 <script src="./js/animaciones.js"></script>

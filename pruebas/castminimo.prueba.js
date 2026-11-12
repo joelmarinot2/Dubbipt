@@ -131,7 +131,7 @@ exports.pruebas = function(t){
       { key: 'TELE', display: 'TELE', talent: 'ORIGINAL', totalInts: 3 }, { key: 'DEE', display: 'DEE', talent: '', totalInts: 8 },
       { key: 'NOREC', display: 'NOREC', talent: '', totalInts: 4, noRec: true }, { key: 'FANTASMA', display: 'FANTASMA', talent: '', totalInts: 0 }];
     const fallos = [];
-    const A = montar([['let ocuMinAbierto = false;', '/* ═══ REGISTRO DE CASTING DEL PROGRAMA'], ['function castNorm(t){', '/** El número final'], ['const OCU_NO_ACTOR', '/** Carga por talento']],
+    const A = montar([['let ocuMinAbierto = true;', '/* ═══ REGISTRO DE CASTING DEL PROGRAMA'], ['function castNorm(t){', '/** El número final'], ['const OCU_NO_ACTOR', '/** Carga por talento']],
       ['castMinimo', 'castMinimoHtml', 'castMinimoLinea', 'verMemo: () => _cmMemo'],
       Object.assign({ chars, script: ctx.script, scriptByKey: ctx.porClave, esc: (s) => String(s).replace(/</g, '&lt;'), fallo: (...x) => fallos.push(x) }, CHQ, M));
     const r = A.castMinimo();
@@ -140,7 +140,7 @@ exports.pruebas = function(t){
     const html = A.castMinimoHtml();
     t.ok('el recuadro: la frase, cuántos usas ahora, por qué no con menos y lo de los que faltan', html.includes('<b>Con 3 talentos se puede hacer todo el capítulo sin choques</b> · ahora usas 1')
          && html.includes('No se puede con menos') && html.includes('Con lo ya repartido, 3 personajes sin talento: hacen falta 2 talentos más'), html.slice(0, 600));
-    t.ok('y cómo repartirlo, con cada personaje y sus líneas', /<summary>Cómo repartirlo<\/summary>/.test(html) && /DEE <i>8<\/i> → <b>Juan Perez<\/b>/.test(html) && /<ol><li>/.test(html) && /el género y el tipo de voz los decides tú/.test(html));
+    t.ok('y cómo repartirlo, con cada personaje y sus líneas', /<summary>Cómo repartirlo<\/summary>/.test(html) && /DEE <i>8<\/i> <span class="cg"[^]*?<\/span> → <b>Juan Perez<\/b>/.test(html) && /<ol><li>/.test(html) && /el tipo de voz lo decides tú/.test(html));
     const memo = A.verMemo();
     chars[1].talent = 'Ana Ochoa';
     const r2 = A.castMinimo();
@@ -152,7 +152,11 @@ exports.pruebas = function(t){
     t.eq('sin fallos', fallos.length, 0);
   }
   const HTML = fs.readFileSync(INDEX, 'utf8'), SW = fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8');
-  t.ok('el panel de Ocupación lo enseña, debajo del resumen, y el desplegable no se cierra al repintar', /\+ '<\/div>'\n    \+ castMinimoHtml\(\);/.test(HTML) && /det\.addEventListener\('toggle', \(\)=>\{ ocuMinAbierto = det\.open; \}\);/.test(HTML));
+  t.ok('sale en su propia pestaña, «Sugerencias», junto a la de Ocupación, con el número de talentos encima (pedido: «en otra pestaña»)',
+       /pest\('sugerencias', 'Sugerencias', \(rMin && rMin\.personajes >= 2\) \? rMin\.minimo : 0/.test(HTML) && /const cuerpo = castMinimoHtml\(rMin\);/.test(HTML)
+       && (HTML.match(/castMinimoHtml\(/g) || []).length === 2);
+  t.ok('pulsar una pestaña la abre; pulsar la que ya está abierta, pliega; y se recuerda cuál era', /if\(ocuAbierto && ocuVista === v\)\{ alternar\(\); return; \}/.test(HTML) && /localStorage\.setItem\('ddl_ocu_vista', v\)/.test(HTML));
+  t.ok('el desplegable no se cierra al repintar', /det\.addEventListener\('toggle', \(\)=>\{ ocuMinAbierto = det\.open; \}\);/.test(HTML));
   t.ok('el panel de Ocupación del libreto, en una línea', /\+ castMinimoLinea\(\)\n    \+ '<\/div>';/.test(HTML));
   t.ok('el módulo se carga después de los choques y queda para usar sin conexión', /<script src="\.\/js\/castchoques\.js"><\/script>\n<script src="\.\/js\/castminimo\.js"><\/script>/.test(HTML) && /'\.\/js\/castminimo\.js'/.test(SW));
 };

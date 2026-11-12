@@ -28,9 +28,18 @@
  * talentos que ya tienes (sin choques), o hacen falta más? Se propone a quién
  * podría ir cada uno. Es una sugerencia: no se asigna nada solo.
  *
- * No sabe de géneros ni de tipos de voz (el desglose no los trae): cuenta
- * solo lo que choca en el tiempo. Es un script clásico: comparte el ámbito
- * global con index.html y usa chqContexto / chqCruce de js/castchoques.js.
+ * Y el género (CAST-51, js/castgenero.js): un personaje de hombre y uno de
+ * mujer no van al mismo talento, y a un talento hombre no se le proponen
+ * personajes de mujer (ni al revés). Si el género de alguno no se sabe, no
+ * se filtra. El tipo de voz no lo sabe nadie: eso lo decide quien reparte.
+ *
+ * Y los talentos de RELLENO (CAST-51): los que ya tienen talento pero hacen
+ * poco en el capítulo («Eduard Pineda solo tiene 2 líneas con un
+ * personaje»): qué personajes sin talento podría hacer además, sin que se
+ * crucen con lo suyo ni entre ellos, y de su género.
+ *
+ * Es un script clásico: comparte el ámbito global con index.html y usa
+ * chqContexto / chqCruce de js/castchoques.js.
  */
 
 const CM_PRESUPUESTO = 60000;   // pasos de búsqueda, como mucho, para probar que se puede con menos
@@ -145,6 +154,22 @@ function cmCon(g, k, presupuesto){
   return agotado ? { sinSaber: true } : { no: true };
 }
 
+/**
+ * El grafo con el género: dos personajes de género distinto (los dos sabidos) tampoco pueden ir al mismo talento.
+ * `generos`: 'H', 'M' o '' por personaje, en el orden de g.nodos. No toca `g`; devuelve uno nuevo que comparte los nodos.
+ */
+function cmConGeneros(g, generos){
+  if(!generos || !generos.some(Boolean)) return g;
+  const ady = g.ady.map(s => new Set(s)), soloGenero = new Set();
+  for(let a = 0; a < g.nodos.length; a++){
+    for(let b = a + 1; b < g.nodos.length; b++){
+      if(!generos[a] || !generos[b] || generos[a] === generos[b] || ady[a].has(b)) continue;
+      ady[a].add(b); ady[b].add(a); soloGenero.add(a + '|' + b);
+    }
+  }
+  return { nodos: g.nodos, ady: ady, soloGenero: soloGenero };
+}
+
 /** Los grupos de un reparto (color por personaje): cada uno, sus personajes (los de más líneas primero); los grupos, los de más líneas primero. */
 function cmGrupos(g, color){
   const por = new Map();
@@ -165,25 +190,34 @@ function cmGrupos(g, color){
  */
 function cmSugerir(personajes, ctx, opts){
   const o = opts || {}, norm = o.norm || ((s) => String(s || '').trim().toUpperCase());
-  const g = o.grafo || cmGrafo(personajes, ctx), n = g.nodos.length;
-  const r = { personajes: n, minimo: 0, exacto: true, cota: 0, juntos: [], grupos: [], conChoques: g.ady.filter(s => s.size).length,
+  const g0 = o.grafo || cmGrafo(personajes, ctx), n = g0.nodos.length;
+  /* El género (CAST-51): `generos[i]` del personaje i; `generoTal(nombre)` del talento. */
+  const generos = o.generos || null, generoTal = o.generoTal || (() => '');
+  const g = cmConGeneros(g0, generos);
+  const r = { personajes: n, minimo: 0, exacto: true, cota: 0, juntos: [], porGenero: false, grupos: [], conChoques: g0.ady.filter(s => s.size).length,
               ahora: 0, sinTalento: 0, conLoRepartido: { nuevos: 0, propuestas: [] } };
   if(!n) return r;
 
-  /* 1 · desde cero: cuántos, como poco */
-  let color = cmDsatur(g, null, null);
-  let k = Math.max(...color) + 1;
-  const clique = cmCliqueGrande(g);
-  r.cota = Math.max(1, clique.length);
-  r.juntos = clique.map(i => g.nodos[i].display);
-  r.exacto = k === r.cota;
-  while(k > r.cota){
-    const t = cmCon(g, k - 1, o.presupuesto || CM_PRESUPUESTO);
-    if(t.colores){ color = t.colores; k--; r.exacto = k === r.cota; continue; }
-    r.exacto = !!t.no;
-    break;
+  /* 1 · desde cero: cuántos, como poco. Lo caro se guarda en `o.cache` (mientras no cambien el libreto ni los géneros). */
+  let color;
+  if(o.cache && o.cache.paso1){ Object.assign(r, o.cache.paso1.r); color = o.cache.paso1.color; }
+  else{
+    color = cmDsatur(g, null, null);
+    let k = Math.max(...color) + 1;
+    const clique = cmCliqueGrande(g);
+    r.cota = Math.max(1, clique.length);
+    r.juntos = clique.map(i => g.nodos[i].display);
+    r.porGenero = !!g.soloGenero && clique.some((a, x) => clique.some((b, y) => y > x && g.soloGenero.has(Math.min(a, b) + '|' + Math.max(a, b))));
+    r.exacto = k === r.cota;
+    while(k > r.cota){
+      const t = cmCon(g, k - 1, o.presupuesto || CM_PRESUPUESTO);
+      if(t.colores){ color = t.colores; k--; r.exacto = k === r.cota; continue; }
+      r.exacto = !!t.no;
+      break;
+    }
+    r.minimo = k;
+    if(o.cache) o.cache.paso1 = { color: color, r: { cota: r.cota, juntos: r.juntos, porGenero: r.porGenero, exacto: r.exacto, minimo: r.minimo } };
   }
-  r.minimo = k;
   r.grupos = cmGrupos(g, color);
 
   /* 2 · con lo que ya está repartido: los que faltan, ¿caben en los talentos que hay? */
@@ -192,7 +226,7 @@ function cmSugerir(personajes, ctx, opts){
     const t = String(p.talento || '').trim();
     if(!t) { r.sinTalento++; return; }
     const kt = norm(t);
-    if(!deTal.has(kt)){ deTal.set(kt, talentos.length); talentos.push({ nombre: t, ints: 0 }); }
+    if(!deTal.has(kt)){ deTal.set(kt, talentos.length); talentos.push({ nombre: t, ints: 0, genero: generoTal(t) || '' }); }
     const c = deTal.get(kt);
     talentos[c].ints += p.ints;
     fijos.set(i, c);
@@ -200,9 +234,14 @@ function cmSugerir(personajes, ctx, opts){
   r.ahora = talentos.length;
   if(r.sinTalento){
     const carga = talentos.map(t => t.ints);
-    /* Entre los talentos que no chocan, el que menos líneas lleva (que no cargue todo uno); si no cabe en ninguno, uno nuevo. */
+    /* Entre los talentos que no chocan y son de su género, el que menos líneas lleva (que no cargue todo uno);
+       si no cabe en ninguno, uno nuevo. Entre dos nuevos, el género ya lo separa el grafo. */
+    let ultimo = talentos.length;
     const col = cmDsatur(g, fijos, (i, libres) => {
-      const c = libres.slice().sort((a, b) => (carga[a] || 0) - (carga[b] || 0) || a - b)[0];
+      const vale = libres.filter(c => c >= talentos.length || cgCasanSi(talentos[c].genero, generos && generos[i]));
+      let c = vale.slice().sort((a, b) => (carga[a] || 0) - (carga[b] || 0) || a - b)[0];
+      if(c == null){ c = Math.max(ultimo, ...libres.map(x => x + 1)); }
+      if(c >= ultimo) ultimo = c + 1;
       carga[c] = (carga[c] || 0) + g.nodos[i].ints;
       return c;
     });
@@ -222,6 +261,48 @@ function cmSugerir(personajes, ctx, opts){
   return r;
 }
 
+/** ¿Casan dos géneros? Si alguno no se sabe, sí. */
+function cgCasanSi(a, b){ return !a || !b || a === b; }
+
+/**
+ * Los talentos de RELLENO y lo que podrían hacer además (CAST-51). `g`: el grafo SIN géneros (lo que choca en el
+ * tiempo), con el talento puesto en cada nodo. `opts`: { tope (líneas: hasta aquí es relleno), norm, generos (por nodo),
+ * generoTal(nombre) }. Devuelve, de menos líneas a más:
+ * [{ talento, genero, ints, personajes: [display], puede: [nodo], tambien: [{ nodo, cruzaCon: [display] }], noGenero: [nodo] }]
+ * `puede`: personajes sin talento que no se cruzan con lo suyo NI entre ellos (los de más líneas primero); `tambien`:
+ * los que tampoco se cruzan con lo suyo, pero sí con alguno de `puede` (o uno u otro); `noGenero`: los que cabrían
+ * por tiempo pero son del otro género.
+ */
+function cmRelleno(g, opts){
+  const o = opts || {}, norm = o.norm || ((s) => String(s || '').trim().toUpperCase()), tope = o.tope == null ? 10 : o.tope;
+  const generos = o.generos || [], generoTal = o.generoTal || (() => '');
+  const por = new Map(), libres = [];
+  g.nodos.forEach((p, i) => {
+    const t = String(p.talento || '').trim();
+    if(!t){ libres.push(i); return; }
+    const k = norm(t);
+    if(!por.has(k)) por.set(k, { talento: t, idx: [], ints: 0 });
+    const e = por.get(k); e.idx.push(i); e.ints += p.ints;
+  });
+  const out = [];
+  for(const e of por.values()){
+    if(e.ints > tope) continue;
+    const gt = generoTal(e.talento) || '';
+    const r = { talento: e.talento, genero: gt, ints: e.ints, personajes: e.idx.map(i => g.nodos[i].display), puede: [], tambien: [], noGenero: [] };
+    const caben = libres.filter(j => !e.idx.some(i => g.ady[i].has(j))).sort((a, b) => g.nodos[b].ints - g.nodos[a].ints);
+    const elegidos = [];
+    for(const j of caben){
+      if(!cgCasanSi(gt, generos[j])){ r.noGenero.push(g.nodos[j]); continue; }
+      /* Entre ellos tampoco: dos del mismo género que se cruzan, o de géneros distintos, no van los dos. */
+      const malos = elegidos.filter(x => g.ady[x].has(j) || !cgCasanSi(generos[x], generos[j]));
+      if(malos.length) r.tambien.push({ nodo: g.nodos[j], cruzaCon: malos.map(x => g.nodos[x].display) });
+      else { elegidos.push(j); r.puede.push(g.nodos[j]); }
+    }
+    out.push(r);
+  }
+  return out.sort((a, b) => a.ints - b.ints || String(a.talento).localeCompare(String(b.talento), 'es'));
+}
+
 /** La frase principal: «Con 7 talentos se puede hacer todo el capítulo sin choques». */
 function cmFrase(r){
   if(!r || !r.personajes) return '';
@@ -232,7 +313,7 @@ function cmFrase(r){
 function cmPorQue(r){
   if(!r || !r.exacto || r.juntos.length < 2 || r.juntos.length !== r.minimo) return '';
   const ns = r.juntos.slice(0, 6).map(x => '«' + x + '»').join(', ') + (r.juntos.length > 6 ? '…' : '');
-  return 'No se puede con menos: ' + ns + ' chocan todos entre sí';
+  return 'No se puede con menos: ' + ns + (r.porGenero ? ' no pueden compartir talento (se cruzan o son de distinto género)' : ' chocan todos entre sí');
 }
 /** Lo de los que faltan por repartir. */
 function cmFraseFaltan(r){
@@ -245,5 +326,5 @@ function cmFraseFaltan(r){
 }
 
 if(typeof module !== 'undefined' && module.exports){
-  module.exports = { CM_PRESUPUESTO, cmChocan, cmGrafo, cmDsatur, cmCliqueGrande, cmCon, cmGrupos, cmSugerir, cmFrase, cmPorQue, cmFraseFaltan };
+  module.exports = { CM_PRESUPUESTO, cmChocan, cmGrafo, cmDsatur, cmCliqueGrande, cmCon, cmConGeneros, cmGrupos, cmSugerir, cgCasanSi, cmRelleno, cmFrase, cmPorQue, cmFraseFaltan };
 }
