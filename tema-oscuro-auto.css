@@ -468,6 +468,8 @@ body{background:radial-gradient(1200px 700px at 50% -8%, rgba(50,211,163,0.16), 
 .cast-fuente.mal{background:rgba(255,107,107,0.12);border:1px solid rgba(255,107,107,0.35)}
 .cast-fuente.comun{background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.35)}
 .ocu-tab{box-shadow:-4px 0 14px rgba(0,0,0,0.3)}
+.ocu-tab.activa{border-color:#69debb}
+.ocu-tab-n.ok{background:#69debb;color:#072018}
 .ocu{box-shadow:-8px 0 26px rgba(0,0,0,0.35)}
 .ocu-head:hover{background:rgba(255,255,255,0.03)}
 .ocu-fila.con-choque{background:rgba(255,107,107,0.06)}
@@ -478,6 +480,9 @@ body{background:radial-gradient(1200px 700px at 50% -8%, rgba(50,211,163,0.16), 
 .ocu-min{background:rgba(105,222,187,0.07);border:1px solid rgba(105,222,187,0.22)}
 .ocu-min-t b{color:#69debb}
 .ocu-min-s.falta{color:#fbbf24}
+.ocu-rel > summary b{color:#69debb}
+.cg-b.ded{border:1px dashed #69debb}
+.cg-b.on{background:#69debb;border-color:#69debb;color:#072018}
 body.modo-casting .card.choque{box-shadow:0 0 0 1px rgba(255,107,107,0.35), 0 6px 18px rgba(255,107,107,0.1)}
 body.modo-casting .pla tbody tr.heredado td{background:rgba(245,158,11,0.07)}
 body.modo-casting .pla tbody tr.heredado .ploc input{color:#f59e0b}
