@@ -1672,6 +1672,11 @@ body:not(.modo-casting) .gestbtn{ display:none; }
 .dud-btns{ display:flex; gap:9px; margin-top:15px; }
 .dud-b{ flex:1; padding:11px 12px !important; font-size:13.5px; }
 .dud-b.dud-ok{ background:#22C55E; color:#06210f; border-color:#22C55E; font-weight:700; }
+/* Personajes sin diálogo (CAST-54) */
+.sd-fila{ cursor:default; }
+.sd-op{ display:flex; align-items:center; gap:7px; margin-top:6px; font-size:13px; cursor:pointer; }
+.sd-op input[type=radio]{ accent-color:#4ADE80; width:15px; height:15px; margin:0; }
+.sd-tal{ flex:1; min-width:120px; background:#141720; color:#e6e9f0; border:1px solid #2b3040; border-radius:8px; padding:6px 9px; font:inherit; font-size:13px; }
 
 /* Producción: lo que viene de DublajeCast */
 .prod-pests{ display:flex; gap:6px; flex-wrap:wrap; margin:4px 0 6px; }
@@ -3130,7 +3135,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v12.8.1-nube';
+const APP_VER_NUM = 'v12.9.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -12100,12 +12105,13 @@ function castRegFusionar(local, nube){
     const a = local.personajes[k], b = out.personajes[k];
     if(!b || (+(a && a.ts) || 0) >= (+(b && b.ts) || 0)) out.personajes[k] = a;
   }
-  /* El género marcado a mano de cada personaje (CAST-51): de cada uno, el más reciente. */
-  if((nube && nube.generos) || (local && local.generos)){
-    out.generos = Object.assign({}, (nube && nube.generos) || {});
-    for(const k in ((local && local.generos) || {})){
-      const a = local.generos[k], b = out.generos[k];
-      if(!b || (+(a && a.ts) || 0) >= (+(b && b.ts) || 0)) out.generos[k] = a;
+  /* El género marcado a mano (CAST-51) y lo contestado de los personajes sin diálogo (CAST-54): de cada uno, el más reciente. */
+  for(const campo of ['generos', 'sinDialogo']){
+    if(!((nube && nube[campo]) || (local && local[campo]))) continue;
+    out[campo] = Object.assign({}, (nube && nube[campo]) || {});
+    for(const k in ((local && local[campo]) || {})){
+      const a = local[campo][k], b = out[campo][k];
+      if(!b || (+(a && a.ts) || 0) >= (+(b && b.ts) || 0)) out[campo][k] = a;
     }
   }
   out.capitulos = Object.assign({}, (nube && nube.capitulos) || {});
@@ -12557,6 +12563,88 @@ function castPreguntarDudosos(lista){
       cap.remove(); resolve(sel);
     };
     cap.addEventListener('click', (e) => { if(e.target === cap){ cap.remove(); resolve([]); } });
+  });
+}
+
+/* ═══ PERSONAJES SIN DIÁLOGO EN EL DESGLOSE (CAST-54) ═══════════════════
+
+   Pedido de sala: «en el desglose original aparece este personaje, PANG
+   (DIAMOND EXPERT), que es un fallo de desglose: no tiene diálogo. Todos esos
+   personajes, pregúntame cuando vaya a descargar si es un personaje real o
+   no: si es un fallo, se marca el talento como X; si no, se le asigna el
+   talento que yo diga».
+   Son las filas del Excel cuyo personaje no habla en el capítulo (CAST-53).
+   Se pregunta al descargar; lo contestado se recuerda en el registro del
+   programa y sale marcado la próxima vez (se vuelve a preguntar igual). */
+
+/** Las respuestas → lo que se escribe: { clave del personaje: 'X' o el talento }. Las que no dicen nada, fuera. */
+function castSinDialogoAsign(resp){
+  const out = {};
+  for(const x of (resp || [])){
+    if(!x || !x.nombre) continue;
+    const t = x.fallo ? 'X' : String(x.talento || '').replace(/\s+/g, ' ').trim();
+    if(t) out[castClave(x.nombre)] = t;
+  }
+  return out;
+}
+/** Recuerda las respuestas en el registro del programa. */
+async function castSinDialogoGuardar(showId, resp){
+  if(!showId || !resp || !resp.length) return false;
+  const reg = await castRegCargar(showId);
+  reg.sinDialogo = Object.assign({}, reg.sinDialogo || {});
+  for(const x of resp){
+    const t = x.fallo ? 'X' : String(x.talento || '').trim();
+    if(t) reg.sinDialogo[castNorm(x.nombre)] = { talent: t, ts: Date.now() };
+  }
+  return castRegGuardar(showId, reg);
+}
+/**
+ * El diálogo: cada personaje, «fallo del desglose (X)» o «es real → talento». Resuelve con
+ * [{ nombre, fallo, talento }] (lo que se haya contestado), o [] si se descarga así, sin tocarlos.
+ */
+function castPreguntarSinDialogo(nombres, previos){
+  return new Promise((resolve) => {
+    const e = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    const tal = (typeof talNombres === 'function') ? talNombres() : [];
+    const cap = document.createElement('div');
+    cap.className = 'modo-cap';
+    cap.innerHTML =
+      '<div class="modo-caja" role="dialog" aria-modal="true" style="max-width:660px;text-align:left">'
+    +   '<div class="modo-tit">Personajes sin diálogo</div>'
+    +   '<div class="modo-sub" style="margin-bottom:8px">Están en el Excel, pero no hablan en este capítulo</div>'
+    +   '<div class="dud-nota">¿Es un fallo del desglose? Entonces su talento será <b>X</b>. Si es un personaje real, escribe su talento. '
+    +     'Sin contestar, la fila se queda vacía (y no cuenta para COMPLETO).</div>'
+    +   '<datalist id="sdTal">' + tal.map(n => '<option value="' + e(n) + '">').join('') + '</datalist>'
+    +   '<div class="dud-lista">' + nombres.map((n, i) => {
+          const p = previos && previos[castNorm(n)], antes = p && p.talent ? String(p.talent) : '';
+          const fallo = !antes || castNorm(antes) === 'X';
+          return '<div class="dud-fila sd-fila" data-i="' + i + '"><span class="dud-txt"><b>' + e(n) + '</b>'
+            + (antes ? ' <span class="dud-ant">la última vez: ' + e(antes) + '</span>' : '') + '<br>'
+            + '<label class="sd-op"><input type="radio" name="sd' + i + '" value="x"' + (fallo ? ' checked' : '') + '> Fallo del desglose → <b>X</b></label>'
+            + '<label class="sd-op"><input type="radio" name="sd' + i + '" value="real"' + (!fallo ? ' checked' : '') + '> Es real → '
+            + '<input type="text" class="sd-tal" list="sdTal" placeholder="talento" value="' + e(fallo ? '' : antes) + '"></label>'
+            + '</span></div>';
+        }).join('')
+    +   '</div>'
+    +   '<div class="dud-btns">'
+    +     '<button class="modo-op dud-b" id="sdAsi">Descargar sin tocarlos</button>'
+    +     '<button class="modo-op dud-b dud-ok" id="sdOk">Aplicar y descargar</button>'
+    +   '</div>'
+    + '</div>';
+    document.body.appendChild(cap);
+    /* Escribir un talento marca «es real». */
+    cap.querySelectorAll('.sd-tal').forEach(inp => inp.addEventListener('input', () => {
+      const fila = inp.closest('.sd-fila'); const r = fila && fila.querySelector('input[value="real"]'); if(r) r.checked = true;
+    }));
+    const leer = () => Array.prototype.slice.call(cap.querySelectorAll('.sd-fila')).map(f => {
+      const n = nombres[+f.dataset.i], real = f.querySelector('input[value="real"]').checked;
+      let t = String(f.querySelector('.sd-tal').value || '').trim();
+      if(t && typeof talValidar === 'function'){ const v = talValidar(t); if(v && v.ok && v.nombre) t = v.nombre; }
+      return { nombre: n, fallo: !real, talento: real ? t : '' };
+    }).filter(x => x.fallo || x.talento);
+    cap.querySelector('#sdAsi').onclick = () => { cap.remove(); resolve([]); };
+    cap.querySelector('#sdOk').onclick = () => { const r = leer(); cap.remove(); resolve(r); };
+    cap.addEventListener('click', (ev) => { if(ev.target === cap){ cap.remove(); resolve([]); } });
   });
 }
 
@@ -13280,7 +13368,21 @@ async function castDescargar(){
     for(const k in charIdx){ const c = charIdx[k], t = (typeof trnDe === 'function') ? trnDe(c) : null; if(t) training[castClave(c.display || k)] = { tel: t.tel || '' }; }
     /* Los personajes que hablan en este capítulo: solo esos cuentan para COMPLETO (CAST-53). */
     const delCapitulo = Object.keys(charIdx).map(k => (charIdx[k] && charIdx[k].display) || k);
-    const r = castRellenar(buf, asign, meta, training, delCapitulo);
+    let r = castRellenar(buf, asign, meta, training, delCapitulo);
+    /* Filas del Excel de personajes que no hablan en el capítulo (CAST-54): se pregunta, uno por uno, si son un fallo
+       del desglose (X) o un personaje real (y con qué talento). Con las respuestas, se rellena otra vez. */
+    if(r.noHablan && r.noHablan.length){
+      const showReg = (currentEp && currentEp.showId) || LDB.showId;
+      let previos = {};
+      try{ const reg = await castRegCargar(showReg); previos = (reg && reg.sinDialogo) || {}; }catch(e){ previos = {}; }
+      const resp = await castPreguntarSinDialogo(r.noHablan, previos);
+      const extra = castSinDialogoAsign(resp);
+      if(Object.keys(extra).length){
+        Object.assign(asign, extra);
+        r = castRellenar(buf, asign, meta, training, delCapitulo);
+        castSinDialogoGuardar(showReg, resp).catch(e => fallo('castSinDialogoGuardar · index.html:castDescargar', e, 'la respuesta no se recuerda para la próxima'));
+      }
+    }
 
     const ep = (LDB.epsAll || []).find(e => e.id === currentEp.id);
     /* DES_<programa y capítulo>_COMPLETO / _INCOMPLETO (CAST-47), con la extensión de lo que el archivo es (CAST-45). */

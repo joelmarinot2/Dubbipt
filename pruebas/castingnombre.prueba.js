@@ -76,10 +76,26 @@ exports.pruebas = function(t){
   t.eq('sin la lista del capítulo, cuentan todas, como antes', JSON.stringify([r.completo, r.faltanActor]), '[false,["RON WOO"]]');
   t.eq('un personaje que no habla pero ya trae actor escrito, cuenta como lleno', JSON.stringify(M.castFaltanActor({ 11: 'LOCUTOR', 17: 'MARLON', 18: 'TELE' }, { 11: 'NOMBRE DEL ACTOR', 17: 'JUAN', 18: 'ORIGINAL' }, ['MARLON'])), '{"total":2,"faltan":[],"noHablan":[]}');
 
+  t.seccion('2c · los sin diálogo: fallo del desglose (X) o real (con su talento) (CAST-54)');
+  {
+    const S = montar([['function castNorm(t){', '/** El número final, si lo hay'], ['/** Las respuestas → lo que se escribe', '/**\n * El diálogo: cada personaje']], ['castSinDialogoAsign'],
+      { castClave: M.castClave });
+    const extra = S.castSinDialogoAsign([{ nombre: 'PANG (DIAMOND EXPERT)', fallo: true }, { nombre: 'Guardia 2', fallo: false, talento: '  Ana  Ochoa ' }, { nombre: 'NADIE', fallo: false, talento: '' }]);
+    t.eq('fallo → X; real → su talento; sin contestar, nada', JSON.stringify(extra), JSON.stringify({ [M.castClave('PANG (DIAMOND EXPERT)')]: 'X', [M.castClave('Guardia 2')]: 'Ana Ochoa' }));
+    arch = libro({ 17: 'MARLON', 20: 'PANG (DIAMOND EXPERT)', 21: 'SHAWN' }, {});
+    const asign = Object.assign(asignDe({ MARLON: 'JUAN D PEREZ', SHAWN: 'SERGIO GARZON' }), extra);
+    r = M.castRellenar(null, asign, null, null, ['MARLON', 'SHAWN']);
+    t.eq('con la respuesta, la fila de PANG lleva X: COMPLETO y ya no queda nadie «sin diálogo»', JSON.stringify([r.completo, r.faltanActor, r.noHablan]), '[true,[],[]]');
+    const R = montar([['function castRegFusionar(local, nube){', '/**\n * Apunta en el registro']], ['castRegFusionar'], {});
+    t.eq('lo contestado se recuerda en el registro del programa; al juntar equipos, lo más reciente', JSON.stringify(R.castRegFusionar({ personajes: {}, sinDialogo: { PANG: { talent: 'X', ts: 9 } } }, { personajes: {}, sinDialogo: { PANG: { talent: 'ANA', ts: 2 }, LOU: { talent: 'X', ts: 1 } } }).sinDialogo),
+         '{"PANG":{"talent":"X","ts":9},"LOU":{"talent":"X","ts":1}}');
+  }
+
   t.seccion('3 · en la descarga');
   const HTML = fs.readFileSync(INDEX, 'utf8');
   t.ok('el nombre sale del programa, el capítulo y si es película; el aviso dice COMPLETO o INCOMPLETO y el nombre',
        /const nombre = castNombreDescarga\(programa, capitulo, num, r\.completo, r\.ext, pelicula\);/.test(HTML) && /sbShows\(\)\.find\(x => String\(x\.id\) === String\(showId\)\)/.test(HTML)
        && /' · COMPLETO: todos los personajes tienen actor'/.test(HTML) && /' · INCOMPLETO: ' \+ r\.faltanActor\.length/.test(HTML) && /msg \+= ' · ' \+ nombre;/.test(HTML) && !/' · CASTING\.'/.test(HTML)
-       && /const delCapitulo = Object\.keys\(charIdx\)\.map\(k => \(charIdx\[k\] && charIdx\[k\]\.display\) \|\| k\);/.test(HTML) && /del Excel sin actor de personajes que no hablan en este capítulo \(no cuentan\)/.test(HTML));
+       && /const delCapitulo = Object\.keys\(charIdx\)\.map\(k => \(charIdx\[k\] && charIdx\[k\]\.display\) \|\| k\);/.test(HTML) && /del Excel sin actor de personajes que no hablan en este capítulo \(no cuentan\)/.test(HTML)
+       && /if\(r\.noHablan && r\.noHablan\.length\)\{[\s\S]{0,400}const resp = await castPreguntarSinDialogo\(r\.noHablan, previos\);[\s\S]{0,200}Object\.assign\(asign, extra\);\s+r = castRellenar\(buf, asign, meta, training, delCapitulo\);/.test(HTML));
 };

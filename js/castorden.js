@@ -33,7 +33,7 @@ const corAttr = (a, k) => { const m = String(a || '').match(new RegExp('\\b' + k
 const corColN = (l) => { let n = 0; for(const ch of l) n = n * 26 + ch.charCodeAt(0) - 64; return n; };
 const corColL = (n) => { let s = ''; while(n > 0){ const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = (n - 1 - r) / 26; } return s; };
 const corClave = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
-const CORD_AL_FINAL = new Set(['', 'TODOS', 'ORIGINAL', 'EDICION', 'X', 'N/A', 'NA', 'VARIOS']);
+const CORD_AL_FINAL = new Set(['', '0', '#N/A', '#REF!', 'TODOS', 'ORIGINAL', 'EDICION', 'X', 'N/A', 'NA', 'VARIOS']);   // «0» o «#N/A»: lo que deja una fórmula sin actor (CAST-54)
 
 /** Las hojas del libro: [{ nombre, ruta }]. */
 function corHojas(arch){

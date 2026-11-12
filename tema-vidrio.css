@@ -294,6 +294,8 @@ html[data-tema] .ddlm-kicker{ color:var(--tv-acento) !important; }
 html[data-tema] .modo-op{ border-radius:20px !important; background:var(--tv-boton) !important; box-shadow:var(--tv-sombra) !important; }
 html[data-tema] .modo-op:hover,
 html[data-tema] .modo-op.on{ border-color:var(--tv-acento) !important; box-shadow:0 0 0 4px rgba(143,230,205,.35), var(--tv-sombra) !important; }
+/* El botón principal de los diálogos de reparto (Asignar / Aplicar y descargar): relleno menta, que se lea (CAST-54). */
+html[data-tema] .modo-op.dud-ok{ background:var(--tv-menta) !important; border-color:var(--tv-menta) !important; color:#06231e !important; }
 
 /* ── La entrada ── */
 html[data-tema] #gate{ background:transparent !important; }

@@ -564,6 +564,8 @@ body.modo-casting .pla tbody tr.gestos td:first-child{box-shadow:inset 3px 0 0 #
 .dud-ant{color:#86a8a1}
 .dud-tal{color:#fcd34d}
 .dud-b.dud-ok{background:#32d3a3;color:#072018;border-color:#32d3a3}
+.sd-op input[type=radio]{accent-color:#69debb}
+.sd-tal{background:#12221f;color:#e7efee;border:1px solid #244740}
 .prod-pest{background:#172d29;color:#c9dcd8;border:1px solid #244740}
 .prod-pest.on{background:#32d3a3;color:#072018;border-color:#32d3a3}
 .prod-prog{background:#172d29;border:1px solid #244740}
