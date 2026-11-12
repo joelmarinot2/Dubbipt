@@ -3130,7 +3130,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v12.8.0-nube';
+const APP_VER_NUM = 'v12.8.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -10249,19 +10249,35 @@ function castFormatoSalida(arch){
    415), o el del capítulo si ya lo lleva; en una película, el de la película.
    COMPLETO si, después de escribir, TODOS los personajes de la hoja CASTING
    tienen su actor (también los que ya lo traían escrito, TODOS u ORIGINAL). */
-/** Los personajes de la hoja CASTING (debajo de la cabecera NOMBRE DEL ACTOR): { total, faltan: los que se quedan sin actor }. */
-function castFaltanActor(personajes, actores){
+/**
+ * Los personajes de la hoja CASTING (debajo de la cabecera NOMBRE DEL ACTOR):
+ * { total, faltan: los que se quedan sin actor, noHablan: los que se quedan sin actor pero no hablan en este capítulo }.
+ *
+ * `delCapitulo` (CAST-53): los personajes que Dubbipt tiene en ESTE capítulo (los que hablan). Pedido de sala:
+ * «hay algunos programas que se marcan INCOMPLETO y no se hace la reorganización; ya terminé todo este programa
+ * (CHOR NIKAL KE BHAAGA 2) y al descargar aparece INCOMPLETO». El desglose suele traer filas de personajes que en
+ * este capítulo no dicen nada (sin páginas ni intervenciones): Dubbipt no los carga —no hay nada que repartir— y su
+ * fila se quedaba sin actor para siempre, así que el capítulo nunca llegaba a COMPLETO ni se ordenaba CASTING 1.
+ * Ahora una fila sin actor solo cuenta como «falta» si su personaje habla en el capítulo; las demás se dicen aparte.
+ * Sin `delCapitulo` (o vacío), cuentan todas, como antes.
+ */
+function castFaltanActor(personajes, actores, delCapitulo){
   const filaCab = Object.keys(actores).map(Number).filter(f => /ACTOR/i.test(String(actores[f] || ''))).sort((a, b) => a - b)[0];
-  const faltan = [];
+  const cap = {};
+  for(const n of (delCapitulo || [])){ const k = castClave(n); if(k) cap[k] = true; }
+  const mirarCap = Object.keys(cap).length > 0;
+  const faltan = [], noHablan = [];
   let total = 0;
   for(const f of Object.keys(personajes).map(Number).sort((a, b) => a - b)){
     if(filaCab != null && f <= filaCab) continue;
     const nombre = String(personajes[f] || '').replace(/\s+/g, ' ').trim();
     if(!nombre || /^\d+$/.test(nombre) || /:$/.test(nombre) || !castClave(nombre)) continue;
+    if(String(actores[f] || '').trim()){ total++; continue; }
+    if(mirarCap && !castQuienVaEnLaFila(nombre, cap)){ noHablan.push(nombre); continue; }
     total++;
-    if(!String(actores[f] || '').trim()) faltan.push(nombre);
+    faltan.push(nombre);
   }
-  return { total: total, faltan: faltan };
+  return { total: total, faltan: faltan, noHablan: noHablan };
 }
 /** «DES_THE WAYANS BROS 415_COMPLETO.xlsx». `programa` y `capitulo`: los nombres; `num`: el número del capítulo si se sabe. */
 function castNombreDescarga(programa, capitulo, num, completo, ext, pelicula){
@@ -10274,7 +10290,7 @@ function castNombreDescarga(programa, capitulo, num, completo, ext, pelicula){
   else nombre = n ? p + ' ' + n : p + ' ' + c;
   return 'DES_' + nombre.toLocaleUpperCase('es') + '_' + (completo ? 'COMPLETO' : 'INCOMPLETO') + '.' + (ext || 'xlsx');   // el título, en mayúsculas (PRO-63)
 }
-function castRellenar(buf, asign, meta, training){
+function castRellenar(buf, asign, meta, training, delCapitulo){
   if(typeof fflate === 'undefined') throw new Error('falta la librería de ZIP');
   const arch = fflate.unzipSync(new Uint8Array(buf));
   const ruta = castHojaXml(arch, CAST_HOJA);
@@ -10320,7 +10336,7 @@ function castRellenar(buf, asign, meta, training){
   arch[ruta] = new TextEncoder().encode(xmlFinal);
   /* ¿Completo? Todos los personajes con su actor, después de escribir (CAST-47). */
   const actoresFinal = castLeerColumnaTexto(arch, xmlFinal, CAST_COL_ACTOR);
-  const llenos = castFaltanActor(personajes, actoresFinal), faltanActor = llenos.faltan;
+  const llenos = castFaltanActor(personajes, actoresFinal, delCapitulo), faltanActor = llenos.faltan;
   const completo = llenos.total > 0 && !faltanActor.length;
   const tiempos = castFormatoTiempos(arch);   // el TIME de CASTING 1, como hh:mm:ss (CAST-46)
   /* Completo: CASTING 1 se ordena por talento (CAST-48), solo esa hoja; las fórmulas, tal cual. */
@@ -10337,7 +10353,7 @@ function castRellenar(buf, asign, meta, training){
            sinCasar: sinCasar, enBlanco: enBlanco,
            enExcel: Object.keys(personajes).length, cabecera: cabecera, training: tr,
            porParecido: porParecido, cubiertos: cubiertos, tiempos: tiempos,
-           completo: completo, faltanActor: faltanActor, orden1: orden1 };
+           completo: completo, faltanActor: faltanActor, noHablan: llenos.noHablan, orden1: orden1 };
 }
 
 /** Catálogo de talentos de la hoja TALENTOS, para autocompletar. */
@@ -13262,7 +13278,9 @@ async function castDescargar(){
     /* Los de training: los personajes de los talentos marcados a mano en ESTE capítulo (clic derecho en una tarjeta). */
     const training = {};
     for(const k in charIdx){ const c = charIdx[k], t = (typeof trnDe === 'function') ? trnDe(c) : null; if(t) training[castClave(c.display || k)] = { tel: t.tel || '' }; }
-    const r = castRellenar(buf, asign, meta, training);
+    /* Los personajes que hablan en este capítulo: solo esos cuentan para COMPLETO (CAST-53). */
+    const delCapitulo = Object.keys(charIdx).map(k => (charIdx[k] && charIdx[k].display) || k);
+    const r = castRellenar(buf, asign, meta, training, delCapitulo);
 
     const ep = (LDB.epsAll || []).find(e => e.id === currentEp.id);
     /* DES_<programa y capítulo>_COMPLETO / _INCOMPLETO (CAST-47), con la extensión de lo que el archivo es (CAST-45). */
@@ -13303,6 +13321,9 @@ async function castDescargar(){
     msg += r.completo ? ' · COMPLETO: todos los personajes tienen actor'
          : ' · INCOMPLETO: ' + r.faltanActor.length + ' personaje' + (r.faltanActor.length === 1 ? '' : 's') + ' sin actor'
            + (r.faltanActor.length ? ' (' + r.faltanActor.slice(0, 5).join(', ') + (r.faltanActor.length > 5 ? '…' : '') + ')' : '');
+    if(r.noHablan && r.noHablan.length)
+      msg += ' · ' + r.noHablan.length + ' fila' + (r.noHablan.length === 1 ? '' : 's') + ' del Excel sin actor de personajes que no hablan en este capítulo (no cuentan): '
+           + r.noHablan.slice(0, 5).join(', ') + (r.noHablan.length > 5 ? '…' : '');
     if(r.orden1) msg += r.orden1.hecho ? (r.orden1.igual ? ' · CASTING 1 ya estaba por talento' : ' · CASTING 1 ordenado por talento (' + r.orden1.bloques + ' personajes)')
                                        : ' · ⚠️ CASTING 1 no se ordenó: ' + r.orden1.motivo;
     msg += ' · ' + nombre;

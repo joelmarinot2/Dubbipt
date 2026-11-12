@@ -53,15 +53,33 @@ exports.pruebas = function(t){
   arch = libro({ 17: 'MARLON', 20: 'RON WOO', 21: 'SHAWN', 27: 'GRUPO MIXTO' }, { 27: 'TODOS' });
   r = M.castRellenar(null, asignDe({ MARLON: 'JUAN D PEREZ' }), null);
   t.eq('falta alguno: INCOMPLETO, y se dice cuáles', JSON.stringify([r.completo, r.faltanActor]), '[false,["RON WOO","SHAWN"]]');
-  t.eq('la cabecera (FECHA, LOCUTOR) no cuenta como personaje', JSON.stringify(M.castFaltanActor({ 7: '0', 9: 'FECHA:', 11: 'LOCUTOR', 17: 'MARLON' }, { 7: 'WILFREDO HUESO', 11: 'NOMBRE DEL ACTOR', 17: 'JUAN D PEREZ' })), '{"total":1,"faltan":[]}');
-  t.eq('filas vacías del final no cuentan', JSON.stringify(M.castFaltanActor({ 11: 'LOCUTOR', 17: 'MARLON', 33: '', 34: ' ' }, { 11: 'NOMBRE DEL ACTOR', 17: 'X' })), '{"total":1,"faltan":[]}');
+  t.eq('la cabecera (FECHA, LOCUTOR) no cuenta como personaje', JSON.stringify(M.castFaltanActor({ 7: '0', 9: 'FECHA:', 11: 'LOCUTOR', 17: 'MARLON' }, { 7: 'WILFREDO HUESO', 11: 'NOMBRE DEL ACTOR', 17: 'JUAN D PEREZ' })), '{"total":1,"faltan":[],"noHablan":[]}');
+  t.eq('filas vacías del final no cuentan', JSON.stringify(M.castFaltanActor({ 11: 'LOCUTOR', 17: 'MARLON', 33: '', 34: ' ' }, { 11: 'NOMBRE DEL ACTOR', 17: 'X' })), '{"total":1,"faltan":[],"noHablan":[]}');
   arch = libro({});
   r = M.castRellenar(null, asignDe({ MARLON: 'JUAN' }), null);
   t.eq('sin personajes leídos no es COMPLETO', r.completo, false);
+
+  t.seccion('2b · los que no hablan en el capítulo no lo dejan INCOMPLETO (CAST-53)');
+  /* «Ya terminé todo este programa (CHOR NIKAL KE BHAAGA 2) y al descargar aparece INCOMPLETO»: el desglose trae filas de
+     personajes que en este capítulo no dicen nada; Dubbipt no los carga y su fila se quedaba sin actor para siempre. */
+  arch = libro({ 17: 'MARLON', 20: 'RON WOO', 21: 'SHAWN', 22: 'ABUELA (VO)', 27: 'GRUPO MIXTO' }, { 27: 'TODOS' });
+  r = M.castRellenar(null, asignDe({ MARLON: 'JUAN D PEREZ', SHAWN: 'SERGIO GARZON' }), null, null, ['MARLON', 'SHAWN']);
+  t.eq('todos los que hablan tienen actor: COMPLETO, aunque RON WOO y ABUELA (VO) se queden sin actor', JSON.stringify([r.completo, r.faltanActor, r.noHablan]), '[true,[],["RON WOO","ABUELA (VO)"]]');
+  arch = libro({ 17: 'MARLON', 20: 'RON WOO', 21: 'SHAWN' }, {});
+  r = M.castRellenar(null, asignDe({ MARLON: 'JUAN D PEREZ' }), null, null, ['MARLON', 'SHAWN']);
+  t.eq('si falta uno que SÍ habla: INCOMPLETO, y se dice cuál', JSON.stringify([r.completo, r.faltanActor, r.noHablan]), '[false,["SHAWN"],["RON WOO"]]');
+  arch = libro({ 17: 'MARLON', 21: 'SHAWN (VO)' }, {});
+  r = M.castRellenar(null, asignDe({ MARLON: 'JUAN D PEREZ' }), null, null, ['MARLON', 'SHAWN']);
+  t.eq('el mismo personaje con sufijo (VO, ARCHIVO…) sí habla: cuenta', JSON.stringify([r.completo, r.faltanActor]), '[false,["SHAWN (VO)"]]');
+  arch = libro({ 17: 'MARLON', 20: 'RON WOO' }, {});
+  r = M.castRellenar(null, asignDe({ MARLON: 'JUAN D PEREZ' }), null, null, []);
+  t.eq('sin la lista del capítulo, cuentan todas, como antes', JSON.stringify([r.completo, r.faltanActor]), '[false,["RON WOO"]]');
+  t.eq('un personaje que no habla pero ya trae actor escrito, cuenta como lleno', JSON.stringify(M.castFaltanActor({ 11: 'LOCUTOR', 17: 'MARLON', 18: 'TELE' }, { 11: 'NOMBRE DEL ACTOR', 17: 'JUAN', 18: 'ORIGINAL' }, ['MARLON'])), '{"total":2,"faltan":[],"noHablan":[]}');
 
   t.seccion('3 · en la descarga');
   const HTML = fs.readFileSync(INDEX, 'utf8');
   t.ok('el nombre sale del programa, el capítulo y si es película; el aviso dice COMPLETO o INCOMPLETO y el nombre',
        /const nombre = castNombreDescarga\(programa, capitulo, num, r\.completo, r\.ext, pelicula\);/.test(HTML) && /sbShows\(\)\.find\(x => String\(x\.id\) === String\(showId\)\)/.test(HTML)
-       && /' · COMPLETO: todos los personajes tienen actor'/.test(HTML) && /' · INCOMPLETO: ' \+ r\.faltanActor\.length/.test(HTML) && /msg \+= ' · ' \+ nombre;/.test(HTML) && !/' · CASTING\.'/.test(HTML));
+       && /' · COMPLETO: todos los personajes tienen actor'/.test(HTML) && /' · INCOMPLETO: ' \+ r\.faltanActor\.length/.test(HTML) && /msg \+= ' · ' \+ nombre;/.test(HTML) && !/' · CASTING\.'/.test(HTML)
+       && /const delCapitulo = Object\.keys\(charIdx\)\.map\(k => \(charIdx\[k\] && charIdx\[k\]\.display\) \|\| k\);/.test(HTML) && /del Excel sin actor de personajes que no hablan en este capítulo \(no cuentan\)/.test(HTML));
 };
