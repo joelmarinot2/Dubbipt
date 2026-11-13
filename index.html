@@ -3135,7 +3135,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v12.9.1-nube';
+const APP_VER_NUM = 'v12.10.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -24292,4 +24292,5 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/castchoques.js"></script>
 <script src="./js/castminimo.js"></script>
 <script src="./js/castgenero.js"></script>
+<script src="./js/castepisodios.js"></script>
 <script src="./js/animaciones.js"></script>

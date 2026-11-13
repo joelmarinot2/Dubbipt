@@ -770,7 +770,18 @@ async function csTalentoDub(p, personaje, nombre, e){
     const x = reg.capitulos[nombreEp] && reg.capitulos[nombreEp].personajes && reg.capitulos[nombreEp].personajes[k];
     return !!x && castNorm(x.talent) !== castNorm(limpio);
   });
-  if(castNorm(antes) === castNorm(limpio) && !fotosDistintas) return 'igual';
+  /* Los capítulos de Dubbipt guardan su propio casting: se cambia también ahí (PRO-65). */
+  const hayCaps = typeof ceReasignarEnEpisodios === 'function';
+  const enCaps = () => hayCaps ? ceReasignarEnEpisodios(p.show.id, personaje, limpio, (e && e.ep) ? { epId: e.ep.id } : null) : Promise.resolve({ episodios: [], fallos: [] });
+  const frase = (rc) => (typeof ceFrase === 'function') ? ceFrase(rc) : '';
+  if(castNorm(antes) === castNorm(limpio) && !fotosDistintas){
+    /* El registro ya lo tenía; puede que algún capítulo no (los de antes de PRO-65). */
+    const rc = await enCaps();
+    if(!rc.episodios.length && !rc.fallos.length) return 'igual';
+    castAviso(personaje + ': ' + (limpio || 'sin talento') + frase(rc));
+    csRepintar();
+    return 'guardado';
+  }
   const eps = (ya && Array.isArray(ya.episodios)) ? ya.episodios.slice() : [];
   if(e && e.ep && eps.indexOf(e.ep.name) < 0) eps.push(e.ep.name);
   reg.personajes[k] = Object.assign({ display: personaje, de: 'Dubbipt' }, ya || {}, { talent: limpio, episodios: eps, ts: Date.now() });
@@ -785,7 +796,9 @@ async function csTalentoDub(p, personaje, nombre, e){
   CS.registros[String(p.show.id)] = reg;
   const que = personaje + ': ' + (limpio || 'sin talento') + ' (antes: ' + (antes || 'sin asignar') + ')';
   dcxRegistrar(dcxEntrada(que, csContexto(p, e || null)));
-  castAviso(que);
+  if(hayCaps) castAviso(que + ' · cambiándolo en los capítulos…');
+  const rc = await enCaps();
+  castAviso(que + frase(rc));
   csRepintar();
   return 'guardado';
 }
@@ -2422,6 +2435,10 @@ async function csReasignarDesdeReparto(clave, nombre){
   if(p.show && (r.charId == null || r.de !== 'dc')){
     const res = await csTalentoDub(p, r.personaje, nombre, null);
     if(res === 'guardado') hecho = 'guardado'; else if(res === 'error') hecho = 'error';
+  }else if(p.show && typeof ceReasignarEnEpisodios === 'function'){
+    /* Solo en Casting, pero el programa también está en Dubbipt: sus capítulos, al día (PRO-65). */
+    const rc = await ceReasignarEnEpisodios(p.show.id, r.personaje, nombre, null);
+    if(rc.episodios.length){ hecho = 'guardado'; castAviso(r.personaje + ': ' + nombre + ceFrase(rc)); }
   }
   if(hecho === 'igual'){ castAviso(r.personaje + ' ya tiene a ' + nombre + ' en todos sus episodios'); csRepintar(); }
   return hecho;
