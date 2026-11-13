@@ -2411,6 +2411,20 @@ function csRepartoDe(p, d, registro){
 }
 
 /**
+ * El talento de cada personaje del programa, para Continuidades original (PRO-66): { castNorm(personaje): 'A' o 'A → B' }.
+ * Sale del Reparto (Casting y lo casteado en Dubbipt); si cambió de talento entre episodios, los dos, en orden.
+ */
+function csTalentosDe(reparto){
+  const out = {};
+  for(const r of (reparto || [])){
+    const ts = [];
+    for(const tr of (r.tramos || [])){ const t = String(tr.talento || '').replace(/\s+/g, ' ').trim(); if(t && !ts.some(x => castNorm(x) === castNorm(t))) ts.push(t); }
+    if(ts.length) out[castNorm(r.personaje)] = ts.join(' → ');
+  }
+  return out;
+}
+
+/**
  * «Reasignar» del Reparto: el talento nuevo para un personaje en TODOS sus
  * episodios, en los dos sitios donde esté. Antes, en un programa de los dos
  * lados, se cambiaba solo en Casting y el Reparto -donde manda lo
@@ -3024,7 +3038,7 @@ function csHtmlPrograma(p, eps, d, registro, hayLibreto){
   if(CS.tab === 'casting') cuerpo = csHtmlCastingPrograma(filasCast);
   else if(CS.tab === 'reparto') cuerpo = csHtmlReparto(p, reparto, d);
   else if(CS.tab === 'historial') cuerpo = csHtmlHistorial(historial, true, 200);
-  else if(CS.tab === 'continuidad') cuerpo = (typeof contHtml === 'function') ? contHtml(p) : '';
+  else if(CS.tab === 'continuidad') cuerpo = (typeof contHtml === 'function') ? contHtml(p, csTalentosDe(reparto)) : '';
   else {
     const temps = csTemporadas(p);
     const fila = (e) => {
@@ -3439,7 +3453,7 @@ function csPintarVista(nav, vista){
   nav.querySelectorAll('.cs-nav-b').forEach(b => { b.onclick = () => csIr(b.dataset.v); });
   vista.innerHTML = csHtml(CS.vista);
   csCablear(vista);
-  if(CS.vista === 'programa' && CS.tab === 'continuidad' && typeof contCablear === 'function'){ try{ contCablear(vista, csActual().p); }catch(e){ fallo('contCablear · js/castingvistas.js', e); } }
+  if(CS.vista === 'programa' && CS.tab === 'continuidad' && typeof contCablear === 'function'){ try{ const xc = csActual(); contCablear(vista, xc.p, (xc.p && xc.p.show) ? csTalentosDe(csRepartoDe(xc.p, xc.datos, csRegistroDe(xc.p.show) || null)) : null); }catch(e){ fallo('contCablear · js/castingvistas.js', e); } }
   /* Las animaciones del tema (ENT-27): la luz de la barra viaja a la sección activa y, si la sección cambió, lo nuevo aparece. */
   if(typeof animVista === 'function'){ try{ animVista(nav, vista, [CS.vista, CS.prog, CS.ep, CS.tab].join('|')); }catch(e){ fallo('animVista · js/castingvistas.js', e); } }
 }

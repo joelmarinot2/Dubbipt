@@ -633,6 +633,10 @@ body.modo-casting .pla tbody tr.gestos td:first-child{box-shadow:inset 3px 0 0 #
 td.ct-escena, span.ct-escena{background:rgba(50,211,163,0.16);color:#69debb}
 td.ct-voz, span.ct-voz{background:rgba(251,191,36,0.16);color:#fbbf24}
 .ct-resumen td{color:#85a7a0;background:#0b1614}
+.ct-busca input{background:#0b1412;border:1px solid #21403a;color:#f1f6f5}
+.ct-busca input:focus{border-color:#69debb}
+.ct-cuenta{color:#85a7a0}
+.ct-tal b{color:#69debb}
 .ct-mas summary{color:#cddfdb}
 .ddlm-field .ddlm-tipo label{border:1px solid #21403a}
 .ddlm-field .ddlm-tipo label:has(input:checked){border-color:#69debb;background:rgba(105,222,187,0.08)}

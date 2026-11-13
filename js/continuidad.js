@@ -28,6 +28,13 @@
  * Se guarda en el almacén, en la carpeta del programa (`<programa>/
  * continuidad.json`), con copia en el equipo.
  *
+ * Y después (PRO-66): «que haya un buscador en la sección de continuidades
+ * original y que se vean los nombres de los talentos que ya se asignaron».
+ * Cada personaje lleva su TALENTO (el del Reparto del programa: Casting o lo
+ * casteado en Dubbipt; si cambió entre episodios, «A → B»), en la pantalla y
+ * en el Excel; y arriba, un buscador por cue, personaje, talento,
+ * descripción o notas que filtra al escribir, sin repintar.
+ *
  * De donde depende: XLSX (SheetJS, para leer), fflate (para escribir el
  * Excel), castNorm, castSimil, sb, idbGet, idbSet, csEsc, csIco, csRepintar,
  * castAviso, ioDescargar, fallo.
@@ -35,7 +42,28 @@
 
 /* ═══ CONTINUIDADES ORIGINAL ═════════════════════════════════════════════ */
 
-const CONT = { datos: {}, cargando: {} };
+const CONT = { datos: {}, cargando: {}, buscar: '' };
+
+/** Un texto comparable: sin tildes ni signos, en mayúsculas. */
+function contClave(s){
+  if(typeof castNorm === 'function') return castNorm(s);
+  return String(s == null ? '' : s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+/** El talento de un personaje de la tabla: por su cue, sus otros cues o su nombre completo. `talentos`: { clave: 'NOMBRE' }. */
+function contTalentoDe(r, talentos){
+  if(!talentos) return '';
+  for(const n of [r.cue].concat(r.alias || [], r.personaje ? [r.personaje] : [])){
+    const t = talentos[contClave(n)];
+    if(t) return t;
+  }
+  return '';
+}
+/** ¿La fila pasa el buscador? */
+function contPasa(r, q){
+  const k = contClave(q);
+  if(!k) return true;
+  return contClave([r.cue].concat(r.alias || [], [r.personaje, r.talento, r.descripcion, r.notas]).join(' ')).indexOf(k) >= 0;
+}
 
 /* Lo que va en el dialogue list y no es un personaje. */
 const CONT_FUERA = new Set(['WALLA', 'GRAPHICS INSERTS', 'PRINCIPAL PHOTOGRAPHY', 'MAIN TITLE']);
@@ -264,7 +292,7 @@ function contSimil(a, b){ return (typeof castSimil === 'function') ? castSimil(a
  * cue; `alias` junta un cue con otro). Devuelve
  * `{ eps, filas, incidentales, alertas, porEp, fuentes, detalle }`.
  */
-function contTabla(datos){
+function contTabla(datos, talentos){
   const episodios = (datos && datos.episodios) || {}, fichas = (datos && datos.fichas) || {};
   const eps = Object.keys(episodios).map(Number).filter(isFinite).sort((a, b) => a - b);
   const destino = (cue) => { let c = cue, n = 0; while(fichas[c] && fichas[c].alias && fichas[c].alias !== c && n++ < 5) c = fichas[c].alias; return c; };
@@ -311,6 +339,7 @@ function contTabla(datos){
     r.idiomasAuto = !f.idiomas;
     r.notas = f.notas || '';
     r.showGuide = f.showGuide || '';
+    r.talento = contTalentoDe(r, talentos);
   }
   const orden = (a, b) => (CONT_CATEGORIAS.indexOf(a.categoria) - CONT_CATEGORIAS.indexOf(b.categoria)) || (b.total - a.total) || a.cue.localeCompare(b.cue, 'es');
   const filas = todos.filter(r => r.categoria !== 'Incidental').sort(orden);
@@ -478,42 +507,49 @@ function contEsc(s){ return (typeof csEsc === 'function') ? csEsc(s) : String(s 
 function contIco(n, t){ return (typeof csIco === 'function') ? csIco(n, t) : ''; }
 
 /** La pestaña «Continuidades original» de un programa. */
-function contHtml(p){
+function contHtml(p, talentos){
   if(!p.show) return '<div class="cs-nada">Para las continuidades, el programa tiene que estar en Dubbipt: créalo con «Crear en Dubbipt» y vuelve aquí.</div>';
   const datos = contDe(p.show);
   if(!datos) return '<div class="cs-nada">Cargando las continuidades…</div>';
-  const t = contTabla(datos);
+  const t = contTabla(datos, talentos);
   const subir = '<button class="cs-b cs-pri" data-ct="subir">' + contIco('subir', 14) + '<span>Subir libretos en original</span></button>';
   const cab = '<div class="cs-cast-cab ct-cab"><span>' + (t.eps.length ? t.eps.length + ' episodio' + (t.eps.length === 1 ? '' : 's') + ' leído' + (t.eps.length === 1 ? '' : 's') + ': ' : 'Sube el libreto en original de cada episodio: el dialogue list de Netflix (.xlsx) o el guion de Discovery (Word, .docx). Puedes subir varios a la vez.') + '</span>'
     + t.fuentes.map(f => '<span class="ct-ep" title="' + contEsc(f.archivo) + '">EP' + f.ep + (f.version ? ' · ' + contEsc(f.version) : '') + '<button class="ct-x" data-ct="quitarEp" data-v="' + f.ep + '" title="Quitar este episodio">' + contIco('cerrar', 11) + '</button></span>').join('')
     + '<span class="ct-bots">' + subir + (t.eps.length ? '<button class="cs-b" data-ct="excel">' + contIco('bajar', 14) + '<span>Descargar Excel</span></button>' : '') + '</span></div>';
   if(!t.eps.length) return cab;
+  /* El buscador (PRO-66): filtra al escribir; las filas que no pasan, escondidas. */
+  const q = CONT.buscar || '';
+  const pasan = t.filas.filter(r => contPasa(r, q)).length, pasanInc = t.incidentales.filter(r => contPasa(r, q)).length;
+  const buscador = '<div class="ct-busca"><input type="text" data-ct="buscar" value="' + contEsc(q) + '" placeholder="Buscar personaje, cue, talento o notas…" aria-label="Buscar en la continuidad">'
+    + '<span class="ct-cuenta">' + (q ? pasan + ' de ' + t.filas.length + ' personajes · ' + pasanInc + ' de ' + t.incidentales.length + ' incidentales' : t.filas.length + ' personajes · ' + t.incidentales.length + ' incidentales') + '</span></div>';
+  const busca = (r) => ' data-busca="' + contEsc(contClave([r.cue].concat(r.alias || [], [r.personaje, r.talento, r.descripcion, r.notas]).join(' '))) + '"' + (contPasa(r, q) ? '' : ' style="display:none"');
+  const tal = (r) => '<td class="ct-tal">' + (r.talento ? '<b>' + contEsc(r.talento) + '</b>' : '<span class="cs-tenue">sin asignar</span>') + '</td>';
   const leyenda = '<div class="ct-leyenda"><span class="ct-cel ct-escena">12</span> Aparece en escena <span class="ct-cel ct-voz">12</span> Solo voz (OFF): teléfono, flashback, archivo</div>';
   const celdas = (r) => t.eps.map(n => r.porEp[n] ? '<td class="ct-cel ct-' + r.porEp[n].tipo + '">' + r.porEp[n].intervenciones + '</td>' : '<td class="ct-cel"></td>').join('');
   const opc = (r) => '<select data-ct="ficha" data-cue="' + contEsc(r.cue) + '" data-campo="categoria">' + CONT_CATEGORIAS.map(c => '<option' + (c === r.categoria ? ' selected' : '') + '>' + c + '</option>').join('') + '</select>';
   const entrada = (r, campo, valor, ph) => '<input type="text" data-ct="ficha" data-cue="' + contEsc(r.cue) + '" data-campo="' + campo + '" value="' + contEsc(valor) + '" placeholder="' + contEsc(ph) + '">';
-  const tabla = '<div class="ct-envoltura"><table class="ct-tabla"><thead><tr><th>#</th><th>Cue</th><th>Personaje</th><th>Categoría</th><th>Descripción</th><th>Idioma(s)</th>'
+  const tabla = '<div class="ct-envoltura"><table class="ct-tabla"><thead><tr><th>#</th><th>Cue</th><th>Talento</th><th>Personaje</th><th>Categoría</th><th>Descripción</th><th>Idioma(s)</th>'
     + t.eps.map(n => '<th>EP' + n + '</th>').join('') + '<th>Nº ep.</th><th>Debut</th><th>Última</th><th>Interv.</th><th>Palabras</th><th>Notas de continuidad</th></tr></thead><tbody>'
-    + t.filas.map((r, i) => '<tr><td class="ct-n">' + (i + 1) + '</td><td class="ct-cue"><b>' + contEsc(r.cue) + '</b>' + (r.alias.length ? '<small>también ' + contEsc(r.alias.join(', ')) + '</small>' : '') + '</td>'
-        + '<td>' + entrada(r, 'personaje', r.personaje, 'Nombre completo') + '</td><td class="ct-cat-' + r.categoria.toLowerCase() + '">' + opc(r) + '</td>'
+    + t.filas.map((r, i) => '<tr' + busca(r) + '><td class="ct-n">' + (i + 1) + '</td><td class="ct-cue"><b>' + contEsc(r.cue) + '</b>' + (r.alias.length ? '<small>también ' + contEsc(r.alias.join(', ')) + '</small>' : '') + '</td>'
+        + tal(r) + '<td>' + entrada(r, 'personaje', r.personaje, 'Nombre completo') + '</td><td class="ct-cat-' + r.categoria.toLowerCase() + '">' + opc(r) + '</td>'
         + '<td>' + entrada(r, 'descripcion', r.descripcion, 'Quién es (del guion)') + '</td><td>' + entrada(r, 'idiomas', r.idiomasAuto ? '' : r.idiomas, r.idiomas || 'Idioma(s) / habla') + '</td>'
         + celdas(r) + '<td class="ct-num">' + r.nEps + '</td><td class="ct-num">EP' + r.debut + '</td><td class="ct-num">EP' + r.ultima + '</td><td class="ct-num"><b>' + r.total + '</b></td><td class="ct-num">' + r.palabras + '</td>'
         + '<td>' + entrada(r, 'notas', r.notas, 'Apodos, muertes, relaciones…') + '</td></tr>').join('')
-    + '<tr class="ct-resumen"><td></td><td colspan="5">Personajes con nombre por episodio</td>' + t.eps.map(n => '<td class="ct-num">' + t.porEp[n].conNombre + '</td>').join('') + '<td colspan="6"></td></tr>'
-    + '<tr class="ct-resumen"><td></td><td colspan="5">Incidentales por episodio</td>' + t.eps.map(n => '<td class="ct-num">' + t.porEp[n].incidentales + '</td>').join('') + '<td colspan="6"></td></tr>'
+    + '<tr class="ct-resumen"' + (q ? ' style="display:none"' : '') + '><td></td><td colspan="6">Personajes con nombre por episodio</td>' + t.eps.map(n => '<td class="ct-num">' + t.porEp[n].conNombre + '</td>').join('') + '<td colspan="6"></td></tr>'
+    + '<tr class="ct-resumen"' + (q ? ' style="display:none"' : '') + '><td></td><td colspan="6">Incidentales por episodio</td>' + t.eps.map(n => '<td class="ct-num">' + t.porEp[n].incidentales + '</td>').join('') + '<td colspan="6"></td></tr>'
     + '</tbody></table></div>';
   const alertas = '<div class="cs-caja cs-caja-hist"><div class="cs-caja-t">' + contIco('aviso', 14) + 'Alertas y notas (' + t.alertas.length + ')</div>'
     + (t.alertas.length ? t.alertas.map(a => '<div class="cs-linea ct-alerta"><span class="cs-linea-t"><b>' + contEsc(a.tipo) + '</b> · ' + contEsc(a.donde) + ' — ' + contEsc(a.detalle) + ' <i class="cs-tenue">' + contEsc(a.accion) + '</i></span>'
         + (a.juntar ? '<button class="cs-b" data-ct="juntar" data-de="' + contEsc(a.juntar.de) + '" data-a="' + contEsc(a.juntar.a) + '">Juntar con ' + contEsc(a.juntar.a) + '</button>' : '') + '</div>').join('')
       : '<div class="cs-nada">Nada que revisar.</div>') + '</div>';
-  const inc = '<details class="ct-mas"><summary>Incidentales (' + t.incidentales.length + ')</summary><div class="ct-envoltura"><table class="ct-tabla"><thead><tr><th>Debut</th><th>Cue</th><th>Descripción</th><th>Episodios</th><th>Interv.</th><th>Palabras</th><th>Sugerencia de reparto</th></tr></thead><tbody>'
-    + t.incidentales.map(r => '<tr><td class="ct-num">EP' + r.debut + '</td><td class="ct-cue"><b>' + contEsc(r.cue) + '</b></td><td>' + entrada(r, 'descripcion', r.descripcion, 'Quién es') + '</td><td>' + r.eps.map(n => 'EP' + n).join(', ') + '</td><td class="ct-num">' + r.total + '</td><td class="ct-num">' + r.palabras + '</td><td>' + contEsc(contSugerencia(r)) + '</td></tr>').join('')
+  const inc = '<details class="ct-mas"' + (q && pasanInc && !pasan ? ' open' : '') + '><summary>Incidentales (' + t.incidentales.length + ')</summary><div class="ct-envoltura"><table class="ct-tabla"><thead><tr><th>Debut</th><th>Cue</th><th>Talento</th><th>Descripción</th><th>Episodios</th><th>Interv.</th><th>Palabras</th><th>Sugerencia de reparto</th></tr></thead><tbody>'
+    + t.incidentales.map(r => '<tr' + busca(r) + '><td class="ct-num">EP' + r.debut + '</td><td class="ct-cue"><b>' + contEsc(r.cue) + '</b></td>' + tal(r) + '<td>' + entrada(r, 'descripcion', r.descripcion, 'Quién es') + '</td><td>' + r.eps.map(n => 'EP' + n).join(', ') + '</td><td class="ct-num">' + r.total + '</td><td class="ct-num">' + r.palabras + '</td><td>' + contEsc(contSugerencia(r)) + '</td></tr>').join('')
     + '</tbody></table></div></details>';
-  return cab + leyenda + tabla + alertas + inc;
+  return cab + buscador + leyenda + tabla + alertas + inc;
 }
 
 /** Engancha los controles de la pestaña. `p`: el programa que se mira. */
-function contCablear(raiz, p){
+function contCablear(raiz, p, talentos){
   if(!raiz || !p || !p.show) return;
   raiz.querySelectorAll('[data-ct]').forEach(el => {
     const que = el.getAttribute('data-ct'), at = (k) => el.getAttribute('data-' + k);
@@ -523,7 +559,25 @@ function contCablear(raiz, p){
       i.onchange = () => { if(i.files && i.files.length) contSubir(p.show, i.files).catch(e => fallo('contSubir · js/continuidad.js', e, 'los libretos no se han podido leer')); };
       i.click();
     };
-    else if(que === 'excel') el.onclick = () => contDescargar(p);
+    else if(que === 'excel') el.onclick = () => contDescargar(p, talentos);
+    /* Buscar: se filtra aquí mismo, sin repintar (repintar quitaría el foco a cada letra). */
+    else if(que === 'buscar') el.oninput = () => {
+      CONT.buscar = el.value;
+      const k = contClave(el.value);
+      let n = 0, ni = 0, tot = 0, toti = 0;
+      raiz.querySelectorAll('tr[data-busca]').forEach(tr => {
+        const ok = !k || String(tr.getAttribute('data-busca') || '').indexOf(k) >= 0;
+        tr.style.display = ok ? '' : 'none';
+        const inc = !!(tr.closest && tr.closest('.ct-mas'));
+        if(inc){ toti++; if(ok) ni++; } else { tot++; if(ok) n++; }
+      });
+      raiz.querySelectorAll('tr.ct-resumen').forEach(tr => { tr.style.display = k ? 'none' : ''; });
+      const c = raiz.querySelector ? raiz.querySelector('.ct-cuenta') : null;
+      if(c) c.textContent = k ? n + ' de ' + tot + ' personajes · ' + ni + ' de ' + toti + ' incidentales' : tot + ' personajes · ' + toti + ' incidentales';
+      /* Si lo buscado solo está entre los incidentales, se abren. */
+      const det = raiz.querySelector ? raiz.querySelector('.ct-mas') : null;
+      if(det && k && ni && !n) det.open = true;
+    };
     else if(que === 'quitarEp') el.onclick = () => { contQuitarEp(p.show, at('v')).catch(e => fallo('contQuitarEp · js/continuidad.js', e)); };
     else if(que === 'ficha') el.onchange = () => { contFicha(p.show, at('cue'), at('campo'), el.value).catch(e => fallo('contFicha · js/continuidad.js', e, 'no se ha podido guardar')); };
     else if(que === 'juntar') el.onclick = () => { contFicha(p.show, at('de'), 'alias', at('a')).catch(e => fallo('contFicha · js/continuidad.js', e, 'no se ha podido juntar')); };
@@ -577,16 +631,16 @@ function contXlsx(t, programa){
     [{ v: 'Fuente: dialogue lists en original (' + t.fuentes.map(f => 'EP' + f.ep + (f.version ? ' ' + f.version : '')).join(', ') + '). Las celdas EP muestran el número de intervenciones (cues) del personaje. Hecha con Dubbipt.', s: E.fino }],
     [{ v: 'Leyenda:', s: E.fino }, '', { v: 'Aparece en escena', s: E.escena }, '', '', { v: 'Solo voz (OFF): teléfono, flashback, archivo', s: E.voz }],
     [],
-    cab(['#', 'Cue', 'Personaje', 'Categoría', 'Descripción', 'Idioma(s) / habla'].concat(epsCab, ['Nº de episodios', 'Debut', 'Última aparición', 'Total intervenciones', 'Total palabras', 'Notas de continuidad']))
+    cab(['#', 'Cue', 'Talento', 'Personaje', 'Categoría', 'Descripción', 'Idioma(s) / habla'].concat(epsCab, ['Nº de episodios', 'Debut', 'Última aparición', 'Total intervenciones', 'Total palabras', 'Notas de continuidad']))
   ];
-  t.filas.forEach((r, i) => cont.push([i + 1, { v: r.cue, s: E.negrita }, r.personaje, { v: r.categoria, s: catEst(r.categoria) }, r.descripcion, r.idiomas]
+  t.filas.forEach((r, i) => cont.push([i + 1, { v: r.cue, s: E.negrita }, r.talento || '', r.personaje, { v: r.categoria, s: catEst(r.categoria) }, r.descripcion, r.idiomas]
     .concat(t.eps.map(n => r.porEp[n] ? { v: r.porEp[n].intervenciones, s: r.porEp[n].tipo === 'voz' ? E.voz : E.escena } : { v: '', s: E.normal }),
             [r.nEps, 'EP' + r.debut, 'EP' + r.ultima, r.total, r.palabras, r.notas + (r.alias.length ? (r.notas ? ' ' : '') + '(También como ' + r.alias.join(', ') + '.)' : '')])));
-  cont.push(['', '', { v: 'Personajes con nombre por episodio', s: E.negrita }, '', '', ''].concat(t.eps.map(n => t.porEp[n].conNombre)));
-  cont.push(['', '', { v: 'Incidentales por episodio', s: E.negrita }, '', '', ''].concat(t.eps.map(n => t.porEp[n].incidentales)));
-  const nCol = 12 + t.eps.length;
-  const inc = [cab(['Episodio', 'Cue', 'Descripción', 'Intervenciones', 'Palabras', 'Sugerencia de reparto'])];
-  for(const r of t.incidentales) for(const n of r.eps) inc.push(['EP' + n, { v: r.cue, s: E.negrita }, r.descripcion, r.porEp[n].intervenciones, r.porEp[n].palabras, contSugerencia(r)]);
+  cont.push(['', '', '', { v: 'Personajes con nombre por episodio', s: E.negrita }, '', '', ''].concat(t.eps.map(n => t.porEp[n].conNombre)));
+  cont.push(['', '', '', { v: 'Incidentales por episodio', s: E.negrita }, '', '', ''].concat(t.eps.map(n => t.porEp[n].incidentales)));
+  const nCol = 13 + t.eps.length;
+  const inc = [cab(['Episodio', 'Cue', 'Talento', 'Descripción', 'Intervenciones', 'Palabras', 'Sugerencia de reparto'])];
+  for(const r of t.incidentales) for(const n of r.eps) inc.push(['EP' + n, { v: r.cue, s: E.negrita }, r.talento || '', r.descripcion, r.porEp[n].intervenciones, r.porEp[n].palabras, contSugerencia(r)]);
   const ale = [cab(['#', 'Tipo', 'Episodio / TC', 'Detalle', 'Acción sugerida'])].concat(t.alertas.map((a, i) => [i + 1, { v: a.tipo, s: E.negrita }, a.donde, a.detalle, a.accion]));
   const fue = [cab(['Archivo', 'Episodio', 'Versión / fecha', 'Uso'])].concat(t.fuentes.map(f => [f.archivo, 'EP' + f.ep, [f.version, f.fecha].filter(Boolean).join(' · '), 'Cues, intervenciones, TCs, palabras, etiquetas']),
     [[], [{ v: 'Criterios', s: E.negrita }],
@@ -597,8 +651,8 @@ function contXlsx(t, programa){
   const det = [cab(['Episodio', 'Cue (dialog list)', 'Personaje', 'Categoría', 'Tipo de aparición', 'Intervenciones', 'Solo [REACTION]', 'Palabras (total)', 'Palabras en otro idioma', 'Primer TC', 'Último TC'])]
     .concat(t.detalle.map(x => ['EP' + x.ep, { v: x.cue, s: E.negrita }, x.personaje, { v: x.categoria, s: catEst(x.categoria) }, x.tipo, x.intervenciones, x.reacciones, x.palabras, x.palabrasOtro, x.primerTC, x.ultimoTC]));
   const hojas = [
-    { nombre: 'Continuidad', filas: cont, anchos: [4, 18, 22, 13, 50, 24].concat(t.eps.map(() => 6), [10, 9, 10, 12, 10, 48]), fijar: [3, 5], combinar: ['A1:' + contColLetra(nCol - 1) + '1', 'A2:' + contColLetra(nCol - 1) + '2'] },
-    { nombre: 'Incidentales', filas: inc, anchos: [9, 26, 50, 13, 10, 32], fijar: [0, 1] },
+    { nombre: 'Continuidad', filas: cont, anchos: [4, 18, 22, 22, 13, 50, 24].concat(t.eps.map(() => 6), [10, 9, 10, 12, 10, 48]), fijar: [3, 5], combinar: ['A1:' + contColLetra(nCol - 1) + '1', 'A2:' + contColLetra(nCol - 1) + '2'] },
+    { nombre: 'Incidentales', filas: inc, anchos: [9, 26, 22, 50, 13, 10, 32], fijar: [0, 1] },
     { nombre: 'Alertas y notas', filas: ale, anchos: [4, 28, 18, 80, 48], fijar: [0, 1] },
     { nombre: 'Fuentes', filas: fue, anchos: [70, 9, 34, 44] },
     { nombre: 'Detalle por episodio', filas: det, anchos: [9, 24, 22, 13, 18, 13, 13, 13, 13, 12, 12], fijar: [2, 1] }
@@ -619,10 +673,10 @@ function contXlsx(t, programa){
   return fflate.zipSync(arch, { level: 6 });
 }
 
-function contDescargar(p){
+function contDescargar(p, talentos){
   const datos = p && p.show && CONT.datos[String(p.show.id)];
   if(!datos) return false;
-  const t = contTabla(datos);
+  const t = contTabla(datos, talentos);
   const nombre = String(p.nombre || 'Programa').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, '_');
   ioDescargar(nombre + '_Continuidad_Personajes' + (t.eps.length ? '_EP' + t.eps[0] + (t.eps.length > 1 ? '-EP' + t.eps[t.eps.length - 1] : '') : '') + '.xlsx',
               contXlsx(t, p.nombre), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');

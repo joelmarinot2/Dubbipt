@@ -38,7 +38,7 @@ function armar(o){
   o = o || {};
   const diario = [], avisos = [], guardados = [], idb = {};
   const M = montar([['function castNorm(t){', 'async function castRegCargar(showId){'], ['/* ═══ CONTINUIDADES ORIGINAL', '/* ═══ FIN DE CONTINUIDADES ORIGINAL']],
-    ['CONT', 'CONT_CATEGORIAS', 'contEsIncidental', 'contNumeroEp', 'contLeerLista', 'contTabla', 'contSugerencia', 'contXlsx', 'contHojaXml', 'contColLetra', 'contHtml', 'contCablear', 'contFicha', 'contQuitarEp', 'contDescargar', 'contDe', 'contCargar', 'contGuardar'],
+    ['contTalentoDe', 'CONT', 'CONT_CATEGORIAS', 'contEsIncidental', 'contNumeroEp', 'contLeerLista', 'contTabla', 'contSugerencia', 'contXlsx', 'contHojaXml', 'contColLetra', 'contHtml', 'contCablear', 'contFicha', 'contQuitarEp', 'contDescargar', 'contDe', 'contCargar', 'contGuardar'],
     { castNorm: undefined, castSimil: SIM.castSimil, fflate: FF,
       csEsc: (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'), csIco: (n) => '<i class="ico-' + n + '"></i>',
       csRepintar: () => diario.push('repintar'), castAviso: (t) => avisos.push(t), fallo: (d) => diario.push('fallo ' + d),
@@ -119,9 +119,9 @@ exports.pruebas = async function(t){
     const X = M.contXlsx(T, 'Serie');
     t.eq('las cinco hojas, como la tabla de sala', (X['xl/workbook.xml'].match(/name="[^"]+"/g) || []).join(' '), 'name="Continuidad" name="Incidentales" name="Alertas y notas" name="Fuentes" name="Detalle por episodio"');
     const h1 = X['xl/worksheets/sheet1.xml'];
-    t.ok('el título, combinado, y la cabecera con los episodios leídos', /Serie · Tabla de continuidad de personajes \(EP1–EP4\)/.test(h1) && /<mergeCell ref="A1:O1"\/>/.test(h1) && /<t xml:space="preserve">EP1<\/t>[\s\S]*?EP2[\s\S]*?EP4<\/t>[\s\S]*?Nº de episodios/.test(h1));
-    t.ok('en escena en verde y solo voz en amarillo, como la leyenda', /<c r="G6" s="3"><v>4<\/v><\/c>/.test(h1) && /<c r="H7" s="4"><v>1<\/v><\/c>/.test(h1));
-    t.ok('la cabecera fija y los anchos', /<pane xSplit="3" ySplit="5" topLeftCell="D6"/.test(h1) && /<col min="5" max="5" width="50"/.test(h1));
+    t.ok('el título, combinado, y la cabecera con los episodios leídos', /Serie · Tabla de continuidad de personajes \(EP1–EP4\)/.test(h1) && /<mergeCell ref="A1:P1"\/>/.test(h1) && /<t xml:space="preserve">EP1<\/t>[\s\S]*?EP2[\s\S]*?EP4<\/t>[\s\S]*?Nº de episodios/.test(h1));
+    t.ok('en escena en verde y solo voz en amarillo, como la leyenda', /<c r="H6" s="3"><v>4<\/v><\/c>/.test(h1) && /<c r="I7" s="4"><v>1<\/v><\/c>/.test(h1));
+    t.ok('la cabecera fija y los anchos', /<pane xSplit="3" ySplit="5" topLeftCell="D6"/.test(h1) && /<col min="6" max="6" width="50"/.test(h1));
     t.ok('los colores, en los estilos', /FF1F3864/.test(X['xl/styles.xml']) && /FFC6EFCE/.test(X['xl/styles.xml']) && /FFFFE699/.test(X['xl/styles.xml']));
     t.ok('las alertas y el detalle', /Normalización de cue|Episodios sin libreto/.test(X['xl/worksheets/sheet3.xml']) && /ANA[\s\S]*?En escena/.test(X['xl/worksheets/sheet5.xml']));
     t.eq('las letras de las columnas', [0, 25, 26, 27, 51, 52].map(M.contColLetra).join(' '), 'A Z AA AB AZ BA');
@@ -167,10 +167,48 @@ exports.pruebas = async function(t){
     t.eq('lo guardado se carga: del equipo primero, si no de la nube', Object.keys((await A.M.contCargar('sQ')).episodios).join(','), '7');
   }
 
+  t.seccion('7b · el buscador y el talento de cada personaje (PRO-66)');
+  {
+    const A = armar();
+    const P = { show: { id: 'sT' }, nombre: 'MI SERIE' };
+    A.M.CONT.datos.sT = datos(); A.M.CONT.buscar = '';
+    const TAL = { ANA: 'Juliana Garcia', BETO: 'Ivan Garcia → Jaime Serrano' };
+    const h = A.M.contHtml(P, TAL);
+    t.ok('una columna Talento, detrás del cue: el que tiene, o «sin asignar»', /<th>Cue<\/th><th>Talento<\/th><th>Personaje<\/th>/.test(h) && /<td class="ct-cue"><b>ANA<\/b><\/td><td class="ct-tal"><b>Juliana Garcia<\/b><\/td>/.test(h)
+         && /<b>Ivan Garcia → Jaime Serrano<\/b>/.test(h) && /<span class="cs-tenue">sin asignar<\/span>/.test(h), h.slice(0, 300));
+    t.ok('el buscador, arriba, con la cuenta', /<input type="text" data-ct="buscar" value="" placeholder="Buscar personaje, cue, talento o notas…"/.test(h) && /<span class="ct-cuenta">\d+ personajes · \d+ incidentales<\/span>/.test(h));
+    A.M.CONT.buscar = 'juliana';
+    const hb = A.M.contHtml(P, TAL);
+    const visibles = (hb.match(/<tr data-busca="[^"]*">/g) || []).length, escondidas = (hb.match(/<tr data-busca="[^"]*" style="display:none">/g) || []).length;
+    t.eq('buscar por talento: solo esa fila, las demás escondidas; los totales, fuera', visibles + ' · ' + (escondidas > 0) + ' · ' + /<tr data-busca="ANA[^"]*">/.test(hb) + ' · ' + /class="ct-resumen" style="display:none"/.test(hb), '1 · true · true · true');
+    t.ok('la cuenta dice cuántos pasan', /1 de \d+ personajes/.test(hb));
+    A.M.CONT.buscar = 'ana';
+    t.ok('buscar por el cue, sin importar mayúsculas', /<tr data-busca="ANA[^"]*">/.test(A.M.contHtml(P, TAL)));
+    A.M.CONT.buscar = '';
+    const X = A.M.contXlsx(A.M.contTabla(A.M.CONT.datos.sT, TAL), 'Serie');
+    t.ok('en el Excel también, en la hoja Continuidad y en Incidentales', /<t xml:space="preserve">Talento<\/t>/.test(X['xl/worksheets/sheet1.xml']) && /Juliana Garcia/.test(X['xl/worksheets/sheet1.xml']) && /<t xml:space="preserve">Talento<\/t>/.test(X['xl/worksheets/sheet2.xml']));
+    t.eq('un personaje con otro cue o con su nombre completo encuentra su talento', [A.M.contTalentoDe({ cue: 'ANNA', alias: [], personaje: '' }, { ANNA: 'X1' }), A.M.contTalentoDe({ cue: 'ZZ', alias: ['ANA'], personaje: '' }, TAL), A.M.contTalentoDe({ cue: 'ZZ', alias: [], personaje: 'Ana' }, TAL), A.M.contTalentoDe({ cue: 'ZZ', alias: [] }, null)].join(' | '), 'X1 | Juliana Garcia | Juliana Garcia | ');
+    /* Escribir en el buscador filtra sin repintar. */
+    const filas = [{ a: 'ANA JULIANA GARCIA', st: {} }, { a: 'BETO', st: {} }].map(x => ({ style: x.st, getAttribute: () => x.a, closest: () => null }));
+    const cuenta = { textContent: '' };
+    const inp = { value: 'juli', getAttribute: (k) => k === 'data-ct' ? 'buscar' : null };
+    const raiz = { querySelectorAll: (sel) => sel === '[data-ct]' ? [inp] : (sel === 'tr[data-busca]' ? filas : []), querySelector: (sel) => sel === '.ct-cuenta' ? cuenta : null };
+    let repintes = 0; A.M.contCablear(raiz, P, TAL);
+    inp.oninput();
+    t.eq('al escribir: esconde lo que no pasa, cuenta, y lo recuerda', [filas[0].style.display, filas[1].style.display, cuenta.textContent, A.M.CONT.buscar].join(' | '), ' | none | 1 de 2 personajes · 0 de 0 incidentales | juli');
+  }
+
+  {
+    const N = montar([['function castNorm(t){', '/** El número final']], ['castNorm'], {});
+    const V = montar([['/**\n * El talento de cada personaje del programa, para Continuidades', '/**\n * «Reasignar» del Reparto']], ['csTalentosDe'], { castNorm: N.castNorm });
+    const out = V.csTalentosDe([{ personaje: 'Ana', tramos: [{ talento: 'Juliana Garcia' }, { talento: 'JULIANA GARCIA' }] }, { personaje: 'Beto', tramos: [{ talento: 'Ivan' }, { talento: '' }, { talento: 'Jaime' }] }, { personaje: 'Rita', tramos: [{ talento: '' }] }]);
+    t.eq('el talento de cada personaje sale del Reparto del programa; si cambió, los dos en orden; sin talento, no sale', JSON.stringify(out), '{"ANA":"Juliana Garcia","BETO":"Ivan → Jaime"}');
+  }
+
   t.seccion('8 · por dónde se entra');
   const HTML = fs.readFileSync(INDEX, 'utf8');
   const SW = fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8');
   const CV = fs.readFileSync(path.join(RAIZ, 'js', 'castingvistas.js'), 'utf8');
   t.ok('el archivo, cargado y en la caché', /<script src="\.\/js\/continuidad\.js"><\/script>/.test(HTML) && /'\.\/js\/continuidad\.js'/.test(SW));
-  t.ok('una pestaña más de cada programa de Casting', /pest\('continuidad', 'Continuidades original'/.test(CV) && /else if\(CS\.tab === 'continuidad'\) cuerpo = \(typeof contHtml === 'function'\) \? contHtml\(p\) : '';/.test(CV) && /contCablear\(vista, csActual\(\)\.p\)/.test(CV));
+  t.ok('una pestaña más de cada programa de Casting', /pest\('continuidad', 'Continuidades original'/.test(CV) && /else if\(CS\.tab === 'continuidad'\) cuerpo = \(typeof contHtml === 'function'\) \? contHtml\(p, csTalentosDe\(reparto\)\) : '';/.test(CV) && /contCablear\(vista, xc\.p, \(xc\.p && xc\.p\.show\) \? csTalentosDe\(csRepartoDe\(xc\.p, xc\.datos, csRegistroDe\(xc\.p\.show\) \|\| null\)\) : null\)/.test(CV));
 };
