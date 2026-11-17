@@ -2514,7 +2514,7 @@ function csPlanImportar(lista){
     if(!p.serie) continue;
     if(!p.show){
       const eps = p.dcEps.slice().sort((a, b) => (parseInt(a.episode_number, 10) || 0) - (parseInt(b.episode_number, 10) || 0));
-      plan.programas.push({ nombre: p.serie.name, eps: eps.map(e => csNombreEpisodio(e, p.serie, p.dcEps)) });
+      plan.programas.push(Object.assign({ nombre: p.serie.name, eps: eps.map(e => csNombreEpisodio(e, p.serie, p.dcEps)) }, p.serie.cliente ? { cliente: p.serie.cliente } : {}));
       continue;
     }
     for(const e of csEpisodios(p)) if(!e.ep && e.dcEp) plan.episodios.push({ showId: p.show.id, programa: p.nombre, nombre: csNombreEpisodio(e.dcEp, p.serie, p.dcEps) });
@@ -2548,6 +2548,10 @@ async function csImportarTodo(){
       const r = await sb.from('shows').insert({ name: (typeof progMayus === 'function' ? progMayus(x.nombre) : x.nombre), workspace_id: WORKSPACE.id }).select().single();
       if(r.error) throw new Error('«' + x.nombre + '»: ' + r.error.message);
       progs++;
+      /* Su casa, la del cliente de la serie: así toma el TC inicial de la casa (EST-10). */
+      if(x.cliente && typeof tciAsignarCasa === 'function'){
+        try{ await tciAsignarCasa(r.data.id, x.cliente); }catch(e){ fallo('tciAsignarCasa · js/castingvistas.js:csImportarTodo', e, 'el programa se creó sin casa: se deduce al abrir un capítulo'); }
+      }
       if(x.eps.length){
         const filas = x.eps.map(n => ({ id: uid(), show_id: r.data.id, name: n, updated_at: ahora() }));
         const r2 = await sb.from('episodes').upsert(filas);

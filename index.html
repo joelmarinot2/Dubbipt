@@ -3140,7 +3140,7 @@ if (window.pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v12.11.0-nube';
+const APP_VER_NUM = 'v12.11.1-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -6293,7 +6293,8 @@ async function qcCargarAudio(file){
     const primero = qcPrimerTc();
     const supuesto = qcInicioSupuesto(primero, studioTc0());
     if(supuesto != null){
-      try{ studioSetTc0(supuesto, true); }
+      /* Supuesto, no elegido: «auto», para que las reglas del proyecto y la casa sigan mandando (EST-10). */
+      try{ studioSetTc0(supuesto, true, 'auto'); }
       catch(e){ fallo('studioSetTc0 · index.html:qcCargarAudio', e); }
     }
     /* El inicio se dice SIEMPRE, se haya supuesto o viniera puesto de antes.
