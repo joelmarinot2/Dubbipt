@@ -160,6 +160,8 @@ function dcxSerieNueva(p, datos){
   const lista = dcxLista(p, 'series');
   const n = castNorm(nombre);
   let s = lista.find(x => x && castNorm(x.name || x.title) === n) || null;
+  /* Casi el mismo nombre («THE WAYANS BRO» / «THE WAYANS BROS»): es ese programa, no uno nuevo (PRO-67). */
+  if(!s && typeof csMismoPrograma === 'function') s = lista.find(x => x && csMismoPrograma(x.name || x.title, nombre)) || null;
   if(!s){
     const studios = dcxLista(p, 'studios');
     s = { id: dcxUid(), name: nombre, type: 'serie', status: 'en_curso', director: '', tecnico: '', cliente: '', requiere_dubcard: true, studio_id: (studios[0] && studios[0].id) || 1 };
@@ -453,6 +455,8 @@ async function dcxGuardar(cambio, entrada){
   if(DCX.guardando) throw new Error('ya se está guardando otro cambio: espera un momento');
   DCX.guardando = true;
   try{
+    /* Sin los datos de Casting cargados, escribir encima sería empezar de cero y, al guardar, pisar lo de la nube (PRO-67). */
+    if(!PROD.cargado && typeof prodCargar === 'function'){ try{ await prodCargar(); }catch(e){ /* sin nube: lo del equipo */ } }
     if(!PROD.datos) PROD.datos = prodNormalizar({});
     const p = dcxCopia(PROD.datos);
     if(!cambio(p)) return { cambiado: false };

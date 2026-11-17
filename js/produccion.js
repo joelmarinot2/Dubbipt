@@ -541,9 +541,12 @@ function prodRecuperar(p, copiaDatos){
     if(!Array.isArray(p[k])) p[k] = [];
     const ids = new Set(p[k].map(prodIdDe));
     const pares = (k === 'castings' || k === 'appearances') ? new Set(p[k].map(parDe).filter(Boolean)) : null;
+    /* Un programa que ya está con ese nombre no vuelve con otro id: sería un programa repetido (PRO-67). */
+    const nombres = k === 'series' ? new Set(p[k].map(x => castNorm(x && (x.name || x.title)))) : null;
     for(const x of viejos){
       const id = prodIdDe(x);
       if(id == null || ids.has(id)) continue;
+      if(nombres){ const nm = castNorm(x && (x.name || x.title)); if(nm && nombres.has(nm)) continue; if(nm) nombres.add(nm); }
       if(pares){ const par = parDe(x); if(par && pares.has(par)) continue; if(par) pares.add(par); }
       p[k].push((x && typeof x === 'object') ? JSON.parse(JSON.stringify(x)) : x);
       ids.add(id); n++;
