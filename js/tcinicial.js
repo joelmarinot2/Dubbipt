@@ -21,6 +21,21 @@
  * video-tc.json`: su casa y sus reglas), con copia en el equipo. Sirve a todos
  * los perfiles, no solo a Casting.
  *
+ * Y después (EST-10): «no está manteniendo el time code inicial de los
+ * episodios de cada casa». Pasaba en tres casos, y ahora se arreglan solos al
+ * abrir el capítulo:
+ *   · un programa SIN casa (los creados antes de esto, o traídos de Casting
+ *     con «Crear en la biblioteca», que no la pedía): la casa se deduce del
+ *     cliente de su serie en Casting (Netflix, Discovery…), se guarda y se
+ *     hereda su TC;
+ *   · un programa CON casa pero sin su TC (se creó cuando la casa aún no lo
+ *     tenía, o el «todos los programas de la casa» no lo alcanzó): toma el de
+ *     su casa al abrir cualquiera de sus capítulos;
+ *   · un capítulo cuyo nombre empieza por el número («415_INDEPENDENCE DAY»):
+ *     no se le sabía el número y los bloques no le llegaban.
+ * Además, el inicio que QC SUPONE al cargar el audio ya no cuenta como «solo
+ * para este capítulo» (lo sacaba de las reglas para siempre): es «auto».
+ *
  * De donde depende: sb, idbGet, idbSet, currentEp, sync, studio, studioSetTc0,
  * studioTc0, studioParseTC, stFmtTC, studioTick, stMsg, libMsg, fallo, esc,
  * sbShows.
@@ -28,7 +43,7 @@
 
 /* ═══ EL TC INICIAL POR PROYECTO Y POR CASA ══════════════════════════════ */
 
-const TCI = { datos: {}, vistos: {}, cada: 30000 };
+const TCI = { datos: {}, vistos: {}, cada: 30000, todos: null, todosTs: 0 };
 /** Las casas con las que se trabaja; cualquier otra se escribe («Otra…»). */
 const TCI_CASAS = ['Discovery', 'Pixelogic', 'Netflix', 'Herald', 'Paramount', 'Pipeline Studio'];
 
@@ -37,6 +52,7 @@ function tciNumEp(nombre){
   const t = String(nombre == null ? '' : nombre).trim();
   let m = t.match(/[st]\d{1,2}\s*[ex]\s*0*(\d{1,4})(?!\d)/i) || t.match(/(?:^|[^a-z])(?:ep|episodio|episode|cap(?:itulo)?)\.?[\s._#-]*0*(\d{1,4})(?!\d)/i);
   if(!m) m = t.match(/(\d{1,4})\s*[A-Za-z]{0,4}\s*$/);
+  if(!m) m = t.match(/^0*(\d{1,4})(?=[\s._-])/);                          // «415_INDEPENDENCE DAY» (EST-10)
   return m ? parseInt(m[1], 10) : null;
 }
 
@@ -126,6 +142,8 @@ async function tciCargar(showId, forzar){
 async function tciGuardar(showId, d){
   const k = String(showId);
   TCI.datos[k] = d; TCI.vistos[k] = Date.now();
+  /* La lista de todos los programas, al día con este. */
+  if(TCI.todos){ const x = TCI.todos.find(p => String(p.id) === k); if(x) x.d = d; }
   try{ await idbSet('tci::' + k, { d: d, ts: Date.now() }); }catch(e){ /* sin copia: va a la nube */ }
   try{
     const r = await sb.storage.from('libretos').upload(tciRuta(showId), new Blob([JSON.stringify(d)], { type: 'application/json' }), { upsert: true });
@@ -146,6 +164,47 @@ async function tciTodos(){
     }
   };
   await Promise.all([w(), w(), w(), w(), w()]);
+  return out;
+}
+
+/** Los programas con lo suyo, guardado un rato: abrir capítulos no los vuelve a pedir todos cada vez. */
+async function tciTodosGuardados(){
+  if(TCI.todos && Date.now() - TCI.todosTs < 5 * 60000) return TCI.todos;
+  TCI.todos = await tciTodos(); TCI.todosTs = Date.now();
+  return TCI.todos;
+}
+
+/**
+ * La casa de un programa que no la tiene, deducida del cliente de su serie en Casting («Netflix», «Discovery»…).
+ * '' si no está en Casting o no dice cliente.
+ */
+function tciCasaDeducida(nombrePrograma){
+  try{
+    const d = (typeof PROD !== 'undefined' && PROD) ? PROD.datos : null;
+    if(!d || !Array.isArray(d.series) || !nombrePrograma) return '';
+    const k = tciCasaClave(nombrePrograma);
+    const s = d.series.find(x => x && tciCasaClave(x.name) === k);
+    return (s && s.cliente) ? tciCasaNombre(s.cliente) : '';
+  }catch(e){ return ''; }
+}
+
+/**
+ * Lo que le falta a un programa para tener su TC (EST-10): la casa (deducida) y, si no tiene ninguna regla para
+ * el capítulo `n`, el TC de su casa. Lo guarda. Devuelve qué hizo: { casa, heredado } (vacío si nada).
+ */
+async function tciCompletar(showId, d, n, nombrePrograma){
+  const out = {};
+  if(!d) return out;
+  let cambio = false;
+  if(!d.casa){
+    const c = tciCasaDeducida(nombrePrograma);
+    if(c){ d.casa = c; out.casa = c; cambio = true; }
+  }
+  if(d.casa && !tciDe(d, n)){
+    const r = tciCasaTc(await tciTodosGuardados(), d.casa, showId);
+    if(r){ tciPoner(d, 'programa', r.v, { casa: d.casa }); out.heredado = r.v; cambio = true; }
+  }
+  if(cambio){ try{ await tciGuardar(showId, d); }catch(e){ /* queda en memoria: se reintenta al abrir otro */ } }
   return out;
 }
 
@@ -197,6 +256,16 @@ async function tciAplicar(avisar){
   const epId = currentEp.id, showId = currentEp.showId, n = tciNumEp(currentEp.name);
   const d = await tciCargar(showId);
   if(!currentEp || currentEp.id !== epId) return null;                 // se cambió de capítulo mientras se leía
+  /* Si el programa no tiene casa, o no tiene el TC de su casa, se completa ahora (EST-10). */
+  if(!d.casa || !tciDe(d, n)){
+    const show = (typeof sbShows === 'function' ? sbShows() : []).find(s => String(s.id) === String(showId));
+    try{
+      const hecho = await tciCompletar(showId, d, n, show && show.name);
+      if(avisar !== false && (hecho.casa || hecho.heredado != null) && typeof libMsg === 'function')
+        libMsg('TC inicial' + (hecho.casa ? ' · casa ' + hecho.casa + ' (del cliente en Casting)' : '') + (hecho.heredado != null ? ' · toma el de su casa: ' + stFmtTC(hecho.heredado) : ''));
+    }catch(e){ if(typeof fallo === 'function') fallo('tciCompletar · js/tcinicial.js', e, 'el capítulo usa el TC que tenía'); }
+    if(!currentEp || currentEp.id !== epId) return null;
+  }
   const r = tciDe(d, n);
   if(!r || !sync || !sync.marks) return null;
   const m = sync.marks._tcOff;

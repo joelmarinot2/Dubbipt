@@ -41,10 +41,10 @@ function entorno(o){
     studioTc0: () => (sync.marks._tcOff && +sync.marks._tcOff.v) || 0,
     studioSetTc0: (sec, save, origen) => { V.campo.value = 'puesto'; if(save !== false) sync.marks._tcOff = { v: sec, o: origen || 'manual' }; },
     studioParseTC: (t) => { const m = String(t).match(/^(\d{1,2}):(\d{2}):(\d{2})$/); return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] : null; },
-    libMsg(){}, fallo(){}, esc: (x) => String(x == null ? '' : x)
+    libMsg: (t) => V.avisos.push('lib: ' + t), fallo(){}, esc: (x) => String(x == null ? '' : x), PROD: o.prod || { datos: null }
   });
   V.campo = { value: '' };
-  vm.runInContext(fs.readFileSync(path.join(RAIZ, 'js', 'tcinicial.js'), 'utf8') + ';this.A = { TCI, TCI_CASAS, tciNumEp, tciSan, tciDe, tciPoner, tciQuitar, tciEtiqueta, tciCargar, tciGuardar, tciTodos, tciCasaTc, tciAsignarCasa, tciAplicar, tciFijar, tciCasaNombre };', ctx);
+  vm.runInContext(fs.readFileSync(path.join(RAIZ, 'js', 'tcinicial.js'), 'utf8') + ';this.A = { TCI, TCI_CASAS, tciNumEp, tciSan, tciDe, tciPoner, tciQuitar, tciEtiqueta, tciCargar, tciGuardar, tciTodos, tciCasaTc, tciAsignarCasa, tciAplicar, tciFijar, tciCompletar, tciCasaDeducida, tciCasaNombre };', ctx);
   V.A = ctx.A; V.nube = nube; V.sync = sync; V.ctx = ctx;
   return V;
 }
@@ -139,6 +139,30 @@ exports.pruebas = async function(t){
     t.eq('si se cambió de capítulo mientras leía las reglas, no se las pone al nuevo', String(await antes), 'null');
   }
 
+  t.seccion('5b · lo que faltaba para mantener el TC de la casa (EST-10)');
+  {
+    const HORA1 = JSON.stringify({ casa: 'Netflix', programa: { v: HORA(1), casa: 'Netflix', ts: 5 }, bloques: [] });
+    /* Un programa con casa pero sin TC (se creó cuando la casa aún no lo tenía): lo toma al abrir un capítulo, y se guarda. */
+    let V = entorno({ nube: { 's1/video-tc.json': JSON.stringify({ casa: 'Netflix' }), 's2/video-tc.json': HORA1 } });
+    await V.A.tciAplicar(true);
+    t.eq('con casa y sin TC: toma el de su casa al abrir, y se queda guardado', JSON.stringify(V.sync.marks._tcOff) + ' · ' + JSON.parse(V.nube['s1/video-tc.json']).programa.v + ' · ' + V.avisos.some(a => /toma el de su casa: 01:00:00/.test(a)), '{"v":3600,"o":"regla"} · 3600 · true');
+    /* Un programa sin casa (de antes, o traído de Casting): la casa sale del cliente de su serie en Casting. */
+    V = entorno({ nube: { 's2/video-tc.json': HORA1 }, prod: { datos: { series: [{ name: 'Show Uno', cliente: 'netflix' }] } } });
+    await V.A.tciAplicar(true);
+    const s1 = JSON.parse(V.nube['s1/video-tc.json']);
+    t.eq('sin casa: la del cliente de Casting, y con ella su TC', s1.casa + ' · ' + s1.programa.v + ' · ' + JSON.stringify(V.sync.marks._tcOff), 'Netflix · 3600 · {"v":3600,"o":"regla"}');
+    V = entorno({ nube: { 's2/video-tc.json': HORA1 }, prod: { datos: { series: [{ name: 'Otra serie', cliente: 'Netflix' }] } } });
+    t.eq('sin casa y sin serie en Casting: no se inventa nada', String(await V.A.tciAplicar()) + ' · ' + ('s1/video-tc.json' in V.nube), 'null · false');
+    V = entorno({ nube: { 's1/video-tc.json': JSON.stringify({ casa: 'Discovery' }), 's2/video-tc.json': HORA1 } });
+    t.eq('una casa que no tiene TC en ningún programa: nada', String(await V.A.tciAplicar()), 'null');
+    V = entorno({ nube: { 's1/video-tc.json': JSON.stringify({ casa: 'Netflix', bloques: [{ desde: 401, hasta: 499, v: HORA(2) }] }), 's2/video-tc.json': HORA1 }, ep: { id: 'e9', showId: 's1', name: '415_INDEPENDENCE DAY' } });
+    await V.A.tciAplicar();
+    t.eq('un capítulo con el número delante («415_INDEPENDENCE DAY») entra en su bloque', JSON.stringify(V.sync.marks._tcOff), '{"v":7200,"o":"regla"}');
+    t.eq('el número, delante o detrás', ['415_INDEPENDENCE DAY', '0103 PILOTO', '2026 MUNDIAL 4'].map(x => V.A.tciNumEp(x)).join(','), '415,103,4');
+    V = entorno({ nube: { 's1/video-tc.json': JSON.stringify({ casa: 'Netflix' }), 's2/video-tc.json': HORA1 }, marks: { _tcOff: { v: HORA(7), o: 'manual' } } });
+    t.eq('el fijado «solo para este capítulo» sigue mandando', String(await V.A.tciAplicar()) + ' ' + JSON.stringify(V.sync.marks._tcOff), 'null {"v":25200,"o":"manual"}');
+  }
+
   t.seccion('6 · cableado en la app');
   {
     const html = fs.readFileSync(INDEX, 'utf8'), sw = fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8');
@@ -151,5 +175,8 @@ exports.pruebas = async function(t){
          && /if\(typeof tciAplicar==='function'\) tciAplicar\(\)/.test(html) && /studioSetTc0\(script\[0\]\.tcEff, true, 'auto'\)/.test(html));
     t.ok('el TC puesto por las reglas no lo pisa el automático', /!\(typeof sync!=='undefined' && sync\.marks && sync\.marks\._tcOff && sync\.marks\._tcOff\.o==='regla'\)/.test(html));
     t.ok('con su estilo', /\.tci-caja\{/.test(html) && /\.tci-op\{/.test(html));
+    t.ok('el inicio que QC supone al cargar el audio es «auto»: no saca al capítulo de las reglas (EST-10)', /studioSetTc0\(supuesto, true, 'auto'\)/.test(html) && !/studioSetTc0\(supuesto, true\)/.test(html));
+    const cv = fs.readFileSync(path.join(RAIZ, 'js', 'castingvistas.js'), 'utf8');
+    t.ok('«Crear en la biblioteca» desde Casting le pone su casa, la del cliente (EST-10)', /if\(x\.cliente && typeof tciAsignarCasa === 'function'\)\{\s+try\{ await tciAsignarCasa\(r\.data\.id, x\.cliente\); \}/.test(cv) && /p\.serie\.cliente \? \{ cliente: p\.serie\.cliente \} : \{\}/.test(cv));
   }
 };
