@@ -94,7 +94,7 @@ function armar(o){
   const guardado = o.almacen || {};
   const almacen = { getItem: (k) => (k in guardado ? guardado[k] : null), setItem: (k, v) => { guardado[k] = String(v); }, removeItem: (k) => { delete guardado[k]; } };
   const M = montar([['/* ═══ CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST', '/* ═══ FIN DE CASTING CON LA ORGANIZACIÓN DE DUBLAJECAST']],
-    ['CS', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
+    ['CS', 'csMismoPrograma', 'csProgramasRepetidos', 'csHtmlProgramasRepetidos', 'csProgramas', 'csEpisodios', 'csActual', 'csFilasPrograma', 'csOrdenarCasting', 'csTramoTexto', 'csReparto', 'csNombreEpisodio', 'csPlanImportar', 'csImportarTodo', 'csEditar',
      'csHtml', 'csHtmlPrograma', 'csCablear', 'csTalentoCelda', 'csRenombrarPrograma', 'csRenombrarEpisodio', 'csContexto', 'csHistorialDe', 'csTalentosEn', 'csCambiadorHtml', 'csRepetidosDc', 'csRepetidosDub', 'csInconsistencias', 'csQuitarVacios', 'CS', 'csAsegurarDatos', 'csDevolverCopia', 'csBajarCopia', 'CS_TRAER',
      'csParecidos', 'csQuedaDe', 'csPlanFusion', 'csFusionarProgramas', 'csMoverEpisodiosDub', 'csJuntarRegistro', 'csRepartoDe', 'csTalentoDub', 'csAlDia', 'CS_BIB', 'csEstadoDe', 'csCambiarEstado', 'csBorrarPrograma', 'csBorrarEpisodio', 'csBorrarDeBiblioteca', 'csEstadoEp', 'csCambiarEstadoEp', 'csLeerActivos', 'csAplicarActivos', 'csNumeroDeLinea', 'csProgramaDeLinea', 'csParecidoPersonaje', 'csIndicePapeles', 'csBuscarPersonajes', 'CS_REGS', 'csFichasTalentos', 'csCargaTalento', 'csOcupacionDatos', 'csOcupacionVisible', 'csTrSla', 'csTrPorVencer', 'csTrAvisar'],
     { castNorm: (t) => String(t == null ? '' : t).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim(),
@@ -142,6 +142,7 @@ function controles(A, vista){
 }
 const espera = () => new Promise(r => setTimeout(r, 0));
 
+const PROD0 = { datos: null, cargado: false };
 exports.pruebas = async function(t){
   const { M } = armar();
   const d = PR.prodNormalizar(VOLCADO());
@@ -173,6 +174,37 @@ exports.pruebas = async function(t){
   const plan = M.csPlanImportar(M.csProgramas(SHOWS, (id) => EPS_DUB[id] || [], d));
   t.eq('los programas que solo están allí, con sus episodios', JSON.stringify(plan.programas), '[{"nombre":"Akka","eps":["Akka 1","Akka 1 (bis)"]},{"nombre":"La peli","eps":["Película"]}]');
   t.eq('y los episodios que faltan en los que ya están', JSON.stringify(plan.episodios), '[{"showId":"s1","programa":"A FILIPINO CHRISTMAS","nombre":"Episodio 3"}]');
+  {
+    /* PRO-67: «en Casting se está creando siempre un programa nuevo de THE WAYANS BRO». Dos series con el mismo nombre (o
+       casi), una con los capítulos y otra vacía: salían dos tarjetas, y «Crear en la biblioteca» creaba otro programa cada vez. */
+    const dw = PR.prodNormalizar({ series: [{ id: 1, name: 'THE WAYANS BRO', cliente: 'DELUX' }, { id: 2, name: 'THE WAYANS BRO' }, { id: 3, name: 'The Wayans Bros' }, { id: 4, name: 'LA VIDA 1' }, { id: 5, name: 'LA VIDA 2' }, { id: 6, name: 'OTRA COSA' }],
+      episodes: [{ id: 10, series_id: 1, episode_number: 1, title: 'Ep 1' }, { id: 11, series_id: 3, episode_number: 2, title: 'Ep 2' }, { id: 12, series_id: 5, episode_number: 1, title: 'x' }], characters: [], talents: [], castings: [], appearances: [] });
+    const shows = [{ id: 'w1', name: 'THE WAYANS BRO' }, { id: 'v1', name: 'LA VIDA 1' }];
+    const lista = M.csProgramas(shows, () => [], dw);
+    t.eq('el mismo programa repetido en Casting sale una vez, con todos sus capítulos; «LA VIDA 2» sigue siendo otro', lista.map(p => p.nombre + (p.show ? '' : '*') + ':' + p.dcEps.map(e => e.id).join('+')).join(' | '),
+         'LA VIDA 1: | LA VIDA 2*:12 | OTRA COSA*: | THE WAYANS BRO:10+11');
+    t.eq('…y «Crear en la biblioteca» no lo vuelve a crear', JSON.stringify(M.csPlanImportar(lista).programas.map(x => x.nombre)), '["LA VIDA 2","OTRA COSA"]');
+    t.eq('qué es el mismo programa', [['THE WAYANS BRO', 'the wayans bros'], ['THE WAYANS BRO', 'THE WAYANS BRO.'], ['LA VIDA 1', 'LA VIDA 2'], ['TOM', 'TIM'], ['FINAL TABLE', 'FINAL TABLES 2']].map(([a, b]) => M.csMismoPrograma(a, b) ? 1 : 0).join(''), '11000');
+    const dup = M.csProgramas([{ id: 'w1', name: 'THE WAYANS BRO' }, { id: 'w2', name: 'The Wayans Bros' }, { id: 'v1', name: 'LA VIDA 1' }], () => [], dw);
+    t.eq('si ya se crearon repetidos en la biblioteca, se avisa para fusionarlos', M.csProgramasRepetidos(dup).map(g => g.map(p => p.show.id).join('+')).join() + ' · ' + /Programas repetidos en la biblioteca: <b>THE WAYANS BRO<\/b> \(2\)/.test(M.csHtmlProgramasRepetidos(dup)), 'w1+w2 · true');
+    t.eq('sin repetidos, nada', M.csHtmlProgramasRepetidos(lista), '');
+  }
+  {
+    /* Y que no se vuelva a crear: Producción con un nombre casi igual usa la serie que hay; devolver una copia vieja no
+       trae otra serie con el mismo nombre; y no se escribe sobre unos datos de Casting sin cargar. */
+    const N = montar([['function castNorm(t){', 'async function castRegCargar(showId){']], ['castNorm'], {});
+    const DXS = montar([['/* ═══ EDITAR DUBLAJECAST DESDE DUBBIPT', '/* ═══ FIN DE EDITAR DUBLAJECAST DESDE DUBBIPT']], ['dcxSerieNueva', 'dcxGuardar', 'DCX'],
+      { castNorm: N.castNorm, csMismoPrograma: M.csMismoPrograma, PROD: PROD0, prodNormalizar: PR.prodNormalizar, prodCargar: async () => { PROD0.cargado = true; PROD0.datos = PR.prodNormalizar({ series: [{ id: 9, name: 'YA ESTABA' }] }); },
+        prodConservarPropio: (n) => n, prodGuardarPronto: () => true, dcxHistorial: () => [], dcxRelevosAceptados: () => [] });
+    const pl = { series: [{ id: 1, name: 'THE WAYANS BROS' }], studios: [] };
+    const s1 = DXS.dcxSerieNueva(pl, { name: 'THE WAYANS BRO', cliente: 'DELUX' });
+    t.eq('Producción con «THE WAYANS BRO»: la serie «THE WAYANS BROS» que ya había, no otra', pl.series.length + ' · ' + s1.id + ' · ' + s1.cliente, '1 · 1 · DELUX');
+    await DXS.dcxGuardar((p) => { p.series.push({ id: 2, name: 'NUEVA' }); return true; }, null);
+    t.eq('sin los datos de Casting cargados, primero se cargan (no se empieza de cero)', PROD0.datos.series.map(x => x.name).join(','), 'YA ESTABA,NUEVA');
+    const ahora = { series: [{ id: 1, name: 'THE WAYANS BRO' }] };
+    const vueltas = PR.prodRecuperar(ahora, { series: [{ id: 7, name: 'The Wayans Bro' }, { id: 8, name: 'OTRA' }] });
+    t.eq('devolver una copia vieja no trae un programa repetido con otro id', ahora.series.map(x => x.id).join(',') + ' · ' + vueltas, '1,8 · 1');
+  }
   {
     const A = armar();
     t.eq('importar: pregunta con la cuenta y crea', await A.M.csImportarTodo(), 'hecho');

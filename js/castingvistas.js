@@ -303,8 +303,40 @@ function csProgramas(shows, epsDe, d){
     if(serie) usadas.add(String(serie.id));
     out.push(csProg(sh, serie, epsDe ? epsDe(sh.id) : [], d));
   }
-  if(d) for(const s of d.series) if(!usadas.has(String(s.id))) out.push(csProg(null, s, [], d));
+  /* Un programa de Casting con el MISMO nombre que otro ya listado («THE WAYANS BRO» y «THE WAYANS BROS») es el
+     mismo programa repetido, no otro: sus capítulos se juntan con los de aquel y no sale una tarjeta más «Solo en
+     Casting» (PRO-67). Antes salía, y «Crear en la biblioteca» lo volvía a crear en Dubbipt cada vez. */
+  if(d) for(const s of d.series){
+    if(usadas.has(String(s.id))) continue;
+    usadas.add(String(s.id));
+    const dueno = out.find(p => csMismoPrograma(p.nombre, s.name) || (p.serie && csMismoPrograma(p.serie.name, s.name)));
+    if(dueno){ csJuntarSerie(dueno, s, d); continue; }
+    out.push(csProg(null, s, [], d));
+  }
   return out.sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es'));
+}
+
+/**
+ * ¿Dos nombres son el mismo programa? Iguales, o casi (una letra: «BRO» / «BROS», una errata), con los MISMOS
+ * números: «LA VIDA 1» y «LA VIDA 2» son dos programas. (PRO-67)
+ */
+function csMismoPrograma(a, b){
+  const x = castNorm(a), y = castNorm(b);
+  if(!x || !y) return false;
+  if(x === y) return true;
+  const num = (s) => (s.match(/\d+/g) || []).join(' ');
+  if(num(x) !== num(y)) return false;
+  return Math.min(x.length, y.length) >= 6 && typeof castSimil === 'function' && castSimil(x, y) >= 0.9;
+}
+
+/** Junta en el programa `p` los capítulos de otra serie de Casting que es el mismo programa repetido. */
+function csJuntarSerie(p, s, d){
+  const eps = (typeof prodIndices === 'function' ? prodIndices(d).epsPorSerie[String(s.id)] : null) || [];
+  const ya = new Set(p.dcEps.map(e => String(e.id)));
+  p.dcEps = p.dcEps.concat(eps.filter(e => !ya.has(String(e.id))));
+  p.seriesRepetidas = (p.seriesRepetidas || []).concat([s]);
+  if(!p.serie){ p.serie = s; p.cliente = p.cliente || s.cliente || ''; p.director = p.director || s.director || ''; p.tipo = p.tipo || s.type || ''; }
+  return p;
 }
 
 /** Los programas que se ven: por estado (todos, en curso, completados) y por lo que se busque en nombre, cliente o director. */
@@ -2510,9 +2542,12 @@ function csNombreEpisodio(dcEp, serie, dcEps){
 /** Lo que falta en Dubbipt de Casting: programas enteros, y episodios de los que ya están. */
 function csPlanImportar(lista){
   const plan = { programas: [], episodios: [] };
+  /* Nunca crear un programa que ya está en la biblioteca con ese nombre (o casi), ni dos veces el mismo (PRO-67). */
+  const yaEstan = lista.filter(p => p.show).map(p => p.nombre);
   for(const p of lista){
     if(!p.serie) continue;
     if(!p.show){
+      if(yaEstan.some(n => csMismoPrograma(n, p.serie.name)) || plan.programas.some(x => csMismoPrograma(x.nombre, p.serie.name))) continue;
       const eps = p.dcEps.slice().sort((a, b) => (parseInt(a.episode_number, 10) || 0) - (parseInt(b.episode_number, 10) || 0));
       plan.programas.push(Object.assign({ nombre: p.serie.name, eps: eps.map(e => csNombreEpisodio(e, p.serie, p.dcEps)) }, p.serie.cliente ? { cliente: p.serie.cliente } : {}));
       continue;
@@ -2991,6 +3026,23 @@ const CS_OP_TONO = [['', '—'], ['grave', 'Grave'], ['medio', 'Medio'], ['agudo
 
 const CS_ESTADO = { en_curso: 'En curso', completo: 'Completado', pendiente: 'Pendiente' };
 
+/** Los programas repetidos en la biblioteca de Dubbipt (el mismo nombre, o casi): se avisa, para fusionarlos (PRO-67). */
+function csProgramasRepetidos(lista){
+  const conShow = (lista || []).filter(p => p.show), grupos = [];
+  for(const p of conShow){
+    const g = grupos.find(x => csMismoPrograma(x[0].nombre, p.nombre));
+    if(g) g.push(p); else grupos.push([p]);
+  }
+  return grupos.filter(g => g.length > 1);
+}
+function csHtmlProgramasRepetidos(lista){
+  const rep = csProgramasRepetidos(lista);
+  if(!rep.length) return '';
+  return '<div class="cs-aviso cs-aviso-rep">' + csIco('aviso', 13) + 'Programas repetidos en la biblioteca: '
+    + rep.map(g => '<b>' + csEsc(g[0].nombre) + '</b> (' + g.length + ')').join(', ')
+    + '. Abre uno y usa «Fusionar» para dejar uno solo con todos sus capítulos.</div>';
+}
+
 function csHtmlProgramas(lista, vivo){
   const vistos = csFiltrarProgramas(lista, CS.filtro, CS.buscarProg);
   const cuenta = (f) => lista.filter(p => f === 'todos' || p.estado === f).length;
@@ -3010,6 +3062,7 @@ function csHtmlProgramas(lista, vivo){
     +   '<input type="text" data-cs="buscarProg" placeholder="Buscar programa, cliente o director…" value="' + csEsc(CS.buscarProg) + '"></label>'
     +   '<div class="cs-pests">' + pest('todos', 'Todos') + pest('en_curso', 'En curso') + pest('completo', 'Completados') + '</div></div>'
     + (CS.buscarProg ? '' : csHtmlParecidos(lista))
+    + csHtmlProgramasRepetidos(lista)
     + (vistos.length ? '<div class="cs-progs">' + vistos.map(p => {
         const n = csEpisodios(p).length;
         return '<div class="cs-prog' + (p.estado === 'completo' ? ' cs-prog-hecho' : '') + '">'
