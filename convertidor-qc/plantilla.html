@@ -129,6 +129,7 @@ button:focus-visible, input:focus-visible, .conv-zona:focus-visible{ outline:2px
 /* La pantalla de este archivo: lo justo para que el convertidor de la
    aplicación (qcConvPintar y compañía, en el motor) viva solo en una página. */
 (function(){
+  window.QCPDF_SIN_RED = true;       // sin internet: el lector de PDF no pide fuentes ni mapas de fuera (PDF-27)
   const CLAVE = 'dubbipt_convqc';
   const avisar = (texto) => {
     const a = document.getElementById('avisos'); if(!a) return;

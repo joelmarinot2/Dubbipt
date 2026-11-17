@@ -105,9 +105,20 @@ exports.pruebas = function(t){
 
   t.seccion('5 · por dónde entra');
   const SRC = require('fs').readFileSync(require('path').join(__dirname, '..', 'js', 'qcpdf.js'), 'utf8');
-  t.ok('el convertidor acepta .txt al buscar y al soltar', /accept="application\/pdf,\.pdf,text\/plain,\.txt,image\/\*"/.test(SRC) && /!\/\\\.txt\$\/i\.test\(f\.name\) && f\.type !== 'text\/plain'\) continue;/.test(SRC));
-  t.ok('el TXT se lee sin PDF de por medio', /const inf = esTxt \? qcpdfLeerTxt\(qcpdfDecodificar\(buf\), f\.nombre\)\s+: qcpdfLeerInforme\(await qcpdfLeerPdf\(buf\), f\.nombre\);/.test(SRC));
+  t.ok('el convertidor acepta .txt al buscar y al soltar', /accept="application\/pdf,\.pdf,text\/plain,\.txt,image\/\*"/.test(SRC) && /!\/\\\.txt\$\/i\.test\(f\.name\) && f\.type !== 'text\/plain'\)\{/.test(SRC));
+  t.ok('el TXT se lee sin PDF de por medio', /const hojas = esTxt \? null : await qcpdfLeerPdf\(buf\);\s+const inf = esTxt \? qcpdfLeerTxt\(qcpdfDecodificar\(buf\), f\.nombre\) : qcpdfLeerInforme\(hojas, f\.nombre\);/.test(SRC));
   t.ok('y dice lo que ha quitado', /qcpdfQuitadoTexto\(inf\.quitado\)/.test(SRC));
+  {
+    /* PDF-27: «me marca el error el convertidor de QC». Los errores, en castellano y con qué hacer. */
+    const vm = require('vm');
+    const ctx = vm.createContext({});
+    vm.runInContext(SRC.slice(SRC.indexOf('function qcConvMotivo('), SRC.indexOf('/** Lo soltado: los PDF a la lista')) + ';this.f = qcConvMotivo;', ctx);
+    t.eq('con contraseña, dañado, sin lector, y lo demás tal cual', [new Error('No password given'), new Error('Invalid PDF structure.'), new Error('Setting up fake worker failed'), new Error('otra cosa')].map(e => ctx.f(e).split(':')[0]).join(' | '),
+         'el PDF tiene contraseña | el archivo está dañado o no es un PDF de verdad | el lector de PDF no arrancó en este navegador | falló');
+    t.ok('un formato que no vale ya no se ignora callado: sale en la lista diciéndolo', /formato no admitido: suelta el PDF del informe o el TXT de marcadores de Pro Tools/.test(SRC) && /if\(f\.listo \|\| f\.noValido\) continue;/.test(SRC));
+    t.ok('un PDF sin texto (escaneado) se dice; y si falta la tabla, qué columnas busca', /el PDF es una imagen \(escaneado\), sin texto que leer/.test(SRC) && /no encuentro la tabla: tiene que traer al menos dos de las columnas LOCATION, NAME y COMMENTS/.test(SRC));
+    t.ok('el convertidor sin internet no pide fuentes de fuera', /const sinRed = typeof window !== 'undefined' && window\.QCPDF_SIN_RED;/.test(SRC) && /window\.QCPDF_SIN_RED = true;/.test(require('fs').readFileSync(require('path').join(__dirname, '..', 'convertidor-qc', 'plantilla.html'), 'utf8')));
+  }
   t.ok('el archivo que sale se llama como el que entra, sin «.txt»', (SRC.match(/replace\(\/\\\.\(pdf\|txt\)\$\/i, ''\) \+ ' · QC\.pdf'\)/g) || []).length === 2);
   t.ok('sin emojis en el panel del convertidor', !/🖼|✕|⤓/.test(SRC.slice(SRC.indexOf('function qcConvPintar'), SRC.indexOf('function qcConvEnganchar'))));
 };
