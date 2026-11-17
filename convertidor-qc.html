@@ -116,7 +116,7 @@ button:focus-visible, input:focus-visible, .conv-zona:focus-visible{ outline:2px
     </div>
   </section>
 
-  <p class="pie">Dubbipt · Convertidor QC · construido el 2026-11-11 · el mismo motor que la aplicación</p>
+  <p class="pie">Dubbipt · Convertidor QC · construido el 2026-11-17 · el mismo motor que la aplicación</p>
 </div>
 
 <script id="lib-jspdf">/** @license
@@ -1243,7 +1243,10 @@ function qcpdfGrisear(file){
     lleva esa informacion y un comentario con un timecode dentro se colaria en
     la columna del timecode. */
 async function qcpdfLeerPdf(buf){
-  const doc = await pdfjsLib.getDocument({
+  /* En el convertidor de un solo archivo (sin internet) no se piden fuentes ni mapas de fuera: para leer el texto
+     no hacen falta, y pedirlos sin red solo llena la consola de errores (PDF-27). */
+  const sinRed = typeof window !== 'undefined' && window.QCPDF_SIN_RED;
+  const doc = await pdfjsLib.getDocument(sinRed ? { data: buf, useSystemFonts: true } : {
     data: buf,
     cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
     cMapPacked: true,
@@ -1885,6 +1888,18 @@ function qcConvEnganchar(ov){
   });
 }
 
+/**
+ * Por qué no se pudo convertir, en palabras de sala (PDF-27). Los errores del lector de PDF llegaban en inglés
+ * («No password given», «Invalid PDF structure») y no decían qué hacer.
+ */
+function qcConvMotivo(e){
+  const m = String((e && (e.message || e.name)) || e || '');
+  if(/password/i.test(m)) return 'el PDF tiene contraseña: ábrelo, guárdalo sin contraseña (Imprimir → Guardar como PDF) y vuelve a soltarlo';
+  if(/invalid pdf|pdf structure|xref|corrupt|unexpected (end|eof)|bad (xref|stream)|missing pdf/i.test(m)) return 'el archivo está dañado o no es un PDF de verdad: vuelve a exportarlo';
+  if(/worker/i.test(m)) return 'el lector de PDF no arrancó en este navegador: recarga la página (o usa el TXT de marcadores de Pro Tools)';
+  return 'falló: ' + m;
+}
+
 /** Lo soltado: los PDF a la lista, una imagen al poster. */
 async function qcConvAnadir(files){
   const l = Array.prototype.slice.call(files || []);
@@ -1895,7 +1910,11 @@ async function qcConvAnadir(files){
       catch(e){ QCCONV.poster = null; }
       continue;
     }
-    if(!/pdf/i.test(f.type) && !/\.pdf$/i.test(f.name) && !/\.txt$/i.test(f.name) && f.type !== 'text/plain') continue;
+    if(!/pdf/i.test(f.type) && !/\.pdf$/i.test(f.name) && !/\.txt$/i.test(f.name) && f.type !== 'text/plain'){
+      /* Antes se ignoraba sin decir nada: parecía que el convertidor no hacía caso (PDF-27). */
+      QCCONV.archivos.push({ nombre: f.name, file: null, estado:'mal', msg:'formato no admitido: suelta el PDF del informe o el TXT de marcadores de Pro Tools', listo:false, doc:null, noValido:true });
+      continue;
+    }
     QCCONV.archivos.push({ nombre: f.name, file: f, estado:'', msg:'en espera', listo:false, doc:null });
   }
   qcConvPintar();
@@ -1908,16 +1927,24 @@ async function qcConvTodos(){
   if(QCCONV.trabajando) return;
   QCCONV.trabajando = true; qcConvPintar();
   for(const f of QCCONV.archivos){
-    if(f.listo) continue;
+    if(f.listo || f.noValido) continue;
     f.estado = ''; f.msg = 'leyendo…'; qcConvPintar();
     try{
       const buf = await f.file.arrayBuffer();
       const esTxt = /\.txt$/i.test(f.nombre) || f.file.type === 'text/plain';
       /* El TXT de marcadores de Pro Tools se lee aquí, sin PDF de por medio, y
          se queda solo con lo que sirve: dónde, quién y qué. */
-      const inf = esTxt ? qcpdfLeerTxt(qcpdfDecodificar(buf), f.nombre)
-                        : qcpdfLeerInforme(await qcpdfLeerPdf(buf), f.nombre);
-      if(!inf){ f.estado = 'mal'; f.msg = esTxt ? 'no es un listado de marcadores de Pro Tools' : 'no encuentro la tabla'; continue; }
+      const hojas = esTxt ? null : await qcpdfLeerPdf(buf);
+      const inf = esTxt ? qcpdfLeerTxt(qcpdfDecodificar(buf), f.nombre) : qcpdfLeerInforme(hojas, f.nombre);
+      if(!inf){
+        f.estado = 'mal';
+        /* Un PDF sin un solo texto es una imagen (escaneado o exportado como foto): no hay nada que leer. */
+        const sinTexto = !esTxt && !(hojas || []).some(h => h && h.length);
+        f.msg = esTxt ? 'no es un listado de marcadores de Pro Tools'
+              : (sinTexto ? 'el PDF es una imagen (escaneado), sin texto que leer: expórtalo otra vez desde Pro Tools, o suelta el TXT de marcadores'
+                          : 'no encuentro la tabla: tiene que traer al menos dos de las columnas LOCATION, NAME y COMMENTS');
+        continue;
+      }
       if(!inf.filas.length){ f.estado = 'mal'; f.msg = 'la tabla está vacía'; continue; }
       f.msg = 'dibujando…'; qcConvPintar();
       const d = qcpdfDeInforme(inf, { poster: QCCONV.poster ? QCCONV.poster.dato : null,
@@ -1930,7 +1957,7 @@ async function qcConvTodos(){
       f.doc.save(String(f.nombre).replace(/\.(pdf|txt)$/i, '') + ' · QC.pdf');
     }catch(e){
       f.estado = 'mal';
-      f.msg = 'falló: ' + ((e && e.message) || e);
+      f.msg = qcConvMotivo(e);
       try{ if(typeof fallo === 'function') fallo('qcConvTodos · js/qcpdf.js', e, 'ese PDF no se ha podido convertir'); }
       catch(e2){ /* sin el registro de fallos, ya lo dice la fila */ }
     }
@@ -1944,6 +1971,7 @@ async function qcConvTodos(){
 /* La pantalla de este archivo: lo justo para que el convertidor de la
    aplicación (qcConvPintar y compañía, en el motor) viva solo en una página. */
 (function(){
+  window.QCPDF_SIN_RED = true;       // sin internet: el lector de PDF no pide fuentes ni mapas de fuera (PDF-27)
   const CLAVE = 'dubbipt_convqc';
   const avisar = (texto) => {
     const a = document.getElementById('avisos'); if(!a) return;
