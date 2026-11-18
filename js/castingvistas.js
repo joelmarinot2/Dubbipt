@@ -3025,6 +3025,7 @@ const CS_OP_TONO = [['', '—'], ['grave', 'Grave'], ['medio', 'Medio'], ['agudo
 /* ── Programas, programa y episodio: lo que se pinta ─────────────────────── */
 
 const CS_ESTADO = { en_curso: 'En curso', completo: 'Completado', pendiente: 'Pendiente' };
+const CS_BUSCAR_MS = 180;     // lo que se espera, tras la última letra, para repintar lo buscado (ENT-30)
 
 /** Los programas repetidos en la biblioteca de Dubbipt (el mismo nombre, o casi): se avisa, para fusionarlos (PRO-67). */
 function csProgramasRepetidos(lista){
@@ -3843,7 +3844,18 @@ function csCablear(vista){
   vista.querySelectorAll('[data-cs]').forEach(el => {
     const que = el.getAttribute('data-cs'), v = el.getAttribute('data-v');
     const at = (k) => el.getAttribute('data-' + k);
-    const escribir = (campo) => { CS[campo] = el.value; const pos = el.selectionStart; csRepintar(); const n = document.querySelector('#csVista [data-cs="' + que + '"]'); if(n){ n.focus(); try{ n.setSelectionRange(pos, pos); }catch(err){ /* el cursor al final */ } } };
+    /* Buscar: lo escrito se guarda al momento, pero se repinta cuando se deja de teclear un instante (ENT-30:
+       «retardo en búsquedas»). Antes cada letra repintaba la sección entera: con 300 talentos se notaba al escribir. */
+    const escribir = (campo) => {
+      CS[campo] = el.value;
+      clearTimeout(CS._tBuscar);
+      CS._tBuscar = setTimeout(() => {
+        const n0 = document.querySelector('#csVista [data-cs="' + que + '"]'), pos = n0 ? n0.selectionStart : null, conFoco = n0 && document.activeElement === n0;
+        csRepintar();
+        const n = document.querySelector('#csVista [data-cs="' + que + '"]');
+        if(n && conFoco){ n.focus(); try{ if(pos != null) n.setSelectionRange(pos, pos); }catch(err){ /* el cursor al final */ } }
+      }, CS_BUSCAR_MS);
+    };
     const id = (x) => (x != null && /^\d+$/.test(String(x))) ? Number(x) : x;      // los ids de Casting son números
     if(que === 'actualizar') el.onclick = () => csActualizar();
     else if(que === 'traer') el.onclick = () => { prodVista = 'datos'; prodPanel(); };

@@ -14,6 +14,7 @@
 const http = require('http');
 const fs   = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
 const RAIZ   = path.join(__dirname, '..');
 const PUERTO = Number(process.env.PUERTO || process.argv[2] || 8080);
@@ -41,8 +42,21 @@ const TIPOS = {
   '.html':'text/html; charset=utf-8', '.js':'application/javascript; charset=utf-8',
   '.json':'application/json; charset=utf-8', '.css':'text/css; charset=utf-8',
   '.png':'image/png', '.jpg':'image/jpeg', '.svg':'image/svg+xml',
-  '.ttf':'font/ttf', '.pdf':'application/pdf', '.webmanifest':'application/manifest+json'
+  '.ttf':'font/ttf', '.woff2':'font/woff2', '.webp':'image/webp', '.pdf':'application/pdf', '.webmanifest':'application/manifest+json'
 };
+/* Como Vercel, el texto sale comprimido (Brotli si el navegador lo acepta; si no, gzip): medir aquí sin comprimir
+   daba tiempos de carga que en el sitio de verdad no existen (ENT-30). Se guarda por archivo y fecha. */
+const COMPRIMIDOS = new Map();
+function comprimido(destino, datos, mtime, cual){
+  const k = destino + '|' + mtime + '|' + cual;
+  if(!COMPRIMIDOS.has(k)){
+    if(COMPRIMIDOS.size > 200) COMPRIMIDOS.clear();
+    COMPRIMIDOS.set(k, cual === 'br'
+      ? zlib.brotliCompressSync(datos, { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 5 } })
+      : zlib.gzipSync(datos, { level: 6 }));
+  }
+  return COMPRIMIDOS.get(k);
+}
 
 http.createServer((req, res) => {
   let ruta = decodeURIComponent(req.url.split('?')[0]);
@@ -59,6 +73,15 @@ http.createServer((req, res) => {
     // el service worker y la config nunca se cachean, igual que en Vercel
     if(/\/(sw|config)\.js$/.test(ruta)) cab['Cache-Control'] = 'no-store, max-age=0';
     if(/\/sw\.js$/.test(ruta)) cab['Service-Worker-Allowed'] = '/';
+    const acepta = String(req.headers['accept-encoding'] || '');
+    if(/^(text\/|application\/(javascript|json|manifest))|image\/svg/.test(cab['Content-Type']) && datos.length > 1024 && /\b(br|gzip)\b/.test(acepta)){
+      const cual = /\bbr\b/.test(acepta) ? 'br' : 'gzip';
+      let mt = 0; try{ mt = fs.statSync(destino).mtimeMs; }catch(e){ mt = 0; }
+      cab['Content-Encoding'] = cual; cab['Vary'] = 'Accept-Encoding';
+      res.writeHead(200, cab);
+      res.end(comprimido(destino, datos, mt, cual));
+      return;
+    }
     res.writeHead(200, cab);
     res.end(datos);
   });

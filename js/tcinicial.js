@@ -125,6 +125,14 @@ const tciRuta = (showId) => showId + '/video-tc.json';
 async function tciCargar(showId, forzar){
   const k = String(showId);
   if(!forzar && TCI.datos[k] && Date.now() - (TCI.vistos[k] || 0) < TCI.cada) return TCI.datos[k];
+  /* Sin llamadas duplicadas (ENT-30): si ya se está trayendo, se espera a ese mismo. */
+  TCI.enCurso = TCI.enCurso || {};
+  if(TCI.enCurso[k]) return TCI.enCurso[k];
+  TCI.enCurso[k] = tciCargarHacer(showId).finally(() => { delete TCI.enCurso[k]; });
+  return TCI.enCurso[k];
+}
+async function tciCargarHacer(showId){
+  const k = String(showId);
   let d = null;
   try{
     if(!(typeof window !== 'undefined' && window.OFFLINE) && typeof sb !== 'undefined' && sb){
