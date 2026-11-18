@@ -387,6 +387,7 @@ function bdDecode(buf){const u=new TextDecoder("utf-8").decode(buf);if((u.match(
 async function bdLoadPdfJs(){
   /* Dubbipt: el pdf.js que ya carga la aplicación, con su worker. */
   if(typeof pdfjsLib !== 'undefined' && pdfjsLib) return pdfjsLib;
+  if(typeof ddlLib === 'function') return ddlLib('pdf');             // bajo demanda (ENT-30)
   throw new Error('No se pudo cargar el lector de PDF');
 }
 /* Texto de un libreto: .txt/.md, .docx (Word) o .pdf */

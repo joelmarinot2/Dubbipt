@@ -639,6 +639,7 @@ async function qcpdfLeerPdf(buf){
   /* En el convertidor de un solo archivo (sin internet) no se piden fuentes ni mapas de fuera: para leer el texto
      no hacen falta, y pedirlos sin red solo llena la consola de errores (PDF-27). */
   const sinRed = typeof window !== 'undefined' && window.QCPDF_SIN_RED;
+  if(typeof pdfjsLib === 'undefined' && typeof ddlLib === 'function') await ddlLib('pdf');     // bajo demanda (ENT-30)
   const doc = await pdfjsLib.getDocument(sinRed ? { data: buf, useSystemFonts: true } : {
     data: buf,
     cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',

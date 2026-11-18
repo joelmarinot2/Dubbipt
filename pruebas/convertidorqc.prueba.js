@@ -46,7 +46,7 @@ exports.pruebas = function(t){
   t.ok('ni un script ni una hoja de estilos de fuera: todo va dentro', (cascara.match(/<script\b/g) || []).length === 6 && !/<script[^>]+\bsrc=/.test(cascara) && !/<link\b/.test(cascara)
        && !/@import|url\(\s*["']?https?:/.test(cascara) && !/\b(?:src|href)=["']https?:/.test(cascara));
   t.ok('jsPDF 2.5.1 y pdf.js 3.11.174, los mismos que usa la aplicación', /2\.5\.1/.test(guion(html, 'lib-jspdf').slice(0, 600)) && /3\.11\.174/.test(guion(html, 'lib-pdfjs'))
-       && /jspdf\/2\.5\.1\/jspdf\.umd\.min\.js/.test(motor) && /pdf\.js\/3\.11\.174\/pdf\.min\.js/.test(INDEXHTML));
+       && /jspdf\/2\.5\.1\/jspdf\.umd\.min\.js/.test(motor) && /const PDFJS_VERSION = '3\.11\.174';/.test(INDEXHTML) && /pdf\.js\/\$\{PDFJS_VERSION\}\/pdf\.min\.js/.test(INDEXHTML));
   t.ok('el hilo del lector de PDF va dentro, como texto, y se arranca desde la memoria (desde un archivo no se puede cargar otro)',
        /<script id="lib-pdfworker" type="text\/plain">/.test(html) && guion(html, 'lib-pdfworker').length > 500000 && /3\.11\.174/.test(guion(html, 'lib-pdfworker'))
        && /GlobalWorkerOptions\.workerSrc = URL\.createObjectURL\(new Blob\(\[codigo\], \{ type: 'text\/javascript' \}\)\)/.test(guion(html, 'pantalla')));
