@@ -142,7 +142,7 @@ exports.pruebas = function(t){
 
   t.seccion('6 · en la descarga');
   const HTML = fs.readFileSync(INDEX, 'utf8'), SW = fs.readFileSync(path.join(RAIZ, 'sw.js'), 'utf8');
-  t.ok('solo cuando el casting está COMPLETO, y con el actor recién escrito', /if\(completo && typeof corOrdenarCasting1 === 'function'\)\{/.test(HTML) && /corOrdenarCasting1\(arch, \{ actorDe: \(p\) => actorDe\[castClave\(p\)\] \|\| null \}\)/.test(HTML));
+  t.ok('solo cuando el casting está COMPLETO, y con el actor recién escrito', /if\(completo && typeof corOrdenarCasting1 === 'function'\)\{/.test(HTML) && /corOrdenarCasting1\(arch, \{ actorDe: \(p, sec\) => actorDe\[deSeccion\(sec\) \+ castClave\(p\)\] \|\| null \}\)/.test(HTML));
   t.ok('el aviso dice si se ordenó, o por qué no', /' · CASTING 1 ordenado por talento \(' \+ r\.orden1\.bloques/.test(HTML) && /' · ⚠️ CASTING 1 no se ordenó: ' \+ r\.orden1\.motivo/.test(HTML));
   t.ok('el módulo se carga y queda para usar sin conexión', /<script src="\.\/js\/castorden\.js"><\/script>/.test(HTML) && /'\.\/js\/castorden\.js'/.test(SW));
 };

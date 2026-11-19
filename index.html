@@ -3216,7 +3216,7 @@ try{
 /* La fecha se saca del propio archivo servido (document.lastModified), asi que
    se actualiza SOLA en cada despliegue. Antes iba escrita a mano junto a la
    version y se quedaba clavada: la version subia y la fecha no. */
-const APP_VER_NUM = 'v12.12.0-nube';
+const APP_VER_NUM = 'v12.13.0-nube';
 function appBuildDate(){
   try{
     const d = new Date(document.lastModified);
@@ -10380,41 +10380,64 @@ function castNombreDescarga(programa, capitulo, num, completo, ext, pelicula){
   else nombre = n ? p + ' ' + n : p + ' ' + c;
   return 'DES_' + nombre.toLocaleUpperCase('es') + '_' + (completo ? 'COMPLETO' : 'INCOMPLETO') + '.' + (ext || 'xlsx');   // el título, en mayúsculas (PRO-63)
 }
-function castRellenar(buf, asign, meta, training, delCapitulo){
+/**
+ * `o.secciones` (CAST-56, episodios vinculados): el desglose trae varios episodios unidos («EPS 101», «EPS 102»…).
+ * Cada uno: { num, fila, desde, hasta, asign, delCapitulo, training }. Las filas de cada sección se rellenan con
+ * SU casting y cuentan para COMPLETO con SUS personajes; la fila «EPS …» no es un personaje. Sin `o.secciones`,
+ * como siempre: `asign`, `training` y `delCapitulo` valen para toda la hoja.
+ */
+function castRellenar(buf, asign, meta, training, delCapitulo, o){
   if(typeof fflate === 'undefined') throw new Error('falta la librería de ZIP');
+  o = o || {};
   const arch = fflate.unzipSync(new Uint8Array(buf));
   const ruta = castHojaXml(arch, CAST_HOJA);
   const xml = new TextDecoder().decode(arch[ruta]);
 
   const personajes = castLeerColumna(xml, CAST_COL_PERSONAJE);
+  const secciones = (Array.isArray(o.secciones) && o.secciones.length) ? o.secciones : null;
+  /* Sin secciones, una sola: toda la hoja con lo de este capítulo. */
+  const partes = secciones
+    ? secciones.map(s => ({ s: s, filas: cvFilasDe(personajes, s), asign: s.asign || {}, delCapitulo: s.delCapitulo || [] }))
+    : [{ s: null, filas: personajes, asign: asign, delCapitulo: delCapitulo }];
   const valores = {};
-  const vistos = new Set();
   /* Las filas del Excel que se van a quedar EN BLANCO. Es la queja que llego:
      el desglose sale con la mitad de la columna vacia y la aplicacion no dice
      ni una palabra. Una celda vacia puede ser dos cosas muy distintas -no hay
      talento asignado, o lo hay y no se encontro la fila- y hasta ahora las dos
      se veian igual. */
-  const enBlanco = [], filasVacias = [];
-  for(const fila in personajes){
-    const bruto = personajes[fila];
-    if(!castClave(bruto)) continue;
-    const usa = castQuienVaEnLaFila(bruto, asign);
-    if(usa){ valores[+fila] = asign[usa]; vistos.add(usa); }
-    else { enBlanco.push(String(bruto).trim()); filasVacias.push(+fila); }
-  }
-  let sinCasar = Object.keys(asign).filter(k => !vistos.has(k));
-  /* Los que el libreto y el desglose escriben distinto (CAST-44): solo en filas vacías y sin dudas. */
+  const enBlanco = [];
+  let sinCasar = [], porParecido = [], cubiertos = [];
   /* Solo filas VACÍAS de verdad: si el Excel subido ya trae un actor escrito en una fila, ese no se toca. */
   const yaEnExcel = castLeerColumnaTexto(arch, xml, CAST_COL_ACTOR);
-  const porParecido = castCasarPorParecido(sinCasar, filasVacias.filter(f => !/^\d+$/.test(String(personajes[f]).trim()) && !String(yaEnExcel[f] || '').trim()), personajes);
-  for(const x of porParecido){
-    valores[x.fila] = asign[x.k]; vistos.add(x.k);
-    const i = enBlanco.indexOf(x.nombreFila); if(i >= 0) enBlanco.splice(i, 1);
+  for(const pt of partes){
+    const vistos = new Set(), filasVacias = [], blancoAqui = [], valAqui = {};
+    for(const fila in pt.filas){
+      const bruto = pt.filas[fila];
+      if(!castClave(bruto)) continue;
+      const usa = castQuienVaEnLaFila(bruto, pt.asign);
+      if(usa){ valAqui[+fila] = pt.asign[usa]; vistos.add(usa); }
+      else { blancoAqui.push(String(bruto).trim()); filasVacias.push(+fila); }
+    }
+    let sc = Object.keys(pt.asign).filter(k => !vistos.has(k));
+    /* Los que el libreto y el desglose escriben distinto (CAST-44): solo en filas vacías y sin dudas. */
+    const pp = castCasarPorParecido(sc, filasVacias.filter(f => !/^\d+$/.test(String(personajes[f]).trim()) && !String(yaEnExcel[f] || '').trim()), pt.filas);
+    for(const x of pp){
+      valAqui[x.fila] = pt.asign[x.k]; vistos.add(x.k);
+      const i = blancoAqui.indexOf(x.nombreFila); if(i >= 0) blancoAqui.splice(i, 1);
+    }
+    sc = sc.filter(k => !vistos.has(k));
+    /* Y los que no tienen fila propia pero su otra cara ya lleva el mismo actor: no falta nada. */
+    const cb = castCubiertosPorGemelo(sc, pt.filas, valAqui, pt.asign);
+    sc = sc.filter(k => !cb.some(c => c.k === k));
+    Object.assign(valores, valAqui);
+    const et = (x) => pt.s ? x + ' (' + pt.s.num + ')' : x;
+    enBlanco.push(...blancoAqui.map(et));
+    sinCasar.push(...sc.map(et));
+    porParecido.push(...pp.map(x => pt.s ? Object.assign({}, x, { k: et(x.k) }) : x));
+    cubiertos.push(...cb.map(x => pt.s ? Object.assign({}, x, { k: et(x.k) }) : x));
   }
-  sinCasar = sinCasar.filter(k => !vistos.has(k));
-  /* Y los que no tienen fila propia pero su otra cara ya lleva el mismo actor: no falta nada. */
-  const cubiertos = castCubiertosPorGemelo(sinCasar, personajes, valores, asign);
-  sinCasar = sinCasar.filter(k => !cubiertos.some(c => c.k === k));
+  /* Los de training: de cada episodio, los suyos. */
+  if(secciones){ training = {}; for(const s of secciones) Object.assign(training, s.training || {}); }
 
   const r = castEscribirColumna(xml, CAST_COL_ACTOR, valores);
   // la cabecera del programa: fecha, género, tiempo, director, técnico, estudio
@@ -10426,15 +10449,29 @@ function castRellenar(buf, asign, meta, training, delCapitulo){
   arch[ruta] = new TextEncoder().encode(xmlFinal);
   /* ¿Completo? Todos los personajes con su actor, después de escribir (CAST-47). */
   const actoresFinal = castLeerColumnaTexto(arch, xmlFinal, CAST_COL_ACTOR);
-  const llenos = castFaltanActor(personajes, actoresFinal, delCapitulo), faltanActor = llenos.faltan;
-  const completo = llenos.total > 0 && !faltanActor.length;
+  /* Con episodios vinculados, cada sección con SUS personajes; la fila «EPS …» no cuenta. */
+  const porSeccion = partes.map(pt => {
+    const l = castFaltanActor(pt.filas, actoresFinal, pt.delCapitulo);
+    return { num: pt.s ? pt.s.num : null, total: l.total, faltan: l.faltan, noHablan: l.noHablan,
+             sinCapitulo: !!(pt.s && pt.s.sinCapitulo), sinDatos: !!(pt.s && pt.s.sinDatos) };
+  });
+  const llenos = { total: porSeccion.reduce((n, x) => n + x.total, 0),
+                   faltan: [].concat(...porSeccion.map(x => x.num ? x.faltan.map(n => n + ' (' + x.num + ')') : x.faltan)),
+                   noHablan: [].concat(...porSeccion.map(x => x.noHablan)) };
+  const faltanActor = llenos.faltan;
+  const completo = llenos.total > 0 && !faltanActor.length && porSeccion.every(x => x.total > 0 || !x.num);
   const tiempos = castFormatoTiempos(arch);   // el TIME de CASTING 1, como hh:mm:ss (CAST-46)
   /* Completo: CASTING 1 se ordena por talento (CAST-48), solo esa hoja; las fórmulas, tal cual. */
   let orden1 = null;
   if(completo && typeof corOrdenarCasting1 === 'function'){
+    /* El actor de cada personaje, por episodio: el mismo nombre puede llevar otro actor en el otro episodio. */
     const actorDe = {};
-    for(const f in personajes){ const k = castClave(personajes[f]); if(k && String(actoresFinal[f] || '').trim()) actorDe[k] = String(actoresFinal[f]).trim(); }
-    try{ orden1 = corOrdenarCasting1(arch, { actorDe: (p) => actorDe[castClave(p)] || null }); }
+    for(const pt of partes){
+      const pre = pt.s ? pt.s.num + '|' : '';
+      for(const f in pt.filas){ const k = castClave(pt.filas[f]); if(k && String(actoresFinal[f] || '').trim()) actorDe[pre + k] = String(actoresFinal[f]).trim(); }
+    }
+    const deSeccion = (sec) => { const n = (sec && typeof cvNumSeccion === 'function') ? cvNumSeccion(sec) : null; return (secciones && n) ? n + '|' : ''; };
+    try{ orden1 = corOrdenarCasting1(arch, { actorDe: (p, sec) => actorDe[deSeccion(sec) + castClave(p)] || null }); }
     catch(e){ orden1 = { hecho: false, motivo: e.message }; fallo('corOrdenarCasting1 · index.html:castRellenar', e, 'CASTING 1 se queda en su orden'); }
   }
   castForzarRecalculo(arch);   // que las demás hojas se enteren del cambio
@@ -10443,7 +10480,7 @@ function castRellenar(buf, asign, meta, training, delCapitulo){
            sinCasar: sinCasar, enBlanco: enBlanco,
            enExcel: Object.keys(personajes).length, cabecera: cabecera, training: tr,
            porParecido: porParecido, cubiertos: cubiertos, tiempos: tiempos,
-           completo: completo, faltanActor: faltanActor, noHablan: llenos.noHablan, orden1: orden1 };
+           completo: completo, faltanActor: faltanActor, noHablan: llenos.noHablan, orden1: orden1, secciones: secciones ? porSeccion : null };
 }
 
 /** Catálogo de talentos de la hoja TALENTOS, para autocompletar. */
@@ -12912,12 +12949,13 @@ async function castSubirFormato(file){
 
     // Comprobar que sirve ANTES de guardarlo: si no trae la hoja de casting,
     // decirlo ahora y no cuando el usuario esté esperando su descarga.
-    let personajes = 0;
+    let personajes = 0, persMapa = {};
     try{
       const arch = fflate.unzipSync(new Uint8Array(buf));
       const ruta = castHojaXml(arch, CAST_HOJA);
       const xml = new TextDecoder().decode(arch[ruta]);
-      personajes = Object.keys(castLeerColumna(xml, CAST_COL_PERSONAJE)).length;
+      persMapa = castLeerColumna(xml, CAST_COL_PERSONAJE);
+      personajes = Object.keys(persMapa).length;
     }catch(e){
       castAviso('❌ Ese archivo no vale como formato: ' + (e.message || e));
       return;
@@ -12937,13 +12975,29 @@ async function castSubirFormato(file){
     }catch(e){ fallo('sb.storage.from · index.html:7823', e, 'puede que esto no se haya guardado en la nube'); }
     const donde = epId ? ('«' + ((currentEp && currentEp.name) || 'este capítulo') + '»')
                        : 'el programa (común a sus capítulos)';
+    /* Episodios unidos (CAST-56): el mismo archivo, también para los otros episodios que trae. */
+    let notaVinc = '', secAbierta = null;
+    const secsV = (typeof cvSecciones === 'function') ? cvSecciones(persMapa) : null;
+    if(secsV && epId){
+      const epsV = ((typeof sbEps === 'function') && sbEps(LDB.showId)) || LDB.epsAll || [];
+      const epAb = (LDB.epsAll || []).find(e => e.id === epId) || currentEp;
+      const num = cvSeccionDe(secsV, epAb, epsV);
+      if(num){
+        secAbierta = secsV.find(x => x.num === num);
+        const g = await cvGuardarEnLosDemas(buf, file.name, secsV, epAb, epsV, LDB.showId);
+        notaVinc = ' · 🔗 desglose unido (' + cvFrase(secsV) + '): este es el ' + num
+          + (g.guardados.length ? ' · guardado también en ' + g.guardados.join(', ') : '')
+          + (g.faltan.length ? ' · aún no hay capítulo ' + g.faltan.join(', ') + ' en el programa: créalo con su libreto y su video (que su nombre lleve el número) y lo tomará solo' : '');
+      }else notaVinc = ' · ⚠️ este desglose trae ' + cvFrase(secsV) + ' y este capítulo no es ninguno (por su número): ponle el número al nombre del capítulo';
+    }
 
     CAST_TALENTOS = [];                 // el catálogo sale de este archivo
     await castCargarCatalogo();
     // si el desglose ya venía con actores puestos, se aprovechan
     let yaTraia = 0;
     try{
-      const trae = castLeerCasting(buf);
+      let trae = castLeerCasting(buf);
+      if(secAbierta) trae = cvCastingDeSeccion(trae, persMapa, secAbierta);   // solo lo de este episodio (CAST-56)
       yaTraia = Object.keys(trae).length;
       if(yaTraia){ await castHeredar(trae); await castRegAnotar(); }
     }catch(e){ console.warn('casting del desglose', e); }
@@ -12952,7 +13006,7 @@ async function castSubirFormato(file){
     castAviso('✅ Desglose guardado para ' + donde + (enNube ? '' : ' (solo en este equipo: no se pudo subir a la nube)')
       + ' · ' + personajes + ' personajes en la hoja ' + CAST_HOJA
       + (CAST_TALENTOS.length ? ' · ' + CAST_TALENTOS.length + ' talentos en el catálogo' : '')
-      + (yaTraia ? ' · ya traía ' + yaTraia + ' actores asignados' : ''));
+      + (yaTraia ? ' · ya traía ' + yaTraia + ' actores asignados' : '') + notaVinc);
   }catch(e){
     castAviso('❌ No se pudo guardar el formato: ' + (e.message || e));
   }finally{
@@ -13338,6 +13392,14 @@ async function castFuente(){
     }catch(e){}
   }
 
+  // 1b) un desglose de episodios unidos subido desde otro episodio antes de que este existiera (CAST-56)
+  if(showId && epId && typeof cvFormatoEsperando === 'function'){
+    try{
+      const v = await cvFormatoEsperando(showId, (LDB.epsAll || []).find(e => e.id === epId) || currentEp);
+      if(v) return { buf: v.buf, nombre: v.name || 'desglose unido', de: epNom };
+    }catch(e){ /* se sigue buscando */ }
+  }
+
   // 2) el .xlsm con el que se creó ESTE capítulo
   if(epId){
     const ep = (LDB.epsAll || []).find(e => e.id === epId) || {};
@@ -13373,7 +13435,9 @@ async function castPintarFuente(){
   el.style.display = '';
   try{
     const f = await castFuente();
-    el.textContent = 'Se rellenará: ' + f.nombre + (f.comun ? ' (común)' : '');
+    let unido = '';
+    try{ const sv = (typeof cvSeccionesDelArchivo === 'function') ? cvSeccionesDelArchivo(f.buf) : null; if(sv) unido = ' · 🔗 unido: ' + cvFrase(sv); }catch(e){ /* sin aviso de unido */ }
+    el.textContent = 'Se rellenará: ' + f.nombre + (f.comun ? ' (común)' : '') + unido;
     el.title = (f.comun
         ? 'Es el formato COMÚN del programa: este capítulo no tiene el suyo. Pulsa para subirle uno propio.'
         : 'Desglose de ' + f.de + ' · pulsa para cambiarlo');
@@ -13408,6 +13472,12 @@ async function castCargarCatalogo(){
 
 /* ── Descargar el desglose relleno ─────────────────────────────────────── */
 
+/** «EPS 101 completo · EPS 102: 2 sin actor» (CAST-56). */
+function castVincResumen(secs){
+  return (secs || []).map(x => 'EPS ' + x.num + ' '
+    + (x.sinCapitulo ? 'sin capítulo en el programa' : x.sinDatos ? 'sin casting guardado (ábrelo y reparte)'
+       : x.faltan.length ? x.faltan.length + ' sin actor' : 'completo')).join(' · ');
+}
 async function castDescargar(){
   const btn = document.getElementById('btnCastOut');
   const antes = btn ? btn.textContent : '';
@@ -13467,7 +13537,20 @@ async function castDescargar(){
     for(const k in charIdx){ const c = charIdx[k], t = (typeof trnDe === 'function') ? trnDe(c) : null; if(t) training[castClave(c.display || k)] = { tel: t.tel || '' }; }
     /* Los personajes que hablan en este capítulo: solo esos cuentan para COMPLETO (CAST-53). */
     const delCapitulo = Object.keys(charIdx).map(k => (charIdx[k] && charIdx[k].display) || k);
-    let r = castRellenar(buf, asign, meta, training, delCapitulo);
+    /* Episodios vinculados (CAST-56): si el desglose trae «EPS 101», «EPS 102»…, cada episodio se rellena con SU
+       casting (el que no está abierto, de lo guardado) y sale UN archivo para todos. */
+    let vinc = null, notaVinc = '';
+    const secsV = (typeof cvSeccionesDelArchivo === 'function') ? cvSeccionesDelArchivo(buf) : null;
+    if(secsV){
+      const showV = (currentEp && currentEp.showId) || LDB.showId;
+      const epsV = ((typeof sbEps === 'function') && sbEps(showV)) || LDB.epsAll || [];
+      const epAb = (LDB.epsAll || []).find(e => e.id === currentEp.id) || currentEp;
+      if(cvSeccionDe(secsV, epAb, epsV)){
+        if(btn) btn.textContent = '⏳ Leyendo ' + cvFrase(secsV) + '…';
+        vinc = await cvPrepararSecciones(secsV, epAb, epsV, { asign: asign, delCapitulo: delCapitulo, training: training });
+      }else notaVinc = '⚠️ Este desglose trae ' + cvFrase(secsV) + ' y este capítulo no es ninguno de ellos (por su número): se rellenó entero con este capítulo · ';
+    }
+    let r = castRellenar(buf, asign, meta, training, delCapitulo, vinc ? { secciones: vinc } : null);
     /* Filas del Excel de personajes que no hablan en el capítulo (CAST-54): se pregunta, uno por uno, si son un fallo
        del desglose (X) o un personaje real (y con qué talento). Con las respuestas, se rellena otra vez. */
     if(r.noHablan && r.noHablan.length){
@@ -13478,7 +13561,12 @@ async function castDescargar(){
       const extra = castSinDialogoAsign(resp);
       if(Object.keys(extra).length){
         Object.assign(asign, extra);
-        r = castRellenar(buf, asign, meta, training, delCapitulo);
+        /* Vinculados: cada respuesta, al episodio de su fila. */
+        if(vinc) for(const ps of (r.secciones || [])){
+          const sv = vinc.find(v => v.num === ps.num);
+          if(sv) for(const nm of (ps.noHablan || [])){ const k = castClave(nm); if(extra[k]) sv.asign[k] = extra[k]; }
+        }
+        r = castRellenar(buf, asign, meta, training, delCapitulo, vinc ? { secciones: vinc } : null);
         castSinDialogoGuardar(showReg, resp).catch(e => fallo('castSinDialogoGuardar · index.html:castDescargar', e, 'la respuesta no se recuerda para la próxima'));
       }
     }
@@ -13492,7 +13580,9 @@ async function castDescargar(){
     const capitulo = (ep && ep.name) || currentEp.name || '';
     let num = '';
     try{ num = (typeof tciNumEp === 'function') ? (tciNumEp(capitulo) || tciNumEp((ep && ep.xls_name) || '') || '') : ''; }catch(e){ num = ''; }
-    const nombre = castNombreDescarga(programa, capitulo, num, r.completo, r.ext, pelicula);
+    /* Vinculados: «DES_MY PET AND ME 101.102_COMPLETO», como lo titula la empresa. */
+    const nombre = vinc ? castNombreDescarga(programa, cvNums(vinc), cvNums(vinc), r.completo, r.ext, false)
+                        : castNombreDescarga(programa, capitulo, num, r.completo, r.ext, pelicula);
     const url = URL.createObjectURL(new Blob([r.datos],
       { type: r.mime || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
     const a = document.createElement('a');
@@ -13522,6 +13612,8 @@ async function castDescargar(){
     msg += r.completo ? ' · COMPLETO: todos los personajes tienen actor'
          : ' · INCOMPLETO: ' + r.faltanActor.length + ' personaje' + (r.faltanActor.length === 1 ? '' : 's') + ' sin actor'
            + (r.faltanActor.length ? ' (' + r.faltanActor.slice(0, 5).join(', ') + (r.faltanActor.length > 5 ? '…' : '') + ')' : '');
+    if(vinc) msg += ' · 🔗 ' + castVincResumen(r.secciones);
+    if(notaVinc) msg = notaVinc + msg;
     if(r.noHablan && r.noHablan.length)
       msg += ' · ' + r.noHablan.length + ' fila' + (r.noHablan.length === 1 ? '' : 's') + ' del Excel sin actor de personajes que no hablan en este capítulo (no cuentan): '
            + r.noHablan.slice(0, 5).join(', ') + (r.noHablan.length > 5 ? '…' : '');
@@ -13552,7 +13644,7 @@ async function castDescargar(){
        falte por repartir no es una avería, y el aviso que salta siempre deja de
        querer decir nada. */
     let diag = null;
-    try{ diag = castDiagExport(fuente, asign, r); }
+    try{ diag = castDiagExport(fuente, vinc ? Object.assign({}, ...vinc.map(v => v.asign)) : asign, r); }
     catch(e){ fallo('castDiagExport · index.html:castDescargar', e); }
     if(castDiagHayAveria(diag)){
       try{ castDiagPanel(diag); }catch(e){ fallo('castDiagPanel · index.html:castDescargar', e); }
@@ -24423,4 +24515,5 @@ if(typeof renderLibretoBlocks === 'function'){
 <script src="./js/castminimo.js"></script>
 <script src="./js/castgenero.js"></script>
 <script src="./js/castepisodios.js"></script>
+<script src="./js/castvinculo.js"></script>
 <script src="./js/animaciones.js"></script>

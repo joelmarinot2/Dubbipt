@@ -223,7 +223,7 @@ exports.pruebas = function(t){
          'si el exacto no mandara, los dos actores se cruzarían');
 
     t.ok('y castRellenar pregunta por aquí',
-         /const usa = castQuienVaEnLaFila\(bruto, asign\);/
+         /const usa = castQuienVaEnLaFila\(bruto, pt\.asign\);/
            .test(require('./ayuda').fuentes().map(x => x.src).join('\n')));
   }
 
