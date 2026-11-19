@@ -1,10 +1,10 @@
 // Service Worker · Dubbipt  (VERSION autogenerada en cada build)
-const VERSION = '2026-11-18T12:00';
+const VERSION = '2026-11-19T12:00';
 const CACHE   = 'dubbipt-' + VERSION;
 
 const SHELL = [
   './', './config.js', './manifest.json',
-  './js/cortes.js', './js/formatos.js', './js/adr.js', './js/sala.js', './js/talentos.js', './js/listadialogos.js', './js/cambiolibreto.js', './js/tcpantalla.js', './js/mtc.js', './js/horapt.js', './js/produccion.js', './js/dublajecast.js', './js/dcescribir.js', './js/castingvistas.js', './js/castdisponible.js', './js/castreparto.js', './js/dctools.js', './js/csproduccion.js', './dctools/contract-inventory.docx', './js/salud.js', './js/borrartexto.js', './js/tcinicial.js', './js/training.js', './js/videofps.js', './js/continuidad.js', './js/castorden.js', './js/castchoques.js', './js/castminimo.js', './js/castgenero.js', './js/castepisodios.js', './js/tema.js', './js/animaciones.js', './js/otp.js', './tema-claro-auto.css', './tema-oscuro-auto.css', './tema-vidrio.css',
+  './js/cortes.js', './js/formatos.js', './js/adr.js', './js/sala.js', './js/talentos.js', './js/listadialogos.js', './js/cambiolibreto.js', './js/tcpantalla.js', './js/mtc.js', './js/horapt.js', './js/produccion.js', './js/dublajecast.js', './js/dcescribir.js', './js/castingvistas.js', './js/castdisponible.js', './js/castreparto.js', './js/dctools.js', './js/csproduccion.js', './dctools/contract-inventory.docx', './js/salud.js', './js/borrartexto.js', './js/tcinicial.js', './js/training.js', './js/videofps.js', './js/continuidad.js', './js/castorden.js', './js/castchoques.js', './js/castminimo.js', './js/castgenero.js', './js/castepisodios.js', './js/castvinculo.js', './js/tema.js', './js/animaciones.js', './js/otp.js', './tema-claro-auto.css', './tema-oscuro-auto.css', './tema-vidrio.css',
   './js/qcpdf.js', './js/analisis.js', './js/analisis-worker.js',
   './icon-192.png', './icon-512.png', './icon-512-mask.png', './apple-touch-icon.png',
   './fuentes.css', './fuentes/fraunces-latin-39ce20.woff2', './fuentes/fraunces-latin-ext-796716.woff2', './fuentes/inter-latin-567244.woff2', './fuentes/inter-latin-ext-395290.woff2', './fuentes/jetbrains-mono-latin-480c06.woff2', './fuentes/jetbrains-mono-latin-ext-ba1653.woff2', './fuentes/space-grotesk-latin-ecea81.woff2', './fuentes/space-grotesk-latin-ext-611be2.woff2',

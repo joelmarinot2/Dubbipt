@@ -33,6 +33,8 @@ const corAttr = (a, k) => { const m = String(a || '').match(new RegExp('\\b' + k
 const corColN = (l) => { let n = 0; for(const ch of l) n = n * 26 + ch.charCodeAt(0) - 64; return n; };
 const corColL = (n) => { let s = ''; while(n > 0){ const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = (n - 1 - r) / 26; } return s; };
 const corClave = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+/* La fila que abre un episodio en un desglose de episodios unidos (CAST-56): «EPS 101», «EP 102», «EPISODIO 3»… La misma regla que CV_SECCION_RE (js/castvinculo.js). */
+const CORD_SECCION_RE = /^\s*(?:EPS?|EPISODIO|EPISODE|CAP(?:ITULO|ÍTULO)?)\.?\s*#?\s*0*(\d{1,4})\s*$/i;
 const CORD_AL_FINAL = new Set(['', '0', '#N/A', '#REF!', 'TODOS', 'ORIGINAL', 'EDICION', 'X', 'N/A', 'NA', 'VARIOS']);   // «0» o «#N/A»: lo que deja una fórmula sin actor (CAST-54)
 
 /** Las hojas del libro: [{ nombre, ruta }]. */
@@ -177,14 +179,21 @@ function corOrdenarCasting1(arch, o){
   if(bloques.length < 2) return { hecho: false, motivo: 'CASTING 1 tiene menos de dos personajes', bloques: bloques.length };
   const ini = bloques[0].desde, fin = bloques[bloques.length - 1].hasta;
 
+  /* Episodios unidos (CAST-56): con dos o más filas «EPS …», cada una abre su episodio. Se ordena DENTRO de cada
+     episodio y la fila «EPS …» se queda delante de los suyos: los personajes de un episodio no pasan al otro. */
+  if(bloques.filter(b => CORD_SECCION_RE.test(b.personaje)).length >= 2){
+    let seg = 0, sec = null;
+    for(const b of bloques){ if(CORD_SECCION_RE.test(b.personaje)){ seg++; sec = b.personaje; b.sep = true; } b.seg = seg; b.sec = sec; }
+  }
   for(const b of bloques){
-    const act = o.actorDe ? o.actorDe(b.personaje) : null;
+    const act = (o.actorDe && !b.sep) ? o.actorDe(b.personaje, b.sec || null) : null;
     b.locutor = String(act != null && String(act).trim() ? act : txt(b.desde, cab.l)).replace(/\s+/g, ' ').trim();
     b.total = colTotal ? (parseFloat(String(txt(b.desde, colTotal)).replace(',', '.')) || 0) : 0;
   }
   const orden = bloques.slice().sort((a, b) => {
     const ka = corClave(a.locutor), kb = corClave(b.locutor), fa = CORD_AL_FINAL.has(ka) ? 1 : 0, fb = CORD_AL_FINAL.has(kb) ? 1 : 0;
-    return (fa - fb) || ka.localeCompare(kb, 'es') || (b.total - a.total) || (a.i - b.i);
+    return ((a.seg || 0) - (b.seg || 0)) || ((b.sep ? 1 : 0) - (a.sep ? 1 : 0))
+        || (fa - fb) || ka.localeCompare(kb, 'es') || (b.total - a.total) || (a.i - b.i);
   });
   if(orden.every((b, k) => b === bloques[k])) return { hecho: true, igual: true, bloques: bloques.length, orden: orden.map(b => b.personaje) };
 
@@ -282,5 +291,6 @@ function corOrdenarCasting1(arch, o){
     if(arch['[Content_Types].xml']) arch['[Content_Types].xml'] = corEnc(corDec(arch['[Content_Types].xml']).replace(/<Override\b[^>]*calcChain[^>]*\/>/g, ''));
     if(arch['xl/_rels/workbook.xml.rels']) arch['xl/_rels/workbook.xml.rels'] = corEnc(corDec(arch['xl/_rels/workbook.xml.rels']).replace(/<Relationship\b[^>]*calcChain[^>]*\/>/g, ''));
   }
-  return { hecho: true, bloques: bloques.length, orden: orden.map(b => b.personaje + ' (' + (b.locutor || '-') + ')'), otrasHojas: otras.map(x => x.h.nombre) };
+  return { hecho: true, bloques: bloques.length, orden: orden.map(b => b.personaje + ' (' + (b.locutor || '-') + ')'), otrasHojas: otras.map(x => x.h.nombre),
+           episodios: bloques.filter(b => b.sep).length };
 }

@@ -94,8 +94,8 @@ exports.pruebas = function(t){
   t.seccion('3 · en la descarga');
   const HTML = fs.readFileSync(INDEX, 'utf8');
   t.ok('el nombre sale del programa, el capítulo y si es película; el aviso dice COMPLETO o INCOMPLETO y el nombre',
-       /const nombre = castNombreDescarga\(programa, capitulo, num, r\.completo, r\.ext, pelicula\);/.test(HTML) && /sbShows\(\)\.find\(x => String\(x\.id\) === String\(showId\)\)/.test(HTML)
+       /: castNombreDescarga\(programa, capitulo, num, r\.completo, r\.ext, pelicula\);/.test(HTML) && /sbShows\(\)\.find\(x => String\(x\.id\) === String\(showId\)\)/.test(HTML)
        && /' · COMPLETO: todos los personajes tienen actor'/.test(HTML) && /' · INCOMPLETO: ' \+ r\.faltanActor\.length/.test(HTML) && /msg \+= ' · ' \+ nombre;/.test(HTML) && !/' · CASTING\.'/.test(HTML)
        && /const delCapitulo = Object\.keys\(charIdx\)\.map\(k => \(charIdx\[k\] && charIdx\[k\]\.display\) \|\| k\);/.test(HTML) && /del Excel sin actor de personajes que no hablan en este capítulo \(no cuentan\)/.test(HTML)
-       && /if\(r\.noHablan && r\.noHablan\.length\)\{[\s\S]{0,400}const resp = await castPreguntarSinDialogo\(r\.noHablan, previos\);[\s\S]{0,200}Object\.assign\(asign, extra\);\s+r = castRellenar\(buf, asign, meta, training, delCapitulo\);/.test(HTML));
+       && /if\(r\.noHablan && r\.noHablan\.length\)\{[\s\S]{0,400}const resp = await castPreguntarSinDialogo\(r\.noHablan, previos\);[\s\S]{0,200}Object\.assign\(asign, extra\);[\s\S]{0,500}r = castRellenar\(buf, asign, meta, training, delCapitulo, vinc \? \{ secciones: vinc \} : null\);/.test(HTML));
 };
