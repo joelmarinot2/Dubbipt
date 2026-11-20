@@ -324,9 +324,24 @@ function csMismoPrograma(a, b){
   const x = castNorm(a), y = castNorm(b);
   if(!x || !y) return false;
   if(x === y) return true;
+  if(csProgDistintos().has(csProgParClave(x, y))) return false;          // dicho en sala: no son el mismo (PRO-68)
   const num = (s) => (s.match(/\d+/g) || []).join(' ');
   if(num(x) !== num(y)) return false;
   return Math.min(x.length, y.length) >= 6 && typeof castSimil === 'function' && castSimil(x, y) >= 0.9;
+}
+
+/**
+ * «No fusionar» (PRO-68). Pedido de sala: «en Casting aparece como el mismo NEMESIS y ROYAL NEMESIS; son
+ * diferentes: pon también una opción de no fusionar». La pareja se guarda en los datos de Casting (los ven todos
+ * los equipos, como «No son el mismo talento») por sus nombres, y desde entonces ni se sugiere fusionarlos ni se
+ * juntan solos.
+ */
+function csProgParClave(a, b){ return [castNorm(a), castNorm(b)].sort().join('|'); }
+function csProgDistintos(d){
+  try{
+    const datos = d || ((typeof PROD !== 'undefined' && PROD) ? PROD.datos : null);
+    return new Set(((datos && Array.isArray(datos.programasDistintos)) ? datos.programasDistintos : []).map(String));
+  }catch(e){ return new Set(); }
 }
 
 /** Junta en el programa `p` los capítulos de otra serie de Casting que es el mismo programa repetido. */
@@ -649,10 +664,11 @@ function csMismaPalabra(a, b){
   return (typeof castSimil === 'function') && castSimil(a, b) >= 0.85;
 }
 function csParecidos(lista){
-  const out = [], pal = (p) => castNorm(p.nombre).split(' ').filter(Boolean);
+  const out = [], pal = (p) => castNorm(p.nombre).split(' ').filter(Boolean), no = csProgDistintos();
   for(let i = 0; i < lista.length; i++) for(let j = i + 1; j < lista.length; j++){
     const a = pal(lista[i]), b = pal(lista[j]);
     if(!a.length || !b.length) continue;
+    if(no.size && no.has(csProgParClave(lista[i].nombre, lista[j].nombre))) continue;   // «No fusionar» (PRO-68)
     const corto = a.length <= b.length ? a : b, largo = a.length <= b.length ? b : a;
     const principio = corto.every((w, k) => csMismaPalabra(largo[k], w));
     const llenas = corto.filter(w => !CS_VACIAS.has(w) && w.length >= 3);
@@ -675,8 +691,15 @@ function csHtmlParecidos(lista){
   return '<div class="cs-caja cs-caja-hist"><div class="cs-caja-t">' + csIco('fusionar', 14) + 'Programas que parecen el mismo</div>'
     + pares.map(([x, y]) => { const a = csQuedaDe(x, y), b = a === x ? y : x;
         return '<div class="cs-linea"><span class="cs-linea-t"><b>' + csEsc(b.nombre) + '</b> y <b>' + csEsc(a.nombre) + '</b></span>'
-          + '<button class="cs-b" data-cs="fusionPar" data-v="' + csEsc(a.clave + '|' + b.clave) + '">' + csIco('fusionar', 14) + '<span>Fusionar</span></button></div>'; }).join('')
+          + '<button class="cs-b" data-cs="fusionPar" data-v="' + csEsc(a.clave + '|' + b.clave) + '">' + csIco('fusionar', 14) + '<span>Fusionar</span></button>'
+          + csBotonNoFusionar(a, b) + '</div>'; }).join('')
     + '</div>';
+}
+
+/** «No fusionar»: son programas distintos y no se vuelve a sugerir (PRO-68). */
+function csBotonNoFusionar(a, b){
+  return '<button class="cs-b" data-cs="progDistintos" data-v="' + csEsc(csProgParClave(a.nombre, b.nombre)) + '" data-n="' + csEsc(a.nombre + '» y «' + b.nombre) + '"'
+    + ' title="Son programas distintos: que no se fusionen ni se vuelva a sugerir">' + csIco('cerrar', 14) + '<span>No fusionar</span></button>';
 }
 
 /**
@@ -694,7 +717,8 @@ function csHtmlOtroIgual(p, lista){
       return '<div class="cs-linea">' + csIco('aviso', 14) + '<span class="cs-linea-t">Hay otro programa que parece este: <b>' + csEsc(o.nombre) + '</b>'
         + ' · ' + eps.length + ' episodio' + (eps.length === 1 ? '' : 's') + (nums ? ' (' + csEsc(nums) + ')' : '') + '</span>'
         + '<button class="cs-b" data-cs="abrirProg" data-v="' + csEsc(o.clave) + '">Abrir</button>'
-        + '<button class="cs-b cs-pri" data-cs="fusionPar" data-v="' + csEsc(a.clave + '|' + b.clave) + '">' + csIco('fusionar', 14) + '<span>Fusionar</span></button></div>';
+        + '<button class="cs-b cs-pri" data-cs="fusionPar" data-v="' + csEsc(a.clave + '|' + b.clave) + '">' + csIco('fusionar', 14) + '<span>Fusionar</span></button>'
+        + csBotonNoFusionar(a, b) + '</div>';
     }).join('') + '</div>';
 }
 
@@ -2893,6 +2917,10 @@ function csCablearMas(el, que, v, at, id, a){
   else if(que === 'fusionOtro') el.onchange = () => { if(CS.fusionProg){ CS.fusionProg.otro = el.value; CS.fusionProg.queda = 'este'; } csRepintar(); };
   else if(que === 'fusionQueda') el.onchange = () => { if(CS.fusionProg) CS.fusionProg.queda = el.value; csRepintar(); };
   else if(que === 'fusionProgNo') el.onclick = () => { CS.fusionProg = null; csRepintar(); };
+  else if(que === 'progDistintos') el.onclick = () => {
+    csEditar(pl => { const l = Array.isArray(pl.programasDistintos) ? pl.programasDistintos.slice() : []; if(l.indexOf(v) >= 0) return false; l.push(v); pl.programasDistintos = l; return true; },
+             '«' + (el.getAttribute('data-n') || '') + '» quedan como programas distintos: no se fusionan ni se vuelve a sugerir');
+  };
   else if(que === 'fusionPar') el.onclick = () => {
     const [ka, kb] = String(v).split('|');
     CS.vista = 'programa'; CS.prog = ka; CS.ep = null; CS.tab = 'episodios';

@@ -750,6 +750,22 @@ exports.pruebas = async function(t){
       cf.de('fusionPar').onclick();
       t.ok('y «Fusionar» abre la fusión ya elegida, sin repetir el aviso', F.M.CS.prog === 's:sX' && F.M.CS.fusionProg.otro === 's:sF' && !/Hay otro programa que parece este/.test(controles(F, 'programa').html));
     }
+    {
+      /* PRO-68. Pedido de sala: «aparece como el mismo NEMESIS y ROYAL NEMESIS; son diferentes: pon una opción de no fusionar». */
+      const N = armar({ shows: [{ id: 'sN', name: 'NEMESIS' }, { id: 'sR', name: 'ROYAL NEMESIS' }], eps: { sN: [], sR: [] } });
+      N.M.CS.vista = 'programas'; N.M.CS.filtro = 'todos'; N.M.CS.buscarProg = '';
+      t.eq('NEMESIS y ROYAL NEMESIS se sugieren como el mismo', N.M.csParecidos(N.M.csActual().lista).length, 1);
+      const cn = controles(N, 'programas');
+      t.ok('…y al lado de «Fusionar», «No fusionar»', /data-cs="fusionPar"[^>]*>[\s\S]*?<\/button><button class="cs-b" data-cs="progDistintos" data-v="NEMESIS\|ROYAL NEMESIS"[^>]*>[\s\S]*?No fusionar/.test(cn.html));
+      cn.de('progDistintos').onclick(); await espera(); await espera();
+      t.eq('«No fusionar» lo guarda en los datos de Casting, por sus nombres', JSON.stringify(N.PROD.datos.programasDistintos), '["NEMESIS|ROYAL NEMESIS"]');
+      t.ok('y lo dice', N.avisos.some(x => /«(ROYAL )?NEMESIS» y «(ROYAL )?NEMESIS» quedan como programas distintos: no se fusionan ni se vuelve a sugerir/.test(x)));
+      t.eq('ya no se sugiere fusionarlos', N.M.csParecidos(N.M.csActual().lista).length, 0);
+      t.ok('ni salen en la caja de parecidos', !/Programas que parecen el mismo/.test(controles(N, 'programas').html));
+      t.eq('ni se juntan solos (aunque se escribieran casi igual)', [N.M.csMismoPrograma('NEMESIS', 'ROYAL NEMESIS'), N.M.csMismoPrograma('royal nemesis', 'Nemesis'), N.M.csMismoPrograma('NEMESIS', 'nemesis')].join(','), 'false,false,true');
+      N.PROD.datos.programasDistintos = ['OTRO|PAR'];
+      t.eq('otro par marcado no afecta a este', N.M.csParecidos(N.M.csActual().lista).length, 1);
+    }
     t.eq('una palabra larga casi igual cuenta como la misma', A.M.csParecidos([{ nombre: 'A FILIPINO CHRISMAS' }, { nombre: 'A Filipino Christmas' }]).length, 1);
     t.eq('las palabras vacías solas no bastan', A.M.csParecidos([{ nombre: 'THE' }, { nombre: 'THE CROWN' }, { nombre: 'LOS DE' }, { nombre: 'LOS SIMPSON DE SIEMPRE' }]).map(x => x.map(y => y.nombre).join(' ~ ')).join(' | '), 'THE ~ THE CROWN');
     const por = (n) => lista.find(x => x.nombre === n);
